@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import route from "./$route_usage_GET";
 import dial from "../ui/usageDial";
+import usageData from "./usageData";
 
 const local = { provider: "codex", account: "local", label: "Local quota", usedPercent: 21, resetsAt: null, planType: null, parkedAgents: 0, tone: "neutral" };
 const catalog = Array.from({ length: 14 }, (_, i) => ({ id: `model-${i}`, provider: "codex", account: i < 7 ? "su4imauz" : "NylahKamalii9806", kind: "subscription" }));
@@ -16,6 +17,7 @@ async function render(nodes: any[], locals: any[] = [local], groups?: Record<str
         procs: { ui: { escape: ({ text }: any) => String(text).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!) ) } },
         ui: { live: ({ html }: any) => html, usageDial: (opts: any) => dial(ctx, null, opts), modelLogo: () => "<span></span>" },
     } };
+    ctx.fns.llms = { usageData: (opts: {}) => usageData(ctx, null, opts) };
     const html = await (await route(ctx, null, {})).text();
     expect(calls).toBe(1);
     return html;

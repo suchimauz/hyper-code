@@ -35,5 +35,6 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         await ctx.fns.procs.db.run({ sql: "UPDATE llm_nodes SET last_error = ?, updated_at = ? WHERE name = ?", params: [String(e?.message ?? e).slice(0, 300), now, node.name] });
     }
     ctx.fns.procs.events.refresh({ topic: "llm-accounts", reason: "node-refresh" });
+    ctx.fns.procs.events.refresh({ topic: "llm-usage", reason: "node-refresh" });
     return ctx.fns.node.get({ name: node.name });
 }

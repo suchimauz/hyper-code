@@ -1,0 +1,96 @@
+import { expect, test } from "bun:test";
+import usageData from "./usageData";
+
+function setup() {
+    let refreshes = 0;
+    const ctx: any = { state: {}, fns: {
+        llm: {
+            refreshUsage: () => { refreshes++; return new Promise(() => {}); },
+            usageOverview: async (opts: {}) => {
+                expect(opts).toEqual({ connectedOnly: true });
+                return [{ provider: "codex", account: "default", label: "codex", model: "codex:", usedPercent: null, resetsAt: null, planType: null, resetCredits: { secret: "not exported" }, parkedAgents: 0, tone: "neutral", updatedAt: 1 }];
+            },
+            listModels: async () => ({ codex: ["codex:a", "codex/team:b"], "hyper/remote": ["hyper/remote:a"] }),
+            gatewayHealth: async () => ({ status: "available", reason: "models-ok", models: ["oneapi:a"], apiKey: "never-export" }),
+        },
+        node: { list: async () => [{ name: "remote", enabled: true, catalogAt: 1, usageAt: 1, catalog: [{ id: "a", provider: "codex", account: "default" }], usage: [{ provider: "codex", account: "default", usedPercent: 90 }] }] },
+    } };
+    return { ctx, refreshes: () => refreshes };
+}
+
+test("nonblocking shared refresh, local unknown, remote stale and narrow gateway data", async () => {
+    const { ctx, refreshes } = setup();
+    const first = await usageData(ctx, null, {});
+    await usageData(ctx, null, {});
+    expect(refreshes()).toBe(1);
+    expect(first.entries[0]).toMatchObject({ models: ["codex:a"], usedPercent: null, tone: "neutral" });
+    expect(first.entries[0].quotaStatus).toBeUndefined();
+    expect(first.entries[1]).toMatchObject({ models: ["hyper/remote:a"], quotaStatus: "stale", usedPercent: 90, tone: "error", node: "remote" });
+    expect(first.gateway).toEqual({ status: "available", reason: "models-ok", models: ["oneapi:a"] });
+    expect(JSON.stringify(first)).not.toContain("secret");
+    expect(JSON.stringify(first)).not.toContain("never-export");
+});
+
+test("missing or nonfinite remote quota stays unavailable; gateway is optional", async () => {
+    const { ctx } = setup();
+    ctx.fns.llm.gatewayHealth = undefined;
+    for (const value of [undefined, NaN, Infinity]) {
+        ctx.fns.node.list = async () => [{ name: "remote", enabled: true, catalogAt: 1, usageAt: Date.now(), catalog: [{ id: "a", provider: "codex", account: "default" }], usage: [{ provider: "codex", account: "default", usedPercent: value }] }];
+        const data = await usageData(ctx, null, {});
+        expect(data.entries[1]).toMatchObject({ usedPercent: null, quotaStatus: "unavailable" });
+        expect(data.gateway).toBeNull();
+    }
+});
+
+test("node-list failure preserves local entries", async () => {
+    const { ctx } = setup();
+    ctx.fns.node.list = async () => { throw new Error("offline"); };
+    expect((await usageData(ctx, null, {})).entries).toHaveLength(1);
+});
+
+function inventory(provider: string, account = "default") {
+    return { provider, account, label: `${provider}/${account}`, model: `${provider}${account === "default" ? "" : `/${account}`}:`, available: true, needsReconnect: false, planType: null, parkedAgents: 0, usedPercent: 0, resetsAt: null, resetCredits: { secret: "inventory-secret" } };
+}
+
+test("connected inventory adds unknown quota, preserves explicit auth state and excludes remote/gateway inventory", async () => {
+    const { ctx } = setup();
+    ctx.fns.llm.listAccounts = async () => [inventory("codex"), { ...inventory("xai"), available: false, needsReconnect: true }, inventory("hyper"), inventory("oneapi")];
+    const data = await usageData(ctx, null, { includeConnected: true });
+    expect(data.entries.find(e => e.provider === "xai")).toMatchObject({ usedPercent: null, updatedAt: 0, tone: "neutral", quotaStatus: "unavailable", available: false, needsReconnect: true });
+    expect(data.entries.find(e => e.provider === "codex" && !e.node)).toMatchObject({ updatedAt: 1, available: true, needsReconnect: false });
+    expect(data.entries.filter(e => e.node)).toHaveLength(1);
+    expect(data.entries.some(e => e.provider === "oneapi" || e.provider === "hyper")).toBe(false);
+    expect(JSON.stringify(data)).not.toContain("inventory-secret");
+});
+
+test("inventory removes disconnected supported providers but retains unknown-provider snapshots", async () => {
+    const { ctx } = setup();
+    const original = (await ctx.fns.llm.usageOverview({ connectedOnly: true }))[0];
+    ctx.fns.llm.usageOverview = async () => ["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai", "custom"].map(provider => ({ ...original, provider }));
+    ctx.fns.llm.listAccounts = async () => [];
+    expect((await usageData(ctx, null, { includeConnected: true })).entries.filter(e => !e.node).map(e => e.provider)).toEqual(["custom"]);
+    expect((await usageData(ctx, null, { includeConnected: false })).entries.filter(e => !e.node)).toHaveLength(6);
+});
+
+test("named inventory maps provider defaults only when no explicit account routes exist", async () => {
+    const { ctx } = setup();
+    ctx.fns.llm.listAccounts = async () => [inventory("codex", "team"), inventory("codex", "work"), inventory("xai", "other")];
+    ctx.fns.llm.listModels = async () => ({ codex: ["codex:a", "codex/team:b", "codex:a"], xai: ["xai:c"], unrelated: ["other:z"] });
+    const data = await usageData(ctx, null, { includeConnected: true });
+    expect(data.entries.find(e => e.account === "team")?.models).toEqual(["codex/team:b"]);
+    expect(data.entries.find(e => e.account === "work")?.models).toEqual(["codex/work:a"]);
+    expect(data.entries.find(e => e.account === "other")?.models).toEqual(["xai/other:c"]);
+});
+
+test("default desktop mode never reads inventory or rewrites named routes", async () => {
+    const { ctx } = setup();
+    ctx.fns.llm.listAccounts = async () => { throw new Error("must not read inventory"); };
+    const snapshot = (await ctx.fns.llm.usageOverview({ connectedOnly: true }))[0];
+    ctx.fns.llm.usageOverview = async () => [{ ...snapshot, account: "work" }];
+    for (const opts of [{}, { includeConnected: false }]) {
+        const data = await usageData(ctx, null, opts);
+        expect(data.entries[0]).toMatchObject({ models: [], updatedAt: 1 });
+        expect(data.entries[0].available).toBeUndefined();
+        expect(data.entries[0].needsReconnect).toBeUndefined();
+    }
+});

@@ -155,7 +155,10 @@ async function proxyEntries(ctx: Context, listed: Record<string, string[]>, acco
             const usage = node?.usage?.find(u => u.provider === g.provider && u.account === g.account);
             const label = g.provider === "hyper" ? "models" : `${UPSTREAM_LABELS[g.provider] ?? g.provider}${g.account !== "default" ? ` · ${g.account}` : ""}${g.via ? ` (${g.via.replace(/^hyper\//, "via ")})` : ""}`;
             const offline = !row || row.available === false;
-            return { provider: "hyper", account: name, label, upstream: g.provider, models: g.ids.map(route), available: !offline, needsReconnect: row?.needsReconnect === true, usedPercent: usage?.usedPercent ?? null, planType: usage?.planType ?? null };
+            const measuredAt = Number(usage?.updatedAt ?? 0);
+            const quotaFresh = !node?.lastError && measuredAt > 0 && Date.now() - measuredAt <= 300_000 && (!usage?.resetsAt || usage.resetsAt > Date.now());
+            const percent = usage?.usedPercent;
+            return { provider: "hyper", account: name, label, upstream: g.provider, models: g.ids.map(route), available: !offline, needsReconnect: row?.needsReconnect === true, usedPercent: quotaFresh && typeof percent === "number" && Number.isFinite(percent) && percent >= 0 && percent <= 100 ? percent : null, planType: usage?.planType ?? null };
         });
         if (!accounts.length) continue;
         // The current route's upstream first, so the right panel opens on it.

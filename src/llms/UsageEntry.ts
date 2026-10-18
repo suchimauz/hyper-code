@@ -1,0 +1,33 @@
+/** Safe subscription quota data shared by desktop and mobile usage indicators. */
+export type UsageEntry = {
+    /** Provider identifier. */
+    provider: string;
+    /** Credential account identifier. */
+    account: string;
+    /** Human-readable credential label. */
+    label: string;
+    /** Provider/account model prefix. */
+    model: string;
+    /** Visible catalogue model IDs for this credential. */
+    models: string[];
+    /** Remote node name; omitted for local credentials. */
+    node?: string;
+    /** Measured quota percentage, or null when unknown. */
+    usedPercent: number | null;
+    /** Quota reset timestamp in milliseconds, if known. */
+    resetsAt: number | null;
+    /** Subscription plan name, if known. */
+    planType: string | null;
+    /** Number of agents waiting on this credential. */
+    parkedAgents: number;
+    /** Display severity of the measured quota. */
+    tone: "neutral" | "warning" | "error";
+    /** Snapshot timestamp in milliseconds, or zero if absent. */
+    updatedAt: number;
+    /** Explicit account availability; false may mean exhausted quota or reconnect required, not network failure. */
+    available?: boolean;
+    /** Whether credential authentication explicitly requires reconnecting. */
+    needsReconnect?: boolean;
+    /** Quota freshness status; unavailable also marks connected accounts without snapshots. */
+    quotaStatus?: "stale" | "unavailable";
+};

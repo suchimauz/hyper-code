@@ -113,7 +113,7 @@ export default async function (
             const item = entry("hyper", node.name, "node", byKey, reconnectKeys);
             item.label = `hyper/${node.name}`;
             item.model = `hyper/${node.name}:`;
-            const worst = [...(node.usage ?? [])].sort((a, b) => (b.usedPercent ?? 0) - (a.usedPercent ?? 0))[0];
+            const worst = [...(node.usage ?? [])].filter(u => !node.lastError && Number(u.updatedAt) > 0 && now - Number(u.updatedAt) <= 300_000 && (!u.resetsAt || u.resetsAt > now) && typeof u.usedPercent === "number" && Number.isFinite(u.usedPercent) && u.usedPercent >= 0 && u.usedPercent <= 100).sort((a, b) => (b.usedPercent ?? 0) - (a.usedPercent ?? 0))[0];
             if (worst) { item.usedPercent = worst.usedPercent; item.resetsAt = worst.resetsAt; item.planType = worst.planType; }
             if (!node.enabled || node.lastError) { item.available = false; item.needsReconnect = Boolean(node.lastError); }
             (item as any).nodeUrl = node.url; (item as any).models = node.catalog?.length ?? 0; (item as any).error = node.lastError;

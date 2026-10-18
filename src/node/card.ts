@@ -4,7 +4,7 @@
 /**
  * Render the Hyper nodes section for the LLM connections page
  *
- * Shows configured nodes with model count, quota and errors plus an Add/Edit
+ * Shows configured nodes with distinct catalogue account counts and errors plus an Add/Edit
  * popup, and the clients issued a token with usage counters, Issue and Revoke.
  */
 export default async function (ctx: Context, _session: Session | null, _opts: {}): Promise<string> {
@@ -14,16 +14,19 @@ export default async function (ctx: Context, _session: Session | null, _opts: {}
     let nodes: types.node.NodeEntry[] = [], clients: Awaited<ReturnType<typeof ctx.fns.node.clients>> = [];
     try { nodes = await ctx.fns.node.list({}); clients = await ctx.fns.node.clients({}); } catch { /* tables absent */ }
 
-    const nodeRows = nodes.map((n) => {
-        const worst = [...(n.usage ?? [])].sort((a, b) => (b.usedPercent ?? 0) - (a.usedPercent ?? 0))[0];
-        const quota = n.lastError ? `error: ${n.lastError}` : worst?.usedPercent != null ? `${Math.round(worst.usedPercent)}% used (${worst.provider})` : "usage unavailable";
-        return ctx.fns.procs.ui.row({ entity: "hyper-node", id: n.name, status: n.lastError ? "error" : n.enabled ? "ready" : "neutral", cells: [
+    const models = await ctx.fns.llm.listModels({});
+    const nodeRows = (await Promise.all(nodes.map(async (n) => {
+        const summary = await ctx.fns.node.accountSummary({ node: n, visibleModelIds: models[`hyper/${n.name}`] ?? [] });
+        const accountText = summary.status === "disabled" ? "0 accounts · disabled"
+            : summary.status === "error" ? `0 accounts · error: ${n.lastError}`
+            : `${summary.count} ${summary.count === 1 ? "account" : "accounts"} in ${summary.status === "cached" ? "cached " : ""}catalogue${n.lastError ? ` · ${n.lastError}` : ""}`;
+        return ctx.fns.procs.ui.row({ entity: "hyper-node", id: n.name, status: n.lastError ? "error" : summary.count ? "ready" : "neutral", cells: [
             { role: "name", text: `hyper/${n.name}:`, class: "w-40 shrink-0 font-mono text-xs font-medium" },
             { role: "url", text: n.url, title: n.url, class: "min-w-0 flex-1 truncate font-mono text-2xs text-faint" },
             { role: "models", text: `${n.catalog?.length ?? 0} models · ${ago(n.catalogAt)}`, class: "shrink-0 text-2xs text-muted" },
-            { role: "quota", text: quota, class: `shrink-0 text-2xs ${n.lastError ? "text-error" : "text-success"}` },
+            { role: "accounts", text: accountText, title: "Distinct provider/account pairs in the shared catalogue; not a quota-readiness guarantee.", class: `min-w-0 text-2xs ${n.lastError ? "text-error" : "text-muted"}` },
         ], right: `<span class="flex items-center gap-1">${ctx.fns.ui.popup({ method: "node.refreshFromPopup", params: { name: n.name }, tone: "default", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Refresh</span>` })}${ctx.fns.ui.popup({ method: "node.editPopup", params: { name: n.name }, tone: "default", size: "xs", html: `<i class="ph ph-gear" aria-hidden="true"></i><span>Edit</span>` })}</span>` });
-    }).join("");
+    }))).join("");
     const clientRows = clients.map((c) => ctx.fns.procs.ui.row({ entity: "hyper-node-client", id: c.id, status: "ready", cells: [
         { role: "name", text: c.name, class: "w-40 shrink-0 font-mono text-xs font-medium" },
         { role: "hint", text: c.tokenHint, class: "shrink-0 font-mono text-2xs text-faint" },

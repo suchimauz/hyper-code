@@ -33,6 +33,7 @@ export default async function (
     parkedAgents: number;
     tone: "neutral" | "warning" | "error";
     updatedAt: number;
+    windows: types.llm.UsageSnapshot["windows"];
 }>> {
     const now = opts?.now ?? Date.now();
     // Thresholds are settings, not constants: how early "too much" starts
@@ -76,6 +77,7 @@ export default async function (
             parkedAgents: 0,
             tone: usedPercent == null ? "neutral" : usedPercent >= alertAt ? "error" : usedPercent >= warnAt ? "warning" : "neutral",
             updatedAt: Number(snapshot.updatedAt ?? 0),
+            windows: { primary, secondary },
         } as const);
     }
 

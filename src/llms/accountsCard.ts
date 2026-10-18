@@ -37,7 +37,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const resetCount = a.provider === "codex" ? a.resetCredits?.availableCount : undefined;
         const resetDetails = a.provider === "codex" && a.resetCredits?.credits?.length ? `<details class="text-3xs text-subtle"><summary class="cursor-pointer">details</summary><div class="absolute z-20 mt-1 max-w-xs space-y-1 rounded-lg border border-ui-border bg-base-100 p-2 shadow-xl">${a.resetCredits.credits.map((credit: any) => `<div><div class="font-medium text-muted">${esc(credit.title || credit.resetType || "Codex reset")}</div>${credit.description ? `<div>${esc(credit.description)}</div>` : ""}${credit.expiresAt ? `<div>expires ${esc(new Date(typeof credit.expiresAt === "number" ? (credit.expiresAt < 10_000_000_000 ? credit.expiresAt * 1000 : credit.expiresAt) : credit.expiresAt).toLocaleString())}</div>` : ""}</div>`).join("")}</div></details>` : "";
         const reset = a.provider === "codex" && resetCount != null ? `<form method="POST" action="/llms/codex/reset" hx-post="/llms/codex/reset" hx-target="find .reset-result" hx-swap="innerHTML" class="flex items-center gap-1" onsubmit="return confirm('Use one of ${resetCount} Codex reset credits now?')"><input type="hidden" name="account" value="${esc(a.account)}"><span class="reset-result text-3xs text-subtle">${resetCount} reset${resetCount === 1 ? "" : "s"}</span>${resetDetails}${resetCount > 0 ? ctx.fns.procs.ui.button({ action: "reset-codex-limit", label: "Reset limit", type: "submit", size: "xs", tone: "warning" }) : ""}</form>` : "";
-        const actions = `<span class="flex items-center gap-1">${reset}${reconnect}${remove(a)}</span>`;
+        const actions = `<span class="llm-account-actions flex flex-wrap items-center gap-1">${reset}${reconnect}${remove(a)}</span>`;
         return ctx.fns.procs.ui.row({ entity: "llm-account", id: `${a.provider}/${a.account}`, status: a.needsReconnect ? "error" : status, cells: [
             { role: "account", text: a.account === "default" ? "main" : a.account, class: "w-28 shrink-0 font-mono text-xs font-medium" },
             ...(a.planType ? [{ role: "plan", text: planName(a.provider, a.planType), title: `Subscription plan: ${a.planType}`, class: "badge badge-sm shrink-0 capitalize text-muted" }] : []),
@@ -49,10 +49,10 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ], right: actions });
     };
 
-    const modelList = (models: string[]) => models.length ? `<ul class="mt-2 flex flex-wrap gap-1" aria-label="Available models">${models.map(model => `<li class="max-w-full break-all rounded bg-base-200 px-2 py-1 font-mono text-2xs">${esc(model)}</li>`).join("")}</ul>` : `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
+    const modelList = (models: string[]) => models.length ? `<ul class="llm-model-list mt-2 flex flex-wrap gap-1" aria-label="Available models">${models.map(model => `<li class="max-w-full break-all rounded bg-base-200 px-2 py-1 font-mono text-2xs">${esc(model)}</li>`).join("")}</ul>` : `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
     const localRow = (a: typeof opts.accounts[number]) => {
         const models = Object.values(opts.models ?? {}).flat().filter(model => model.startsWith(prefix(a)));
-        return `<div>${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div></div>`;
+        return `<div class="llm-account">${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div></div>`;
     };
     const providers = [
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },
@@ -74,16 +74,42 @@ export default function (ctx: Context, _session: Session | null, opts: {
 
     const nodeSections = (opts.nodes ?? []).map(node => {
         const visible = new Set(opts.models?.[`hyper/${node.name}`] ?? []);
-        if (!node.enabled || !visible.size) return "";
+        if (!node.enabled || !node.catalogAt || !visible.size || /^models 4(?!08:|29:)\d\d:/.test(node.lastError ?? "")) return "";
         const groups = new Map<string, { provider: string; account: string; models: string[] }>();
         for (const item of node.catalog ?? []) {
             const model = `hyper/${node.name}:${item.id}`;
             if (!visible.has(model)) continue;
             const key = JSON.stringify([item.provider, item.account]);
             const group = groups.get(key) ?? { provider: item.provider, account: item.account, models: [] };
-            group.models.push(model); groups.set(key, group);
+            if (!group.models.includes(model)) group.models.push(model);
+            groups.set(key, group);
         }
-        return `<section data-node="${esc(node.name)}">${ctx.fns.procs.ui.heading({ title: `Hyper node · ${node.name}`, meta: node.lastError ? "Cached catalogue · node unavailable" : "Available catalogue · grouped by account" })}<div class="mt-2 divide-y divide-ui-border rounded-xl border border-ui-border bg-base-100">${[...groups.values()].map(group => `<div class="p-3" data-node-account="${esc(`${group.provider}/${group.account}`)}"><div class="text-sm font-medium">${esc(group.account)}</div><div class="text-2xs text-muted">${esc(group.provider)} · node ${esc(node.name)} · ${group.models.length} models</div>${modelList(group.models)}</div>`).join("")}</div></section>`;
+        const accountQuota = (group: { provider: string; account: string }) => {
+            const usage = node.usage?.find(item => item.provider === group.provider && item.account === group.account);
+            const value = usage?.usedPercent;
+            const known = typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+            const measuredAt = Number(usage?.updatedAt ?? 0);
+            const stale = Boolean(node.lastError) || !measuredAt || now - measuredAt > 5 * 60_000 || Boolean(usage?.resetsAt && usage.resetsAt <= now);
+            const state = !known ? "unknown" : stale ? "stale" : "fresh";
+            const quota = known ? `${Math.round(value)}% used · ${Math.round(100 - value)}% left` : "Usage unavailable";
+            const localDate = (value?: number | null) => {
+                if (!value || !Number.isFinite(value) || Math.abs(value) > 8.64e15) return "";
+                const date = new Date(value);
+                const fallback = new Intl.DateTimeFormat("ru-RU", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+                return `<time data-llm-local-time datetime="${date.toISOString()}">${esc(fallback)} UTC</time>`;
+            };
+            const resetDate = localDate(usage?.resetsAt);
+            const reset = resetDate ? `${usage!.resetsAt! <= now ? "Последний сброс" : "Сброс лимита"}: ${resetDate}` : "Время сброса неизвестно";
+            const windows = Object.entries(usage?.windows ?? {}).map(([name, w]) => {
+                if (!w) return "";
+                const date = localDate(w.resetsAt);
+                return `${esc(name)}: ${esc(w.usedPercent)}% used${date ? ` · сброс: ${date}` : ""}`;
+            }).filter(Boolean).join("; ");
+            const checkedDate = localDate(measuredAt);
+            const checked = checkedDate ? ` · Замер: ${checkedDate}` : " · Время замера неизвестно";
+            return `<div class="llm-node-quota text-2xs text-muted" data-quota-state="${state}"><span>${esc(quota)} · ${state}</span>${usage?.planType ? `<span> · ${esc(usage.planType)}</span>` : ""}<div>${reset}${checked}${windows ? ` · ${windows}` : ""}</div></div>`;
+        };
+        return `<section class="llm-node-catalogue" data-node="${esc(node.name)}">${ctx.fns.procs.ui.heading({ title: `Hyper node · ${node.name}`, meta: `${groups.size} ${groups.size === 1 ? "account" : "accounts"} in ${node.lastError ? "cached" : "available"} catalogue${node.lastError ? " · node unavailable" : ""}` })}<div class="mt-2 divide-y divide-ui-border rounded-xl border border-ui-border bg-base-100">${[...groups.values()].map(group => `<div class="llm-node-account p-3" data-node-account="${esc(`${group.provider}/${group.account}`)}"><div class="text-sm font-medium">${esc(group.account)}</div><div class="text-2xs text-muted">${esc(group.provider)} · node ${esc(node.name)} · ${group.models.length} models</div>${accountQuota(group)}${modelList(group.models)}</div>`).join("")}</div></section>`;
     }).join("");
     const knownProviders = new Set(["codex", "claude-code", "anthropic-oauth", "xai", "kimi-coding", "oneapi", "hyper"]);
     const otherLocals = opts.accounts.filter(a => !knownProviders.has(a.provider));
@@ -101,7 +127,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ...(f.userCode ? [{ role: "device-code", text: f.userCode, class: "select-all shrink-0 rounded bg-base-200 px-2 py-1 font-mono text-sm font-semibold tracking-wider" }] : []),
     ], right: ctx.fns.ui.popup({ method: "llms.loginProgressFor", params: { provider: f.provider, account: f.account }, tone: "default", size: "xs", html: "Continue login" }) })).join("");
 
-    const html = `<div class="space-y-6">${providerSections}${extraLocalSection}${catalogueOnlySections}${gatewaySection}${nodeSections}${flowRows ? `<section>${ctx.fns.procs.ui.heading({ title: "Logins in progress", meta: "Safe authorization status only." })}<div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${flowRows}</div></section>` : ""}</div>`;
+    const html = `<div class="llm-accounts space-y-6">${providerSections}${extraLocalSection}${catalogueOnlySections}${gatewaySection}${nodeSections}<script src="/llms/localDates.js" defer></script>${flowRows ? `<section>${ctx.fns.procs.ui.heading({ title: "Logins in progress", meta: "Safe authorization status only." })}<div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${flowRows}</div></section>` : ""}</div>`;
     // Morph, not replace: the 10 s refresh must not snap an open "details" shut.
     return ctx.fns.ui.live({ id: "llm-accounts", url: "/llms/accounts", topic: "llm-accounts", swap: "outerMorph", every: 10, attrs: 'class="block"', html });
 }
