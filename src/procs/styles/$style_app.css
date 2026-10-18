@@ -28,7 +28,7 @@
   --color-primary-content: var(--theme-primary-content);
   --color-info: var(--theme-info);
   --color-success: var(--theme-success);
-  --color-warning: var(--theme-danger);
+  --color-warning: var(--theme-warning);
   --color-error: var(--theme-danger);
 
   --color-bg-primary: var(--color-base-200);
@@ -45,15 +45,15 @@
   /* Secondary text has exactly three levels. Use `text-muted` for supporting
    * copy, `text-subtle` for metadata and `text-faint` for hints, timestamps and
    * placeholders — never an ad-hoc `text-base-content/NN`. */
-  --color-muted: color-mix(in oklab, var(--color-base-content) 72%, transparent);
-  --color-subtle: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-  --color-faint: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  --color-muted: var(--theme-text-muted);
+  --color-subtle: var(--theme-text-subtle);
+  --color-faint: var(--theme-text-faint);
   --color-ui-border-strong: var(--ui-border-strong);
   --color-text-primary: var(--color-base-content);
   --color-text-heading: var(--color-base-content);
-  --color-text-muted: color-mix(in oklab, var(--color-base-content) 70%, transparent);
-  --color-text-tertiary: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-  --color-text-placeholder: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  --color-text-muted: var(--theme-text-muted);
+  --color-text-tertiary: var(--theme-text-subtle);
+  --color-text-placeholder: var(--theme-text-faint);
   --color-text-inverse: var(--color-primary-content);
   --color-text-link: var(--color-primary);
   --color-brand: var(--color-primary);
@@ -129,11 +129,17 @@
   --theme-info: #57606a;
   --theme-success: #1a7f37;
   --theme-danger: #cf222e;
+  --theme-warning: #865600;
+  --theme-text-muted: #50545b;
+  --theme-text-subtle: #595f67;
+  --theme-text-faint: #62676f;
+  --theme-focus: #0066cc;
+  --theme-press: rgb(0 0 0 / .09);
   --color-canvas: oklch(98.8% 0.001 240);
   --ui-border: oklch(88.5% 0.004 240);
-  --ui-border-strong: oklch(88.5% 0.004 240);
+  --ui-border-strong: oklch(78% 0.004 240);
   --ui-input-border: oklch(72% 0.008 240);
-  /* GitHub-inspired restrained palette: neutral ink plus green/red states. */
+  /* Neutral surfaces; distinct success, warning and error with readable secondary text. */
 }
 
 [data-theme="dark"] {
@@ -146,6 +152,12 @@
   --theme-info: #8c959f;
   --theme-success: #3fb950;
   --theme-danger: #f85149;
+  --theme-warning: #e9b949;
+  --theme-text-muted: #c0c5cd;
+  --theme-text-subtle: #adb4be;
+  --theme-text-faint: #a0a8b3;
+  --theme-focus: #70b7ff;
+  --theme-press: rgb(255 255 255 / .12);
   /* Dense chat surfaces use their own restrained border ramp: nested cards,
    * popups and controls should separate without becoming a white wireframe. */
   --color-canvas: color-mix(in oklab, var(--color-base-100) 72%, black);
@@ -535,12 +547,12 @@ summary::-webkit-details-marker { display: none; }
 .ui-button { display:inline-flex; min-height:2.25rem; align-items:center; justify-content:center; gap:.4rem; border:1px solid var(--ui-input-border); border-radius:.5rem; background:var(--theme-base-100); padding:.45rem .8rem; color:var(--theme-base-content); font-size:.8125rem; font-weight:600; line-height:1; cursor:pointer; transition:background-color .15s,border-color .15s,opacity .15s; }
 .ui-button:hover { background:var(--theme-base-200); }
 [data-theme="light"] .ui-button--default { border-color:var(--ui-input-border) !important; background:#fff !important; color:#1f2328 !important; }
-[data-theme="dark"] .ui-button--default { border-color:var(--ui-input-border) !important; background:#20242b !important; color:#f0f6fc !important; }
+[data-theme="dark"] .ui-button--default { border-color:var(--ui-input-border) !important; background:var(--theme-base-100) !important; color:var(--theme-base-content) !important; }
 .ui-button--default:hover { background:var(--theme-base-200) !important; }
 .ui-button:disabled,.ui-button[aria-disabled="true"] { cursor:not-allowed; opacity:.45; }
 [data-theme="light"] .ui-button--primary { border-color:#1f2328 !important; background:#1f2328 !important; color:#fff !important; }
 [data-theme="dark"] .ui-button--primary { border-color:#8c959f !important; background:#1f2328 !important; color:#f0f6fc !important; }
-.ui-button--primary:hover { opacity:.88; }
+.ui-button--primary:hover:not(:disabled):not([aria-disabled="true"]) { opacity:.88; }
 .ui-button--ghost { border-color:transparent !important; background:transparent !important; color:var(--theme-base-content) !important; }
 .ui-button--danger { border-color:color-mix(in oklab,var(--color-error) 55%,var(--ui-border)) !important; background:color-mix(in oklab,var(--color-error) 12%,var(--theme-base-100)) !important; color:color-mix(in oklab,var(--color-error) 78%,var(--theme-base-content)) !important; }
 .ui-button--danger:hover { background:color-mix(in oklab,var(--color-error) 20%,var(--theme-base-100)) !important; }
@@ -639,3 +651,38 @@ summary::-webkit-details-marker { display: none; }
 .chat-composer.is-recording [data-dictation-bar] { order: 1; justify-content: center; margin: 0; padding-top: .5rem; }
 .chat-composer.is-recording [data-dictation-status] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .chat-composer.is-recording [data-dictation-cancel] { margin-left: 0; }
+
+/* Shared visual feedback only: never transform or resize an interactive target. */
+:where(button, a[href], summary, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 2px;
+}
+/* The composer is one rounded control; do not draw a second rectangle inside it. */
+.chat-composer textarea:focus-visible { outline: none; }
+:where(button, a[data-action], summary):not(:disabled):not([aria-disabled="true"]):active {
+  box-shadow: inset 0 0 0 100vmax var(--theme-press);
+  transition-duration: 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-button, .ui-tree__caret, .ui-tooltip__bubble, .tooltip::after {
+    transition: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass-input, .glass-panel, .glass-card, [role="dialog"] {
+    background-color: var(--theme-base-100) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  #nav-overlay { backdrop-filter: none !important; }
+}
+@media (prefers-contrast: more) {
+  [data-theme] {
+    --theme-text-muted: var(--theme-base-content);
+    --theme-text-subtle: var(--theme-base-content);
+    --theme-text-faint: var(--theme-base-content);
+    --ui-border: var(--theme-base-content);
+    --ui-border-strong: var(--theme-base-content);
+    --ui-input-border: var(--theme-base-content);
+  }
+}
