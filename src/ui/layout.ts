@@ -547,8 +547,12 @@ export default async function (ctx: Context, session: Session | null, opts: {
   .chat-composer textarea[name="text"] { max-height: min(40vh, calc(var(--chat-viewport-height, 100dvh) * .3)); }
   .chat-composer textarea[name="text"] { font-size: max(16px, 1.0625rem) !important; line-height: 1.5; }
   #app-popup { width: calc(100vw - 1rem) !important; max-height: calc(var(--chat-viewport-height, 100dvh) - 1rem) !important; }
-  /* On a phone the composer owns the bottom; toasts drop from the top, under the header. */
-  #toasts { top: calc(env(safe-area-inset-top) + 3.5rem) !important; bottom: auto !important; right: .5rem !important; left: .5rem; align-items: stretch !important; flex-direction: column !important; }
+  /* Keep mobile notifications away from the navigation header. Show one at a time. */
+  #toasts { top: auto !important; bottom: max(8rem, calc(env(safe-area-inset-bottom) + 8rem)) !important; right: .75rem !important; left: .75rem; align-items: stretch !important; flex-direction: column !important; }
+  #toasts > :not(:last-child) { display: none; }
+  #toasts > .hyper-toast { max-width: 100%; max-height: 25dvh; overflow-y: auto; background: var(--theme-base-100); border-color: var(--ui-border); box-shadow: 0 4px 20px rgb(0 0 0 / .15); }
+  #toasts .toast-detail { max-height: 4.5rem; }
+  @media (prefers-reduced-motion: reduce) { #toasts > .hyper-toast { transition: none; transform: none; } }
   #app-popup > div { max-height: calc(var(--chat-viewport-height, 100dvh) - 1rem) !important; }
   /* Phone reading surface: quiet content, real controls, no desktop changes. */
   #chat-panel, #chat-panel #messages { background-color: var(--color-base-100); background-image: none; }
