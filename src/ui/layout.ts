@@ -34,6 +34,13 @@ export default async function (ctx: Context, session: Session | null, opts: {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>${esc(pageTitle)}</title>
 <link rel="icon" href="${esc(favicon)}">
+<link rel="apple-touch-icon" sizes="180x180" href="/ui/app-icon?size=180">
+<link rel="manifest" href="/ui/manifest.webmanifest">
+<meta name="theme-color" content="#252a34">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hyper">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <!-- htmx 4 (framework bundle). Inheritance stays explicit (htmx 4 default):
      implicit inheritance let hx-trigger="load" leak into child buttons and loop.
      Default 60 s timeout; long actions opt out with hx-config='{"timeout":0}'.
