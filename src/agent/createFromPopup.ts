@@ -7,7 +7,15 @@
  * @param opts.promptPreset System-prompt preset name or names.
  * @param opts.systemPrompt Additional system instructions.
  */
-export default async function (ctx: Context, _session: Session | null, opts: any): Promise<Response> {
+export default async function (ctx: Context, _session: Session | null, opts: {
+    /** Visible project whose stored host and directory override workspace fields. */ projectId?: string;
+    /** Optional human-readable conversation title. */ title?: string;
+    /** Local workspace directory for ordinary nonproject creation. */ workspaceDir?: string;
+    /** Set to 1 only after confirming creation of a missing local directory. */ createWorkspaceDir?: string;
+    /** Selected provider-qualified model identifier. */ model?: string;
+    /** Selected shared prompt preset identifiers. */ promptPreset?: string | string[];
+    /** Additional instructions for the new conversation. */ systemPrompt?: string;
+}): Promise<Response> {
     const result = await ctx.fns.agent.createFromValues(opts);
     if (result.error) return new Response(result.error, { status: 400 });
     if (result.confirmation) {

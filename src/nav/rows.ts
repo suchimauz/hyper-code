@@ -45,12 +45,12 @@ export default async function (
         const mark = item.model && agentPin && isPinned ? '<i class="ph ph-push-pin-fill mr-1 text-faint opacity-50" aria-label="Pinned"></i>' : "";
         const compact = opts.compact || !!item.model;
         const label = compact
-            ? `<span class="min-w-0 flex-1 truncate text-xs text-muted">${mark}${esc(item.label)}${item.model && agentPin ? ` <span class="font-mono text-3xs font-normal text-faint">(${esc(agentPin)})</span>` : ""}</span>`
+            ? `<span data-nav-label class="min-w-0 flex-1 truncate text-xs text-muted">${mark}${esc(item.label)}${item.model && agentPin ? ` <span data-nav-technical-id class="font-mono text-3xs font-normal text-faint">(${esc(agentPin)})</span>` : ""}</span>`
             : item.detail
-                ? `<span class="min-w-0 flex-1"><span class="block truncate text-xs font-medium">${mark}${esc(item.label)}</span><span class="line-clamp-2 block text-3xs text-faint">${esc(item.detail)}</span></span>`
-                : `<span class="min-w-0 flex-auto shrink truncate">${mark}${esc(item.label)}</span>`;
+                ? `<span class="min-w-0 flex-1"><span data-nav-label class="block truncate text-xs font-medium">${mark}${esc(item.label)}</span><span data-nav-detail class="line-clamp-2 block text-3xs text-faint">${esc(item.detail)}</span></span>`
+                : `<span data-nav-label class="min-w-0 flex-auto shrink truncate">${mark}${esc(item.label)}</span>`;
         const owner = item.owner ? `<span class="max-w-24 shrink-0 truncate text-3xs text-faint" data-owner>${esc(item.owner)}</span>` : "";
-        const hint = item.hint ? `<span class="min-w-0 max-w-32 shrink-[100] truncate text-3xs text-faint">${esc(item.hint)}</span>` : "";
+        const hint = item.hint ? `<span data-nav-hint class="min-w-0 max-w-32 shrink-[100] truncate text-3xs text-faint">${esc(item.hint)}</span>` : "";
         const dot = item.unread ? `<span class="size-2 shrink-0 rounded-full bg-success" title="New activity" aria-label="New activity"></span>` : "";
         const size = compact ? "min-h-7 gap-1.5 px-1.5 py-0.5" : `min-h-8 gap-2 px-2 py-1 text-sm${item.detail ? " items-start" : ""}`;
         const safeHref = local(href) || /^https?:\/\//.test(href) ? href : "#";

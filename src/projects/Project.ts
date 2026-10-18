@@ -1,0 +1,2 @@
+/** Exact workspace identity; virtual records are discovered without writes. */
+export type Project = { id: string; title: string; dir: string; host: string; virtual: boolean; /** Personal archive state; newer navigation chats reactivate the project. */ archived?: boolean; /** Active navigation chats with a non-idle native run state. */ runningCount?: number; /** Active navigation chats with native unread notifications for this viewer. */ unreadCount?: number };

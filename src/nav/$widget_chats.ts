@@ -1,4 +1,4 @@
-// Core widget: New agent, the viewer's unread @mentions, pinned chats and recent chats — the first column of the menu.
+// Core widget: New agent, the viewer's unread @mentions, pinned chats and recent chats.
 export default {
     title: "Chats",
     icon: "ph-chats-circle",
@@ -14,7 +14,7 @@ export default {
         ]);
         const chatItems = await ctx.fns.nav.chatItems({ agents });
         const pinnedAgents = pinnedIds.size ? (await ctx.fns.nav.agents({ limit: 500 }).catch(() => [] as any[])).filter((a: any) => pinnedIds.has(String(a.id))) : [];
-        const newAgent = `<section class="mb-3 border-b border-ui-border pb-2"><a href="/agent/new" data-nav-default class="nav-row mb-1 flex min-h-10 items-center gap-2 rounded-lg border border-primary bg-primary/10 px-3 py-2 text-left text-primary shadow-sm outline-none transition hover:bg-primary/15 focus:bg-primary/15"><i class="ph ph-plus-circle shrink-0 text-lg" aria-hidden="true"></i><span class="min-w-0 flex-1 text-xs font-medium">New agent</span></a></section>`;
+        const newAgent = ctx.fns.ui.popup({ method: "ui.newAgentPopup", params: {}, html: '<i class="ph ph-plus-circle" aria-hidden="true"></i> New agent', tone: "primary", attrs: 'data-nav-default class="nav-row mb-3" aria-label="New agent"' });
         const mentionsHtml = mentions.length ? await ctx.fns.mentions.rowsHtml({ items: mentions, navRow: true }) : "";
         return {
             html: newAgent,

@@ -1,10 +1,10 @@
-/** Append event for the runtime. */
+/** Persist an agent event, refresh its live stream, and notify navigation for unread-worthy events. */
 export default async function (ctx: Context, session: Session | null, opts: {
         /** Agent identifier. */
 id: string;
         /** Event to persist or render. */
 event: any;
-        /** Ts used by the operation. */
+        /** Event timestamp in epoch milliseconds. @default Date.now() */
 ts?: number }): Promise<{ idx: number }> {
     const { id, event } = opts;
     const ts = opts.ts ?? Date.now();
@@ -50,5 +50,8 @@ ts?: number }): Promise<{ idx: number }> {
     // Topic-addressed: a tab watching another agent is not woken, and the seq
     // this returns is the cursor a live region compares itself against.
     ctx.fns.procs.events.refresh({ topic: `agent:${id}`, reason: "event" });
+    // Navigation subscribes to agents, not every agent stream. Only unread-worthy
+    // writes invalidate it; read/markSeen requests must not create refresh loops.
+    if (notifiable) ctx.fns.events.emitAgentsChanged({ agentId: id, reason: "unread/event" });
     return { idx };
 }

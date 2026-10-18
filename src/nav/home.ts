@@ -4,6 +4,7 @@
  *
  * Grid: 4 columns on wide screens, 2 on medium, 1 on narrow; S = 1×1, M = 2×1, L = 2×2, wide = full row,
  * tall = one column × 3 rows. Tiles keep DOM order = visual order = keyboard order (no dense packing).
+ * Only the uncustomized default Home opts into mobile chats-first DOM ordering in ui.navMenu.
  * In edit mode every tile gets move / size / remove controls, the grid ends with an "Add widget" picker over
  * the widget catalogue, and the tab strip gets rename / move / remove / new tab / reset — each a POST
  * /nav/layout form (nav.editLayout), keyboard reachable.
@@ -21,7 +22,7 @@ export default async function (
     },
 ): Promise<string> {
     const esc = (v: unknown) => ctx.fns.procs.ui.escape({ text: String(v ?? "") });
-    const { tabs } = await ctx.fns.nav.tabs({});
+    const { tabs, source } = await ctx.fns.nav.tabs({});
     const tab = tabs.find(t => t.id === opts.tab) ?? tabs[0];
     if (!tab) return `<div class="px-4 py-5 text-sm text-faint">no tabs</div>`;
     const widgets = ((ctx.state as any).nav?.widgets ?? {}) as Record<string, types.nav.Widget & types.nav.Registered>;
@@ -72,7 +73,7 @@ export default async function (
     const editToggle = `<button type="button" data-nav-edit-toggle aria-pressed="${edit}" title="${edit ? "Done editing" : "Edit menu"}" aria-label="${edit ? "Done editing" : "Edit menu"}" class="ml-auto inline-flex shrink-0 items-center gap-1 self-center rounded px-2 py-1 text-xs ${edit ? "bg-primary text-primary-content" : "text-faint hover:bg-base-200 hover:text-base-content"}"><i class="ph ${edit ? "ph-check" : "ph-pencil-simple"}" aria-hidden="true"></i>${edit ? "Done" : ""}</button>`;
     const strip = `<nav class="flex items-end gap-1 overflow-x-auto border-b border-ui-border px-3" aria-label="Menu tabs">${tabs.length > 1 || edit ? pills : ""}${tabTools}${editToggle}</nav>`;
     const grid = tiles.length
-        ? `<div class="grid grid-cols-1 gap-px bg-base-200 lg:grid-cols-3" style="grid-template-rows:auto auto 1fr" data-nav-tab-body="${esc(tab.id)}">${tiles.join("")}</div>`
+        ? `<div class="grid grid-cols-1 gap-px bg-base-200 lg:grid-cols-3" style="grid-template-rows:auto auto 1fr" data-nav-tab-body="${esc(tab.id)}"${source === "default" && tab.id === "home" && !edit ? ' data-nav-mobile-chats-first' : ""}>${tiles.join("")}</div>`
         : `<div class="px-4 py-5 text-sm text-faint" data-nav-tab-body="${esc(tab.id)}">No widgets on this tab yet.</div>`;
     return strip + grid;
 }
