@@ -85,6 +85,42 @@ describe("team delegation", () => {
         expect(child.scratchpad.plan.tasks[0].resultSummary).toBe("done");
     });
 
+    test("stopped parents retain all team updates without being restarted, with or without a plan", async () => {
+        const ctx = await setup();
+        for (const withPlan of [false, true]) {
+            const parent = await ctx.fns.agent.start({ model: "m" });
+            const child = await ctx.fns.session.fork({ id: parent.id, offset: 0 });
+            if (withPlan) await ctx.fns.session.plan({ agent: parent, title: "Work", tasks: [{ id: "work", title: "Work" }] });
+            await ctx.fns.agent.stop({ agent: parent, clearQueue: true });
+            // Deliberately stale live state: the scheduling guard must read the row.
+            parent.scratchpad = {};
+            for (const event of ["task.completed", "plan.completed", "answer", "blocked", "failed"] as const) {
+                const delivered = await steer(ctx, null, { from: child, event, summary: "retained result" });
+                expect(delivered.delivered).toBe(true);
+                const row = (await ctx.fns.procs.db.select({ sql: "SELECT run_state, next_run_at FROM agents WHERE id = ?", params: [parent.id] }))[0];
+                expect(row.run_state).toBe("idle");
+                expect(row.next_run_at).toBeNull();
+            }
+            const messages = await ctx.fns.procs.db.select({ sql: "SELECT content FROM messages WHERE agent_id = ? AND message_type = 'team_update'", params: [parent.id] });
+            expect(messages).toHaveLength(5);
+            expect(messages.every((row: any) => row.content.includes("retained result"))).toBe(true);
+            if (withPlan) {
+                // A changed diagnostic must not override the durable plan pause.
+                await ctx.fns.procs.db.run({ sql: "UPDATE agents SET last_error = NULL WHERE id = ?", params: [parent.id] });
+                await steer(ctx, null, { from: child, event: "answer", summary: "still paused" });
+                const row = (await ctx.fns.procs.db.select({ sql: "SELECT next_run_at FROM agents WHERE id = ?", params: [parent.id] }))[0];
+                expect(row.next_run_at).toBeNull();
+            }
+            // Explicit user input owns its schedule; steer must not erase it.
+            await ctx.fns.session.appendUserMessage({ id: parent.id, text: "Continue" });
+            const scheduled = Date.now();
+            await ctx.fns.procs.db.run({ sql: "UPDATE agents SET next_run_at = ? WHERE id = ?", params: [scheduled, parent.id] });
+            await steer(ctx, null, { from: child, event: "answer", summary: "new result" });
+            const row = (await ctx.fns.procs.db.select({ sql: "SELECT next_run_at FROM agents WHERE id = ?", params: [parent.id] }))[0];
+            expect(Number(row.next_run_at)).toBe(scheduled);
+        }
+    });
+
     test("steer schedules a parent even when it is already running", async () => {
         const ctx = await setup();
         const parent = await ctx.fns.agent.start({ model: "m" });

@@ -1,7 +1,7 @@
 /**
  * Send a durable team update from a delegated child to its parent
  *
- * Persists a structured progress, completion, blocked, or failure notification in the parent transcript, refreshes both Meta panels, and schedules an idle parent immediately. Use internally when a delegated child changes meaningful task state.
+ * Persists a structured progress, completion, blocked, or failure notification in the parent transcript and refreshes both Meta panels. Schedules the parent unless explicitly stopped or its plan is paused; stopped parents retain updates for their next explicit run. Use internally when a delegated child changes meaningful task state.
  * @param opts.from Delegated child agent sending the update; its parentId determines the recipient.
  * @param opts.event Team lifecycle event represented by the update.
  * @param opts.summary Short parent-facing description of completed work or a problem.
@@ -43,10 +43,18 @@ export default async function (
             await ctx.fns.session.updateScratchpad({ id: child.id, scratchpad: child.scratchpad });
         }
     }
-    // Always set a schedule, including while the parent is running. The worker
-    // claim already consumed the previous schedule; preserving this value makes
-    // a team update that lands during the final model call trigger another pass.
-    await ctx.fns.procs.db.run({ sql: "UPDATE agents SET next_run_at = COALESCE(next_run_at, ?), updated_at = ? WHERE id = ? AND archived_at IS NULL", params: [ts, ts, parentId] });
+    // Preserve a follow-up schedule even during the final model call, but never
+    // restart an explicitly stopped parent. Check durable state in the UPDATE
+    // itself: a cached parent or a preceding SELECT can race with user stop.
+    // Keep the message/event above regardless, so a later explicit run sees it.
+    // last_error covers parents without plans; pausedAt survives error changes.
+    await ctx.fns.procs.db.run({
+        sql: `UPDATE agents SET next_run_at = COALESCE(next_run_at, ?), updated_at = ?
+              WHERE id = ? AND archived_at IS NULL
+                AND COALESCE(last_error, '') NOT LIKE 'stopped by user%'
+                AND COALESCE(NULLIF(scratchpad, '')::jsonb #>> '{plan,pausedAt}', '') IN ('', '0')`,
+        params: [ts, ts, parentId],
+    });
     const parent = (ctx.state as any).agent?.[parentId];
     if (parent) await ctx.fns.session.syncAgentState({ agent: parent });
     ctx.fns.events.refreshAgentMeta({ agentId: parentId, section: "team", reason: "team-update" });
