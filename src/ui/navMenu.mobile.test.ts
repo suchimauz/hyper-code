@@ -108,3 +108,42 @@ describe('mobile navigation menu', () => {
         } finally { await f.window.happyDOM.close(); }
     });
 });
+
+test('touch menu resets on each opening without auto-scroll after async selection or redraw', async () => {
+    const f = setup();
+    try {
+        f.window.history.replaceState({}, '', '/agent/ab');
+        f.window.document.body.insertAdjacentHTML('afterbegin', '<div id="main"><div id="chat-panel" data-agent-id="ab"></div></div>');
+        let resolveFetch!: (response: any) => void;
+        f.window.fetch = (() => new Promise(resolve => { resolveFetch = resolve; })) as any;
+        const results = f.window.document.getElementById('nav-results')!;
+        results.innerHTML = '<a class="nav-row" data-nav-id="first">First</a><a class="nav-row" data-nav-id="project:p">Current project</a>';
+        let reveals = 0;
+        f.window.HTMLElement.prototype.scrollIntoView = () => { reveals++; results.scrollTop = 700; };
+        results.scrollTop = 500;
+        f.client.__navOpen();
+        expect(results.scrollTop).toBe(0);
+        resolveFetch({ ok: true, json: async () => ({ tabs: '<div class="project-tabs" data-project-id="p"></div>' }) });
+        for (let i=0;i<10;i++) await Promise.resolve();
+        expect(results.querySelector('[data-nav-id="project:p"]')?.getAttribute('aria-selected')).toBe('true');
+        expect(results.scrollTop).toBe(0);
+        expect(reveals).toBe(0);
+        results.scrollTop = 120;
+        f.window.document.body.dispatchEvent(new f.window.CustomEvent('htmx:afterSwap', { detail: { target: results } }));
+        expect(results.scrollTop).toBe(120);
+        expect(reveals).toBe(0);
+        f.window.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'ArrowDown' }));
+        expect(reveals).toBe(1);
+        f.client.__navClose(); f.client.__navOpen();
+        expect(results.scrollTop).toBe(0);
+    } finally { await f.window.happyDOM.close(); }
+});
+
+test('desktop automatic selection still reveals the default row', async () => {
+    const f = setup({ touch: false, width: 1280 });
+    try {
+        f.window.document.getElementById('nav-results')!.innerHTML = '<a class="nav-row" data-nav-default>Default</a>';
+        let reveals=0; f.window.HTMLElement.prototype.scrollIntoView=()=>{reveals++;};
+        f.client.__navOpen(); expect(reveals).toBe(1);
+    } finally { await f.window.happyDOM.close(); }
+});

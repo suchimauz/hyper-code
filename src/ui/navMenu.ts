@@ -129,7 +129,9 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
     if (sel < 0) sel = rows().findIndex(row => row.hasAttribute('data-nav-default'));
     mark();
   };
-  const mark = () => rows().forEach((row, index) => {
+  // Automatic highlighting must not pull a touch menu down to the active project.
+  // Explicit keyboard navigation still reveals the selected row on any device.
+  const mark = (reveal = !touch()) => rows().forEach((row, index) => {
     const active = index === sel;
     row.classList.toggle('bg-base-200', active);
     row.classList.toggle('text-base-content', active);
@@ -140,13 +142,13 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
     const current = !!currentProject && row.getAttribute('data-nav-id') === 'project:' + currentProject;
     if (current) row.setAttribute('aria-current', 'page'); else row.removeAttribute('aria-current');
     if (active) window.__navSelId = row.getAttribute('data-nav-id') || '';
-    if (active) row.scrollIntoView({ block: 'nearest' });
+    if (active && reveal) row.scrollIntoView({ block: 'nearest' });
   });
   const move = delta => {
     const list = rows();
     if (!list.length) return;
     sel = (sel + delta + list.length) % list.length;
-    mark();
+    mark(true);
   };
   // ⌘← / ⌘→ jump to the previous / next widget tile (or search group), landing on its first row.
   const jump = delta => {
@@ -157,7 +159,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
     const at = boxes.indexOf(box(list[sel]));
     const next = boxes[(at + delta + boxes.length) % boxes.length];
     sel = list.findIndex(row => box(row) === next);
-    mark();
+    mark(true);
   };
   const openSelected = beside => {
     const row = rows()[sel];
@@ -200,6 +202,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
     if (!window.__navIsOpen()) returnFocus = document.activeElement;
     overlay().classList.remove('hidden');
     orderWidgets();
+    if (touch()) document.getElementById('nav-results').scrollTop = 0;
     void selectCurrent();
     // Focus the dialog on touch screens, not the search field: browsing needs no keyboard.
     if (touch()) overlay().querySelector('[role="dialog"]').focus({ preventScroll: true });
