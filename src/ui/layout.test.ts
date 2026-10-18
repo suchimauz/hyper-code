@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry.ts";
+import { Window } from "happy-dom";
 
 describe("ui.layout", () => {
     // The bug this guards against: navigation attributes were declared on the
@@ -105,6 +106,44 @@ describe("ui.layout", () => {
                 expect(html).toContain('id="app-popup"');
                 expect(html).toContain('id="nav-overlay"');
                 expect(html).toContain('id="mobile-nav-button"');
+            }
+        }
+    });
+
+    test("chat input prevents iPhone focus zoom without disabling manual zoom or changing desktop text", async () => {
+        const ctx: any = await mkTestCtx();
+        const composer = await ctx.fns.ui.chatComposer({ action: "/agent/ab/send" });
+        const html = await ctx.fns.ui.layout({ main: composer });
+        const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(match => match[1]).join("\n");
+        // The anti-zoom rule must target the editable node, not just its glass wrapper.
+        expect(styles).toContain('.chat-composer textarea[name="text"] { font-size: max(16px, 1.0625rem) !important; line-height: 1.5; }');
+        const viewport = /<meta name="viewport"[^>]*>/.exec(html)?.[0] ?? "";
+        expect(viewport).toContain("initial-scale=1");
+        expect(viewport).not.toMatch(/user-scalable\s*=\s*(no|0)|maximum-scale\s*=/i);
+
+        for (const { width, touchPoints, expected } of [
+            { width: 390, touchPoints: 5, expected: "16px" },
+            { width: 844, touchPoints: 5, expected: "16px" },
+            { width: 600, touchPoints: 0, expected: "16px" },
+            { width: 1280, touchPoints: 0, expected: "14px" },
+        ]) {
+            const window = new Window({ width, height: 844, settings: { enableJavaScriptEvaluation: false } });
+            try {
+                Object.defineProperty(window.navigator, "maxTouchPoints", { value: touchPoints });
+                window.document.body.innerHTML = composer;
+                const style = window.document.createElement("style");
+                // Model Tailwind's explicit text-sm: font-size on the wrapper cannot override it.
+                // happy-dom does not resolve comma-separated media queries or max(rem,px)
+                // correctly. This test checks the 16px safety floor; mobileDesign.test checks
+                // the actual scalable declaration and desktop/mobile rule boundaries.
+                const resolvedMedia = styles.replace(/@media\s+([^{}]+)\{/g, (_match, query: string) =>
+                    `@media ${query.split(',').some(part => window.matchMedia(part.trim()).matches) ? '(min-width: 0px)' : '(min-width: 999999px)'} {`);
+                style.textContent = `.text-sm { font-size: 14px; }\n${resolvedMedia.replaceAll('max(16px, 1.0625rem)', '16px')}`;
+                window.document.head.append(style);
+                const input = window.document.querySelector("textarea[name='text']")!;
+                expect(window.getComputedStyle(input).fontSize).toBe(expected);
+            } finally {
+                await window.happyDOM.close();
             }
         }
     });

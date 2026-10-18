@@ -1,6 +1,9 @@
-/** Render status bar for the runtime.  * @param opts.agentId Target agent identifier.
+/** Render live agent status or composer controls. Busy and queued chats retain stop
+ * alongside send so a nonempty draft can steer the agent without stopping its run.
+ * Use part='stop' for the event-refreshed composer region; idle chats expose only send.
+ * @param opts.agentId Target agent identifier.
  * @param opts.initialUsage Initial token usage shown in the status bar.
-*/
+ */
 export default async function (ctx: Context, _session: Session | null, opts: {
         /** Agent id used by the operation. */
 agentId: string;
@@ -86,10 +89,11 @@ initialUsage?: any;
     // Stop is rendered by this live fragment so it appears and disappears with
     // the run, but CSS anchors it inside the composer instead of the top bar.
     const busy = row?.run_state === 'running' || !!row?.next_run_at;
-    const stopBtn = busy
-        ? ctx.fns.procs.ui.button({ action: 'stop', entity: 'agent', id: agentId, post: `/agent/${encodeURIComponent(agentId)}/stop`, swap: 'none', title: 'stop this run', ariaLabel: 'Stop generation', tone: 'primary', class: 'size-8 rounded-full shadow-md', html: '<span class="block size-2.5 rounded-[2px] bg-base-100" aria-hidden="true"></span>' })
-        : `<button type="submit" class="flex size-8 items-center justify-center rounded-full bg-base-content text-base-100 shadow-sm transition hover:opacity-85" title="Send · Enter" aria-label="Send message"><i class="ph ph-arrow-up text-base" aria-hidden="true"></i></button>`;
-    if (part === 'stop') return stopBtn;
+    const sendBtn = `<button type="submit" data-composer-send class="flex size-8 items-center justify-center rounded-full bg-base-content text-base-100 shadow-sm transition hover:opacity-85" title="Send message" aria-label="Send message"><i class="ph ph-arrow-up text-base" aria-hidden="true"></i></button>`;
+    const controls = busy
+        ? `<span data-composer-running-controls>${ctx.fns.procs.ui.button({ action: 'stop', entity: 'agent', id: agentId, post: `/agent/${encodeURIComponent(agentId)}/stop`, swap: 'none', title: 'stop this run', ariaLabel: 'Stop generation', tone: 'primary', class: 'size-8 rounded-full shadow-md', html: '<span class="block size-2.5 rounded-[2px] bg-base-100" aria-hidden="true"></span>' })}${sendBtn}</span>`
+        : sendBtn;
+    if (part === 'stop') return controls;
     // The SSE stream is the real trigger (it dispatches hyper-tick on every
     // agent event); the timer is only a safety net. A busy agent still refreshes
     // often enough to keep its elapsed counter honest, but an idle one costs one

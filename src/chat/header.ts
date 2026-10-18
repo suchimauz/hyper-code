@@ -2,6 +2,7 @@
  * Draws the chat header: icon · name · badges … buttons · ⋯ panel button.
  *
  * The icon (chat.icon; click opens the model picker) and the name (click renames) belong to the core.
+ * On phones the icon identifies the model provider and a separate inspector button opens the existing Meta panel without replacing the chat; desktop retains the custom chat icon.
  * Badges come from `$chatbadge_` files, buttons from `$chatbutton_` files, the ⋯ panel from `$chatcard_`
  * files, ordered and hidden by the chat.layout setting. The panel content loads when it opens
  * (GET /chat/:id/panel), so its cards are always fresh and never slow down the chat.
@@ -25,14 +26,14 @@ export default async function (
     const icon = ctx.fns.ui.popup({
         method: "agent.modelPicker",
         params: { agentId: id },
-        html: ctx.fns.chat.icon({ icon: agent.icon, model: agent.model, size: "md", live: true }),
+        html: `<span data-chat-avatar>${ctx.fns.chat.icon({ icon: agent.icon, model: agent.model, size: "md", live: true })}</span><span data-chat-model-mark>${ctx.fns.ui.modelLogo({ model: agent.model, bare: true })}</span>`,
         attrs: `class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-base-100/25 text-muted transition hover:bg-base-100/60 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/25" title="Change provider or model · ${esc(agent.model)}" aria-label="Change provider or model: ${esc(agent.model)}" data-chat-part="icon"`,
     });
     const title = String(agent.title ?? "").slice(0, 60) || id;
     const name = ctx.fns.ui.popup({
         method: "chat.renamePopup",
         params: { agentId: id },
-        html: `${esc(title)} <span class="text-faint">(${esc(id)})</span>`,
+        html: `${esc(title)} <span data-chat-technical-id class="text-faint">(${esc(id)})</span>`,
         attrs: `class="min-w-0 truncate text-left font-mono font-medium leading-4 text-muted hover:text-base-content" title="Rename · ${esc(title)}" aria-label="Rename chat ${esc(title)}" data-chat-part="name"`,
     });
     const panel = await ctx.fns.ui.inplacePopup({
@@ -49,6 +50,7 @@ export default async function (
     <div data-chat-badges class="flex min-w-0 items-center gap-1 overflow-hidden">${badges.join("")}</div>
   </div>
   <div class="ml-auto flex shrink-0 items-center gap-0.5" data-chat-buttons>${buttons.join("")}</div>
+  <button type="button" data-mobile-inspector-open aria-controls="agent-meta-${esc(id)}" aria-haspopup="dialog" aria-expanded="false" aria-label="Открыть инспектор чата" title="Инспектор чата"><i class="ph ph-sidebar-simple" aria-hidden="true"></i></button>
   ${panel}
 </header>`;
 }

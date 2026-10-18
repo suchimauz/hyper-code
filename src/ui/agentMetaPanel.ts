@@ -14,7 +14,7 @@
 // This used to be one live region around the whole <aside>: every plan tick
 // re-rendered everything, and every <details> lost its "open" state, so the
 // panel collapsed under the user's hands while an agent was working.
-/** Renders the agent inspector panel shell with its six sections. */
+/** Renders the six live inspector sections in a desktop rail or a mobile full-screen dialog, preserving the same section nodes and forms. */
 /**
  * Render the metadata panel for an agent.
  *
@@ -46,7 +46,11 @@ export default function (ctx: Context, _session: Session | null, opts: {
         + `</div>`;
     const collapsed = opts.collapsed === true;
     return `<aside id="agent-meta-${esc(agent.id)}" data-agent-meta-panel class="glass-panel agent-meta-panel${collapsed ? ' agent-meta-collapsed' : ''} my-2 mr-2 ml-1 flex h-[calc(100%-1rem)] w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-ui-border text-base-content shadow-sm">
-      <header class="glass-bar flex h-9 shrink-0 items-center gap-2 border-b border-ui-border px-2">
+      <header data-mobile-inspector-header>
+        <button type="button" data-mobile-inspector-close aria-label="Назад в чат"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Назад</span></button>
+        <div><h2 id="mobile-inspector-title-${esc(agent.id)}">Инспектор чата</h2><p>${esc(agent.title || agent.id)}</p></div>
+      </header>
+      <header data-desktop-inspector-header class="glass-bar flex h-9 shrink-0 items-center gap-2 border-b border-ui-border px-2">
         ${ctx.fns.procs.ui.button({ action: 'toggle-agent-meta', html: '<i class="ph ph-sidebar-simple" aria-hidden="true"></i>', appearance: 'plain', title: collapsed ? 'Expand agent inspector' : 'Collapse agent inspector', ariaLabel: collapsed ? 'Expand agent inspector' : 'Collapse agent inspector', class: 'agent-meta-toggle flex size-7 shrink-0 items-center justify-center rounded-full text-faint transition hover:bg-base-100/55 hover:text-base-content', attrs: { 'data-agent-meta-toggle': true, 'aria-expanded': String(!collapsed) } })}<span data-agent-meta-label class="min-w-0 flex-1 truncate text-xs font-semibold text-base-content">Agent inspector</span>${ctx.fns.auth?.onlineRegion?.({ agentId: agent.id }) ?? ""}<span data-agent-meta-label class="font-mono text-3xs text-faint">${esc(agent.id)}</span>
       </header>
       <div data-agent-meta-content class="flex-1 overflow-y-auto bg-transparent">

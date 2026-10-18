@@ -102,16 +102,18 @@
 
     // ── theme switch (delegated, so it survives a Dock refresh) ──────────────
     function paintTheme() {
-        const button = document.getElementById('theme-toggle');
-        if (!button) return;
         const dark = document.documentElement.dataset.theme === 'dark';
-        button.setAttribute('aria-pressed', String(dark));
-        button.title = dark ? 'Use light theme' : 'Use dark theme';
-        const icon = button.querySelector('i');
-        if (icon) icon.className = 'ph ' + (dark ? 'ph-sun' : 'ph-moon');
+        document.querySelectorAll('[data-action="toggle-theme"]').forEach(button => {
+            button.setAttribute('aria-pressed', String(dark));
+            const label = dark ? 'Включить светлую тему' : 'Включить тёмную тему';
+            button.title = label;
+            button.setAttribute('aria-label', label);
+            const icon = button.querySelector('i');
+            if (icon) icon.className = 'ph ' + (dark ? 'ph-sun' : 'ph-moon');
+        });
     }
     document.addEventListener('click', e => {
-        if (!e.target.closest?.('#theme-toggle')) return;
+        if (!e.target.closest?.('[data-action="toggle-theme"]')) return;
         const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
         document.documentElement.dataset.theme = next;
         document.documentElement.style.colorScheme = next;
