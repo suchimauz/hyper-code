@@ -23,7 +23,7 @@ export default async function (
         /** Human-readable child plan task title when available. */
         taskTitle?: string;
     },
-): Promise<{ delivered: boolean; parentId: string | null; messageIdx?: number }> {
+): Promise<{ delivered: boolean; queued?: boolean; parentId: string | null; messageIdx?: number }> {
     const child = opts.from;
     const parentId = child.parentId ? String(child.parentId) : null;
     if (!parentId) return { delivered: false, parentId: null };
@@ -31,9 +31,13 @@ export default async function (
     if (!summary) throw new Error("steer: summary is required");
     const taskTitle = opts.taskTitle ? String(opts.taskTitle) : null;
     const content = '<team-update member="' + child.id + '" event="' + opts.event + '">Agent ' + child.id + ' ' + opts.event + (taskTitle ? ' task "' + taskTitle + '"' : '') + '. ' + summary + '</team-update>';
-    const ts = Date.now();
-    const message = await ctx.fns.session.appendMessage({ id: parentId, message: { role: "user", content, message_type: "team_update" } });
-    await ctx.fns.session.appendEvent({ id: parentId, event: { type: "team_update", event: opts.event, memberId: child.id, taskId: opts.taskId ?? null, taskTitle, summary, messageIdx: message.idx } });
+    const completion = child.scratchpad?.delegation?.result ?? child.scratchpad?.delegateTask?.result;
+    const key = opts.event === 'plan.completed' && completion?.finishedAt
+        ? `completion:${child.id}:${completion.finishedAt}` : crypto.randomUUID();
+    const message = await ctx.fns.session.deliverInbound({ id: parentId, delivery: {
+        key, text: content, author: 'agent:' + child.id, messageType: 'team_update', wake: true,
+        event: { type: 'team_update', event: opts.event, memberId: child.id, taskId: opts.taskId ?? null, taskTitle, summary },
+    } });
     if (opts.event === "blocked" || opts.event === "failed") {
         child.scratchpad ??= {};
         const meta = child.scratchpad.delegation;
@@ -43,23 +47,7 @@ export default async function (
             await ctx.fns.session.updateScratchpad({ id: child.id, scratchpad: child.scratchpad });
         }
     }
-    // Preserve a follow-up schedule even during the final model call, but never
-    // restart an explicitly stopped parent. Check durable state in the UPDATE
-    // itself: a cached parent or a preceding SELECT can race with user stop.
-    // Keep the message/event above regardless, so a later explicit run sees it.
-    // last_error covers parents without plans; pausedAt survives error changes.
-    await ctx.fns.procs.db.run({
-        sql: `UPDATE agents SET next_run_at = COALESCE(next_run_at, ?), updated_at = ?
-              WHERE id = ? AND archived_at IS NULL
-                AND COALESCE(last_error, '') NOT LIKE 'stopped by user%'
-                AND COALESCE(last_error, '') <> 'context limit guard stopped work'
-                AND COALESCE(NULLIF(scratchpad, '')::jsonb #>> '{plan,pausedAt}', '') IN ('', '0')`,
-        params: [ts, ts, parentId],
-    });
-    const parent = (ctx.state as any).agent?.[parentId];
-    if (parent) await ctx.fns.session.syncAgentState({ agent: parent });
     ctx.fns.events.refreshAgentMeta({ agentId: parentId, section: "team", reason: "team-update" });
     ctx.fns.events.refreshAgentMeta({ agentId: child.id, section: "plan", reason: "team-update" });
-    ctx.fns.agent.wakeWorker({});
-    return { delivered: true, parentId, messageIdx: message.idx };
+    return { delivered: !message.queued, queued: message.queued, parentId, ...(message.messageIdx == null ? {} : { messageIdx: message.messageIdx }) };
 }

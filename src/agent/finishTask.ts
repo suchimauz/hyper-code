@@ -29,7 +29,8 @@ export default async function (
     if (opts.result === undefined || opts.result === null) throw new Error("finishTask: result is required");
     const parentId = currentMeta.parentId ? String(currentMeta.parentId) : null;
     const finishedAt = Date.now();
-    const updated: any = await ctx.fns.session.mutateScratchpad({ id: agent.id, mutate: (scratchpad: Record<string, any>) => {
+    const updated: any = await ctx.fns.procs.db.transaction({ fn: async () => {
+    const saved: any = await ctx.fns.session.mutateScratchpad({ id: agent.id, mutate: (scratchpad: Record<string, any>) => {
         const delegated = !!scratchpad.delegation;
         const meta = scratchpad.delegation ?? scratchpad.delegateTask;
         if (!meta || typeof meta !== "object") throw new Error("finishTask: missing delegation metadata");
@@ -54,10 +55,25 @@ export default async function (
         else scratchpad.delegateTask = meta;
         return { alreadyFinished: false, meta };
     } });
+    // Result and immutable completion outbox commit together. No recipient lock:
+    // enqueue-only avoids child/parent lock inversion; delivery obtains it later.
+    const savedMeta = saved.result.meta;
+    if (agent.parentId && savedMeta.result?.finishedAt) {
+        const brief = String(savedMeta.summary ?? summary).trim().slice(0, 4000);
+        const key = `completion:${agent.id}:${savedMeta.result.finishedAt}`;
+        const text = '<team-update member="' + agent.id + '" event="plan.completed">Agent ' + agent.id + ' plan.completed. ' + brief + '</team-update>';
+        const payload = JSON.stringify({ key, text, author: 'agent:' + agent.id, messageType: 'team_update', wake: true,
+            event: { type: 'team_update', event: 'plan.completed', memberId: agent.id, taskId: null, taskTitle: null, summary: brief } });
+        await ctx.fns.procs.db.run({ sql: 'INSERT INTO session_inbound_deliveries(agent_id,delivery_key,payload,created_at) VALUES(?,?,?,?) ON CONFLICT(agent_id,delivery_key) DO NOTHING', params: [String(agent.parentId), key, payload, Date.now()] });
+    }
+    return saved;
+    } });
     agent.scratchpad = updated.scratchpad;
     const meta = updated.result.meta;
     if (updated.result.alreadyFinished) {
         await ctx.fns.session.syncAgentState?.({ agent });
+        // Repair a crash between durable result persistence and notification enqueue.
+        if (agent.parentId) await ctx.fns.agent.steer({ from: agent, event: 'plan.completed', summary: String(meta.summary ?? summary) });
         return { ok: true, parentId, summary: String(meta.summary ?? summary), waiterFound: false };
     }
     await ctx.fns.session.syncAgentState?.({ agent });

@@ -20,5 +20,11 @@ export default async function (
       const changed = await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context=?::jsonb, updated_at=? WHERE id=? AND run_state='idle' AND sleep_context->>'draftRevision'=? AND COALESCE(sleep_context->>'draftOwner','')=?", params: [JSON.stringify(next), Date.now(), row.id, String(revision), String(sleep.draftOwner ?? "")] });
       if (changed.changes) { recovered.push(String(row.id)); const live=(ctx.state as any).agent?.[row.id]; if(live) live.sleepContext=next; await ctx.fns.session.appendEventWithHtml({ id:String(row.id), type:"compaction_failed", payload:{ revision, error:"recovered after interrupted Hyper process" } }).catch(()=>undefined); }
     }
+    // This hot-reloaded function is called by existing worker closures too.
+    const pending = await ctx.fns.procs.db.select({ sql: "SELECT DISTINCT d.agent_id FROM session_inbound_deliveries d JOIN agents a ON a.id=d.agent_id WHERE d.delivered_at IS NULL AND a.archived_at IS NULL AND a.sleep_context->>'draftRevision' IS NULL", params: [] });
+    for (const row of pending) {
+      try { await ctx.fns.session.deliverInbound({ id: String(row.agent_id) }); }
+      catch (error) { await ctx.fns.procs.log.warn({ event: 'inbound.recovery.failed', msg: String(error), agentId: String(row.agent_id) }); }
+    }
     return { recovered };
 }

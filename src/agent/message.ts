@@ -26,7 +26,7 @@ export default async function (
         /** Queue the target so it processes the message right away. @default true */
         wake?: boolean;
     },
-): Promise<{ delivered: true; to: string; messageIdx: number; hop: number }> {
+): Promise<{ delivered: boolean; queued: boolean; to: string; messageIdx: number | null; hop: number }> {
     const MAX_HOPS = 50;
     const MAX_PER_10_MIN = 30;
     const sender = opts.agent;
@@ -69,19 +69,12 @@ export default async function (
     const attrs = `from="${sender.id}" title="${title}" hop="${hop}"` + (ownerName ? ` on-behalf-of="${String(ownerName).replace(/["<>\n]/g, " ")}"` : "");
     const content = `<agent-message ${attrs}>\n${text}\n\n<reply-guidance>If a reply is requested or useful, answer the sender with await ctx.fns.agent.message({ agent, to: "${sender.id}", text: "..." }). Do not answer only in your own chat because the sender will not receive it.</reply-guidance>\n</agent-message>`;
 
-    const out = await ctx.fns.session.appendUserMessage({
-        id: to,
-        text: content,
-        author: "agent:" + sender.id,
-        messageType: "agent_message",
-        eventExtra: { agentMessage: { from: sender.id, title, hop, body: text, onBehalfOf } },
-    });
-    const live = (ctx.state as any).agent?.[to];
-    if (live) await ctx.fns.session.syncAgentState({ agent: live });
-    if (opts.wake !== false) {
-        const now = Date.now();
-        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET next_run_at = COALESCE(next_run_at, ?), updated_at = ? WHERE id = ? AND archived_at IS NULL", params: [now, now, to] });
-        ctx.fns.agent.wakeWorker({});
-    }
-    return { delivered: true, to, messageIdx: out.idx, hop };
+    const event = { type: 'user', text: content, actor: 'agent:' + sender.id,
+        agentMessage: { from: sender.id, title, hop, body: text, onBehalfOf } };
+    const html = await ctx.fns.agent.renderEventHtml({ event, agentId: to });
+    const out = await ctx.fns.session.deliverInbound({ id: to, delivery: {
+        key: crypto.randomUUID(), text: content, author: 'agent:' + sender.id,
+        messageType: 'agent_message', event: { ...event, html }, wake: opts.wake !== false,
+    } });
+    return { delivered: !out.queued, queued: out.queued, to, messageIdx: out.messageIdx, hop };
 }

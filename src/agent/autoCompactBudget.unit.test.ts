@@ -6,14 +6,15 @@ function fixture({ reported=140000, active=false, available=true }={}) {
  const agent:any={id:'fixture',model:'fixture:model',abortController:controller,activeRunCount:1,currentJobId:'owner'};
  let calls=0;
  const generation=active?{tailStart:2,activatedAt:1,model:agent.model,contextMessages:[{role:'assistant',content:'summary'}]}:null;
+ const events:any[]=[{type:'assistant',ts:2,payload:JSON.stringify({usage:{prompt_tokens:reported}})}];
  const ctx:any={fns:{
   compaction:{resolve:()=>{if(!available)throw Error('unavailable');return {};},portable:({messages}:any)=>messages,contextWindow:()=>200000},
-  procs:{db:{select:({sql}:any)=>sql.includes('FROM agents')?[{run_state:'running',run_token:'owner',sleep_context:generation}]:[{ts:2,payload:JSON.stringify({usage:{prompt_tokens:reported}})}]}},
+  procs:{db:{select:({sql}:any)=>{if(sql.includes('FROM agents'))return [{run_state:'running',run_token:'owner',sleep_context:generation}];expect(sql).toContain("type = 'context_usage'");expect(sql).toContain('NOT EXISTS');expect(sql).toContain('LIMIT 1');const dedicated=events.some(e=>e.type==='context_usage');return events.filter(e=>e.type==='context_usage'||(!dedicated&&e.type==='assistant')).slice(-1);}}},
   session:{getMessages:()=>[{role:'user',content:'task'},{role:'assistant',content:'response'}],appendEventWithHtml:()=>{}},
   agent:{normalizeSleepContext:({sleepContext}:any)=>sleepContext,getSleepGeneration:()=>generation,compactContext:()=>{calls++;return {status:'compacted'};}},
   settings:{getNumber:({key}:any)=>key==='autoCompactWindowPercent'?65:700000},
  }};
- return {agent,ctx,signal:controller.signal,calls:()=>calls};
+ return {agent,ctx,events,signal:controller.signal,calls:()=>calls};
 }
 test('owned request compacts at 65 percent and checkOnly never invokes summarizer',async()=>{
  const f=fixture();
@@ -37,4 +38,29 @@ test('recent checkpoint cannot hide an oversized budget',async()=>{
  const f=fixture({reported:195000,active:true});
  const r=await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true});
  expect(r.estimatedTokens).toBe(195000);expect(r.contextWindow).toBe(200000);expect(f.calls()).toBe(0);
+});
+test('tool-only usage drives checkOnly and threshold despite a later usage-less assistant',async()=>{
+ const f=fixture({reported:1000});
+ f.events.push({type:'context_usage',ts:3,payload:JSON.stringify({usage:{prompt_tokens:135000,completion_tokens:5000}})});
+ f.events.push({type:'assistant',ts:4,payload:JSON.stringify({text:'done'})});
+ const opts={agent:f.agent,signal:f.signal,runToken:'owner'};
+ const measured=await autoCompact(f.ctx,null,{...opts,checkOnly:true});
+ expect(measured.status).toBe('over_threshold');expect(measured.estimatedTokens).toBe(140000);expect(f.calls()).toBe(0);
+ expect((await autoCompact(f.ctx,null,opts)).status).toBe('compacted');expect(f.calls()).toBe(1);
+});
+test('usage before or at active compaction is discarded, newer tool usage counts',async()=>{
+ for(const ts of [0,1]){
+  const f=fixture({reported:195000,active:true});
+  f.events.push({type:'context_usage',ts,payload:JSON.stringify({usage:{prompt_tokens:195000,completion_tokens:1000}})});
+  const opts={agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true};
+  const measured=await autoCompact(f.ctx,null,opts);expect(measured.status).toBe('below_threshold');expect(measured.estimatedTokens).toBeLessThan(1000);
+  f.events.push({type:'context_usage',ts:2,payload:JSON.stringify({usage:{prompt_tokens:140000,completion_tokens:1000}})});
+  expect((await autoCompact(f.ctx,null,opts)).estimatedTokens).toBe(141000);expect(f.calls()).toBe(0);
+ }
+});
+test('invalid dedicated usage cannot poison budget or revive legacy high usage',async()=>{
+ const f=fixture({reported:195000});
+ f.events.push({type:'context_usage',ts:3,payload:JSON.stringify({usage:{prompt_tokens:'bad',completion_tokens:1}})});
+ const measured=await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true});
+ expect(measured.status).toBe('below_threshold');expect(Number.isFinite(measured.estimatedTokens)).toBe(true);expect(f.calls()).toBe(0);
 });

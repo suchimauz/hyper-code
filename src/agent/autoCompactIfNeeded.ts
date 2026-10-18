@@ -1,7 +1,7 @@
 /**
  * Compact oversized context after a successful turn or at an owned completed tool batch
  *
- * Estimate the effective context after a completed run and invoke the provider's `$compaction_<provider>` compactor (or `$compaction_default`) when it exceeds the threshold: the smaller of the global `autoCompactTokens` setting and `autoCompactWindowPercent` of the model's context window (Claude 200K, Codex 272K). The size is the larger of a chars/4 estimate and the last provider-reported prompt tokens. Skip agents without a compactor, running, already compacted, or too-small agents; failures are recorded as events but do not fail the completed user turn.
+ * Estimate the effective context after a completed run and invoke the provider's `$compaction_<provider>` compactor (or `$compaction_default`) when it exceeds the threshold: the smaller of the global `autoCompactTokens` setting and `autoCompactWindowPercent` of the model's context window (Claude 200K, Codex 272K). The size is the larger of a chars/4 estimate and the latest provider-reported request plus completion tokens, including tool-only responses. Skip agents without a compactor, running, already compacted, or too-small agents; failures are recorded as events but do not fail the completed user turn.
  * @param opts.agent Live agent to inspect after its run has finalized.
  * @param opts.thresholdTokens Token threshold overriding both settings. @minimum 10000
  * @param opts.runToken Worker ownership token at a completed tool batch.
@@ -39,10 +39,16 @@ export default async function (
     const activeMessages = active ? ctx.fns.compaction.portable({ model: agent.model, producedBy: active.model, messages: storedActive }) : [];
     const effective = active && activeMessages ? [...activeMessages, ...root.slice(Math.max(0, Number(active.tailStart ?? active.sourceOffset ?? 0)))] : root;
     // chars/4 underestimates code and JSON; the provider's own count of the last
-    // request is authoritative when it exists (it predates this turn's reply).
-    const last = ((await ctx.fns.procs.db.select({ sql: "SELECT payload, ts FROM events WHERE agent_id = ? AND type = 'assistant' ORDER BY idx DESC LIMIT 1", params: [agent.id] })) as any[])[0];
+    // request plus completion is authoritative, including empty-text tool turns.
+    // Legacy assistant usage is only a fallback before dedicated usage events exist.
+    const last = ((await ctx.fns.procs.db.select({ sql: "SELECT payload, ts FROM events e WHERE agent_id = ? AND (type = 'context_usage' OR (type = 'assistant' AND NOT EXISTS (SELECT 1 FROM events usage_event WHERE usage_event.agent_id = e.agent_id AND usage_event.type = 'context_usage'))) ORDER BY idx DESC LIMIT 1", params: [agent.id] })) as any[])[0];
     let reported = 0;
-    try { const usage = JSON.parse(String(last?.payload ?? "{}"))?.usage ?? {}; reported = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0) + Number(usage.completion_tokens ?? usage.output_tokens ?? 0); } catch {}
+    try {
+        const usage = JSON.parse(String(last?.payload ?? "{}"))?.usage ?? {};
+        const prompt = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
+        const completion = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+        reported = Number.isFinite(prompt) && prompt >= 0 && Number.isFinite(completion) && completion >= 0 ? prompt + completion : 0;
+    } catch { reported = 0; }
     // A usage recorded before the active compaction describes the old, larger context.
     const fresh = !active || Number(last?.ts ?? 0) > Number(active.activatedAt ?? 0);
     const estimatedTokens = Math.max(estimate(effective), fresh ? reported : 0);

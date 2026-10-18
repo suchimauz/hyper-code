@@ -211,6 +211,7 @@ export default async function (
             ac.signal.removeEventListener("abort", onRunAbort);
         }
         const { text, usage, finishReason, toolCalls = [] } = streamed;
+        await ctx.fns.session.recordContextUsage({ id: agent.id, usage });
         delete agent.scratchpad.mobileStream;
         const prose = String(text ?? '');
         delete agent.scratchpad.activeGoalFeedback;

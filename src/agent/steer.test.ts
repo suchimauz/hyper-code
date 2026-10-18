@@ -1,41 +1,10 @@
-import { expect, test } from "bun:test";
-import steer from "./steer";
-
-test("steer persists notifications before guarded scheduling, without trusting cached parent state", async () => {
-    const calls: string[] = [];
-    let schedulingSql = "";
-    const parent = { id: "parent", scratchpad: {} };
-    const ctx: any = {
-        state: { agent: { parent } },
-        fns: {
-            session: {
-                appendMessage: async (opts: any) => {
-                    expect(opts.message.message_type).toBe("team_update");
-                    expect(opts.message.content).toContain("kept result");
-                    calls.push("message");
-                    return { idx: 12 };
-                },
-                appendEvent: async (opts: any) => {
-                    expect(opts.event.messageIdx).toBe(12);
-                    calls.push("event");
-                },
-                syncAgentState: async () => { calls.push("sync"); },
-            },
-            procs: { db: { run: async (opts: any) => {
-                schedulingSql = opts.sql;
-                expect(opts.params[2]).toBe("parent");
-                calls.push("schedule");
-                return { changes: 0 };
-            } } },
-            events: { refreshAgentMeta: () => {} },
-            agent: { wakeWorker: () => {} },
-        },
-    };
-    const result = await steer(ctx, null, { from: { id: "child", parentId: "parent" } as any, event: "plan.completed", summary: "kept result" });
-    expect(result).toEqual({ delivered: true, parentId: "parent", messageIdx: 12 });
-    expect(calls).toEqual(["message", "event", "schedule", "sync"]);
-    expect(schedulingSql).toContain("COALESCE(last_error, '') NOT LIKE 'stopped by user%'");
-    expect(schedulingSql).toContain("COALESCE(last_error, '') <> 'context limit guard stopped work'");
-    expect(schedulingSql).toContain("NULLIF(scratchpad, '')::jsonb #>> '{plan,pausedAt}'");
-    expect(schedulingSql).toContain("next_run_at = COALESCE(next_run_at, ?)");
+import { expect, test } from 'bun:test';
+import steer from './steer';
+for(const queued of [false,true])test(`steer routes through durable barrier; queued=${queued}`,async()=>{
+ let delivery:any;
+ const ctx:any={state:{},fns:{session:{deliverInbound:async(opts:any)=>{expect(opts.id).toBe('parent');delivery=opts.delivery;return {queued,messageIdx:queued?null:12};}},events:{refreshAgentMeta:()=>{}}}};
+ const child:any={id:'child',parentId:'parent',scratchpad:{delegation:{result:{finishedAt:123}}}};
+ const result=await steer(ctx,null,{from:child,event:'plan.completed',summary:'kept result'});
+ expect(delivery.messageType).toBe('team_update');expect(delivery.text).toContain('kept result');expect(delivery.author).toBe('agent:child');expect(delivery.wake).toBe(true);expect(delivery.key).toBe('completion:child:123');
+ expect(result).toEqual({delivered:!queued,queued,parentId:'parent',...(queued?{}:{messageIdx:12})});
 });

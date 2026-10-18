@@ -111,9 +111,10 @@ async function claimOne(ctx: Context, now: number): Promise<{ id: string; token:
                  AND next_run_at IS NOT NULL
                  AND next_run_at <= ?
                  AND archived_at IS NULL
+                 AND sleep_context->>'draftRevision' IS NULL
                ORDER BY next_run_at ASC
                LIMIT 1
-          )
+          ) AND run_state = 'idle' AND sleep_context->>'draftRevision' IS NULL
           RETURNING id`,
         params: [now, now, token, now, now],
     }) as any[];
