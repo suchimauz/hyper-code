@@ -62,7 +62,7 @@ export default async function (
     await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_start", payload: { revision } });
     try {
       // Provider-specific strategy from `$compaction_<provider>.ts`, else `$compaction_default.ts`.
-      const compactor = ctx.fns.compaction.resolve({ model: child.model });
+      const compactor = (await ctx.fns.compaction.resolve({ model: child.model }));
       const result = await compactor.compact(ctx, session, {
         model: child.model,
         sessionId: child.id,

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
+  <title>Hyper-code2 — подключение</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="renderer.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Hyper-code2</h1>
+    <p>Подключитесь к своему серверу. Приложение не запускает сервер локально.</p>
+    <form id="connection">
+      <label for="server">Адрес сервера</label>
+      <input id="server" type="url" placeholder="https://hyper.example.com" required maxlength="4096" autocomplete="url" spellcheck="false" autofocus aria-describedby="hint">
+      <p id="hint">HTTP допустим в доверенной внутренней сети; для других сетей используйте HTTPS. Не добавляйте пароль или токен в адрес.</p>
+      <button type="submit">Подключиться / повторить</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <small>Адрес и штатная браузерная сессия сохраняются на этом компьютере. Сменить сервер можно в меню «Сервер».</small>
+  </main>
+</body>
+</html>

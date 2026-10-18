@@ -20,7 +20,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     try { usage = last ? JSON.parse(last.payload).usage ?? null : null; } catch { usage = null; }
     const used = usage ? Number(usage.prompt_tokens ?? 0) + Number(usage.completion_tokens ?? 0) : 0;
     if (!used) return "";
-    const window = Number(ctx.fns.compaction.contextWindow({ model: String(agent.model) }) ?? 0);
+    const window = Number((await ctx.fns.compaction.contextWindow({ model: String(agent.model) })) ?? 0);
     const k = (n: number) => n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
     const share = window > 0 ? Math.min(1, used / window) : 0;
     const colour = share >= 0.9 ? "var(--color-error)" : share >= 0.7 ? "var(--color-warning)" : "var(--color-subtle)";

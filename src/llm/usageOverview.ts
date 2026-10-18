@@ -7,6 +7,9 @@
  * Returns the worst of the two rolling windows per credential. Reads only the
  * small stored snapshot set; it never scans agents and never calls a provider.
  *
+ * Use connectedOnly for live quota indicators: historical Codex snapshots must
+ * not imply a connection after the CLI removes its auth file. Stored history is retained.
+ * @param opts.connectedOnly Omit Codex slots whose credential file is absent.
  * @param opts.now Current time in ms, for testing.
  */
 export default async function (
@@ -15,6 +18,8 @@ export default async function (
     opts?: {
         /** Current timestamp in ms; defaults to Date.now(). */
         now?: number;
+        /** Omit disconnected local Codex credentials from live UI/export; retain stored snapshots. @default false */
+        connectedOnly?: boolean;
     },
 ): Promise<Array<{
     provider: string;
@@ -44,6 +49,8 @@ export default async function (
         let snapshot: types.llm.UsageSnapshot | null = null;
         try { snapshot = JSON.parse(String(row.value)); } catch { snapshot = null; }
         if (!snapshot?.provider) continue;
+        if (opts?.connectedOnly && snapshot.provider === "codex" &&
+            !ctx.fns.llm.accountCredentialExists({ provider: "codex", account: snapshot.account ?? "default" })) continue;
 
         // A window whose reset has passed is stale: the quota rolled over and
         // nothing has reported the new figure yet. Better to show nothing than

@@ -38,9 +38,11 @@ export default async function (
         if (ep.api === "mock") result = await ctx.fns.llm.streamMock(wireOpts);
         else if (ep.api === "anthropic") result = await ctx.fns.llm.streamAnthropic(wireOpts);
         else if (ep.api === "cursor") result = await ctx.fns.llm.streamCursor(wireOpts);
-        else if (ep.provider === "xai") result = await ctx.fns.llm.streamXai(wireOpts);
+        else if ((ep.provider === "hyper" ? ep.upstream : ep.provider) === "xai") result = await ctx.fns.llm.streamXai(wireOpts);
         else if (ep.api === "responses") result = await ctx.fns.llm.streamCodex(wireOpts);
         else result = await ctx.fns.llm.streamOpenAI(wireOpts);
+        // Gateway-reported model is diagnostic metadata, not verified upstream identity.
+        if (typeof result?.responseModel === "string") attrs["llm.response_model"] = result.responseModel;
         attrs["llm.ttft_ms"] = firstEventMs ?? null;
         attrs["llm.finish_reason"] = result?.finishReason ?? null;
         attrs["llm.prompt_tokens"] = result?.usage?.prompt_tokens ?? result?.usage?.input_tokens ?? null;

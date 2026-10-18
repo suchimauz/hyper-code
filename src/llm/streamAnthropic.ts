@@ -118,7 +118,7 @@ export default async function (
         // window must arrive at the worker as a parkable failure carrying its
         // reset moment, not as an opaque "provider 429: {…}" string.
         const info = ctx.fns.llm.classifyError({
-            provider: ep.provider, account: ep.account, kind: ep.kind,
+            provider: ep.provider, account: ep.quotaAccount ?? ep.account, kind: ep.kind,
             status: res.status, body: await res.text(), headers: res.headers,
         });
         const error = new Error(info.message);

@@ -27,10 +27,13 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         attrs: `class="inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs text-muted hover:bg-base-200 hover:text-base-content" title="Reasoning effort · ${esc(requested === "auto" ? `auto → ${applied}` : requested)}" aria-label="Change reasoning effort: ${esc(requested)}" data-chat-part="effort"`,
     }) : "";
     const label = esc(name);
+    const node = /^hyper\/([^:]+):/i.exec(model)?.[1];
+    // The logo already carries the proxy icon; add its readable node name once.
+    const nodeBadge = node ? `<span class="max-w-20 truncate rounded bg-base-200 px-1 text-2xs" title="Hyper node ${esc(node)}">${esc(node)}</span>` : "";
     return ctx.fns.ui.popup({
         method: "agent.modelPicker",
         params: { agentId: id },
-        html: `${ctx.fns.ui.modelLogo({ model, bare: true, compact: true })}<span class="max-w-44 truncate">${label}</span><i class="ph ph-caret-down text-3xs text-faint" aria-hidden="true"></i>`,
+        html: `${ctx.fns.ui.modelLogo({ model, bare: true, compact: true })}<span class="max-w-44 truncate">${label}</span>${nodeBadge}<i class="ph ph-caret-down text-3xs text-faint" aria-hidden="true"></i>`,
         attrs: `class="inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-xs text-muted hover:bg-base-200 hover:text-base-content" title="Provider, account and model · ${esc(model)}" aria-label="Change model: ${esc(model)}" data-chat-part="model"`,
     }) + effortChip;
 }

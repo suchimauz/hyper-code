@@ -86,7 +86,7 @@ export default async function (
             // them costs a round-trip per agent. classifyError carries the
             // reset moment so the caller can park instead of hammering.
             const info = ctx.fns.llm.classifyError({
-                provider: ep.provider, account: ep.account, kind: ep.kind,
+                provider: ep.provider, account: ep.quotaAccount ?? ep.account, kind: ep.kind,
                 status: res.status, body: errText, headers: res.headers,
             });
             lastErr = failure(info);

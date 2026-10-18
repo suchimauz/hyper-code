@@ -5,7 +5,7 @@ const ctx: any = { fns: {
     procs: { ui: {
         escape: ({ text }: any) => String(text),
         row: (o: any) => JSON.stringify(o),
-        heading: ({ title }: any) => title,
+        heading: ({ title, meta }: any) => `${title} ${meta ?? ""}`,
         empty: () => "empty",
         button: (o: any) => JSON.stringify(o),
         toolbar: () => "toolbar",
@@ -47,4 +47,16 @@ test("shows a reconnect action only on the broken account", () => {
     expect(html).toContain("llms.loginPopupFor");
     expect(html).toContain('\\"account\\":\\"persona\\"');
     expect(html).not.toContain('llms.loginPopupFor\\",\\"params\\":{\\"provider\\":\\"codex\\",\\"account\\":\\"healthy\\"');
+});
+
+test("gateway health is API availability, never exhausted quota or verified generation", () => {
+    for (const status of ["available", "unavailable", "unknown", "configured"] as const) {
+        const html = accountsCard(ctx, null, { accounts: [{ provider: "oneapi", account: "default", label: "Asoft LLM Gate", model: "oneapi:", source: "file", available: status === "available", usedPercent: null, planType: null, resetsAt: null, parkedAgents: 0, gatewayHealth: { configured: true, status, reason: "models-ok", checkedAt: 1, models: [] } }] });
+        expect(html).toContain("Asoft LLM Gate");
+        expect(html).toContain('data-provider="oneapi"');
+        expect(html).toContain("no quota data");
+        expect(html).toContain("generation not verified");
+        expect(html).not.toContain("limit exhausted");
+        expect(html).not.toContain("llms.removeAccount");
+    }
 });

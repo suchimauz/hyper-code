@@ -6,7 +6,7 @@
  * Resolve upstream URL and authenticated headers for relaying one model call through an own provider
  *
  * Refreshes subscription credentials (claude-code, anthropic-oauth, codex,
- * kimi-coding) exactly like the local stream functions and adds the identity
+ * kimi-coding, xai) exactly like the local stream functions and adds the identity
  * headers each provider requires. Returns null when no credential is available.
  * @param opts.provider Own provider name, e.g. "claude-code".
  * @param opts.account Credential account within the provider. @default "default"
@@ -35,6 +35,7 @@ export default async function (
     else if (ep.provider === "anthropic-oauth") apiKey = await ctx.fns.llm.getAnthropicOAuthToken({ account });
     else if (ep.provider === "kimi-coding") apiKey = await ctx.fns.llm.refreshKimiCode({ account }) ?? apiKey;
     else if (ep.provider === "codex") apiKey = await ctx.fns.llm.refreshCodex({ account }) ?? apiKey;
+    else if (ep.provider === "xai") apiKey = await ctx.fns.llm.getXaiOAuthToken({ account });
     if (!apiKey) return null;
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (ep.api === "anthropic") {
@@ -55,6 +56,10 @@ export default async function (
         headers.originator = "codex_cli_rs";
         headers.version = await ctx.fns.llm.codexCliVersion({});
         headers["OpenAI-Beta"] = "responses=experimental";
+        headers.accept = "text/event-stream";
+        if (opts.sessionId) headers.session_id = opts.sessionId;
+    } else if (ep.provider === "xai") {
+        headers.authorization = `Bearer ${apiKey}`;
         headers.accept = "text/event-stream";
         if (opts.sessionId) headers.session_id = opts.sessionId;
     } else {

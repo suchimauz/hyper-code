@@ -39,7 +39,7 @@ describe("agent.autoCompactIfNeeded window threshold", () => {
         const result = await ctx.fns.agent.autoCompactIfNeeded({ agent });
         expect(result.status).toBe("compacted");
         expect(calls).toBe(1);
-        expect(ctx.fns.compaction.contextWindow({ model: "codex/work:gpt-5.6-sol" })).toBe(272_000);
-        expect(ctx.fns.compaction.contextWindow({ model: "lmstudio:mystery" })).toBeNull();
+        expect((await ctx.fns.compaction.contextWindow({ model: "codex/work:gpt-5.6-sol" }))).toBe(272_000);
+        expect((await ctx.fns.compaction.contextWindow({ model: "lmstudio:mystery" }))).toBeNull();
     });
 });

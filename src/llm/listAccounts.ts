@@ -37,6 +37,8 @@ export default async function (
     resetCredits: types.llm.UsageSnapshot["resetCredits"];
     parkedAgents: number;
     needsReconnect: boolean;
+    /** Gateway API catalogue health; does not imply generation success or quota. */
+    gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>;
 }>> {
     const now = opts?.now ?? Date.now();
     const filter = opts?.provider;
@@ -117,6 +119,14 @@ export default async function (
             (item as any).nodeUrl = node.url; (item as any).models = node.catalog?.length ?? 0; (item as any).error = node.lastError;
             out.push(item);
         }
+    }
+
+    if ((!filter || filter === "oneapi") && ctx.fns.llm.gatewayHealth) {
+        const gatewayHealth = await ctx.fns.llm.gatewayHealth({});
+        const item = entry("oneapi", "default", "file", new Map(), new Set());
+        item.label = "Asoft LLM Gate";
+        item.available = gatewayHealth.status === "available";
+        out.push({ ...item, gatewayHealth });
     }
 
     return out;

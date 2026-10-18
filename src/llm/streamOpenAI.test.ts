@@ -67,3 +67,55 @@ describe.skipIf(!process.env.LIVE_LLM)("agent.stream — stateless /v1/chat/comp
     }, 60_000);
 
 });
+
+// Offline gateway protocol regressions: no network and no real credentials.
+describe("OpenAI-compatible gateway normalization", () => {
+    const run = async (response: Response) => {
+        let request: any;
+        const events: any[] = [];
+        const ctx: any = { fns: {
+            agent: { buildLlmRequest: async () => ({ system: "", messages: [] }), wireTools: () => [] },
+            llm: {
+                resolveEndpoint: async () => ({ provider: "oneapi", modelId: "requested-alias", url: "http://mock.invalid", apiKey: null }),
+                toOpenAIMessages: () => [],
+                parseSSE: (opts: any) => parseSSE(ctx, null, opts),
+                connectFetch: async (opts: any) => { request = JSON.parse(opts.init.body); return response; },
+            },
+        } };
+        const result = await stream(ctx, null, { agent: { model: "oneapi:requested-alias" } as any, onEvent: ev => events.push(ev) });
+        return { result, request, events };
+    };
+    test("accepts JSON fallback, separates reasoning, preserves distinct tool slots and reported model", async () => {
+        const { result, request, events } = await run(Response.json({ model: "gateway-reported-alias", usage: { completion_tokens: 3 }, choices: [{ finish_reason: "tool_calls", message: {
+            content: "hello", reasoning: "private thought", tool_calls: [
+                { id: "a", function: { name: "first", arguments: '{"x":1}' } },
+                { id: "b", function: { name: "second", arguments: '{}' } },
+            ],
+        } }] }));
+        expect(request.model).toBe("requested-alias");
+        expect(request.stream).toBe(true);
+        expect(result.requestedModel).toBe("requested-alias");
+        expect(result.responseModel).toBe("gateway-reported-alias");
+        expect(result.text).toBe("hello");
+        expect(result.thinking).toBe("private thought");
+        expect(result.toolCalls).toEqual([{ id: "a", name: "first", args: { x: 1 } }, { id: "b", name: "second", args: {} }]);
+        expect(events.map(e => e.type)).toEqual(["text_delta", "thinking_delta"]);
+    });
+    test("keeps SSE reasoning out of text and concatenates tool arguments", async () => {
+        const frames = [
+            { model: "reported", choices: [{ delta: { reasoning_content: "thought", tool_calls: [{ index: 0, id: "t", function: { name: "lookup", arguments: '{"x":' } }] } }] },
+            { choices: [{ delta: { content: "answer", tool_calls: [{ index: 0, function: { arguments: '2}' } }] }, finish_reason: "tool_calls" }] },
+            { choices: [], usage: { total_tokens: 9 } },
+        ];
+        const { result } = await run(new Response(frames.map(f => `data: ${JSON.stringify(f)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } }));
+        expect(result.text).toBe("answer");
+        expect(result.thinking).toBe("thought");
+        expect(result.responseModel).toBe("reported");
+        expect(result.usage).toEqual({ total_tokens: 9 });
+        expect(result.toolCalls).toEqual([{ id: "t", name: "lookup", args: { x: 2 } }]);
+    });
+    test("does not silently return an empty answer for non-SSE or gateway error bodies", async () => {
+        await expect(run(new Response("not a stream"))).rejects.toThrow("no completion choices");
+        await expect(run(Response.json({ error: { message: "private upstream detail" } }))).rejects.toThrow("returned an error");
+    });
+});
