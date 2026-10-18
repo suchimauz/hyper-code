@@ -98,6 +98,44 @@ export default async function (
     let consumedUserIdx = -1;
     const MAX_TURNS = 300;
     let turns = 0;
+    // One unsuccessful compaction per run: a failing summarizer must not become
+    // another expensive loop. Successful compactions may recur as context grows.
+    let compactionBlocked = false;
+    const runToken = agent.currentJobId ?? undefined;
+    const compactAtBoundary = async () => {
+        ac.signal.throwIfAborted();
+        if (runToken) {
+            const owner = ((await ctx.fns.procs.db.select({ sql: 'SELECT run_state, run_token FROM agents WHERE id = ?', params: [agent.id] })) as any[])[0];
+            if (agent.currentJobId !== runToken || owner?.run_state !== 'running' || owner?.run_token !== runToken) throw new DOMException('Run ownership lost', 'AbortError');
+        }
+        let compacted;
+        try {
+            compacted = await ctx.fns.agent.autoCompactIfNeeded({ agent, runToken, signal: ac.signal, checkOnly: compactionBlocked });
+        } catch (error) {
+            compactionBlocked = true;
+            ctx.fns.procs.log?.warn?.({ event: 'agent.mid-turn-compaction.failed', msg: String(error), agentId: agent.id });
+        }
+        if (compacted && ['failed', 'stale', 'not_needed', 'no_compactor', 'busy'].includes(compacted.status)) compactionBlocked = true;
+        ac.signal.throwIfAborted();
+        // No retryable provider error: finish this run with a durable explanation,
+        // preserving the cursor and every completed tool effect exactly once.
+        if (compactionBlocked || compacted?.status === 'compacted' || compacted?.status === 'already_compact') {
+            const budget = await ctx.fns.agent.autoCompactIfNeeded({ agent, runToken, signal: ac.signal, checkOnly: true });
+            if (budget.contextWindow && budget.estimatedTokens >= budget.contextWindow * 0.9) {
+                const text = 'Paused before another model request: context is near the model limit and compaction could not reduce it. Compact the context or start a new chat before continuing.';
+                await ctx.fns.session.appendMessage({ id: agent.id, message: { role: 'assistant', content: text } });
+                await ctx.fns.session.appendErrorEvent({ id: agent.id, error: text });
+                await ctx.fns.agent.stop({ agent, clearQueue: true });
+                return true;
+            }
+        }
+        ac.signal.throwIfAborted();
+        if (runToken) {
+            const owner = ((await ctx.fns.procs.db.select({ sql: 'SELECT run_state, run_token FROM agents WHERE id = ?', params: [agent.id] })) as any[])[0];
+            if (agent.currentJobId !== runToken || owner?.run_state !== 'running' || owner?.run_token !== runToken) throw new DOMException('Run ownership lost', 'AbortError');
+        }
+        return false;
+    };
 
     let goalIterations = 0;
     let lastGoalFeedback = "";
@@ -105,6 +143,7 @@ export default async function (
     const planAttempts: Record<string, number> = {};
     let totalPlanInjections = 0;
     while (true) {
+        ac.signal.throwIfAborted();
         if (++turns > MAX_TURNS) {
             await ctx.fns.session.appendErrorEvent({ id: agent.id, error: `run hit the ${MAX_TURNS}-turn cap — closing; send a message to continue` });
             await ctx.fns.session.appendMessage({ id: agent.id, message: {
@@ -127,6 +166,12 @@ export default async function (
         })) as any[])[0];
         consumedUserIdx = Math.max(consumedUserIdx, Number(seen?.i ?? -1));
         await ctx.fns.session.syncAgentState({ agent });
+        // Initial preflight is safe only when all persisted calls have results.
+        if (turns === 1) {
+            const answered = new Set(agent.messages.filter((m: any) => m.role === 'tool').map((m: any) => m.tool_call_id));
+            const complete = agent.messages.every((m: any) => !m.tool_calls?.some((c: any) => !answered.has(c.id)));
+            if (complete && await compactAtBoundary()) return { text: '', usage: null, consumedUserIdx };
+        }
 
         // Keep the current prose in live memory for native clients. Persisting
         // every token would hammer Postgres; the final assistant event remains
@@ -358,6 +403,9 @@ export default async function (
             observeCompletedTurn(final.idx);
             return { text, html, usage, consumedUserIdx, terminal: true };
         }
+        // Every side effect and tool-result replacement is durable now. Never
+        // restart the turn or replay a tool batch to reclaim model context.
+        if (await compactAtBoundary()) return { text: '', usage: null, consumedUserIdx };
     }
     } finally {
         agent.activeRunCount = Math.max(0, (agent.activeRunCount ?? 1) - 1);

@@ -1,9 +1,11 @@
 /**
- * Compacts an idle agent context into a hidden summary fork and retained verbatim tail
+ * Compact idle context, or an owned run at a completed tool-batch boundary, into a hidden summary and verbatim tail
  *
  * Use for manual, non-destructive context compaction. It summarizes the current effective projection, preserves a safe recent tail, and atomically activates only when the root transcript and compact head remain unchanged.
  * @param opts.agent Live root agent whose effective model context is compacted.
  * @param opts.instructions Optional focus instructions appended to the handoff summarizer prompt.
+ * @param opts.runToken Owning worker token for a completed tool-batch boundary.
+ * @param opts.signal Owning run signal; cancellation prevents activation.
  */
 export default async function (
     ctx: Context,
@@ -13,16 +15,30 @@ export default async function (
         agent: types.agent.Agent;
         /** Optional focus instructions appended to the handoff summarizer prompt. */
         instructions?: string;
+        /** Owning worker token, supplied only at a completed tool-batch boundary. */
+        runToken?: string;
+        /** Owning run cancellation signal; required for mid-turn compaction. */
+        signal?: AbortSignal;
     },
 ): Promise<{ status: "compacted" | "not_needed" | "stale"; revision?: number; tokensBefore: number; tokensAfter?: number; keptMessages?: number; summary?: string }> {
     const parent = opts.agent;
+    const midTurn = !!opts.signal;
+    const controller = parent.abortController;
+    const ownsRun = () => !midTurn || (controller?.signal === opts.signal && parent.abortController === controller && !opts.signal!.aborted && (parent.activeRunCount ?? 0) === 1 && (parent.currentJobId ?? undefined) === opts.runToken);
+    const ownershipSql = midTurn && opts.runToken ? "run_state = 'running' AND run_token = ?" : "run_state = 'idle' AND run_token IS NULL";
+    const ownershipParams = midTurn && opts.runToken ? [opts.runToken] : [];
+    if (!ownsRun() || (!midTurn && (parent.activeRunCount ?? 0) > 0)) throw new Error("compaction run ownership lost");
     const estimate = (messages: any[]) => Math.ceil(messages.reduce((n: number, m: any) => n + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length) + JSON.stringify(m.tool_calls ?? []).length, 0) / 4);
     const compactMessage = (m: any) => ({ role: m.role, content: m.content, ...(m.message_type ? { message_type: m.message_type } : {}), ...(m.tool_calls?.length ? { tool_calls: m.tool_calls } : {}), ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}) });
     const rootMessages = await ctx.fns.session.getMessages({ id: parent.id });
     const sourceFrontier = rootMessages.length;
-    const row = ((await ctx.fns.procs.db.select({ sql: "SELECT updated_at, run_state, sleep_context FROM agents WHERE id = ? AND archived_at IS NULL", params: [parent.id] })) as any[])[0];
+    const row = ((await ctx.fns.procs.db.select({ sql: "SELECT updated_at, run_state, run_token, sleep_context FROM agents WHERE id = ? AND archived_at IS NULL", params: [parent.id] })) as any[])[0];
     if (!row) throw new Error("agent not found");
-    if (row.run_state !== "idle") throw new Error("agent is running");
+    if (midTurn && opts.runToken ? row.run_state !== "running" || row.run_token !== opts.runToken : row.run_state !== "idle" || row.run_token != null) throw new Error("agent run ownership mismatch");
+    const fingerprintSql = "SELECT md5(COALESCE(jsonb_agg(to_jsonb(m) ORDER BY idx)::text, '[]')) AS fingerprint FROM messages m WHERE agent_id = ?";
+    const fingerprint = ((await ctx.fns.procs.db.select({ sql: fingerprintSql, params: [parent.id] })) as any[])[0].fingerprint;
+    // Capture must describe the messages read above, not a concurrent append/edit.
+    if (JSON.stringify(await ctx.fns.session.getMessages({ id: parent.id })) !== JSON.stringify(rootMessages)) return { status: "stale", tokensBefore: estimate(rootMessages) };
     const sleep = ctx.fns.agent.normalizeSleepContext({ sleepContext: row.sleep_context });
     if (sleep?.draftRevision != null) throw new Error("compaction already running");
     const active = sleep ? ctx.fns.agent.getSleepGeneration({ sleepContext: sleep, kind: "active" }) : null;
@@ -56,19 +72,31 @@ export default async function (
     const generation: any = { revision, kind: "compaction", status: "draft", contextAgentId: child.id, sourceAgentId: parent.id, sourceOffset: sourceFrontier, sourceFrontier, tailStart, summary: "", ...(opts.instructions?.trim() ? { instructions: opts.instructions.trim() } : {}), tokensBefore, tokensAfter: 0, model: parent.model, createdAt };
     const draftContext = { mode: sleep?.mode ?? "full", activeRevision: oldHead, draftRevision: revision, draftOwner, generations: [...(sleep?.generations ?? []), generation].slice(-8) };
     const draftAt = Date.now();
-    const drafted = await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb, updated_at = ? WHERE id = ? AND updated_at = ? AND run_state = 'idle'", params: [JSON.stringify(draftContext), draftAt, parent.id, Number(row.updated_at)] });
+    if (!ownsRun()) { await ctx.fns.session.archive({ id: child.id }); return { status: "stale", tokensBefore }; }
+    const drafted = await ctx.fns.procs.db.run({ sql: `UPDATE agents SET sleep_context = ?::jsonb, updated_at = ? WHERE id = ? AND updated_at = ? AND ${ownershipSql}`, params: [JSON.stringify(draftContext), draftAt, parent.id, Number(row.updated_at), ...ownershipParams] });
     if (!drafted.changes) { await ctx.fns.session.archive({ id: child.id }).catch(() => undefined); return { status: "stale", tokensBefore }; }
     parent.sleepContext = draftContext;
     await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_start", payload: { revision } });
     try {
       // Provider-specific strategy from `$compaction_<provider>.ts`, else `$compaction_default.ts`.
       const compactor = (await ctx.fns.compaction.resolve({ model: child.model }));
-      const result = await compactor.compact(ctx, session, {
+      const instructions = await ctx.fns.agent.fullSystemPrompt({ agent: parent });
+      opts.signal?.throwIfAborted();
+      let onAbort: (() => void) | undefined;
+      const aborted = opts.signal ? new Promise<never>((_, reject) => {
+        onAbort = () => reject(new DOMException('Compaction aborted', 'AbortError'));
+        opts.signal!.addEventListener('abort', onAbort, { once: true });
+      }) : null;
+      const pendingSummary = compactor.compact(ctx, session, {
         model: child.model,
         sessionId: child.id,
-        instructions: await ctx.fns.agent.fullSystemPrompt({ agent: parent }),
+        instructions,
         focus: opts.instructions?.trim() || undefined,
         messages: effective.map(compactMessage),
+        signal: opts.signal,
+      });
+      const result = await (aborted ? Promise.race([pendingSummary, aborted]) : pendingSummary).finally(() => {
+        if (onAbort) opts.signal!.removeEventListener('abort', onAbort);
       });
       const summary = result.summary;
       const summaryMessage: any = result.message;
@@ -76,25 +104,25 @@ export default async function (
       generation.compactor = compactor.provider;
       await ctx.fns.session.appendMessage({ id: child.id, message: summaryMessage });
       const currentCount = (await ctx.fns.session.getMessages({ id: parent.id })).length;
-      const currentRow = ((await ctx.fns.procs.db.select({ sql: "SELECT updated_at, run_state, sleep_context FROM agents WHERE id = ?", params: [parent.id] })) as any[])[0];
+      const currentRow = ((await ctx.fns.procs.db.select({ sql: "SELECT updated_at, run_state, run_token, sleep_context FROM agents WHERE id = ?", params: [parent.id] })) as any[])[0];
       const currentSleep = ctx.fns.agent.normalizeSleepContext({ sleepContext: currentRow?.sleep_context });
-      const valid = currentRow?.run_state === "idle" && currentCount === sourceFrontier && currentSleep?.draftRevision === revision && currentSleep?.activeRevision === oldHead;
+      const valid = tokensAfter < tokensBefore && ownsRun() && (midTurn && opts.runToken ? currentRow?.run_state === "running" && currentRow?.run_token === opts.runToken : currentRow?.run_state === "idle" && currentRow?.run_token == null) && currentCount === sourceFrontier && currentSleep?.draftRevision === revision && currentSleep?.activeRevision === oldHead;
       if (!valid) {
         generation.status = "stale"; generation.summary = summary;
         const stale = { ...draftContext, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
-        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ?", params: [JSON.stringify(stale), parent.id, String(revision)] });
-        parent.sleepContext = stale;
+        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(stale), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] });
+        await ctx.fns.session.syncAgentState({ agent: parent });
         return { status: "stale", tokensBefore };
       }
       Object.assign(generation, { status: "active", summary, tokensAfter, activatedAt: Date.now() });
       const next = { mode: "compact", activeRevision: revision, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
-      const activated = await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb, updated_at = ? WHERE id = ? AND updated_at = ? AND run_state = 'idle' AND (SELECT COUNT(*) FROM messages WHERE agent_id = ?) = ?", params: [JSON.stringify(next), generation.activatedAt, parent.id, Number(currentRow.updated_at), parent.id, sourceFrontier] });
+      const activated = await ctx.fns.procs.db.run({ sql: `UPDATE agents SET sleep_context = ?::jsonb, updated_at = ? WHERE id = ? AND updated_at = ? AND ${ownershipSql} AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ? AND (SELECT md5(COALESCE(jsonb_agg(to_jsonb(m) ORDER BY idx)::text, '[]')) FROM messages m WHERE agent_id = ?) = ?`, params: [JSON.stringify(next), generation.activatedAt, parent.id, Number(currentRow.updated_at), ...ownershipParams, String(revision), draftOwner, oldHead == null ? null : String(oldHead), parent.id, fingerprint] });
       if (!activated.changes) {
         generation.status = "stale";
         delete generation.activatedAt;
         const stale = { ...draftContext, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
-        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ?", params: [JSON.stringify(stale), parent.id, String(revision)] });
-        parent.sleepContext = stale;
+        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(stale), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] });
+        await ctx.fns.session.syncAgentState({ agent: parent });
         return { status: "stale", tokensBefore };
       }
       parent.sleepContext = next;
@@ -103,8 +131,8 @@ export default async function (
     } catch (error: any) {
       generation.status = "failed";
       const failed = { ...draftContext, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
-      await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ?", params: [JSON.stringify(failed), parent.id, String(revision)] }).catch(() => undefined);
-      parent.sleepContext = failed;
+      await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(failed), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] }).catch(() => undefined);
+      await ctx.fns.session.syncAgentState({ agent: parent });
       await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_failed", payload: { revision, error: String(error?.message ?? error) } }).catch(() => undefined);
       throw error;
     }
