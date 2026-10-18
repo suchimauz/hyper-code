@@ -125,7 +125,8 @@ export default async function (
                 const text = 'Paused before another model request: context is near the model limit and compaction could not reduce it. Compact the context or start a new chat before continuing.';
                 await ctx.fns.session.appendMessage({ id: agent.id, message: { role: 'assistant', content: text } });
                 await ctx.fns.session.appendErrorEvent({ id: agent.id, error: text });
-                await ctx.fns.agent.stop({ agent, clearQueue: true });
+                if (runToken) await ctx.fns.agent.stopContextGuard({ agent, runToken });
+                else await ctx.fns.agent.stop({ agent, clearQueue: true });
                 return true;
             }
         }

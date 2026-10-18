@@ -52,6 +52,7 @@ export default async function (
         sql: `UPDATE agents SET next_run_at = COALESCE(next_run_at, ?), updated_at = ?
               WHERE id = ? AND archived_at IS NULL
                 AND COALESCE(last_error, '') NOT LIKE 'stopped by user%'
+                AND COALESCE(last_error, '') <> 'context limit guard stopped work'
                 AND COALESCE(NULLIF(scratchpad, '')::jsonb #>> '{plan,pausedAt}', '') IN ('', '0')`,
         params: [ts, ts, parentId],
     });

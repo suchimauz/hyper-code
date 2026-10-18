@@ -57,7 +57,13 @@ const MAX_STALE_RETRIES = 3;
 
 async function recoverStaleRuns(ctx: Context, now: number): Promise<void> {
     const recovered = await ctx.fns.procs.db.select({
-        sql: `UPDATE agents
+        sql: `WITH stale AS (
+            SELECT id,run_token AS failed_token FROM agents
+            WHERE run_state='running'
+              AND COALESCE(run_heartbeat_at,run_started_at) IS NOT NULL
+              AND COALESCE(run_heartbeat_at,run_started_at) < ?
+            FOR UPDATE
+        ) UPDATE agents
             SET run_state = 'idle', run_started_at = NULL,
                 run_heartbeat_at = NULL, run_token = NULL,
                 stale_recovery_count = stale_recovery_count + 1,
@@ -68,11 +74,9 @@ async function recoverStaleRuns(ctx: Context, now: number): Promise<void> {
                     THEN 'stale run recovered; automatic retry scheduled'
                     ELSE 'stale run recovered; automatic retry limit reached' END,
                 updated_at = ?
-          WHERE run_state = 'running'
-            AND COALESCE(run_heartbeat_at, run_started_at) IS NOT NULL
-            AND COALESCE(run_heartbeat_at, run_started_at) < ?
-          RETURNING id`,
-        params: [MAX_STALE_RETRIES, now, MAX_STALE_RETRIES, now, now - RUN_LEASE_MS],
+          FROM stale WHERE agents.id=stale.id
+          RETURNING agents.id,stale.failed_token,agents.next_run_at`,
+        params: [now - RUN_LEASE_MS, MAX_STALE_RETRIES, now, MAX_STALE_RETRIES, now],
     }) as any[];
 
     // In this process the revoked run may still be awaiting a tool. Cooperative
@@ -81,6 +85,9 @@ async function recoverStaleRuns(ctx: Context, now: number): Promise<void> {
         const live = (ctx.state as any).agent?.[row.id];
         if (live) live.currentJobId = null;
         try { live?.abortController?.abort('stale_run_recovered'); } catch {}
+        if (row.failed_token && row.next_run_at == null) {
+            await ctx.fns.webPush.recordFailure({agentId:row.id,runToken:row.failed_token,finalizedAt:now});
+        }
     }
     if (recovered.length) { try { ctx.fns.agent.wakeWorker({}); } catch {} }
 }
@@ -267,6 +274,12 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
                     params: [ts + Math.max(1_000, Number(failure?.retryAfterMs ?? 10_000)), agentId],
                 });
             }
+        }
+
+        // Retry/parking decisions are durable before attempting terminal delivery.
+        // The timestamp fence additionally rejects concurrent posts and manual stops.
+        if (errorText && !aborted) {
+            await ctx.fns.webPush.recordFailure({agentId,runToken,finalizedAt:ts});
         }
 
         if (agent.currentJobId === runToken) {

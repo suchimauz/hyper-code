@@ -35,6 +35,7 @@ test("steer persists notifications before guarded scheduling, without trusting c
     expect(result).toEqual({ delivered: true, parentId: "parent", messageIdx: 12 });
     expect(calls).toEqual(["message", "event", "schedule", "sync"]);
     expect(schedulingSql).toContain("COALESCE(last_error, '') NOT LIKE 'stopped by user%'");
+    expect(schedulingSql).toContain("COALESCE(last_error, '') <> 'context limit guard stopped work'");
     expect(schedulingSql).toContain("NULLIF(scratchpad, '')::jsonb #>> '{plan,pausedAt}'");
     expect(schedulingSql).toContain("next_run_at = COALESCE(next_run_at, ?)");
 });
