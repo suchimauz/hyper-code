@@ -53,5 +53,9 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     await ctx.fns.session.appendEvent({ id: agentId, event, ts: now });
     const live = (ctx.state as any).agent?.[agentId];
     if (live) await ctx.fns.session.syncAgentState({ agent: live });
+    // Only new actionable inputs trigger push; delivery must never break form creation.
+    await ctx.fns.webPush.notifyInput({ inputId: id }).catch(() => {
+        console.warn("Web Push input notification unavailable");
+    });
     return { id, kind: kindName, state: "open", agentId };
 }

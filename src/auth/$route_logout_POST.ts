@@ -2,6 +2,12 @@
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
     const raw = new Bun.CookieMap(opts.req.headers.get("cookie") ?? "").get(ctx.fns.procs.auth.cookieName({}));
     const claims: any = raw ? await ctx.fns.procs.auth.verify({ token: raw, allowExpired: true }).catch(() => null) : null;
+    // Revoke this browser login's push subscriptions before invalidating its OIDC binding.
+    // A delivery-store failure must never prevent the user from signing out.
+    if (raw && claims) {
+        try { await ctx.fns.webPush.revokeSession({ token: raw }); }
+        catch { ctx.fns.procs.log.warn({ event: 'web-push.logout-revoke.failed', msg: 'Push subscription cleanup failed during logout' }); }
+    }
     const sid = String(claims?.jti ?? "");
     if (sid.startsWith("s_")) {
         await ctx.fns.procs.db.run({ sql: "UPDATE auth_sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL", params: [Date.now(), sid] }).catch(() => {});

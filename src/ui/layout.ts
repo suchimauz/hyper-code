@@ -674,6 +674,7 @@ ${opts.headExtra ?? ""}
 <script src="/ui/mobileMessage.js" defer></script>
 <script src="/ui/chatSearch.js" defer></script>
 <script src="/ui/mobileUsage.js" defer></script>
+<script src="/ui/webPush.js" defer></script>
 <script src="/screen/client.js" defer></script>
 <script src="/ui/wake-timer.js" defer></script>
 <script src="/ui/spin-sync.js" defer></script>

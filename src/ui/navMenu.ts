@@ -23,6 +23,11 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
       <button id="nav-close" type="button" class="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-base-200" aria-label="Close menu" title="Close menu"><i class="ph ph-x text-lg" aria-hidden="true"></i></button>
     </div>
     <div id="nav-results" class="min-h-0 flex-1 overflow-y-auto"></div>
+    <details class="border-t border-ui-border px-4 py-2 text-xs">
+      <summary class="cursor-pointer">Push notifications · this device</summary>
+      <p id="web-push-status" role="status" aria-live="polite" class="my-2 text-muted">Action requests and stopping errors. Choose types per agent in Agent Inspector.</p>
+      <button id="web-push-toggle" type="button" disabled class="btn btn-sm mb-1" aria-describedby="web-push-status">Enable push notifications</button>
+    </details>
     <div data-nav-keyboard-help class="flex gap-4 border-t border-ui-border bg-base-200 px-4 py-1.5 text-3xs text-subtle">
       <span>⌘J/⌘K move</span><span>⌘←/⌘→ widget</span><span>↵ open</span><span>⌘↵ beside</span><span>⌘1–9 tab</span><span class="ml-auto">⌘/ open</span>
     </div>
