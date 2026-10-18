@@ -16,7 +16,7 @@
     }, true);
     // A popup opened from a panel row replaces the panel: close it so the two never overlap.
     document.addEventListener('click', (event) => {
-        const row = event.target.closest?.('[data-chat-panel] [hx-popup]');
+        const row = event.target.closest?.('[data-chat-panel] [hx-popup], [data-chat-panel] [data-canvas-toggle="open"]');
         if (row) row.closest('[data-chat-panel]')?.hidePopover?.();
     }, true);
 })();

@@ -8,8 +8,81 @@
     const page = () => document.querySelector('[data-page="agent"][data-canvas-agent]');
     const agentOf = root => root?.getAttribute('data-canvas-agent') || '';
 
+    // Mobile is a CSS overlay on the existing panel: never reparent a live iframe.
+    const mobile = window.matchMedia('(max-width: 700px), (max-width: 1023px) and (pointer: coarse)');
+    let modalPanel = null, returnFocus = null, scrollSnapshot = null;
+    const inertBefore = new Map();
+    const restoreBackground = () => {
+        for (const [el, inert] of inertBefore) el.inert = inert;
+        inertBefore.clear();
+    };
+    const popupOpen = () => document.querySelector('dialog[open]');
+    const syncMobile = () => {
+        const root = page();
+        if (scrollSnapshot && !root?.contains(scrollSnapshot.element)) scrollSnapshot = null;
+        if (returnFocus && !returnFocus.isConnected) returnFocus = null;
+        const panel = root?.querySelector(':scope > [data-canvas-panel]');
+        const open = mobile.matches && root?.hasAttribute('data-canvas-open');
+        if (modalPanel && (modalPanel !== panel || !open)) {
+            modalPanel.removeAttribute('aria-modal');
+            modalPanel.removeAttribute('role');
+            modalPanel.removeAttribute('tabindex');
+            restoreBackground();
+            modalPanel = null;
+            if (!open && returnFocus?.isConnected && !returnFocus.matches('input, textarea, [contenteditable="true"]')) returnFocus.focus({ preventScroll: true });
+            if (!open) {
+                returnFocus = null;
+                if (scrollSnapshot?.element.isConnected) scrollSnapshot.element.scrollTop = scrollSnapshot.top;
+                scrollSnapshot = null;
+            }
+        }
+        if (panel) panel.inert = mobile.matches && !open;
+        if (!open || !panel) return;
+        if (!modalPanel) {
+            returnFocus ??= document.activeElement;
+            const messages = root.querySelector('#messages');
+            if (!scrollSnapshot && messages) scrollSnapshot = { element: messages, top: messages.scrollTop };
+            modalPanel = panel;
+            panel.setAttribute('role', 'dialog');
+            panel.setAttribute('aria-modal', 'true');
+            panel.setAttribute('tabindex', '-1');
+        }
+        // Inert siblings at every ancestor, not the ancestor containing Canvas.
+        // This covers chat, navigation and inspectors without touching their DOM or drafts.
+        for (let node = panel; node && node !== document.body; node = node.parentElement) {
+            for (const sibling of node.parentElement?.children || []) {
+                if (sibling === node || !(sibling instanceof HTMLElement) || sibling.tagName === 'DIALOG') continue;
+                if (!inertBefore.has(sibling)) inertBefore.set(sibling, sibling.inert);
+                sibling.inert = true;
+            }
+        }
+        if (!popupOpen() && !panel.contains(document.activeElement)) (panel.querySelector('.canvas-mobile-back') || panel).focus({ preventScroll: true });
+    };
+    const focusable = panel => [...panel.querySelectorAll('button, select, input, textarea, a[href], iframe, [tabindex]')]
+        .filter(el => !el.disabled && el.tabIndex >= 0 && !el.closest('[inert]') && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+    document.addEventListener('keydown', event => {
+        if (!modalPanel || popupOpen()) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            setOpen(page(), false);
+        } else if (event.key === 'Tab') {
+            const controls = focusable(modalPanel);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (!first || (event.shiftKey && (document.activeElement === first || document.activeElement === modalPanel)) || (!event.shiftKey && document.activeElement === last)) {
+                event.preventDefault();
+                (event.shiftKey ? last : first)?.focus({ preventScroll: true });
+            }
+        }
+    }, true);
+    document.addEventListener('focusin', event => {
+        if (modalPanel && !popupOpen() && !modalPanel.contains(event.target)) (modalPanel.querySelector('.canvas-mobile-back') || modalPanel).focus({ preventScroll: true });
+    });
+    mobile.addEventListener('change', syncMobile);
+
     // Keep the conversation pinned to the bottom across a reflow, if it was there.
     const keepBottom = fn => {
+        if (mobile.matches) { fn(); return; }
         const messages = document.getElementById('messages');
         const atBottom = messages && messages.scrollHeight - messages.scrollTop - messages.clientHeight < 40;
         fn();
@@ -31,6 +104,7 @@
             if (!root.hasAttribute('data-canvas-open')) root.removeAttribute('data-canvas-meta-open');
         });
         paintButtons(root);
+        syncMobile();
     };
     const save = (root, body) => fetch(`/canvas/${encodeURIComponent(agentOf(root))}`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
@@ -59,6 +133,7 @@
             panel.replaceWith(next);
             runBodyScripts(next);
             window.htmx?.process?.(next);
+            syncMobile();
             return;
         }
         // Same body: change only what is around it. Moving an iframe in the DOM reloads it, so the live
@@ -66,6 +141,7 @@
         panel.setAttribute('data-canvas-rev', next.getAttribute('data-canvas-rev') || '');
         const oldHeader = panel.querySelector(':scope > header'), newHeader = next.querySelector(':scope > header');
         if (oldHeader && newHeader) { oldHeader.replaceWith(newHeader); window.htmx?.process?.(newHeader); }
+        syncMobile();
         // A live-state page (html tab) gets the new state posted in instead of a reload.
         const nextState = newBody.getAttribute('data-canvas-state');
         if (nextState !== null && nextState !== oldBody.getAttribute('data-canvas-state')) {
@@ -188,6 +264,12 @@
         }
     }, true);
 
+    document.addEventListener('change', event => {
+        const select = event.target.closest?.('[data-canvas-mobile-tabs]');
+        const root = page();
+        if (select && root?.contains(select) && select.value) tabAction(root, { activeItemId: Number(select.value) });
+    });
+
     const clampWidth = (root, width) => {
         const chat = document.getElementById('chat-panel');
         const meta = root.querySelector('[data-agent-meta-panel]');
@@ -197,7 +279,7 @@
     document.addEventListener('pointerdown', event => {
         const handle = event.target.closest?.('[data-canvas-resizer]');
         const root = page();
-        if (!handle || !root) return;
+        if (!handle || !root || mobile.matches) return;
         event.preventDefault();
         const chat = document.getElementById('chat-panel');
         const right = chat.getBoundingClientRect().right;
@@ -231,7 +313,7 @@
     document.addEventListener('keydown', event => {
         const handle = event.target.closest?.('[data-canvas-resizer]');
         const root = page();
-        if (!handle || !root || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+        if (!handle || !root || mobile.matches || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
         event.preventDefault();
         const current = document.getElementById('chat-panel').getBoundingClientRect().width;
         const width = clampWidth(root, current + (event.key === 'ArrowLeft' ? 32 : -32));
@@ -343,7 +425,9 @@
         tabAction(root, { navigate: { itemId: Number(form.getAttribute('data-canvas-navigate')), url } });
     });
 
-    const init = () => { const root = page(); if (root) paintButtons(root); };
+    const init = () => { const root = page(); if (root) paintButtons(root); syncMobile(); };
+    // HTMX navigation and server-driven attribute changes share the same lifecycle.
+    new MutationObserver(syncMobile).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-canvas-open'] });
     document.addEventListener('htmx:after:swap', init);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

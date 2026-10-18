@@ -34,5 +34,5 @@ export default async function (
     }));
     const a = view.agent;
     const head = `<div class="mb-2 flex items-center gap-2 px-1">${ctx.fns.chat.icon({ icon: a.icon, model: a.model, size: "md" })}<div class="min-w-0"><div class="truncate text-sm font-medium text-base-content">${esc(a.title || a.id)}</div><div class="truncate font-mono text-3xs text-faint">${esc(a.id)} · ${esc(a.model)}</div></div></div>`;
-    return `${head}<div class="grid grid-cols-2 gap-2">${drawn.filter(Boolean).join("")}</div>`;
+    return `${head}<button type="button" class="chat-search-open mb-2 w-full rounded-lg border border-ui-border p-2 text-left text-sm" data-chat-search="${esc(opts.agentId)}"><i class="ph ph-magnifying-glass" aria-hidden="true"></i> Поиск по переписке</button><button type="button" class="mb-2 w-full rounded-lg border border-ui-border p-2 text-left text-sm" data-canvas-toggle="open">Открыть Canvas</button><div class="grid grid-cols-2 gap-2">${drawn.filter(Boolean).join("")}</div>`;
 }
