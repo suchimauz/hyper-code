@@ -30,17 +30,17 @@ export default async function (ctx: Context, session: Session | null, opts: {
 <head>
 <meta charset="utf-8">
 <meta name="csrf-token" content="${esc(csrfToken)}">
-<script>(function(){try{var saved=localStorage.getItem('hyper-theme');var theme=saved==='light'||saved==='dark'?saved:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme}catch(_){document.documentElement.dataset.theme='light';document.documentElement.style.colorScheme='light'}})()</script>
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>(function(){var mode='auto';try{var saved=localStorage.getItem('hyper-theme');if(saved==='light'||saved==='dark')mode=saved}catch(_){}var theme=mode==='auto'?(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):mode;var root=document.documentElement;root.dataset.themeMode=mode;root.dataset.theme=theme;root.style.colorScheme=theme;root.style.backgroundColor=theme==='dark'?'#252a34':'#ffffff';document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#252a34':'#ffffff';document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').content=theme==='dark'?'black':'default'})()</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>${esc(pageTitle)}</title>
 <link rel="icon" href="${esc(favicon)}">
 <link rel="apple-touch-icon" sizes="180x180" href="/ui/app-icon?size=180">
 <link rel="manifest" href="/ui/manifest.webmanifest">
-<meta name="theme-color" content="#252a34">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hyper">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <!-- htmx 4 (framework bundle). Inheritance stays explicit (htmx 4 default):
      implicit inheritance let hx-trigger="load" leak into child buttons and loop.
      Default 60 s timeout; long actions opt out with hx-config='{"timeout":0}'.
@@ -490,6 +490,8 @@ export default async function (ctx: Context, session: Session | null, opts: {
   #mobile-nav-button:active { transform: scale(.94); }
   #chat-panel > header { padding-left: 3.1rem !important; }
   #nav-overlay { padding: max(.5rem, env(safe-area-inset-top)) max(.5rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left)) !important; }
+  /* Keep the mobile menu and its safe-area surround opaque and theme-matched. */
+  #nav-overlay { background: var(--color-base-100); backdrop-filter: none; -webkit-backdrop-filter: none; }
   #nav-overlay [role="dialog"] { border-radius: 1.25rem; }
   #nav-overlay .nav-row { min-height: 3rem; }
   #nav-overlay [data-nav-keyboard-help] { display: none; }

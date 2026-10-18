@@ -100,26 +100,65 @@
         open(e.clientX + 2, e.clientY + 2, entries);
     });
 
-    // ── theme switch (delegated, so it survives a Dock refresh) ──────────────
+    // Theme preference is separate from the resolved light/dark palette.
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+    let themeMode = document.documentElement.dataset.themeMode || 'auto';
+    try { const saved = localStorage.getItem('hyper-theme'); themeMode = ['light', 'dark', 'auto'].includes(saved) ? saved : 'auto'; } catch (_) {}
+    const themeNames = { light: 'Светлая', dark: 'Тёмная', auto: 'Auto (системная)' };
+    const nextTheme = () => ({ light: 'dark', dark: 'auto', auto: 'light' })[themeMode];
     function paintTheme() {
-        const dark = document.documentElement.dataset.theme === 'dark';
         document.querySelectorAll('[data-action="toggle-theme"]').forEach(button => {
-            button.setAttribute('aria-pressed', String(dark));
-            const label = dark ? 'Включить светлую тему' : 'Включить тёмную тему';
+            button.removeAttribute('aria-pressed');
+            const label = 'Тема: ' + themeNames[themeMode] + '. Переключить: ' + themeNames[nextTheme()];
             button.title = label;
             button.setAttribute('aria-label', label);
+            button.dataset.themeMode = themeMode;
             const icon = button.querySelector('i');
-            if (icon) icon.className = 'ph ' + (dark ? 'ph-sun' : 'ph-moon');
+            if (icon) icon.className = 'ph ' + ({ light: 'ph-sun', dark: 'ph-moon', auto: 'ph-desktop' })[themeMode];
         });
+    }
+    let chromeFrame = 0;
+    function refreshThemeColor(color) {
+        // WebKit can defer an in-place content mutation until navigation. Replace
+        // the node after the palette has painted; cancel stale rapid toggles.
+        if (chromeFrame) cancelAnimationFrame(chromeFrame);
+        chromeFrame = requestAnimationFrame(() => {
+            chromeFrame = 0;
+            const meta = document.createElement('meta');
+            meta.name = 'theme-color';
+            meta.content = color;
+            document.querySelectorAll('meta[name="theme-color"]').forEach(old => old.remove());
+            document.head.appendChild(meta);
+        });
+    }
+    function applyTheme() {
+        const theme = themeMode === 'auto' ? (systemTheme.matches ? 'dark' : 'light') : themeMode;
+        const root = document.documentElement;
+        root.dataset.themeMode = themeMode;
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+        const color = theme === 'dark' ? '#252a34' : '#ffffff';
+        root.style.backgroundColor = color;
+        document.querySelectorAll('meta[name="theme-color"]').forEach(meta => { meta.content = color; });
+        document.querySelectorAll('meta[name="apple-mobile-web-app-status-bar-style"]').forEach(meta => { meta.content = theme === 'dark' ? 'black' : 'default'; });
+        refreshThemeColor(color);
+        paintTheme();
     }
     document.addEventListener('click', e => {
         if (!e.target.closest?.('[data-action="toggle-theme"]')) return;
-        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-        document.documentElement.dataset.theme = next;
-        document.documentElement.style.colorScheme = next;
-        try { localStorage.setItem('hyper-theme', next); } catch (_) {}
-        paintTheme();
+        themeMode = nextTheme();
+        try { localStorage.setItem('hyper-theme', themeMode); } catch (_) {}
+        applyTheme();
     });
+    systemTheme.addEventListener('change', () => { if (themeMode === 'auto') applyTheme(); });
+    window.addEventListener('pageshow', applyTheme);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) applyTheme(); });
+    window.addEventListener('storage', e => {
+        if (e.key !== 'hyper-theme' && e.key !== null) return;
+        themeMode = ['light', 'dark', 'auto'].includes(e.newValue) ? e.newValue : 'auto';
+        applyTheme();
+    });
+    applyTheme();
 
     // ── refresh after a pin changes (HX-Trigger dock-refresh, or the dock.changed event) ──
     let refreshing = false;
