@@ -34,6 +34,8 @@ export default async function (
     ctx = agentCtx;
     const ac = new AbortController();
     agent.abortController = ac;
+    agent.activeRunCount = (agent.activeRunCount ?? 0) + 1;
+    try {
     // One successful-turn hook shared by direct and worker runs. The cutoff is
     // the final durable assistant row, never the triggering user frontier or a
     // later MAX(idx) that could capture a concurrently arriving user message.
@@ -356,5 +358,9 @@ export default async function (
             observeCompletedTurn(final.idx);
             return { text, html, usage, consumedUserIdx, terminal: true };
         }
+    }
+    } finally {
+        agent.activeRunCount = Math.max(0, (agent.activeRunCount ?? 1) - 1);
+        if (agent.abortController === ac) agent.abortController = null;
     }
 }

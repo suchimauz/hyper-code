@@ -40,6 +40,23 @@ const mkCtx = (env: Record<string, string> = {}) => {
 };
 
 describe("ai.resolveEndpoint", () => {
+    test("One API uses configured root, secret and OpenAI wire format", async () => {
+        const ctx = mkCtx();
+        ctx.fns.settings.getString = async () => "http://gateway.test/v1/";
+        ctx.fns.secrets.resolveSetting = async () => "test-token";
+        const r = await resolve(ctx, null, { model: "oneapi:qwen3.8-flash-next" });
+        expect(r.url).toBe("http://gateway.test/v1/chat/completions");
+        expect(r.modelId).toBe("qwen3.8-flash-next");
+        expect(r.api).toBe("openai");
+        expect(r.apiKey).toBe("test-token");
+    });
+
+    test("One API fails clearly without a configured root", async () => {
+        const ctx = mkCtx();
+        ctx.fns.settings.getString = async () => null;
+        await expect(resolve(ctx, null, { model: "oneapi:test" })).rejects.toThrow("One API is not configured");
+    });
+
     test("no prefix → lmstudio default", async () => {
         const r = await resolve(mkCtx(), null, { model: "some-local/model" });
         expect(r.provider).toBe("lmstudio");

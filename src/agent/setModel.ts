@@ -2,10 +2,12 @@
 // fixed at creation, so an exhausted subscription left the only choice of
 // waiting. This is the manual half of the parking story: switch model, or
 // switch to another credential of the same provider, and continue now.
-/** Switches a running agent to another model or credential account. */
+/** Switches an inactive agent to another model or credential account. */
 /**
  * Point an existing agent at a different model, provider or credential account.
  *
+ * Rejects active worker/direct runs before changing any target; idle agents,
+ * including usage-limit parked agents, can still switch through the UI.
  * Validates the target through llm.resolveEndpoint (unknown provider or a
  * missing key fails here rather than on the next request), records a visible
  * transcript event, and lifts a usage-limit parking so the interrupted work
@@ -58,20 +60,31 @@ export default async function (
                 sql: "SELECT id, model FROM agents WHERE archived_at IS NULL AND model IS NOT NULL",
                 params: [],
             })) as any[];
-            targets = rows
-                .filter((r) => {
-                    const parsed = splitModel(String(r.model ?? ""));
-                    return parsed.provider === parked.provider && parsed.account === (parked.account ?? "default");
-                })
-                .map((r) => String(r.id));
+            targets = [];
+            for (const r of rows) {
+                const parsed = await splitModel(ctx, String(r.model ?? ""));
+                if (parsed.provider === parked.provider && parsed.account === (parked.account ?? "default")) targets.push(String(r.id));
+            }
             if (!targets.includes(String(row.id))) targets.push(String(row.id));
         }
     }
 
-    const changed: string[] = [];
+    // Preflight the whole group before the first mutation. A stale controller
+    // is not evidence of a live run; activeRunCount tracks direct-run lifetime.
+    const prepared: { id: string; previous: string | null }[] = [];
     for (const id of targets) {
-        const before = ((await ctx.fns.procs.db.select({ sql: "SELECT model FROM agents WHERE id = ?", params: [id] })) as any[])[0];
-        const previous = before?.model ? String(before.model) : null;
+        const before = ((await ctx.fns.procs.db.select({ sql: "SELECT model, run_state FROM agents WHERE id = ? AND archived_at IS NULL", params: [id] })) as any[])[0];
+        if (!before) throw new Error(`setModel: agent not found: ${id}`);
+        const previous = before.model ? String(before.model) : null;
+        const live = (ctx.state as any).agent?.[id];
+        if (previous === model && (!live || live.model === model)) continue;
+        if (before.run_state === "running" || Number(live?.activeRunCount ?? 0) > 0) {
+            throw new Error(`setModel: agent ${id} is running; wait for the run to finish`);
+        }
+        prepared.push({ id, previous });
+    }
+    const changed: string[] = [];
+    for (const { id, previous } of prepared) {
         const live = (ctx.state as any).agent?.[id];
         // The live object is what the next turn reads. A row edited behind the
         // process (SQL, migration) can already say the new model while the agent
@@ -79,10 +92,14 @@ export default async function (
         if (previous === model && (!live || live.model === model)) continue;
         // The last error belonged to the old model; leaving it makes the status
         // bar keep shouting about a credential the agent no longer uses.
-        await ctx.fns.procs.db.run({
-            sql: "UPDATE agents SET model = ?, last_error = NULL, updated_at = ? WHERE id = ? AND archived_at IS NULL",
-            params: [model, now, id],
+        // Recheck after async preflight, then CAS against a worker claim or
+        // another model switch. Direct runs still lack a durable DB lease.
+        if (Number(live?.activeRunCount ?? 0) > 0) throw new Error(`setModel: agent ${id} is running; wait for the run to finish`);
+        const updated = await ctx.fns.procs.db.run({
+            sql: "UPDATE agents SET model = ?, last_error = NULL, updated_at = ? WHERE id = ? AND archived_at IS NULL AND run_state = 'idle' AND model IS NOT DISTINCT FROM ?",
+            params: [model, now, id, previous],
         });
+        if (!updated.changes) throw new Error(`setModel: agent ${id} is running or changed; retry after it is idle`);
         const liveBefore = live?.model ?? previous;
         if (live) live.model = model;
         await ctx.fns.session.appendEvent({ id, event: { type: "model_changed", from: liveBefore, to: model } }).catch(() => undefined);
@@ -112,7 +129,16 @@ export default async function (
     return { changed, model, from };
 }
 
-function splitModel(model: string): { provider: string; account: string } {
-    const m = /^([a-z][\w\-]*)(?:\/([\w\-.]+))?:/.exec(model);
-    return { provider: m ? m[1]! : "lmstudio", account: m?.[2] ?? "default" };
+async function splitModel(ctx: Context, model: string): Promise<{ provider: string; account: string }> {
+    const m = /^([a-z][\w\-]*)(?:\/([\w\-.]+))?:(.+)$/.exec(model);
+    const provider = m?.[1] ?? "lmstudio", account = m?.[2] ?? "default";
+    if (provider !== "hyper") return { provider, account };
+    const id = m![3]!;
+    const canonical = /^([a-z][\w\-]*)\/([\w\-.]+):/.exec(id);
+    if (canonical) return { provider, account: `${account}/${canonical[1]}/${canonical[2]}` };
+    const node = await ctx.fns.node.get({ name: account });
+    const exact = (node?.catalog ?? []).filter((e) => e.id === id);
+    const matches = exact.length ? exact : id.includes(":") ? [] : (node?.catalog ?? []).filter((e) => e.id.slice(e.id.indexOf(":") + 1) === id);
+    const entry = matches.length === 1 ? matches[0] : null;
+    return { provider, account: entry ? `${account}/${entry.provider}/${entry.account ?? "default"}` : `${account}/unresolved/${id}` };
 }

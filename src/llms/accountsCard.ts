@@ -12,8 +12,10 @@
  * @param opts.now Current time in ms, for testing.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
-    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean }>;
+    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>> }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
+    /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
+    /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
     /** Current timestamp in ms. */ now?: number;
 }): string {
     const now = opts.now ?? Date.now();
@@ -47,6 +49,11 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ], right: actions });
     };
 
+    const modelList = (models: string[]) => models.length ? `<ul class="mt-2 flex flex-wrap gap-1" aria-label="Available models">${models.map(model => `<li class="max-w-full break-all rounded bg-base-200 px-2 py-1 font-mono text-2xs">${esc(model)}</li>`).join("")}</ul>` : `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
+    const localRow = (a: typeof opts.accounts[number]) => {
+        const models = Object.values(opts.models ?? {}).flat().filter(model => model.startsWith(prefix(a)));
+        return `<div>${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div></div>`;
+    };
     const providers = [
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
@@ -56,8 +63,36 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const providerSections = providers.map(p => {
         const title = `${ctx.fns.ui.modelLogo?.({ model: p.icon, bare: true }) ?? ""}<span>${esc(p.title)}</span>`;
         const heading = ctx.fns.procs.ui.heading({ title: p.title, meta: `${p.accounts.length} connected account${p.accounts.length === 1 ? "" : "s"}`, actions: p.add });
-        return `<section data-provider="${p.id}"><div class="[&_h2]:flex [&_h2]:items-center [&_h2]:gap-2">${heading.replace(esc(p.title), title)}</div><div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${p.accounts.length ? p.accounts.map(row).join("") : ctx.fns.procs.ui.empty({ title: `No ${p.title} accounts`, text: "Use Add account to connect one." })}</div></section>`;
+        return `<section data-provider="${p.id}"><div class="[&_h2]:flex [&_h2]:items-center [&_h2]:gap-2">${heading.replace(esc(p.title), title)}</div><div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${p.accounts.length ? p.accounts.map(localRow).join("") : ctx.fns.procs.ui.empty({ title: `No ${p.title} accounts`, text: "Use Add account to connect one." })}</div></section>`;
     }).join("");
+
+    const gateway = opts.accounts.find(a => a.provider === "oneapi");
+    const health = gateway?.gatewayHealth;
+    const gatewayStatus = health?.status ?? "unknown";
+    const gatewayDetail = health?.reason === "disabled" ? "Disabled · set base URL and API key in settings" : health?.reason === "missing-key" ? "Configured URL · API key missing" : gatewayStatus === "available" ? "API /models available · generation not verified" : gatewayStatus === "unavailable" ? "API /models unavailable · generation not verified" : "API availability unknown · generation not verified";
+    const gatewaySection = gateway ? `<section data-provider="oneapi">${ctx.fns.procs.ui.heading({ title: "Asoft LLM Gate", meta: "OpenAI-compatible gateway · no quota data" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100 p-3"><div class="text-sm font-medium">${esc(gatewayStatus)}</div><div class="text-xs text-muted">${esc(gatewayDetail)}</div><div class="text-2xs text-faint">${health?.checkedAt ? `Checked ${esc(new Date(health.checkedAt).toLocaleTimeString())} · cached up to 60 s` : "Not checked"} · saved models stay selectable offline</div>${modelList((health?.models ?? []).map(model => `oneapi:${model}`))}</div></section>` : "";
+
+    const nodeSections = (opts.nodes ?? []).map(node => {
+        const visible = new Set(opts.models?.[`hyper/${node.name}`] ?? []);
+        if (!node.enabled || !visible.size) return "";
+        const groups = new Map<string, { provider: string; account: string; models: string[] }>();
+        for (const item of node.catalog ?? []) {
+            const model = `hyper/${node.name}:${item.id}`;
+            if (!visible.has(model)) continue;
+            const key = JSON.stringify([item.provider, item.account]);
+            const group = groups.get(key) ?? { provider: item.provider, account: item.account, models: [] };
+            group.models.push(model); groups.set(key, group);
+        }
+        return `<section data-node="${esc(node.name)}">${ctx.fns.procs.ui.heading({ title: `Hyper node · ${node.name}`, meta: node.lastError ? "Cached catalogue · node unavailable" : "Available catalogue · grouped by account" })}<div class="mt-2 divide-y divide-ui-border rounded-xl border border-ui-border bg-base-100">${[...groups.values()].map(group => `<div class="p-3" data-node-account="${esc(`${group.provider}/${group.account}`)}"><div class="text-sm font-medium">${esc(group.account)}</div><div class="text-2xs text-muted">${esc(group.provider)} · node ${esc(node.name)} · ${group.models.length} models</div>${modelList(group.models)}</div>`).join("")}</div></section>`;
+    }).join("");
+    const knownProviders = new Set(["codex", "claude-code", "anthropic-oauth", "xai", "kimi-coding", "oneapi", "hyper"]);
+    const otherLocals = opts.accounts.filter(a => !knownProviders.has(a.provider));
+    const extraLocalSection = otherLocals.length ? `<section>${ctx.fns.procs.ui.heading({ title: "Other local connections", meta: "Available catalogue models" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100">${otherLocals.map(localRow).join("")}</div></section>` : "";
+
+    const catalogueOnly = Object.entries(opts.models ?? {}).filter(([provider]) => provider !== "oneapi" && !provider.startsWith("hyper/"))
+        .map(([provider, models]) => ({ provider, models: models.filter(model => !opts.accounts.some(a => a.provider !== "hyper" && model.startsWith(prefix(a)))) }))
+        .filter(group => group.models.length);
+    const catalogueOnlySections = catalogueOnly.map(group => `<section data-catalogue="${esc(group.provider)}">${ctx.fns.procs.ui.heading({ title: group.provider, meta: "Local / API catalogue · quota not measured" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100 p-3">${modelList(group.models)}</div></section>`).join("");
 
     const flowRows = (opts.logins ?? []).map(f => ctx.fns.procs.ui.row({ entity: "llm-login", id: `${f.provider}/${f.account}`, status: f.status, cells: [
         { role: "provider", text: providerName(f.provider), class: "w-36 shrink-0 font-medium" },
@@ -66,7 +101,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ...(f.userCode ? [{ role: "device-code", text: f.userCode, class: "select-all shrink-0 rounded bg-base-200 px-2 py-1 font-mono text-sm font-semibold tracking-wider" }] : []),
     ], right: ctx.fns.ui.popup({ method: "llms.loginProgressFor", params: { provider: f.provider, account: f.account }, tone: "default", size: "xs", html: "Continue login" }) })).join("");
 
-    const html = `<div class="space-y-6">${providerSections}${flowRows ? `<section>${ctx.fns.procs.ui.heading({ title: "Logins in progress", meta: "Safe authorization status only." })}<div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${flowRows}</div></section>` : ""}</div>`;
+    const html = `<div class="space-y-6">${providerSections}${extraLocalSection}${catalogueOnlySections}${gatewaySection}${nodeSections}${flowRows ? `<section>${ctx.fns.procs.ui.heading({ title: "Logins in progress", meta: "Safe authorization status only." })}<div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${flowRows}</div></section>` : ""}</div>`;
     // Morph, not replace: the 10 s refresh must not snap an open "details" shut.
     return ctx.fns.ui.live({ id: "llm-accounts", url: "/llms/accounts", topic: "llm-accounts", swap: "outerMorph", every: 10, attrs: 'class="block"', html });
 }

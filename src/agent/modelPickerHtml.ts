@@ -53,6 +53,7 @@ export default async function (
         codex: "Codex",
         openai: "OpenAI API",
         openrouter: "OpenRouter",
+        oneapi: "Asoft LLM Gate",
         "kimi-coding": "Kimi Coding",
         kimi: "Kimi API",
         cursor: "Cursor",

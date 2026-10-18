@@ -14,6 +14,7 @@ test("transient per-account discovery is retriable, not a false model denial", a
     const ctx: any = { env: {}, state, fns: {
         settings: { get: async () => [] },
         llm: {
+            gatewayHealth: async () => ({ ok: false, models: [] }),
             listAccounts: async () => connected ? [{ account: "named", source: "file" }] : [],
             accountRegistry: async () => connected ? [{ provider: "codex", account: "named", status: "connected" }] : [],
             resolveEndpoint: async ({ model }: { model: string }) => ({ apiKey: model.startsWith("codex/") ? "test" : null, api: "responses", kind: "subscription" }),

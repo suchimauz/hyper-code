@@ -2,7 +2,8 @@
  * Reports supported reasoning effort levels for a model route
  *
  * Return the safe reasoning effort choices, default and provider wire mode for a concrete provider/account/model route. Use when rendering controls and before constructing an LLM request.
- * @param opts.model Concrete model route in provider[/account]:modelId form.
+ * Hyper routes use the enabled node's cached catalogue identity, without fetching credentials or contacting the node. Missing, ambiguous or inconsistent entries return no reasoning capability.
+ * @param opts.model Concrete model route in provider[/account]:modelId form, including hyper/node:provider/account:modelId.
  */
 export default async function (
     ctx: Context,
@@ -13,9 +14,30 @@ export default async function (
     },
 ): Promise<types.llm.ReasoningProfile> {
     const model = String(opts.model ?? "");
-    const m = /^([a-z][\w-]*)(?:\/[\w.-]+)?:(.+)$/.exec(model);
-    const provider = m?.[1] ?? "lmstudio";
-    const modelId = String(m?.[2] ?? model).toLowerCase();
+    const m = /^([a-z][\w-]*)(?:\/([\w.-]+))?:(.+)$/.exec(model);
+    let provider = m?.[1] ?? "lmstudio";
+    let rawModelId = m?.[3] ?? model;
+    if (provider === "hyper") {
+        const unavailable: types.llm.ReasoningProfile = { supported: ["auto", "off"], defaultEffort: "off", mode: "none" };
+        // Only cached metadata is needed: capability controls must not read tokens
+        // or trigger network/auth refreshes. Never infer trust from the route text.
+        let node: types.node.NodeEntry | null;
+        try { node = await ctx.fns.node.get({ name: m?.[2] ?? "default" }); }
+        catch { return unavailable; }
+        if (!node?.enabled || !Array.isArray(node.catalog)) return unavailable;
+        let matches = node.catalog.filter((entry) => entry.id === rawModelId);
+        if (!matches.length && !rawModelId.includes(":")) {
+            matches = node.catalog.filter((entry) => entry.id.slice(entry.id.indexOf(":") + 1) === rawModelId);
+        }
+        if (matches.length !== 1) return unavailable;
+        const entry = matches[0]!;
+        const identity = /^([a-z][\w-]*)\/([\w.-]+):(.+)$/.exec(entry.id);
+        if (entry.id.includes(":") && (!identity || identity[1] !== entry.provider || identity[2] !== entry.account)) return unavailable;
+        if (entry.provider === "hyper") return unavailable;
+        provider = entry.provider;
+        rawModelId = identity?.[3] ?? entry.id;
+    }
+    const modelId = rawModelId.toLowerCase();
     // gpt-6 family rejects effort "none"/"minimal": only low..max on the wire.
     if ((provider === "codex" || provider === "openai") && /^gpt-6/.test(modelId)) {
         return { supported: ["auto", "low", "medium", "high", "xhigh"], defaultEffort: "medium", mode: "openai-effort" };

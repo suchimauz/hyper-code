@@ -13,7 +13,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 }): Promise<types.node.NodeEntry | null> {
     const node = await ctx.fns.node.get({ name: opts.name });
     if (!node) return null;
-    if (opts.maxAgeMs && node.catalogAt && Date.now() - node.catalogAt < opts.maxAgeMs) return node;
+    if (opts.maxAgeMs && !node.lastError && node.catalogAt && Date.now() - node.catalogAt < opts.maxAgeMs) return node;
     const token = await ctx.fns.node.token({ name: node.name });
     const headers = { authorization: `Bearer ${token}` };
     const now = Date.now();
@@ -22,6 +22,11 @@ export default async function (ctx: Context, _session: Session | null, opts: {
             fetch(`${node.url}/models`, { headers, signal: AbortSignal.timeout(5000) }),
             fetch(`${node.url}/usage`, { headers, signal: AbortSignal.timeout(5000) }),
         ]);
+        // An explicit denial invalidates the old choices, unlike a transport outage.
+        // Persist the empty snapshot so a later offline refresh cannot resurrect it.
+        if (m.status >= 400 && m.status < 500 && m.status !== 408 && m.status !== 429) {
+            await ctx.fns.procs.db.run({ sql: "UPDATE llm_nodes SET catalog = ?, catalog_at = ?, usage = ?, usage_at = ?, last_error = NULL, updated_at = ? WHERE name = ?", params: ["[]", now, null, null, now, node.name] });
+        }
         if (!m.ok) throw new Error(`models ${m.status}: ${(await m.text()).slice(0, 120)}`);
         const models = ((await m.json()) as any)?.models ?? [];
         const usage = u.ok ? (((await u.json()) as any)?.usage ?? []) : null;

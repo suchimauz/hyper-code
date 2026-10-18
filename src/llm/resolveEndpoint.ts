@@ -5,7 +5,7 @@
 // "codex/personal:gpt-5.6-sol". Omitted means account "default" — the historical
 // single-credential behaviour, unchanged. Quota belongs to a subscription
 // account, not to a provider, so parking and usage tracking key on both.
-/** Performs the llm.resolveEndpoint runtime operation. */
+/** Resolve a provider-prefixed model to its authenticated wire endpoint, including configurable One API gateways. */
 /**
  * Parse agent.model "provider[/account]:modelId" into a callable endpoint.
  * @param opts.model Model identifier.
@@ -21,6 +21,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     api: "openai" | "anthropic" | "responses" | "cursor" | "mock";
     /** For hyper/<node> models: the provider the node uses upstream (e.g. claude-code). */
     upstream?: string;
+    /** Node-scoped upstream quota identity; transport account remains the node name. */
+    quotaAccount?: string;
 }> {
     const model = opts.model;
     const m = /^([a-z][\w\-]*)(?:\/([\w\-.]+))?:(.+)$/.exec(model);
@@ -33,11 +35,20 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     if (provider === "hyper") {
         const node = await ctx.fns.node.get({ name: account });
         if (!node || !node.enabled) throw new Error(`hyper node not configured: ${account}`);
-        const entry = node.catalog?.find((e) => e.id === modelId);
+        const matches = node.catalog?.filter((e) => e.id === modelId) ?? [];
+        // Bare IDs from older saved agents are safe only when unambiguous.
+        if (!matches.length && !modelId.includes(":")) matches.push(...(node.catalog ?? []).filter((e) => e.id.slice(e.id.indexOf(":") + 1) === modelId));
+        if (matches.length > 1) throw new Error(`hyper/${account} model ${modelId} is ambiguous; select provider/account:model`);
+        const entry = matches[0];
         if (!entry) throw new Error(`hyper/${account} does not offer model ${modelId}`);
         if (String(entry.api) === "cursor") throw new Error(`hyper/${account}: Cursor transport is not supported; use a direct cursor account`);
         const path = entry.api === "openai" ? "chat" : entry.api;
-        return { url: `${node.url}/${path}`, apiKey: await ctx.fns.node.token({ name: account }), modelId, provider, account, kind: entry.kind, api: entry.api, upstream: entry.provider };
+        return { url: `${node.url}/${path}`, apiKey: await ctx.fns.node.token({ name: account }), modelId: entry.id, provider, account, kind: entry.kind, api: entry.api, upstream: entry.provider, quotaAccount: `${account}/${entry.provider}/${entry.account ?? "default"}` };
+    }
+    if (provider === "oneapi") {
+        const baseUrl = (await declaredString('oneapiBaseUrl')(ctx))?.replace(/\/+$/, '');
+        if (!baseUrl) throw new Error('One API is not configured: set llm.oneapiBaseUrl including /v1');
+        return { url: `${baseUrl}/chat/completions`, apiKey: await declaredSecret('oneapiApiKey')(ctx), modelId, provider, account, kind: "api", api: "openai" };
     }
     const p = PROVIDERS[provider];
     if (!p) throw new Error(`unknown provider: ${provider}`);

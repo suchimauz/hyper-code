@@ -50,10 +50,11 @@ export default async function (
         params: [],
     })) as any[];
 
-    const targets = rows.filter((row) => {
-        const parsed = splitModel(String(row.model ?? ""));
-        return parsed.provider === info.provider && parsed.account === info.account;
-    });
+    const targets = [];
+    for (const row of rows) {
+        const parsed = await splitModel(ctx, String(row.model ?? ""));
+        if (parsed.provider === info.provider && parsed.account === info.account) targets.push(row);
+    }
 
     const reason = `${info.provider} usage limit resets — continue the interrupted work`;
     const parked: string[] = [];
@@ -145,9 +146,19 @@ export default async function (
 }
 
 // "codex/personal:gpt-5.6-sol" → provider codex, account personal.
-function splitModel(model: string): { provider: string; account: string } {
-    const m = /^([a-z][\w\-]*)(?:\/([\w\-.]+))?:/.exec(model);
-    return { provider: m ? m[1]! : "lmstudio", account: m?.[2] ?? "default" };
+async function splitModel(ctx: Context, model: string): Promise<{ provider: string; account: string }> {
+    const m = /^([a-z][\w\-]*)(?:\/([\w\-.]+))?:(.+)$/.exec(model);
+    const provider = m?.[1] ?? "lmstudio", account = m?.[2] ?? "default";
+    if (provider !== "hyper") return { provider, account };
+    const id = m![3]!;
+    const canonical = /^([a-z][\w\-]*)\/([\w\-.]+):/.exec(id);
+    if (canonical) return { provider, account: `${account}/${canonical[1]}/${canonical[2]}` };
+    const node = await ctx.fns.node.get({ name: account });
+    const exact = (node?.catalog ?? []).filter((e) => e.id === id);
+    const matches = exact.length ? exact : id.includes(":") ? [] : (node?.catalog ?? []).filter((e) => e.id.slice(e.id.indexOf(":") + 1) === id);
+    const entry = matches.length === 1 ? matches[0] : null;
+    // Unknown/ambiguous legacy routes must never join a node-wide quota group.
+    return { provider, account: entry ? `${account}/${entry.provider}/${entry.account ?? "default"}` : `${account}/unresolved/${id}` };
 }
 
 function hash(text: string): number {

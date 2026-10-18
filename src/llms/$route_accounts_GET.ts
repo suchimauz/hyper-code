@@ -9,5 +9,7 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
         Promise.resolve(ctx.fns.llm.accountLoginStatus({})),
     ]);
     const accounts = await ctx.fns.llm.listAccounts({});
-    return new Response(ctx.fns.llms.accountsCard({ accounts, logins }), { headers: { "content-type": "text/html; charset=utf-8" } });
+    const models = await ctx.fns.llm.listModels({});
+    const nodes = await ctx.fns.node.list({});
+    return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes }), { headers: { "content-type": "text/html; charset=utf-8" } });
 }

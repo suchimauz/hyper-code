@@ -1,0 +1,32 @@
+{
+  "name": "hyper-code2-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal secure desktop client for an existing Hyper-code2 server",
+  "author": "Hyper-code2 contributors",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "test": "bun test ./security.test.ts ./navigation.test.ts ./lifecycle.test.ts ./icons.test.ts ./prefetch-electron.test.ts",
+    "icons": "bun run generate-icons.cjs",
+    "check": "bun build main.cjs preload.cjs renderer.js --target=node --external electron --outdir .check",
+    "prefetch:win": "bun run prefetch-electron.cjs",
+    "build:win": "bun run prefetch:win && electron-builder --win nsis --x64",
+    "build:mac": "electron-builder --mac dmg --arm64 --x64"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "trustedDependencies": ["electron"],
+  "build": {
+    "appId": "dev.hypercode.desktop",
+    "productName": "Hyper-code2",
+    "directories": { "output": "dist" },
+    "files": ["main.cjs", "navigation.cjs", "lifecycle.cjs", "assets/**/*", "security.cjs", "preload.cjs", "renderer.js", "index.html", "styles.css", "package.json"],
+    "asar": true,
+    "win": { "target": "nsis", "icon": "assets/icon.ico" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "mac": { "target": "dmg", "icon": "assets/icon.icns", "category": "public.app-category.productivity" }
+  }
+}

@@ -16,12 +16,18 @@ export default function (
     ctx: Context,
     _session: Session | null,
     opts: {
-        /** Rows produced by llm.usageOverview. */
+        /** Local usage snapshots and node/provider/account snapshots, with optional freshness status. */
         entries: Array<{
             provider: string;
             account: string;
             label: string;
             model?: string;
+            /** Available catalogue model IDs for this provider/account; shown in the native tooltip. */
+            models?: string[];
+            /** Hyper node name for remote credentials; omitted for local credentials. */
+            node?: string;
+            /** Remote snapshot is outdated or has no measured quota; omitted for current data. */
+            quotaStatus?: "stale" | "unavailable";
             usedPercent: number | null;
             resetsAt: number | null;
             planType: string | null;
@@ -39,7 +45,7 @@ export default function (
 
     const rings = entries.map((entry) => {
         const percent = entry.usedPercent == null ? 0 : Math.max(0, Math.min(100, entry.usedPercent));
-        const known = entry.usedPercent != null;
+        const known = entry.usedPercent != null && Number.isFinite(entry.usedPercent);
         const parked = entry.parkedAgents > 0;
         const colour = parked || entry.tone === "error" ? "text-error"
             : entry.tone === "warning" ? "text-warning"
@@ -52,7 +58,11 @@ export default function (
         // What the number MEANS, spelled out: how much is left, until when, and
         // what happens next. A bare "78%" answers none of those.
         const remaining = known ? Math.max(0, 100 - percent) : null;
-        const verdict = !known
+        const verdict = entry.quotaStatus === "unavailable"
+            ? "quota unavailable — usage unknown"
+            : entry.quotaStatus === "stale"
+                ? "stale quota snapshot — current usage unknown"
+                : !known
             ? "no data yet — available after the first model response"
             : parked
                 ? `quota exhausted · ${entry.parkedAgents} agent(s) parked`
@@ -63,9 +73,12 @@ export default function (
                         : `${remaining}% remaining — sufficient capacity`;
         const title = [
             `${entry.label}${entry.planType ? ` · ${entry.planType}` : ""}`,
-            known ? `${percent}% used` : null,
+            entry.node ? `Hyper node ${entry.node} · provider ${entry.provider} · account ${entry.account}` : null,
+            known ? `${percent}% used${entry.quotaStatus === "stale" ? " (last known)" : ""}` : null,
             verdict,
             left ? `resets in ${left}` : null,
+            `Provider ${entry.provider} · account ${entry.account}${entry.node ? ` · node ${entry.node}` : " · local"}`,
+            entry.models?.length ? `\nAvailable models (${entry.models.length}):\n${entry.models.join("\n")}` : null,
         ].filter(Boolean).join(" · ");
 
         return `<a href="/llms" class="flex flex-col items-center gap-0.5 rounded-md px-0.5 py-1 hover:bg-base-300" title="${esc(title)}" aria-label="${esc(title)}">
@@ -77,7 +90,9 @@ export default function (
             ${parked
             ? `<i class="ph ph-pause text-2xs" aria-hidden="true"></i>`
             : ctx.fns.ui.modelLogo({ model: entry.model ?? `${entry.provider}:`, bare: true })}
+            ${entry.node ? `<i class="ph ph-arrows-left-right absolute -bottom-0.5 -right-0.5 rounded-full bg-base-100 text-[8px] leading-none" aria-hidden="true"></i>` : ""}
           </span>
+          ${entry.node ? `<span class="block max-w-8 truncate text-[8px] leading-tight" aria-hidden="true">${esc(entry.node)}</span>` : ""}
         </a>`;
     }).join("");
 

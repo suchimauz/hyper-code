@@ -1,46 +1,45 @@
 import { test, expect } from "bun:test";
+import listModels from "./listModels";
+import modelPickerHtml from "../agent/modelPickerHtml";
 
-async function load(path: string, fetcher?: typeof fetch) {
-    const source = await Bun.file(new URL(path, import.meta.url)).text();
-    const code = new Bun.Transpiler({ loader: "ts" }).transformSync(source).replace("export default", "return");
-    return new Function("fetch", code)(fetcher);
-}
-
-test("named-only Codex catalogue retains account through node catalogue and upstream", async () => {
-    const refreshed: string[] = [];
-    const payload = Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "fixture-account" } })).toString("base64url");
-    const token = `fixture.${payload}.fixture`;
-    const fetcher = (async (url: string) => url.includes("/codex/models")
-        ? Response.json({ models: [{ slug: "visible" }, { slug: "hidden", visibility: "hidden" }, { slug: "no-api", supported_in_api: false }] })
-        : new Response(null, { status: 503 })) as typeof fetch;
-    const list = await load("listModels.ts", fetcher);
-    const catalog = await load("../node/catalog.ts");
-    const upstream = await load("../node/upstream.ts");
-    const ctx: any = { env: {}, fns: { llm: {
-        accountRegistry: async () => [
-            { provider: "codex", account: "broken", status: "connected" },
-            { provider: "codex", account: "named", status: "connected" },
-            { provider: "codex", account: "pending", status: "pending" },
-        ],
-        refreshCodex: async ({ account }: { account: string }) => {
-            refreshed.push(account);
-            if (account === "broken") throw new Error("fixture unavailable");
-            return account === "named" ? token : null;
+test("named-only local Codex remains in rendered picker with a Hyper current route", async () => {
+    const originalFetch = globalThis.fetch;
+    const requested: string[] = [];
+    globalThis.fetch = (async (url: string | URL | Request) => {
+        if (String(url).includes("/codex/models")) return Response.json({ models: [{ slug: "gpt-6-astra" }] });
+        throw new Error("offline test");
+    }) as typeof fetch;
+    const rows = [{ provider: "codex", account: "pro500", source: "file", available: true }];
+    const remoteModels = ["codex/pro:gpt-6-astra", "codex/pro500:gpt-6-astra"];
+    const ctx = { env: {}, state: {}, fns: {
+        settings: { get: async () => [] },
+        llm: {
+            gatewayHealth: async () => ({ ok: false, models: [] }),
+            listAccounts: async () => rows,
+            resolveEndpoint: async () => ({ apiKey: null }),
+            refreshCodex: async ({ account }: { account: string }) => { requested.push(account); return "test-token"; },
+            codexCliVersion: async () => "1",
         },
-        codexCliVersion: async () => "fixture",
-        resolveEndpoint: async ({ model }: { model: string }) => {
-            if (!model.startsWith("codex/named:")) throw new Error("not configured");
-            return { provider: "codex", api: "responses", kind: "subscription", apiKey: token, url: "https://example.test/responses" };
+        node: {
+            list: async () => [{ name: "mini6", enabled: true }],
+            refresh: async () => ({ name: "mini6", enabled: true, catalogAt: 1, catalog: remoteModels.map(id => ({ id })) }),
         },
-    }, node: { list: async () => [] } } };
-    ctx.fns.llm.listModels = async () => list(ctx, null, { skipNodes: true });
-    const result = await ctx.fns.llm.listModels();
-    expect(result).toEqual({ "codex/named": ["codex/named:visible"] });
-    expect(refreshed).toEqual(["default", "broken", "named"]);
-    const entries = await catalog(ctx, null, { providers: ["codex"] });
-    expect(entries).toEqual([{ id: "visible", api: "responses", provider: "codex", account: "named", kind: "subscription" }]);
-    const route = await upstream(ctx, null, entries[0]);
-    expect(route.url).toBe("https://example.test/responses");
-    expect(refreshed.at(-1)).toBe("named");
-    expect(route.headers["chatgpt-account-id"]).toBe("fixture-account");
+        procs: { ui: {
+            escape: ({ text }: { text: string }) => text,
+            button: ({ html, ariaLabel }: { html: string; ariaLabel: string }) => `<button aria-label="${ariaLabel}">${html}</button>`,
+        } },
+        ui: { modelLogo: () => "" },
+    } } as unknown as Context;
+    try {
+        const groups = await listModels(ctx, null);
+        expect(requested).toEqual(["pro500"]);
+        expect(groups.codex).toEqual(["codex/pro500:gpt-6-astra"]);
+        expect(groups["hyper/mini6"]).toEqual(remoteModels.map(id => `hyper/mini6:${id}`));
+        (ctx.fns.llm as any).listModels = async () => groups;
+        const html = await modelPickerHtml(ctx, null, { current: "hyper/mini6:codex/pro:gpt-6-astra", mode: "form" });
+        expect(html).toContain("Show Codex accounts");
+        expect(html).toContain("codex/pro500:gpt-6-astra");
+        expect(html).toContain("hyper/mini6:codex/pro:gpt-6-astra");
+        expect(html).toContain("hyper/mini6:codex/pro500:gpt-6-astra");
+    } finally { globalThis.fetch = originalFetch; }
 });
