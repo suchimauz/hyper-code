@@ -5,7 +5,7 @@ import { homedir, tmpdir } from "node:os";
  * Any ffmpeg-readable input (wav, webm, ogg, mp3, m4a) is converted to 16 kHz mono WAV first.
  * Use for local voice input, dictation tests and comparing whisper models without any cloud service.
  */
-export default async function (_ctx: Context, _session: Session | null, opts: {
+export default async function (ctx: Context, _session: Session | null, opts: {
     /** Absolute path of an audio file to transcribe; ignored when `audio` is given. */
     path?: string;
     /** Raw audio bytes (e.g. a browser MediaRecorder blob); takes precedence over `path`. */
@@ -18,7 +18,13 @@ export default async function (_ctx: Context, _session: Session | null, opts: {
     prompt?: string;
     /** Translate the speech to English instead of transcribing it. @default false */
     translate?: boolean;
+    /** Use bounded local microphone transcription: requires audio, fixes small/ru, ignores other options, limits duration to 60 seconds and child runtime. @default false */
+    dictation?: boolean;
 }): Promise<{ text: string; model: string; language: string; audioSec: number; convertMs: number; whisperMs: number }> {
+    if (opts.dictation) {
+        if (!opts.audio) throw new Error("invalid_audio");
+        return ctx.fns.whisper.transcribeDictation({ audio: opts.audio });
+    }
     const model = opts.model ?? "large-v3-turbo";
     if (!/^[\w.-]+$/.test(model)) throw new Error(`bad model name: ${model}`);
     const modelPath = `${homedir()}/.local/share/whisper-cpp/ggml-${model}.bin`;
