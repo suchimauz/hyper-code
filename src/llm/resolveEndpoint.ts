@@ -35,6 +35,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         if (!node || !node.enabled) throw new Error(`hyper node not configured: ${account}`);
         const entry = node.catalog?.find((e) => e.id === modelId);
         if (!entry) throw new Error(`hyper/${account} does not offer model ${modelId}`);
+        if (String(entry.api) === "cursor") throw new Error(`hyper/${account}: Cursor transport is not supported; use a direct cursor account`);
         const path = entry.api === "openai" ? "chat" : entry.api;
         return { url: `${node.url}/${path}`, apiKey: await ctx.fns.node.token({ name: account }), modelId, provider, account, kind: entry.kind, api: entry.api, upstream: entry.provider };
     }

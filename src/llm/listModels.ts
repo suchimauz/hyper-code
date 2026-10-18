@@ -25,6 +25,7 @@ export default async function (ctx: Context, _session: Session | null, opts?: { 
 
 async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Record<string, string[]>> {
     const out: Record<string, string[]> = {};
+    const codexUnavailable: string[] = [];
 
     // Local: LM Studio /v1/models
     const lmUrl = (ctx.env.LMSTUDIO_URL ?? "http://localhost:1234") + "/v1/models";
@@ -113,26 +114,41 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
     } catch { /* no key / unreachable — omit */ }
 
 
-    // Codex (ChatGPT subscription) — only if user has a valid JWT.
-    // Models pulled live from /codex/models (subscription-gated whitelist).
+    // Discover connected slots independently; named prefixes preserve account routing.
+    const codexAccounts = new Set<string>(["default"]);
     try {
-        const tok = await ctx.fns.llm.refreshCodex?.({});
-        if (tok) {
-            const version = await ctx.fns.llm.codexCliVersion({});
-            const url = `https://chatgpt.com/backend-api/codex/models?client_version=${encodeURIComponent(version)}`;
-            const r = await fetch(url, {
-                headers: { "authorization": `Bearer ${tok}`, "originator": "codex_cli_rs" },
-                signal: AbortSignal.timeout(3000),
-            });
-            if (r.ok) {
-                const j: any = await r.json();
-                const ids = (j.models ?? [])
-                    .filter((m: any) => m.visibility !== "hidden" && m.visibility !== "hide" && m.supported_in_api !== false)
-                    .map((m: any) => `codex:${m.slug}`);
-                if (ids.length) out.codex = ids;
-            }
+        for (const entry of await ctx.fns.llm.accountRegistry({ action: "list" })) {
+            if (entry.provider === "codex" && entry.status === "connected") codexAccounts.add(entry.account);
         }
-    } catch { /* not logged in or unreachable — omit */ }
+    } catch { /* registry unavailable — retain legacy default discovery */ }
+    for (const account of codexAccounts) try {
+        const tok = await ctx.fns.llm.refreshCodex?.({ account });
+        if (!tok) continue;
+        const version = await ctx.fns.llm.codexCliVersion({});
+        const url = `https://chatgpt.com/backend-api/codex/models?client_version=${encodeURIComponent(version)}`;
+        const r = await fetch(url, {
+            headers: { "authorization": `Bearer ${tok}`, "originator": "codex_cli_rs" },
+            signal: AbortSignal.timeout(3000),
+        });
+        if (!r.ok) {
+            const transient = r.status >= 500 || r.status === 429 || r.status === 408;
+            if (transient) codexUnavailable.push(account);
+            console.warn(`[model-catalog] provider=codex account=${account} status=${r.status} transient=${transient}`);
+            continue;
+        }
+        const j: any = await r.json();
+        const prefix = account === "default" ? "codex" : `codex/${account}`;
+        const ids = (j.models ?? [])
+            .filter((m: any) => m.visibility !== "hidden" && m.visibility !== "hide" && m.supported_in_api !== false)
+            .map((m: any) => `${prefix}:${m.slug}`);
+        if (ids.length) out[prefix] = ids;
+    } catch (error) {
+        const name = error instanceof Error ? error.name : "Error";
+        const transient = ["TypeError", "TimeoutError", "AbortError"].includes(name);
+        if (transient) codexUnavailable.push(account);
+        // No provider body, token, headers, or exception message in diagnostics.
+        console.warn(`[model-catalog] provider=codex account=${account} error=${name} transient=${transient}`);
+    }
 
     // Claude subscription models. We cannot query an account-specific model
     // catalogue from the Messages API, so expose the current Anthropic aliases
@@ -183,5 +199,9 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
             if (catalog.length) out[`hyper/${node.name}`] = catalog.map((e) => `hyper/${node.name}:${e.id}`);
         }
     } catch { /* node tables absent (fresh db) — omit */ }
+    if (ctx.state) {
+        const failures = ((ctx.state as any).llmModelCatalogFailures ??= {});
+        failures[opts?.skipNodes ? "skipNodes" : "all"] = { at: Date.now(), codex: codexUnavailable };
+    }
     return out;
 }

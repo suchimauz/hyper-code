@@ -45,10 +45,13 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     // Claude's browser callback may end on a page that displays a one-time code
     // and asks the CLI to paste it. stdin MUST remain writable; using "ignore"
     // here made the second auth step hang forever.
+    // Persist before spawning: an await between spawn and listener registration
+    // can lose an immediate spawn error (e.g. ENOENT), leaving a pending flow
+    // with no process, URL or code forever.
+    await ctx.fns.llm.accountRegistry({ action: "begin", provider, account, dir: path.dir });
     const proc = spawn(cmd, args, { env, stdio: ["pipe", "pipe", "pipe"] });
     const flow: any = { provider, account, dir: path.dir, proc, status: "pending", verificationUri: null, userCode: null, error: null, startedAt: Date.now() };
     flows.set(key, flow);
-    await ctx.fns.llm.accountRegistry({ action: "begin", provider, account, dir: path.dir });
 
     const onData = (chunk: Buffer) => {
         const text = String(chunk);

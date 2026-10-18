@@ -89,7 +89,7 @@ async function callModel(ctx: Context, opts: any): Promise<{ text: string; finis
     const endpoint = await ctx.fns.llm.resolveEndpoint({ model });
 
     if (endpoint.api === "mock") return normalizeStructured({ text: user, finishReason: "stop", usage: null, raw: { mock: true } }, opts.response_format);
-    const result = endpoint.provider === "xai" ? await xaiResponses(ctx, endpoint, { ...opts, user, system })
+    const result = (endpoint.provider === "hyper" ? endpoint.upstream : endpoint.provider) === "xai" ? await xaiResponses(ctx, endpoint, { ...opts, user, system })
         : endpoint.api === "responses" ? await responses(ctx, endpoint, { ...opts, user, system })
             : endpoint.api === "anthropic" ? await anthropic(ctx, endpoint, { ...opts, user, system })
                 : await openAI(endpoint, { ...opts, user, system });
@@ -121,7 +121,8 @@ function shouldFallback(error: unknown): boolean {
 }
 
 async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
-    const token = await ctx.fns.llm.getXaiOAuthToken({ account: endpoint.account });
+    const token = endpoint.provider === "hyper" ? endpoint.apiKey : await ctx.fns.llm.getXaiOAuthToken({ account: endpoint.account });
+    if (!token) throw new Error(`${endpoint.provider}: no credentials`);
     const body: any = {
         model: endpoint.modelId,
         store: false,
@@ -147,13 +148,13 @@ async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
     });
     if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await readResponsesSSE(response);
-    ctx.fns.llm.refreshUsage?.({ provider: endpoint.provider, account: endpoint.account, maxAgeMs: 60_000 })?.catch(() => undefined);
+    if (endpoint.provider === "xai") ctx.fns.llm.refreshUsage?.({ provider: endpoint.provider, account: endpoint.account, maxAgeMs: 60_000 })?.catch(() => undefined);
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
 }
 
 
 async function responses(ctx: Context, endpoint: any, opts: any) {
-    const token = await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
+    const token = endpoint.provider === "hyper" ? endpoint.apiKey : await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
     if (!token) throw new Error("codex: no access_token");
     const body: any = {
         model: endpoint.modelId,
@@ -172,9 +173,11 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
         method: "POST",
         headers: {
             authorization: `Bearer ${token}`,
-            "chatgpt-account-id": accountId(token),
-            originator: "codex_cli_rs",
-            "OpenAI-Beta": "responses=experimental",
+            ...(endpoint.provider === "hyper" ? {} : {
+                "chatgpt-account-id": accountId(token),
+                originator: "codex_cli_rs",
+                "OpenAI-Beta": "responses=experimental",
+            }),
             "content-type": "application/json",
             session_id: opts.sessionId || Bun.randomUUIDv7(),
         },
