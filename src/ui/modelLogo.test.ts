@@ -55,3 +55,16 @@ describe('ui.modelLogo', () => {
         expect(render('local:some-model')).toContain('ph-cpu');
     });
 });
+
+test('provider marks explicitly inherit the theme foreground in every size and frame', () => {
+    for (const model of ['codex:gpt', 'claude-code:claude', 'cursor:composer', 'xai:grok', 'kimi:kimi', 'hyper/node:codex:gpt']) {
+        for (const bare of [false, true]) for (const compact of [false, true]) {
+            const html = render(model, false, bare, compact);
+            expect(html).toContain('text-base-content');
+            expect(html).toContain('fill="currentColor"');
+            expect(html).not.toContain('text-faint');
+            expect(html).not.toContain('text-subtle');
+        }
+    }
+    expect(render('local:unknown')).toContain('text-base-content');
+});

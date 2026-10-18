@@ -53,11 +53,12 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const motion = opts.active ? ' animate-spin' : '';
     const markSize = opts.compact ? 'size-2.5' : 'size-3.5';
     const mark = path
-        ? `<svg viewBox="0 0 24 24" class="${markSize} fill-current${motion}" aria-hidden="true"><path d="${path}"></path></svg>`
+        ? `<svg viewBox="0 0 24 24" fill="currentColor" class="${markSize} fill-current${motion}" aria-hidden="true"><path d="${path}"></path></svg>`
         : `<i class="ph ph-cpu ${markSize} ${opts.compact ? 'text-xs' : 'text-sm'}${motion}" aria-hidden="true"></i>`;
 
     const frameSize = opts.compact ? 'size-4' : 'size-6';
-    const tone = opts.compact ? 'text-faint' : 'text-subtle';
+    // Provider marks need full foreground contrast, including tiny mobile variants.
+    const tone = 'text-base-content';
     const frame = opts.bare
         ? `inline-flex ${frameSize} shrink-0 items-center justify-center ${tone}`
         : `inline-flex ${frameSize} shrink-0 items-center justify-center rounded-md border border-base-300 bg-base-100 ${tone}`;
