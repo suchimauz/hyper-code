@@ -14,12 +14,20 @@ export default async function (
 ): Promise<{ archived: string[] }> {
     const olderThanMs = Math.max(0, Number(opts.olderThanMs ?? 60000));
     const cutoff = Date.now() - olderThanMs;
-    const rows = (await ctx.fns.procs.db.select({ sql: "SELECT id, parent_id, scratchpad, updated_at FROM agents WHERE archived_at IS NULL AND parent_id IS NOT NULL AND updated_at <= ?", params: [cutoff] })) as any[];
+    const rows = (await ctx.fns.procs.db.select({ sql: "SELECT id, parent_id, scratchpad, updated_at FROM agents WHERE archived_at IS NULL AND parent_id IS NOT NULL AND run_state = 'idle' AND next_run_at IS NULL AND wake_at IS NULL AND updated_at <= ?", params: [cutoff] })) as any[];
     const archived: string[] = [];
     for (const row of rows) {
       const scratchpad = typeof row.scratchpad === "string" ? JSON.parse(row.scratchpad) : (row.scratchpad ?? {});
       if (scratchpad.delegation?.status !== "ready") continue;
-      await ctx.fns.session.archive({ id: String(row.id) });
+      if (Number(ctx.state.agent?.[String(row.id)]?.activeRunCount ?? 0) > 0) continue;
+      try {
+        const result = await ctx.fns.session.archive({ id: String(row.id) });
+        if (!result.ok) continue;
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code === 'busy' || code === 'queued' || code === 'scheduled' || code === 'conflict') continue;
+        throw error;
+      }
       archived.push(String(row.id));
       ctx.fns.events.refreshAgentMeta({ agentId: String(row.parent_id), section: "team", reason: "team-timeout-archive" });
     }
