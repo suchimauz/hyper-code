@@ -1,7 +1,7 @@
 /**
  * Refreshes cached subscription quota for one or all configured LLM accounts
  *
- * Fetch live quota windows from provider-specific subscription usage endpoints for Codex, Claude and xAI/SuperGrok, then persist them through llm.recordUsage. Use before rendering /llms or the sidebar; requests are cached briefly and individual account failures are returned without failing the whole refresh.
+ * Fetch live quota windows from provider-specific subscription usage endpoints for Codex, Claude and xAI/SuperGrok, then persist them through llm.recordUsage. Connected SSH accounts use the remote bridge; their credentials never enter this process. Use before rendering /llms or the sidebar; requests are cached briefly and individual account failures are returned without failing the whole refresh.
  * @param opts.provider Only refresh this provider.
  * @param opts.account Only refresh this credential account.
  * @param opts.maxAgeMs Reuse a recent successful refresh for this many milliseconds. @default 60000 @minimum 0 @maximum 3600000
@@ -35,12 +35,19 @@ export default async function (
     const results = await Promise.all(accounts.map(async (item: any) => {
         const provider = String(item.provider);
         const account = String(item.account || "default");
-        if (account.startsWith("ssh.") || !["codex", "claude-code", "anthropic-oauth", "xai"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
+        if (!["codex", "claude-code", "anthropic-oauth", "xai"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
         const cacheKey = `llm:usage-refresh:${provider}:${account}`;
         const cached = ((await ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = ?", params: [cacheKey] })) as any[])[0];
         if (cached && now - Number(cached.value ?? 0) < maxAgeMs) return { provider, account, status: "cached" as const, error: null };
         try {
-            if (provider === "codex") await refreshCodex(ctx, account, timeoutMs, now);
+            if (account.startsWith('ssh.')) {
+                const remote = (await ctx.fns.sshAccount.registry({action:'list'})).find(row => row.provider === provider && `ssh.${row.instance}.${row.account}` === account);
+                if (!remote || remote.status !== 'connected') throw new Error('SSH account is not connected');
+                const response = await ctx.fns.sshAccount.fetchUsage({instance:remote.instance,provider:remote.provider,account:remote.account,timeoutMs});
+                if (provider === 'codex') await refreshCodex(ctx, account, timeoutMs, now, response);
+                else await refreshClaude(ctx, 'claude-code', account, timeoutMs, now, response);
+            }
+            else if (provider === "codex") await refreshCodex(ctx, account, timeoutMs, now);
             else if (provider === "xai") await refreshXai(ctx, account, timeoutMs, now);
             else await refreshClaude(ctx, provider as "claude-code" | "anthropic-oauth", account, timeoutMs, now);
             await ctx.fns.llm.accountAuthHealth({ action: "clear", provider, account });
@@ -62,12 +69,12 @@ export default async function (
     }));
     return results;
     
-    async function refreshCodex(ctx: Context, account: string, timeoutMs: number, now: number): Promise<void> {
-        const token = await ctx.fns.llm.refreshCodex({ account });
-        if (!token) throw new Error("credential is unavailable");
-        const payload = decodeJwt(token);
+    async function refreshCodex(ctx: Context, account: string, timeoutMs: number, now: number, remoteResponse?: Response): Promise<void> {
+        const token = remoteResponse ? null : await ctx.fns.llm.refreshCodex({ account });
+        if (!remoteResponse && !token) throw new Error("credential is unavailable");
+        const payload = token ? decodeJwt(token) : null;
         const accountId = payload?.["https://api.openai.com/auth"]?.chatgpt_account_id;
-        const res = await ctx.fns.llm.connectFetch({
+        const res = remoteResponse ?? await ctx.fns.llm.connectFetch({
             url: "https://chatgpt.com/backend-api/wham/usage",
             ms: timeoutMs,
             init: { method: "GET", headers: {
@@ -90,7 +97,7 @@ export default async function (
             availableCount: Number(resetSummary.available_count),
             ...(Array.isArray(resetSummary.credits) ? { credits: resetSummary.credits.map(normalizeResetCredit) } : {}),
         } : null;
-        if (resetCredits && resetCredits.availableCount > 0 && !resetCredits.credits) {
+        if (!remoteResponse && resetCredits && resetCredits.availableCount > 0 && !resetCredits.credits) {
             const detailRes = await ctx.fns.llm.connectFetch({
                 url: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits",
                 ms: timeoutMs,
@@ -150,13 +157,13 @@ export default async function (
     }
 
 
-    async function refreshClaude(ctx: Context, provider: "claude-code" | "anthropic-oauth", account: string, timeoutMs: number, now: number): Promise<void> {
-        const token = provider === "claude-code"
+    async function refreshClaude(ctx: Context, provider: "claude-code" | "anthropic-oauth", account: string, timeoutMs: number, now: number, remoteResponse?: Response): Promise<void> {
+        const token = remoteResponse ? null : provider === "claude-code"
             ? await ctx.fns.llm.refreshClaudeCode({ account })
             : await ctx.fns.llm.getAnthropicOAuthToken({ account });
-        if (!token) throw new Error("credential is unavailable");
+        if (!remoteResponse && !token) throw new Error("credential is unavailable");
         const base = String(ctx.env.CLAUDE_CODE_BASE_API_URL ?? "https://api.anthropic.com").replace(/\/$/, "");
-        const res = await ctx.fns.llm.connectFetch({
+        const res = remoteResponse ?? await ctx.fns.llm.connectFetch({
             url: `${base}/api/oauth/usage`,
             ms: timeoutMs,
             init: { method: "GET", headers: {
@@ -175,14 +182,16 @@ export default async function (
         // Profile failure must not discard otherwise valid usage data.
         let planType: string | null = null;
         try {
-            const profileRes = await ctx.fns.llm.connectFetch({
-                url: `${base}/api/oauth/profile`,
-                ms: timeoutMs,
-                init: { method: "GET", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" } },
-            });
-            if (profileRes.ok) {
-                const profile: any = await profileRes.json();
-                planType = claudePlan(profile?.organization?.organization_type);
+            if (!remoteResponse) {
+                const profileRes = await ctx.fns.llm.connectFetch({
+                    url: `${base}/api/oauth/profile`,
+                    ms: timeoutMs,
+                    init: { method: "GET", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" } },
+                });
+                if (profileRes.ok) {
+                    const profile: any = await profileRes.json();
+                    planType = claudePlan(profile?.organization?.organization_type);
+                }
             }
         } catch { /* usage remains useful when profile metadata is unavailable */ }
         const snapshot = await ctx.fns.llm.recordUsage({ provider, account, headers, planType, now });

@@ -43,6 +43,13 @@ Persistent SSH multiplexing avoids a new SSH handshake on every request. Provide
 
 This moves provider connectivity to the remote host, but it does not make the local link reliable. A broken SSH connection fails the active request; response resumption after reconnection is not implemented. Do not automatically replay a partially received generation as though it had never run. A long-running remote agent queue with resumable event storage is a separate capability.
 
+## Usage and limits
+
+Connected SSH Codex and Claude accounts participate in the normal background quota refresh. Usage requests run as bounded GETs through the SSH bridge to fixed provider endpoints; credential reading and refresh stay on the remote host. Hyper stores quota snapshots under the same synthetic account identity used by inference. Successful refreshes are cached for one minute. A telemetry failure displays unavailable usage, not an exhausted account.
+
+SSH refresh reads the usage endpoint only: Claude profile/plan enrichment and Codex reset-credit detail requests are not fetched separately. Codex plan and reset-credit summaries are retained when supplied in the usage response.
+
+
 ## Verification
 
 Unit tests use mocked SSH and HTTP processes; they do not authenticate provider accounts or contact user servers. End-to-end authorization and inference require a user-configured, trusted SSH instance and must be checked separately.
