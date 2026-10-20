@@ -35,7 +35,7 @@ export default async function (
     const results = await Promise.all(accounts.map(async (item: any) => {
         const provider = String(item.provider);
         const account = String(item.account || "default");
-        if (!["codex", "claude-code", "anthropic-oauth", "xai"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
+        if (account.startsWith("ssh.") || !["codex", "claude-code", "anthropic-oauth", "xai"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
         const cacheKey = `llm:usage-refresh:${provider}:${account}`;
         const cached = ((await ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = ?", params: [cacheKey] })) as any[])[0];
         if (cached && now - Number(cached.value ?? 0) < maxAgeMs) return { provider, account, status: "cached" as const, error: null };

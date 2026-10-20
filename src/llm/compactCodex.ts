@@ -30,18 +30,21 @@ export default async function (
     const relay = ep.provider === "hyper" && ep.upstream === "codex" && ep.api === "responses";
     if (ep.provider !== "codex" && !relay) throw new Error("server compaction is only supported for codex models");
     // Node bearer is not a Codex token: credentials and account identity stay on the host.
-    const apiKey = relay ? ep.apiKey : await ctx.fns.llm.refreshCodex({ account: ep.account }) ?? ep.apiKey;
+    const apiKey = ep.ssh ? "ssh-remote" : relay ? ep.apiKey : await ctx.fns.llm.refreshCodex({ account: ep.account }) ?? ep.apiKey;
     if (!apiKey) throw new Error("codex: no access_token");
     let accountId = "";
-    try { if (!relay) accountId = JSON.parse(Buffer.from(apiKey.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString())?.["https://api.openai.com/auth"]?.chatgpt_account_id ?? ""; } catch {}
+    try { if (!relay && !ep.ssh) accountId = JSON.parse(Buffer.from(apiKey.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString())?.["https://api.openai.com/auth"]?.chatgpt_account_id ?? ""; } catch {}
     const converted = ctx.fns.llm.toCodexInput({ messages: opts.messages as any });
     const input = [...converted.input, { type: "compaction_trigger" }];
     const compaction = { trigger: "manual", reason: "user_requested", implementation: "remote", phase: "standalone_turn", strategy: "memento" };
     const turnMetadata = JSON.stringify({ session_id: opts.sessionId, thread_id: opts.sessionId, turn_id: crypto.randomUUID(), request_kind: "compaction", compaction });
     const body = { model: ep.modelId, instructions: opts.instructions || converted.instructions, input, tools: [], tool_choice: "auto", parallel_tool_calls: false, reasoning: { effort: "medium", summary: "auto" }, store: false, stream: true, include: [], client_metadata: { session_id: opts.sessionId, thread_id: opts.sessionId, "x-codex-turn-metadata": turnMetadata } };
     const headers: Record<string, string> = { authorization: `Bearer ${apiKey}`, "chatgpt-account-id": accountId, originator: "codex_cli_rs", version: await ctx.fns.llm.codexCliVersion({}), "OpenAI-Beta": "responses=experimental", accept: "text/event-stream", "content-type": "application/json", session_id: opts.sessionId, "x-codex-turn-metadata": turnMetadata };
-    if (relay) delete headers["chatgpt-account-id"];
-    const res = await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal } });
+    if (relay || ep.ssh) delete headers["chatgpt-account-id"];
+    const init = { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal };
+    const res = ep.ssh
+        ? await ctx.fns.sshAccount.fetch({ ssh: ep.ssh, url: ep.url, init })
+        : await ctx.fns.llm.connectFetch({ url: ep.url, init });
     if (!res.ok) { const text = await res.text(); throw new Error(`codex compaction ${res.status}: ${text.slice(0, 500)}`); }
     if (!res.body) throw new Error("codex compaction returned no stream");
     let item: any = null; let responseId = ""; const usage = { prompt_tokens: 0, completion_tokens: 0 };

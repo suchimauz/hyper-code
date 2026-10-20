@@ -14,9 +14,15 @@
 export default async function (ctx: Context, _session: Session | null, opts: {
     /** Provider to authenticate. */ provider: "claude-code" | "codex" | "xai";
     /** Account slot name. */ account: string;
+    /** SSH instance to authorize on; omitted or empty starts local login. */ instance?: string;
 }): Promise<string> {
     const provider = opts.provider;
     if (provider !== "claude-code" && provider !== "codex" && provider !== "xai") throw new Error("unsupported provider");
+    if (opts.instance) {
+        if (provider === "xai") throw new Error("Grok does not support SSH account login");
+        const flow = await ctx.fns.sshAccount.startLogin({ instance: opts.instance, provider, account: opts.account });
+        return ctx.fns.sshAccount.progressPopup({ id: flow.id });
+    }
     if (provider === "xai") await ctx.fns.llm.startXaiOAuth({ account: opts.account });
     else await ctx.fns.llm.startAccountLogin({ provider, account: opts.account });
     const flow = [...ctx.fns.llm.accountLoginStatus({})].reverse().find((f: any) => f.provider === provider && f.account === opts.account) ?? null;

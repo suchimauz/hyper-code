@@ -50,7 +50,7 @@ export default async function (
         let snapshot: types.llm.UsageSnapshot | null = null;
         try { snapshot = JSON.parse(String(row.value)); } catch { snapshot = null; }
         if (!snapshot?.provider) continue;
-        if (opts?.connectedOnly && snapshot.provider === "codex" &&
+        if (opts?.connectedOnly && snapshot.provider === "codex" && !(snapshot.account ?? "").startsWith("ssh.") &&
             !ctx.fns.llm.accountCredentialExists({ provider: "codex", account: snapshot.account ?? "default" })) continue;
 
         // A window whose reset has passed is stale: the quota rolled over and

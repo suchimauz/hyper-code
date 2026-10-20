@@ -54,6 +54,13 @@ export default async function (
         // retains transient failures, and omits denied/disabled/empty catalogues.
         const models = await ctx.fns.llm.listModels({});
         for (const entry of entries) {
+            if (entry.account.startsWith("ssh.")) {
+                const identity = /^ssh\.(.+)\.([^.]+)$/.exec(entry.account);
+                const prefix = identity ? `ssh/${identity[1]}:${entry.provider}/${identity[2]}:` : "";
+                entry.models = prefix ? Object.values(models).flat().filter(model => model.startsWith(prefix)) : [];
+                if (prefix) entry.model = prefix;
+                continue;
+            }
             const prefix = `${entry.provider}${entry.account === "default" ? "" : `/${entry.account}`}:`;
             const catalogue = Object.values(models).flat();
             entry.models = catalogue.filter(model => model.startsWith(prefix));

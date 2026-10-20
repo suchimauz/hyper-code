@@ -17,6 +17,11 @@ export default async function (
     const m = /^([a-z][\w-]*)(?:\/([\w.-]+))?:(.+)$/.exec(model);
     let provider = m?.[1] ?? "lmstudio";
     let rawModelId = m?.[3] ?? model;
+    if (provider === 'ssh') {
+        const route = /^(codex|claude-code)\/[\w.-]+:(.+)$/.exec(rawModelId);
+        if (!route) return {supported:['auto','off'],defaultEffort:'off',mode:'none'};
+        provider = route[1]!; rawModelId = route[2]!;
+    }
     if (provider === "hyper") {
         const unavailable: types.llm.ReasoningProfile = { supported: ["auto", "off"], defaultEffort: "off", mode: "none" };
         // Only cached metadata is needed: capability controls must not read tokens

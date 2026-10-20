@@ -13,6 +13,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Provider login type. */ provider: "claude-code" | "codex" | "xai";
     /** Safe login progress, never credentials. */ flow?: { account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null } | null;
     /** Existing account slot to reconnect. */ account?: string;
+    /** Configured SSH targets for new CLI accounts; omitted or empty keeps local-only UI. */ instances?: Array<{ name: string; pinnedHostKey: string | null }>;
+    /** Fixed SSH target when reconnecting a remote account. */ instance?: string;
 }): string {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: String(s ?? "") });
     const button = (action: string, label: string, tone: "default" | "primary" = "default", cls = "") => ctx.fns.llms?.popupButton
@@ -20,9 +22,9 @@ export default function (ctx: Context, _session: Session | null, opts: {
         : ctx.fns.procs.ui.button({ action, label, type: "submit", tone, class: cls });
     const claude = opts.provider === "claude-code";
     const xai = opts.provider === "xai";
-    const accountValue = opts.account ? ` value="${esc(opts.account)}"` : '';
-    const accountReadonly = opts.account ? ' readonly' : '';
+    const accountField = opts.account ? `<input type="hidden" name="account" value="${esc(opts.account)}"><span class="block mt-1 font-mono text-xs">${esc(opts.account)}</span>` : ctx.fns.procs.ui.field({ name: "account", placeholder: "work or personal", ariaLabel: "Account name", pattern: "[\\w.-]{1,40}", maxlength: 40, class: "mt-1 w-full font-mono text-xs" });
     const title = opts.account ? `Reconnect ${opts.account}` : claude ? "Add Claude Code account" : xai ? "Add Grok account" : "Add Codex account";
+    const target = !xai && opts.instance ? `<input type="hidden" name="instance" value="${esc(opts.instance)}"><p class="text-xs text-subtle">SSH instance: ${esc(opts.instance)}</p>` : !xai && !opts.account && opts.instances?.length ? `<label class="block text-xs font-medium">SSH Instance${ctx.fns.procs.ui.select({ name: "instance", value: "", ariaLabel: "SSH Instance", class: "mt-1 w-full", options: [{ value: "", label: "Local (this machine)" }, ...opts.instances.map(item => ({ value: item.name, label: item.name + (item.pinnedHostKey ? "" : " — trust required") }))] })}</label>` : "";
     const flow = opts.flow;
     if (flow) return `<div class="space-y-3">
       <div class="rounded-lg border ${flow.status === "failed" ? "border-error/30 bg-error/10" : "border-info/30 bg-info/10"} p-3 text-xs">
@@ -35,21 +37,23 @@ export default function (ctx: Context, _session: Session | null, opts: {
       <p class="text-2xs text-faint">This popup may be closed; login continues in the background and the account list updates automatically.</p>
     </div>`;
     return `<div class="space-y-4">
-      <div><h3 class="text-sm font-semibold">${title}</h3><p class="mt-1 text-xs leading-5 text-subtle">${claude ? "Choose how to connect this Claude subscription account. Managed OAuth is recommended for multiple accounts; Claude Code CLI keeps the credential in its own Keychain service." : xai ? "Starts xAI managed device OAuth. The next popup safely shows only the public authorization URL and one-time code." : "Starts `codex login --device-auth` in an isolated CODEX_HOME. The next popup shows the device URL and code."}</p></div>
-      ${claude ? `<div class="grid gap-2 sm:grid-cols-2">
+      <div><h3 class="text-sm font-semibold">${title}</h3><p class="mt-1 text-xs leading-5 text-subtle">${claude ? "Choose how to connect this Claude subscription account. Managed OAuth is recommended for local accounts. SSH Instance applies only to Claude Code CLI; its credentials stay on the selected machine." : xai ? "Starts xAI managed device OAuth. The next popup safely shows only the public authorization URL and one-time code." : "Starts `codex login --device-auth` in an isolated CODEX_HOME. The next popup shows the device URL and code."}</p></div>
+      ${claude && !opts.instance ? `<div class="grid gap-2 sm:grid-cols-2">
         <form hx-popup="llms.startClaudeManagedOAuth" class="rounded-lg border border-primary/35 bg-primary/5 p-3">
-          <input name="account" required pattern="[\\w.-]{1,40}" placeholder="work or personal"${accountValue}${accountReadonly} class="input input-bordered input-sm w-full font-mono text-xs">
+          <label class="block text-xs font-medium">Account name${accountField}</label>
           <div class="mt-2 text-xs font-semibold">Managed OAuth <span class="text-primary">recommended</span></div><p class="mt-1 text-3xs leading-4 text-faint">Hyper handles PKCE and encrypts tokens in Postgres. Best for several accounts.</p>
           ${button("start-managed-oauth", "Continue", "primary", "mt-2 w-full")}
         </form>
         <form hx-popup="llms.startLoginFromPopup" hx-popup-params="${esc(JSON.stringify({ provider: opts.provider }))}" class="rounded-lg border border-base-300 p-3">
-          <input name="account" required pattern="[\\w.-]{1,40}" placeholder="work or personal"${accountValue}${accountReadonly} class="input input-bordered input-sm w-full font-mono text-xs">
-          <div class="mt-2 text-xs font-semibold">Claude Code CLI</div><p class="mt-1 text-3xs leading-4 text-faint">Runs the official CLI in an isolated config directory. Token stays in Keychain.</p>
+          <label class="block text-xs font-medium">Account name${accountField}</label>
+          ${target}
+          <div class="mt-2 text-xs font-semibold">Claude Code CLI</div><p class="mt-1 text-3xs leading-4 text-faint">Runs the official CLI in isolated storage on the selected machine. Remote credentials stay on the SSH host.</p>
           ${button("start-claude-cli", "Start CLI login", "default", "mt-2 w-full")}
         </form>
       </div>` : `<form hx-popup="llms.startLoginFromPopup" hx-popup-params="${esc(JSON.stringify({ provider: opts.provider }))}" class="space-y-3">
-        <label class="block text-xs font-medium">Account name<input autofocus name="account" required pattern="[\\w.-]{1,40}" placeholder="work or personal"${accountValue}${accountReadonly} class="input input-bordered input-sm mt-1 w-full font-mono text-xs"></label>
-        ${button(xai ? "start-xai-login" : "start-codex-login", xai ? "Start Grok login" : "Start Codex login", "primary", "w-full")}
+        <label class="block text-xs font-medium">Account name${accountField}</label>
+        ${target}
+        ${button(xai ? "start-xai-login" : claude ? "start-claude-cli" : "start-codex-login", xai ? "Start Grok login" : claude ? "Start Claude Code login" : "Start Codex login", "primary", "w-full")}
       </form>`}
       <div class="rounded-md bg-base-200 px-3 py-2 text-3xs leading-4 text-faint"><i class="ph ph-lock-key mr-1"></i>No access or refresh token is rendered in this popup or written to a transcript.</div>
     </div>`;

@@ -1,0 +1,8 @@
+{
+  "label": "SSH Instances",
+  "href": "/sshInstance",
+  "hint": "page · trusted remote SSH hosts and CLI accounts",
+  "icon": "ph-terminal-window",
+  "group": "System",
+  "order": 17
+}

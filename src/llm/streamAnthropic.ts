@@ -72,7 +72,7 @@ export default async function (
     if (ep.provider === "kimi-coding") {
         const fresh = await ctx.fns.llm.refreshKimiCode({ account: ep.account });
         if (fresh) apiKey = fresh;
-    } else if (ep.provider === "claude-code") {
+    } else if (ep.provider === "claude-code" && !ep.ssh) {
         const fresh = await ctx.fns.llm.refreshClaudeCode({ account: ep.account });
         if (fresh) apiKey = fresh;
     } else if (ep.provider === "anthropic-oauth") {
@@ -107,7 +107,8 @@ export default async function (
         headers["anthropic-beta"] = [headers["anthropic-beta"], "compact-2026-09-04"].filter(Boolean).join(",");
     }
 
-    const res = await ctx.fns.llm.connectFetch({ url: ep.url, init: {
+    const transport = ep.ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh:ep.ssh!,...request}) : ctx.fns.llm.connectFetch;
+    const res = await transport({ url: ep.url, init: {
         method: "POST",
         headers,
         body: JSON.stringify(body),

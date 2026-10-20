@@ -154,7 +154,7 @@ async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
 
 
 async function responses(ctx: Context, endpoint: any, opts: any) {
-    const token = endpoint.provider === "hyper" ? endpoint.apiKey : await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
+    const token = endpoint.provider === "hyper" || endpoint.ssh ? endpoint.apiKey : await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
     if (!token) throw new Error("codex: no access_token");
     const body: any = {
         model: endpoint.modelId,
@@ -168,13 +168,14 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
     if (format) body.text.format = format;
     // ChatGPT Codex backend controls output limits and sampling; neither
     // max_output_tokens nor temperature is accepted by the subscription API.
-    const response = await fetch(endpoint.url, {
+    const transport = endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    const response = await transport(endpoint.url, {
         signal: opts.signal,
         method: "POST",
         headers: {
             authorization: `Bearer ${token}`,
             ...(endpoint.provider === "hyper" ? {} : {
-                "chatgpt-account-id": accountId(token),
+                ...(endpoint.ssh ? {} : { "chatgpt-account-id": accountId(token) }),
                 originator: "codex_cli_rs",
                 "OpenAI-Beta": "responses=experimental",
             }),
@@ -209,7 +210,7 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
     const headers: Record<string, string> = { "content-type": "application/json", "anthropic-version": "2023-06-01" };
     if (endpoint.provider === "kimi-coding") {
         apiKey = await ctx.fns.llm.refreshKimiCode({ account: endpoint.account }) ?? apiKey;
-    } else if (endpoint.provider === "claude-code") {
+    } else if (endpoint.provider === "claude-code" && !endpoint.ssh) {
         apiKey = await ctx.fns.llm.refreshClaudeCode({ account: endpoint.account }) ?? apiKey;
     } else if (endpoint.provider === "anthropic-oauth") {
         apiKey = await ctx.fns.llm.getAnthropicOAuthToken({ account: endpoint.account });
@@ -236,8 +237,9 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
         if (opts.system) body.system.push({ type: "text", text: opts.system });
     } else if (opts.system) body.system = opts.system;
     if (opts.temperature != null) body.temperature = opts.temperature;
-    let response = await fetch(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) });
-    response = await retryWithoutUnsupportedTemperature(response, body, () => fetch(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) }));
+    const transport = endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) });
+    response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) }));
     if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await response.json();
     return { text: (raw.content ?? []).filter((x: any) => x.type === "text").map((x: any) => x.text).join(""), finishReason: raw.stop_reason ?? null, usage: raw.usage, raw };

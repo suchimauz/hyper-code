@@ -12,7 +12,7 @@
  * @param opts.now Current time in ms, for testing.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
-    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>> }>;
+    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>> }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
@@ -20,26 +20,29 @@ export default function (ctx: Context, _session: Session | null, opts: {
 }): string {
     const now = opts.now ?? Date.now();
     const esc = (x: any) => ctx.fns.procs.ui.escape({ text: String(x ?? "") });
-    const prefix = (a: typeof opts.accounts[number]) => `${a.provider}${a.account === "default" ? "" : `/${a.account}`}:`;
+    const prefix = (a: typeof opts.accounts[number]) => a.source === "ssh" ? a.model : `${a.provider}${a.account === "default" ? "" : `/${a.account}`}:`;
 
     const remove = (a: typeof opts.accounts[number]) => {
-        if (a.source !== "oauth" && a.account === "default") return "";
+        if (a.source === "ssh" || (a.source !== "oauth" && a.account === "default")) return "";
         return ctx.fns.ui.popup({ method: "llms.removeAccount", params: { provider: a.provider, account: a.account }, tone: "danger", size: "xs", html: `<i class="ph ph-trash" aria-hidden="true"></i><span>Remove</span>` });
     };
     const row = (a: typeof opts.accounts[number]) => {
+        const remote = a.source === "ssh" ? /^ssh\/([^:]+):(?:codex|claude-code)\/([^:]+):/.exec(a.model) : null;
+        const pending = remote ? [...(ctx.state.sshAccount?.flows?.values() ?? [])].find(flow => flow.instance === remote[1] && flow.account === remote[2] && flow.provider === a.provider && flow.status === "pending") : undefined;
         const used = a.usedPercent;
         const quota = !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
         const status = !a.available || (used != null && used >= 75) ? "limit" : used != null && used >= 50 ? "warning" : "ready";
         const storage = storageLabel(a.source);
-        const reconnect = a.needsReconnect
-            ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: a.account }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
+        const reconnect = pending ? ctx.fns.ui.popup({ method: "sshAccount.progressPopup", params: { id: pending.id }, tone: "default", size: "xs", html: "Continue login" }) : (a.needsReconnect || remote) && (a.source !== "ssh" || remote)
+            ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: remote ? remote[2] : a.account, ...(remote ? { instance: remote[1] } : {}) }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
             : "";
-        const resetCount = a.provider === "codex" ? a.resetCredits?.availableCount : undefined;
+        const resetCount = a.provider === "codex" && a.source !== "ssh" ? a.resetCredits?.availableCount : undefined;
         const resetDetails = a.provider === "codex" && a.resetCredits?.credits?.length ? `<details class="text-3xs text-subtle"><summary class="cursor-pointer">details</summary><div class="absolute z-20 mt-1 max-w-xs space-y-1 rounded-lg border border-ui-border bg-base-100 p-2 shadow-xl">${a.resetCredits.credits.map((credit: any) => `<div><div class="font-medium text-muted">${esc(credit.title || credit.resetType || "Codex reset")}</div>${credit.description ? `<div>${esc(credit.description)}</div>` : ""}${credit.expiresAt ? `<div>expires ${esc(new Date(typeof credit.expiresAt === "number" ? (credit.expiresAt < 10_000_000_000 ? credit.expiresAt * 1000 : credit.expiresAt) : credit.expiresAt).toLocaleString())}</div>` : ""}</div>`).join("")}</div></details>` : "";
         const reset = a.provider === "codex" && resetCount != null ? `<form method="POST" action="/llms/codex/reset" hx-post="/llms/codex/reset" hx-target="find .reset-result" hx-swap="innerHTML" class="flex items-center gap-1" onsubmit="return confirm('Use one of ${resetCount} Codex reset credits now?')"><input type="hidden" name="account" value="${esc(a.account)}"><span class="reset-result text-3xs text-subtle">${resetCount} reset${resetCount === 1 ? "" : "s"}</span>${resetDetails}${resetCount > 0 ? ctx.fns.procs.ui.button({ action: "reset-codex-limit", label: "Reset limit", type: "submit", size: "xs", tone: "warning" }) : ""}</form>` : "";
         const actions = `<span class="llm-account-actions flex flex-wrap items-center gap-1">${reset}${reconnect}${remove(a)}</span>`;
         return ctx.fns.procs.ui.row({ entity: "llm-account", id: `${a.provider}/${a.account}`, status: a.needsReconnect ? "error" : status, cells: [
-            { role: "account", text: a.account === "default" ? "main" : a.account, class: "w-28 shrink-0 font-mono text-xs font-medium" },
+            { role: "account", text: remote ? remote[2] : a.account === "default" ? "main" : a.account, class: "w-28 shrink-0 font-mono text-xs font-medium" },
+            ...(remote ? [{ role: "instance", text: `SSH · ${remote[1]}`, title: "Credentials stay on this SSH instance", class: "badge badge-sm shrink-0 text-muted" }] : []),
             ...(a.planType ? [{ role: "plan", text: planName(a.provider, a.planType), title: `Subscription plan: ${a.planType}`, class: "badge badge-sm shrink-0 capitalize text-muted" }] : []),
             { role: "prefix", text: prefix(a), title: prefix(a), class: "min-w-0 flex-1 truncate font-mono text-2xs text-faint" },
             { role: "storage", text: storage.text, title: storage.title, class: "hidden shrink-0 text-3xs text-faint lg:block" },
@@ -115,7 +118,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const otherLocals = opts.accounts.filter(a => !knownProviders.has(a.provider));
     const extraLocalSection = otherLocals.length ? `<section>${ctx.fns.procs.ui.heading({ title: "Other local connections", meta: "Available catalogue models" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100">${otherLocals.map(localRow).join("")}</div></section>` : "";
 
-    const catalogueOnly = Object.entries(opts.models ?? {}).filter(([provider]) => provider !== "oneapi" && !provider.startsWith("hyper/"))
+    const catalogueOnly = Object.entries(opts.models ?? {}).filter(([provider]) => provider !== "oneapi" && !provider.startsWith("hyper/") && !provider.startsWith("ssh/"))
         .map(([provider, models]) => ({ provider, models: models.filter(model => !opts.accounts.some(a => a.provider !== "hyper" && model.startsWith(prefix(a)))) }))
         .filter(group => group.models.length);
     const catalogueOnlySections = catalogueOnly.map(group => `<section data-catalogue="${esc(group.provider)}">${ctx.fns.procs.ui.heading({ title: group.provider, meta: "Local / API catalogue · quota not measured" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100 p-3">${modelList(group.models)}</div></section>`).join("");

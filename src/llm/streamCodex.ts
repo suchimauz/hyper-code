@@ -29,10 +29,10 @@ export default async function (
     // Through a Hyper node the bearer is our node token and the host adds the
     // ChatGPT account headers itself (docs/hyper-node.md).
     const viaNode = ep.provider === "hyper";
-    const apiKey = viaNode ? ep.apiKey : (await ctx.fns.llm.refreshCodex({ account: ep.account }) ?? ep.apiKey);
+    const apiKey = viaNode || ep.ssh ? ep.apiKey : (await ctx.fns.llm.refreshCodex({ account: ep.account }) ?? ep.apiKey);
     const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort ?? "auto" });
     if (!apiKey) throw new Error("codex: no access_token (run /settings → login)");
-    const accountId = viaNode ? "" : extractAccountId(apiKey);
+    const accountId = viaNode || ep.ssh ? "" : extractAccountId(apiKey);
 
     const { system: instructions, messages: convo } = await ctx.fns.agent.buildLlmRequest({ agent });
     const { input } = ctx.fns.llm.toCodexInput({ messages: convo as any });
@@ -74,7 +74,7 @@ export default async function (
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         if (opts.signal?.aborted) throw new Error("aborted");
         try {
-            res = await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } });
+            res = ep.ssh ? await ctx.fns.sshAccount.fetch({ ssh: ep.ssh, url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } });
             if (res.ok) {
                 await ctx.fns.llm.accountAuthHealth({ action: "clear", provider: ep.provider, account: ep.account });
                 break;

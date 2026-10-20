@@ -23,8 +23,21 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     upstream?: string;
     /** Node-scoped upstream quota identity; transport account remains the node name. */
     quotaAccount?: string;
+    /** Remote SSH execution route; credentials never leave this host. */
+    ssh?: { instance: string; provider: "codex" | "claude-code"; account: string };
 }> {
     const model = opts.model;
+    if (model.startsWith('ssh/')) {
+        const remote = /^ssh\/([A-Za-z0-9][A-Za-z0-9_.-]{0,63}):(codex|claude-code)\/([A-Za-z0-9][A-Za-z0-9_-]{0,39}):([^:\s]+)$/.exec(model);
+        if (!remote || [remote[1], remote[3]].some(x => x === '.' || x === '..')) throw new Error('invalid SSH subscription model route');
+        const instance = remote[1]!; const provider = remote[2]! as 'codex'|'claude-code'; const account = remote[3]!; const modelId = remote[4]!;
+        const [instances, accounts] = await Promise.all([ctx.fns.sshInstance.list({}), ctx.fns.sshAccount.registry({action:'list'})]);
+        if (!instances.some(x=>x.name===instance&&x.pinnedHostKey)) throw new Error('SSH instance is missing or not trusted');
+        if (!accounts.some(x=>x.instance===instance&&x.provider===provider&&x.account===account&&x.status==='connected')) throw new Error('SSH subscription account is not connected');
+        return { url: provider === 'codex' ? 'https://chatgpt.com/backend-api/codex/responses' : 'https://api.anthropic.com/v1/messages',
+            apiKey: 'ssh-remote', modelId, provider, account: `ssh.${instance}.${account}`, kind: 'subscription',
+            api: provider === 'codex' ? 'responses' : 'anthropic', ssh: {instance,provider,account} };
+    }
     const m = /^([a-z][\w\-]*)(?:\/([\w\-.]+))?:(.+)$/.exec(model);
     const provider = m ? m[1]! : "lmstudio";
     const account = (m?.[2] ?? "default");

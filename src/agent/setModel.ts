@@ -38,7 +38,7 @@ export default async function (
 
     // Fail here, loudly, instead of on the agent's next turn.
     const endpoint = await ctx.fns.llm.resolveEndpoint({ model });
-    if (!endpoint.apiKey && endpoint.kind !== "local" && endpoint.provider !== "claude-code" && endpoint.provider !== "anthropic-oauth") {
+    if (!endpoint.apiKey && !endpoint.ssh && endpoint.kind !== "local" && endpoint.provider !== "claude-code" && endpoint.provider !== "anthropic-oauth") {
         throw new Error(`setModel: no credential for ${endpoint.provider}/${endpoint.account} — add a key or log in first`);
     }
 
@@ -132,6 +132,10 @@ export default async function (
 async function splitModel(ctx: Context, model: string): Promise<{ provider: string; account: string }> {
     const m = /^([a-z][\w\-]*)(?:\/([\w\-.]+))?:(.+)$/.exec(model);
     const provider = m?.[1] ?? "lmstudio", account = m?.[2] ?? "default";
+    if (provider === "ssh") {
+        const inner = /^(codex|claude-code)\/([\w-]+):/.exec(m?.[3] ?? "");
+        if (inner) return { provider: inner[1]!, account: `ssh.${account}.${inner[2]}` };
+    }
     if (provider !== "hyper") return { provider, account };
     const id = m![3]!;
     const canonical = /^([a-z][\w\-]*)\/([\w\-.]+):/.exec(id);

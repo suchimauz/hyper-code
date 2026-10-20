@@ -1,0 +1,31 @@
+import {describe,test,expect} from 'bun:test';
+import {mkdtemp,mkdir,writeFile,readFile,readdir,rm,stat,symlink} from 'node:fs/promises';
+import save from './save';
+import trust from './trust';
+import remove from './remove';
+import replaceDescriptor from './replaceDescriptor';
+import validate from './validate';
+import authorize from './authorize';
+
+async function harness(){
+ const root=await mkdtemp(process.cwd()+'/.hyper/tmp/ssh-lifecycle-');
+ const pin=(byte:number)=>{const b=Buffer.alloc(51,byte);b.writeUInt32BE(11,0);b.write('ssh-ed25519',4);b.writeUInt32BE(32,15);return 'ssh-ed25519 '+b.toString('base64');};
+ let item:any={name:'test',host:'old.example',user:'alice',port:22,id:crypto.randomUUID(),publicKey:'public identity',pinnedHostKey:pin(1),updatedAt:1};
+ let stale=false,denied=false,queries:any[]=[];let accounts=[{instance:'test',status:'connected'},{instance:'other',status:'connected'}];
+ const ctx:any={state:{sshAccount:{flows:new Map()},llmModelCatalog:{all:{value:{ssh:['old']}}}},fns:{sshInstance:{},procs:{db:{select:async(o:any)=>{queries.push(o);expect(o.sql).toContain('value::jsonb = ?::jsonb');expect(o.sql).toContain('EXISTS (SELECT 1 FROM changed)');expect((o.sql.match(/\?/g)||[]).length).toBe(o.params.length);if(stale)return [];if(o.sql.startsWith('WITH changed AS (UPDATE')){expect(JSON.parse(o.params[6])).toEqual(item);item=JSON.parse(o.params[0]);accounts=accounts.map(a=>a.instance==='test'?{...a,status:'failed'}:a);}else{expect(JSON.parse(o.params[4])).toEqual(item);item=null;accounts=accounts.filter(a=>a.instance!=='test');}return [{scope_id:'test'}];}}}}};
+ ctx.fns.sshInstance.authorize=()=>authorize(ctx,denied?({kind:'http',req:new Request('http://localhost'),user:{role:'member'}} as any):null,{});
+ ctx.fns.sshInstance.get=async()=>({...item});ctx.fns.sshInstance.validate=(o:any)=>validate(ctx,null,o);
+ ctx.fns.sshInstance.paths=async({id}:any)=>{const dir=root+'/'+id;await mkdir(dir,{recursive:true,mode:0o700});return {dir,key:dir+'/identity',knownHosts:dir+'/known_hosts',socket:dir+'/cm'};};
+ ctx.fns.sshInstance.replaceDescriptor=(o:any)=>replaceDescriptor(ctx,null,o);
+ const old={...item};const p=await ctx.fns.sshInstance.paths({id:item.id});await writeFile(p.key,'fake private identity',{mode:0o600});await writeFile(p.knownHosts,'old pin');
+ return {ctx,root,old,p,pin,queries,get item(){return item;},get accounts(){return accounts;},stale:()=>stale=true,deny:()=>denied=true,clean:()=>rm(root,{recursive:true,force:true})};
+}
+describe('SSH lifecycle without network or actual identities',()=>{
+ test('endpoint edit retains key, rotates namespace, clears pin and fails only related accounts',async()=>{const h=await harness();try{const next=await save(h.ctx,null,{name:'test',host:'new.example',user:'bob',port:2222});expect(next.id).not.toBe(h.old.id);expect(next.publicKey).toBe(h.old.publicKey);expect(next.pinnedHostKey).toBeNull();expect(await readFile(h.root+'/'+next.id+'/identity','utf8')).toBe('fake private identity');expect((await stat(h.root+'/'+next.id+'/identity')).mode&0o777).toBe(0o600);expect(await readdir(h.root+'/'+next.id)).toEqual(['identity']);expect(h.accounts.map(a=>a.status)).toEqual(['failed','connected']);expect(h.ctx.state.llmModelCatalog).toEqual({});expect(await readFile(h.p.key,'utf8')).toBe('fake private identity');}finally{await h.clean();}});
+ test('replacement requires both explicit flags and creates known_hosts before publishing',async()=>{const h=await harness();try{await expect(trust(h.ctx,null,{name:'test',hostKey:h.pin(2),confirmed:false,replace:true})).rejects.toThrow('confirmation');await expect(trust(h.ctx,null,{name:'test',hostKey:h.pin(2),confirmed:true})).rejects.toThrow('replacement');const n=await trust(h.ctx,null,{name:'test',hostKey:h.pin(2),confirmed:true,replace:true});expect(n.id).not.toBe(h.old.id);expect(await readFile(h.root+'/'+n.id+'/known_hosts','utf8')).toBe('old.example '+h.pin(2)+'\n');expect(h.accounts[0]!.status).toBe('failed');}finally{await h.clean();}});
+ test('CAS loss removes staged files and preserves original identity',async()=>{const h=await harness();try{h.stale();await expect(save(h.ctx,null,{name:'test',host:'new.example',user:'alice'})).rejects.toThrow('concurrently');expect(await readdir(h.root)).toEqual([h.old.id]);expect(h.item).toEqual(h.old);}finally{await h.clean();}});
+ test('pending login blocks edit trust and remove',async()=>{const h=await harness();try{h.ctx.state.sshAccount.flows.set('login',{instance:'test',status:'pending'});for(const run of [()=>save(h.ctx,null,{name:'test',host:'new.example',user:'alice'}),()=>trust(h.ctx,null,{name:'test',hostKey:h.pin(2),confirmed:true,replace:true}),()=>remove(h.ctx,null,{name:'test',confirmed:true})])await expect(run()).rejects.toThrow('pending login');expect(h.queries.length).toBe(0);}finally{await h.clean();}});
+ test('confirmed removal only forgets local metadata and retains protected keys',async()=>{const h=await harness();try{await expect(remove(h.ctx,null,{name:'test',confirmed:false})).rejects.toThrow('confirmation');await remove(h.ctx,null,{name:'test',confirmed:true});expect(h.item).toBeNull();expect(h.accounts).toEqual([{instance:'other',status:'connected'}]);expect(await readFile(h.p.key,'utf8')).toBe('fake private identity');}finally{await h.clean();}});
+ test('owner guard covers all mutators and idempotent saves do not rotate',async()=>{const h=await harness();try{expect(await save(h.ctx,null,{name:'test',host:'old.example',user:'alice'})).toEqual(h.old);expect(h.queries.length).toBe(0);h.deny();for(const run of [()=>save(h.ctx,null,{name:'test',host:'new.example',user:'alice'}),()=>trust(h.ctx,null,{name:'test',hostKey:h.pin(2),confirmed:true,replace:true}),()=>remove(h.ctx,null,{name:'test',confirmed:true}),()=>replaceDescriptor(h.ctx,null,{previous:h.old,next:null})])await expect(run()).rejects.toThrow('owners');}finally{await h.clean();}});
+ test('symlink identity fails generically and cleans stage',async()=>{const h=await harness();try{await rm(h.p.key);await symlink(h.p.knownHosts,h.p.key);await expect(save(h.ctx,null,{name:'test',host:'new.example',user:'alice'})).rejects.toThrow('Could not update local SSH instance');expect(await readdir(h.root)).toEqual([h.old.id]);expect(h.queries.length).toBe(0);}finally{await h.clean();}});
+});

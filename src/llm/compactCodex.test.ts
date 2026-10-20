@@ -7,7 +7,7 @@ const sse = (events: any[]) => new Response(events.map(event => `data: ${JSON.st
 describe("llm.compactCodex", () => {
     test("sends compaction trigger and returns the encrypted checkpoint", async () => {
         let request: any;
-        const ctx: any = { fns: { llm: {
+        const ctx: any = { fns: { compaction: { modelIdentity: async () => ({ provider: "codex", account: "default", modelId: "gpt-test", relay: false }) }, llm: {
             resolveEndpoint: async () => ({ provider: "codex", account: "default", modelId: "gpt-test", apiKey: null, url: "https://chatgpt.test/responses" }),
             refreshCodex: async () => jwt(), codexCliVersion: async () => "1.0.0",
             toCodexInput: () => ({ instructions: "", input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] }] }),

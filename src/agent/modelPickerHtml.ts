@@ -37,13 +37,13 @@ export default async function (
     for (const [group, models] of Object.entries(listed ?? {})) {
         // Hyper nodes are not one provider here: each node becomes its own proxy
         // entry below, with the host's providers as its accounts.
-        if (group.startsWith("hyper/") || group === "hyper") continue;
+        if (group.startsWith("hyper/") || group === "hyper" || group.startsWith("ssh/") || group === "ssh") continue;
         const provider = group.split("/")[0]!;
         const values = Array.from(new Set((models ?? []).map(String).filter(Boolean)));
         if (values.length) groups[provider] = Array.from(new Set([...(groups[provider] ?? []), ...values]));
     }
     if (current && !Object.values(groups).some(models => models.some(model => sameBaseModel(model, current)))) {
-        if (currentRoute.provider !== "hyper") (groups[currentRoute.provider] ??= []).unshift(stripAccount(current));
+        if (currentRoute.provider !== "hyper" && currentRoute.provider !== "ssh") (groups[currentRoute.provider] ??= []).unshift(stripAccount(current));
     }
 
     const labels: Record<string, string> = {
@@ -72,13 +72,14 @@ export default async function (
         return (labels[a.provider] ?? a.provider).localeCompare(labels[b.provider] ?? b.provider);
     });
     entries.push(...await proxyEntries(ctx, listed ?? {}, accountRows, currentRoute, current));
+    entries.push(...sshEntries(listed ?? {}, accountRows, current));
 
     const providerNav = entries.map((entry, providerIndex) => {
         const selected = isSelectedProvider(entries, entry, providerIndex, currentRoute);
-        const name = entry.node ?? labels[entry.provider] ?? entry.provider;
+        const name = entry.node ?? entry.sshInstance ?? labels[entry.provider] ?? entry.provider;
         const count = entry.accounts.reduce((sum, account) => sum + (account.models?.length ?? 0), 0) || entry.models.length;
-        const mark = entry.node ? '<i class="ph ph-arrows-left-right size-4 shrink-0 text-faint" aria-hidden="true"></i>' : ctx.fns.ui.modelLogo({ model: entry.models[0] ?? entry.provider + ":?", bare: true, compact: true });
-        const badge = entry.node ? '<span class="rounded bg-warning/15 px-1 text-3xs font-semibold text-warning">proxy</span>' : "";
+        const mark = entry.node || entry.sshInstance ? '<i class="ph ph-arrows-left-right size-4 shrink-0 text-faint" aria-hidden="true"></i>' : ctx.fns.ui.modelLogo({ model: entry.models[0] ?? entry.provider + ":?", bare: true, compact: true });
+        const badge = entry.node || entry.sshInstance ? `<span class="rounded bg-warning/15 px-1 text-3xs font-semibold text-warning">${entry.sshInstance ? "SSH" : "proxy"}</span>` : "";
         const html = `${mark}<span class="truncate">${esc(name)}</span>${badge}<span class="ml-auto text-3xs text-faint" title="${count} models">${count}</span>`;
         const heading = entry.node && !entries[providerIndex - 1]?.node ? '<p class="px-2 pb-0.5 pt-2 text-3xs uppercase tracking-wide text-faint">via proxy</p>' : "";
         return heading + ctx.fns.procs.ui.button({ action: "select-model-provider", html, ariaLabel: entry.node ? `Show models relayed by Hyper node ${entry.node}` : `Show ${name} accounts`, class: `flex w-full items-center gap-2 rounded-lg text-left text-xs ${selected ? "bg-primary/10 font-medium text-primary" : "text-subtle"}`, attrs: { "data-model-provider-tab": true, "aria-selected": selected, onclick: providerScript(providerIndex) } });
@@ -104,8 +105,8 @@ export default async function (
                 const button = ctx.fns.procs.ui.button({ action: "select-model", html, type: mode === "form" ? "button" : "submit", disabled: mode === "form" ? account.needsReconnect : selected || account.needsReconnect, title: account.needsReconnect ? "Reconnect this account in LLM connections before selecting it" : undefined, class: `flex w-full items-center gap-2 rounded-lg text-left ${selected ? "border-primary/30 bg-primary/10 text-primary" : "text-muted"}`, attrs: { "data-model-route": target, ...(selected ? { "aria-current": "true" } : {}), ...(mode === "form" ? { onclick: FORM_SELECT } : {}) } });
                 return mode === "form" ? button : `<form hx-post="/agent/${encodeURIComponent(id)}/model" hx-swap="none" class="contents"><input type="hidden" name="model" value="${esc(target)}"><input type="hidden" name="scope" value="agent">${button}</form>`;
             }).join("");
-            const heading = account.label ? `${entry.node} → ${account.label}` : account.account === "default" ? "main" : account.account;
-            const sub = entry.node ? `relayed through Hyper node ${entry.node} · hyper/${entry.node}:` : `${entry.provider}${account.account === "default" ? "" : `/${account.account}`}:`;
+            const heading = account.label ? `${entry.node ?? entry.sshInstance} → ${account.label}` : account.account === "default" ? "main" : account.account;
+            const sub = entry.sshInstance ? `remote SSH instance ${entry.sshInstance} · ssh/${entry.sshInstance}:` : entry.node ? `relayed through Hyper node ${entry.node} · hyper/${entry.node}:` : `${entry.provider}${account.account === "default" ? "" : `/${account.account}`}:`;
             return `<section data-model-account-panel class="${accountSelected ? "" : "hidden "}min-h-0"><div class="mb-2 flex items-center justify-between gap-2"><div><h3 class="text-xs font-semibold">${esc(heading)}</h3><p class="text-micro text-faint">${esc(sub)}</p></div>${account.planType ? `<span class="badge badge-sm">${esc(planName(account.upstream ?? entry.provider, account.planType))}</span>` : ""}</div><div class="grid gap-1.5">${rows}</div></section>`;
         }).join("");
         return `<section data-model-provider-panel class="${providerSelected ? "" : "hidden "}min-h-0"><div class="grid min-h-0 grid-cols-[8rem_minmax(0,1fr)] gap-3"><nav aria-label="Accounts" class="space-y-1 border-r border-ui-border pr-3">${accountNav}</nav><div>${modelPanels}</div></div></section>`;
@@ -118,7 +119,7 @@ export default async function (
 }
 
 type Account = { provider: string; account: string; available: boolean; needsReconnect: boolean; usedPercent: number | null; planType: string | null; label?: string; upstream?: string; models?: string[] };
-type Entry = { provider: string; models: string[]; accounts: Account[]; node?: string };
+type Entry = { provider: string; models: string[]; accounts: Account[]; node?: string; sshInstance?: string };
 
 const UPSTREAM_LABELS: Record<string, string> = { "claude-code": "Claude Code", "anthropic-oauth": "Claude managed", anthropic: "Anthropic API", codex: "Codex", openai: "OpenAI API", openrouter: "OpenRouter", "kimi-coding": "Kimi Coding", kimi: "Kimi API", cursor: "Cursor", groq: "Groq", xai: "xAI" };
 
@@ -167,16 +168,45 @@ async function proxyEntries(ctx: Context, listed: Record<string, string[]>, acco
     }
     return out.sort((a, b) => a.node!.localeCompare(b.node!));
 }
+// SSH routes have two colons: never rebuild them with local withAccount().
+function sshEntries(listed: Record<string, string[]>, rows: any[], current: string): Entry[] {
+    const names = new Set(Object.keys(listed).filter(key => key.startsWith("ssh/")).map(key => key.slice(4)));
+    const selected = parseRoute(current);
+    if (selected.provider === "ssh") names.add(selected.account);
+    return [...names].sort().flatMap(instance => {
+        const routes = [...new Set(listed[`ssh/${instance}`] ?? [])];
+        if (selected.provider === "ssh" && selected.account === instance && !routes.includes(current)) routes.unshift(current);
+        const accounts = new Map<string, Account>();
+        for (const route of routes) {
+            const outer = parseRoute(route);
+            if (outer.provider !== "ssh" || outer.account !== instance) continue;
+            const inner = parseRoute(outer.modelId);
+            const identity = `ssh.${instance}.${inner.account}`;
+            const key = `${inner.provider}:${identity}`;
+            const row = rows.find(row => row.source === "ssh" && row.provider === inner.provider && row.account === identity);
+            const account: Account = accounts.get(key) ?? {
+                provider: inner.provider, account: identity, upstream: inner.provider,
+                label: `${UPSTREAM_LABELS[inner.provider] ?? inner.provider} · ${inner.account}`,
+                available: row?.available !== false, needsReconnect: row?.needsReconnect === true,
+                usedPercent: row?.usedPercent ?? null, planType: row?.planType ?? null, models: [],
+            };
+            account.models!.push(route);
+            accounts.set(key, account);
+        }
+        const ordered = [...accounts.values()].sort((a, b) => Number(b.models!.includes(current)) - Number(a.models!.includes(current)));
+        return ordered.length ? [{ provider: "ssh", sshInstance: instance, models: routes, accounts: ordered }] : [];
+    });
+}
 function isSelectedProvider(entries: Entry[], entry: Entry, index: number, current: ReturnType<typeof parseRoute>): boolean {
-    const owns = (e: Entry) => e.node ? current.provider === "hyper" && current.account === e.node : e.provider === current.provider;
+    const owns = (e: Entry) => e.sshInstance ? current.provider === "ssh" && current.account === e.sshInstance : e.node ? current.provider === "hyper" && current.account === e.node : e.provider === current.provider;
     return owns(entry) || (!entries.some(owns) && index === 0);
 }
 function isSelectedAccount(entry: Entry, account: Account, index: number, current: ReturnType<typeof parseRoute>, currentModel: string): boolean {
-    if (entry.node) return account.models!.includes(currentModel) || (!entry.accounts.some(a => a.models!.includes(currentModel)) && index === 0);
+    if (entry.node || entry.sshInstance) return account.models!.includes(currentModel) || (!entry.accounts.some(a => a.models!.includes(currentModel)) && index === 0);
     return account.account === current.account && entry.provider === current.provider || (entry.provider !== current.provider && index === 0);
 }
 function accountsFor(provider: string, rows: any[], current: ReturnType<typeof parseRoute>): Account[] {
-    const found = rows.filter(row => row.provider === provider).map(row => ({ provider, account: String(row.account ?? "default"), available: row.available !== false, needsReconnect: row.needsReconnect === true, usedPercent: row.usedPercent ?? null, planType: row.planType ?? null }));
+    const found = rows.filter(row => row.provider === provider && row.source !== "ssh").map(row => ({ provider, account: String(row.account ?? "default"), available: row.available !== false, needsReconnect: row.needsReconnect === true, usedPercent: row.usedPercent ?? null, planType: row.planType ?? null }));
     if (!found.length) found.push({ provider, account: "default", available: true, needsReconnect: false, usedPercent: null, planType: null });
     if (provider === current.provider && !found.some(row => row.account === current.account)) found.unshift({ provider, account: current.account, available: true, needsReconnect: false, usedPercent: null, planType: null });
     return found.sort((a, b) => Number(b.account === current.account && provider === current.provider) - Number(a.account === current.account && provider === current.provider));

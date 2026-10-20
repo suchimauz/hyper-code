@@ -30,9 +30,9 @@ export default async function (
     const ep = await ctx.fns.llm.resolveEndpoint({ model: opts.model });
     const upstream = ep.provider === "hyper" ? String(ep.upstream ?? "") : ep.provider;
     if (ep.api !== "anthropic" || !["anthropic", "claude-code", "anthropic-oauth"].includes(upstream)) throw new Error(`server compaction is not supported for ${ep.provider}`);
-    let apiKey = ep.apiKey;
-    if (ep.provider === "claude-code") apiKey = (await ctx.fns.llm.refreshClaudeCode({ account: ep.account })) ?? apiKey;
-    else if (ep.provider === "anthropic-oauth") apiKey = await ctx.fns.llm.getAnthropicOAuthToken({ account: ep.account });
+    let apiKey = ep.ssh ? "ssh-remote" : ep.apiKey;
+    if (!ep.ssh && ep.provider === "claude-code") apiKey = (await ctx.fns.llm.refreshClaudeCode({ account: ep.account })) ?? apiKey;
+    else if (!ep.ssh && ep.provider === "anthropic-oauth") apiKey = await ctx.fns.llm.getAnthropicOAuthToken({ account: ep.account });
     if (!apiKey) throw new Error(`${ep.provider}: no credentials`);
     const subscription = upstream === "claude-code" || upstream === "anthropic-oauth";
     const headers: Record<string, string> = { "content-type": "application/json", "anthropic-version": "2023-06-01" };
@@ -53,7 +53,10 @@ export default async function (
     if (focus) compaction.instructions = ("Summarize this conversation into a handoff checkpoint so another model can seamlessly continue: goal, progress, decisions, constraints, exact identifiers/paths/errors, and next steps.\n\nFocus: " + focus).slice(0, 16384);
     const body: any = { model: ep.modelId, max_tokens: opts.maxTokens ?? 32000, messages, compaction };
     if (system.length) body.system = system;
-    const res = await fetch(ep.url, { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal });
+    const init = { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal };
+    const res = ep.ssh
+        ? await ctx.fns.sshAccount.fetch({ ssh: ep.ssh, url: ep.url, init })
+        : await fetch(ep.url, init);
     if (!res.ok) throw new Error(`anthropic compaction ${res.status}: ${(await res.text()).slice(0, 500)}`);
     const raw: any = await res.json();
     const block = (raw.content ?? []).find((b: any) => b?.type === "compaction");

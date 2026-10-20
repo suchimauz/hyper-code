@@ -8,8 +8,10 @@
  * Enumerate the credential accounts available per subscription provider.
  *
  * Combines file-backed logins (~/.codex/auth.json and its named siblings,
- * ~/.kimi/credentials), managed OAuth rows and the recorded quota snapshots,
- * and marks which accounts are currently exhausted. Use it to render an account
+ * ~/.kimi/credentials), managed OAuth rows, secret-free SSH account metadata,
+ * and recorded quota snapshots. SSH rows use the normal provider and synthetic
+ * ssh.<instance>.<account> quota identity, without reading remote credentials.
+ * Marks which accounts are currently exhausted. Use it to render an account
  * switcher or to pick a fallback credential.
  *
  * @param opts.provider Restrict the listing to one provider.
@@ -29,7 +31,7 @@ export default async function (
     account: string;
     label: string;
     model: string;
-    source: "file" | "oauth" | "keychain" | "node";
+    source: "file" | "oauth" | "keychain" | "node" | "ssh";
     available: boolean;
     usedPercent: number | null;
     resetsAt: number | null;
@@ -129,10 +131,26 @@ export default async function (
         out.push({ ...item, gatewayHealth });
     }
 
+    // Remote identities share the inference provider's quota namespace, but
+    // never its local credential slot. Registry metadata is secret-free.
+    const remote = ctx.fns.sshAccount?.registry ? await ctx.fns.sshAccount.registry({ action: "list" }) : [];
+    const instances = ctx.fns.sshInstance?.list ? new Set((await ctx.fns.sshInstance.list({})).map(item => item.name)) : null;
+    for (const row of remote) {
+        if (instances && !instances.has(row.instance)) continue;
+        if (filter && filter !== row.provider && filter !== "ssh") continue;
+        const account = `ssh.${row.instance}.${row.account}`;
+        const item = entry(row.provider, account, "ssh", byKey, reconnectKeys);
+        item.label = `${row.instance} · ${row.provider} · ${row.account}`;
+        item.model = `ssh/${row.instance}:${row.provider}/${row.account}:`;
+        item.needsReconnect = item.needsReconnect || row.status !== "connected";
+        item.available = row.status === "connected" && item.available;
+        out.push(item);
+    }
+
     return out;
 }
 
-function entry(provider: string, account: string, source: "file" | "oauth" | "keychain" | "node", byKey: Map<string, any>, reconnectKeys: Set<string>) {
+function entry(provider: string, account: string, source: "file" | "oauth" | "keychain" | "node" | "ssh", byKey: Map<string, any>, reconnectKeys: Set<string>) {
     const known = byKey.get(`${provider}:${account}`);
     const usedPercent = known?.usedPercent ?? null;
     const needsReconnect = reconnectKeys.has(`${provider}:${account}`);
