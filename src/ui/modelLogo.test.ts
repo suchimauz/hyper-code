@@ -68,3 +68,16 @@ test('provider marks explicitly inherit the theme foreground in every size and f
     }
     expect(render('local:unknown')).toContain('text-base-content');
 });
+test('SSH keeps exact provider mark with a small terminal corner badge in every variant', () => {
+    for(const model of ['codex/work:o3','claude-code/work:sonnet']) for(const bare of [false,true]) for(const compact of [false,true]) {
+        const local=render(model,true,bare,compact);
+        const ssh=render(`ssh/claude-gpt-host:${model}`,true,bare,compact);
+        expect(ssh.match(/<svg[\s\S]*?<\/svg>/)?.[0]).toBe(local.match(/<svg[\s\S]*?<\/svg>/)?.[0]);
+        expect(ssh).toContain('ph-terminal-window absolute -bottom-1 -right-1');
+        expect(ssh).toContain('(via SSH claude-gpt-host)');
+        expect(ssh).not.toContain('ph-arrows-left-right');
+        expect(local).not.toContain('ph-terminal-window');
+    }
+    expect(render('hyper/node:codex/work:o3')).toContain('ph-arrows-left-right');
+    expect(render('hyper/node:codex/work:o3')).not.toContain('ph-terminal-window');
+});

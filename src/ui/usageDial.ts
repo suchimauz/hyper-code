@@ -1,7 +1,7 @@
 // The quota indicator: one ring per subscription credential, filled by how much
 // of the window is spent. A ring is readable at a glance in a way a number is
 // not — the point is noticing 87% before the work stops, not reading it after.
-/** Renders subscription quota rings for the navigation panel. */
+/** Renders compact quota groups by local machine, Hyper node or SSH instance, with equal-height provider rings. */
 /**
  * Render a compact ring per subscription credential showing spent quota.
  *
@@ -43,7 +43,16 @@ export default function (
     if (!entries.length) return "";
     const now = opts.now ?? Date.now();
 
-    const rings = entries.map((entry) => {
+    const groups = new Map<string, { label: string; entries: typeof entries }>();
+    for (const entry of entries) {
+        const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];
+        const key = entry.node ? `hyper/${entry.node}` : ssh ? `ssh/${ssh}` : 'local';
+        const label = entry.node ? `Hyper · ${entry.node}` : ssh ? `SSH · ${ssh}` : 'Local';
+        if (!groups.has(key)) groups.set(key, { label, entries: [] });
+        groups.get(key)!.entries.push(entry);
+    }
+    const ring = (entry: typeof entries[number]) => {
+        const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];
         const percent = entry.usedPercent == null ? 0 : Math.max(0, Math.min(100, entry.usedPercent));
         const known = entry.usedPercent != null && Number.isFinite(entry.usedPercent);
         const parked = entry.parkedAgents > 0;
@@ -77,11 +86,11 @@ export default function (
             known ? `${percent}% used${entry.quotaStatus === "stale" ? " (last known)" : ""}` : null,
             verdict,
             left ? `resets in ${left}` : null,
-            `Provider ${entry.provider} · account ${entry.account}${entry.node ? ` · node ${entry.node}` : " · local"}`,
+            `Provider ${entry.provider} · account ${entry.account}${entry.node ? ` · node ${entry.node}` : ssh ? ` · SSH ${ssh}` : " · local"}`,
             entry.models?.length ? `\nAvailable models (${entry.models.length}):\n${entry.models.join("\n")}` : null,
         ].filter(Boolean).join(" · ");
 
-        return `<a href="/llms" class="flex flex-col items-center gap-0.5 rounded-md px-0.5 py-1 hover:bg-base-300" title="${esc(title)}" aria-label="${esc(title)}">
+        return `<a href="/llms" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-base-300" title="${esc(title)}" aria-label="${esc(title)}">
           <span class="relative flex size-7 shrink-0 items-center justify-center ${colour}">
             <svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">
               <circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2" opacity="0.18"></circle>
@@ -89,14 +98,14 @@ export default function (
             </svg>
             ${parked
             ? `<i class="ph ph-pause text-2xs" aria-hidden="true"></i>`
-            : ctx.fns.ui.modelLogo({ model: entry.model ?? `${entry.provider}:`, bare: true })}
-            ${entry.node ? `<i class="ph ph-arrows-left-right absolute -bottom-0.5 -right-0.5 rounded-full bg-base-100 text-[8px] leading-none" aria-hidden="true"></i>` : ""}
+            : ctx.fns.ui.modelLogo({ model: entry.model ?? (entry.node ? `hyper/${entry.node}:${entry.provider}:` : ssh ? `ssh/${ssh}:${entry.provider}:` : `${entry.provider}:`), bare: true })}
           </span>
-          ${entry.node ? `<span class="block max-w-8 truncate text-[8px] leading-tight" aria-hidden="true">${esc(entry.node)}</span>` : ""}
         </a>`;
-    }).join("");
-
-    return `<div class="flex flex-col items-center gap-0.5 border-t border-ui-border pt-1" role="group" aria-label="Subscription quota">${rings}</div>`;
+    };
+    const grouped = [...groups.entries()].sort(([a], [b]) => a === 'local' ? -1 : b === 'local' ? 1 : a.localeCompare(b));
+    const showHeadings = groups.size > 1 || !groups.has('local');
+    const html = grouped.map(([key, group]) => `<section data-quota-group="${esc(key)}" aria-label="${esc(group.label)}" class="min-w-0">${showHeadings ? `<h3 class="truncate px-1 text-[9px] font-medium leading-3 text-faint" title="${esc(group.label)}">${esc(group.label)}</h3>` : ''}<div class="flex flex-wrap items-center gap-0.5">${group.entries.map(ring).join('')}</div></section>`).join('');
+    return `<div class="w-full border-t border-ui-border pt-1" role="group" aria-label="Subscription quota"><div class="w-full min-w-0 space-y-1">${html}</div></div>`;
 }
 
 function humanDelay(ms: number): string {
