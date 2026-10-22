@@ -10,6 +10,22 @@ function isIgnoredPath(rel: string): boolean {
     return rel.split('/').some(seg => IGNORED_SEGMENT.test(seg));
 }
 
+// One realpath syscall per file is the whole cost of a scan on ext4 (~7ms ×
+// thousands of files ≈ 20s), and repl.load rescans per file it reloads — a
+// namespace reload was minutes of nothing but realpath. A path resolves to
+// the same target for the life of a process (result-store symlinks are unique
+// per result) and the glob itself only lists files that exist, so resolve
+// each path once per process.
+const REALPATH_CACHE = new Map<string, string>();
+async function cachedRealpath(p: string): Promise<string> {
+    let c = REALPATH_CACHE.get(p);
+    if (c === undefined) {
+        c = await realpath(p).catch(() => p);
+        REALPATH_CACHE.set(p, c);
+    }
+    return c;
+}
+
 export type ScanEntry = ProjectEntry & { root: string; rootDir: string; namespace: string; module: string; projectRel: string; abs: string; fn?: any };
 
 /**
@@ -47,7 +63,7 @@ export default async function (ctx: Context, session: Session | null, _opts?: {}
             // from rel0, and a symlink may hide the entire result-store path.
             const absolute = resolve(root.dir, rel0);
             if ((absolute + '/').includes('/.hyper/results/')) continue;
-            const canonical = await realpath(absolute).catch(() => absolute);
+            const canonical = await cachedRealpath(absolute);
             if ((canonical + '/').includes('/.hyper/results/')) continue;
             if (isIgnoredPath(rel0)) continue;
             // A template's own placeholder, in the PATH. Provisioning fills

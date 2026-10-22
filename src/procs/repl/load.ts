@@ -36,7 +36,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { n
             others.push((entry as any).rel);
             continue;
         }
-        await loadFile(ctx, target, entry.runtimeName!);
+        await loadFile(ctx, target, entry.runtimeName!, entries);
         if (!loaded.includes(entry.runtimeName!)) loaded.push(entry.runtimeName!);
     }
     scheduleDocsIndex(ctx);
@@ -52,10 +52,12 @@ function scheduleDocsIndex(ctx: Context): void {
 }
 
 
-async function loadFile(ctx: Context, modPath: string, fnName: string) {
+async function loadFile(ctx: Context, modPath: string, fnName: string, all?: any[]) {
     // Look the fn up by its dotted registry path in the scan (which knows the
     // real abs path) — works for src AND module files (which live outside src/).
-    const entries = await ctx.fns.procs.project.scan({});
+    // A namespace reload passes the entries it already scanned: a fresh scan
+    // PER FILE turns a 64-fn module into a ~20-minute wait.
+    const entries = all ?? await ctx.fns.procs.project.scan({});
     const e = entries.find((x: any) => x.kind === 'fn' && x.moduleDir === modPath && x.runtimeName === fnName);
     if (!e) throw new Error(`no file for ${modPath}/${fnName}`);
     const m = await import((e as any).abs + `?t=${Date.now()}`);
