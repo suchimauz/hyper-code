@@ -9,8 +9,9 @@
   const el = (tag, text, cls) => { const node = document.createElement(tag); if (text) node.textContent = text; if (cls) node.className = cls; return node; };
   const providers = { codex: 'Codex', 'claude-code': 'Claude Code', anthropic: 'Anthropic', 'anthropic-oauth': 'Claude', openai: 'OpenAI', oneapi: 'Asoft LLM Gate', 'zai-coding': 'Z.ai', 'minimax-coding': 'MiniMax' };
   const provider = row => providers[row.provider] || row.provider;
-  const identity = row => JSON.stringify([row.node || '', row.provider, row.account]);
-  const name = row => row.node ? row.node + ' · ' + row.account : row.account === 'default' ? provider(row) : row.account;
+  const sshInstance = row => (row.node ? null : (/^ssh\.(.+)\.[^.]+$/.exec(row.account) || [])[1] || null);
+  const identity = row => JSON.stringify([row.node || '', sshInstance(row) || '', row.provider, row.account]);
+  const name = row => row.node ? row.node + ' · ' + row.account : sshInstance(row) ? sshInstance(row) + ' · ' + provider(row) : row.account === 'default' ? provider(row) : row.account;
   const rows = () => !data ? [] : [...data.entries, ...(data.gateway && data.gateway.reason !== 'disabled' ? [{ ...data.gateway, gateway: true, provider: 'oneapi', account: 'default', label: 'Asoft LLM Gate', usedPercent: null, models: data.gateway.models }] : [])];
   const known = row => typeof row.usedPercent === 'number' && Number.isFinite(row.usedPercent);
   const stale = row => failure || row.quotaStatus === 'stale' || (!row.gateway && known(row) && (!row.updatedAt || Date.now() - row.updatedAt > 5 * 60000)) || Boolean(row.resetsAt && row.resetsAt <= Date.now());
@@ -97,7 +98,7 @@
       const track = (radius, label) => '<circle data-quota-window="' + label + '" class="mobile-usage-ring-track-line" cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".18"/>';
       // Two measured windows: the weekly one outside, the short one inside —
       // the same arrangement as the desktop dock.
-      const rings = win.dual
+      const rings = row.provider === 'opencode' ? '' : win.dual
         ? track(12, 'weekly') + circle(12, win.weekly?.usedPercent, 'weekly') + track(9, '5h') + circle(9, win.short?.usedPercent, '5h')
         : (measured ? track(12, 'quota') + circle(12, row.usedPercent, 'quota') : track(12, 'quota'));
       // Same 28px spent-quota ring as desktop, with no account name or percentage beside it.
@@ -112,6 +113,7 @@
         ? ' · недельный ' + (win.weekly ? Math.max(0, 100 - win.weekly.usedPercent) + '%' : 'неизвестен') + ' · 5 ч ' + (win.short ? Math.max(0, 100 - win.short.usedPercent) + '%' : 'неизвестен')
         : '';
       chip.title = (row.label || name(row)) + ' · ' + (measured ? (outdated ? 'последний известный остаток ' : 'остаток ') + amount(row) : 'лимит неизвестен') + winTitle;
+      if (row.provider === 'opencode') chip.title = (row.label || name(row)) + ' · ' + (row.memberBudgetText || 'Monthly member budget unavailable; prepaid balance unavailable');
       if (row.needsReconnect) chip.title += ' · требуется повторное подключение';
       chip.setAttribute('role', 'img'); chip.setAttribute('aria-label', chip.title); box.append(chip);
     }
@@ -128,11 +130,15 @@
   function card(row) {
     const section = el('section', '', 'mobile-usage-card'); section.dataset.usageKey = identity(row);
     const heading = el('h3'); heading.append(logo(row), el('span', row.label || name(row))); section.append(heading);
-    section.append(el('p', [provider(row), row.account, row.node ? 'Через ' + row.node : 'Локальное подключение', row.planType].filter(Boolean).join(' · '), 'mobile-usage-meta'));
+    section.append(el('p', [provider(row), row.node ? row.node : sshInstance(row) || 'default', row.node ? 'Через ' + row.node : sshInstance(row) ? 'Через ' + sshInstance(row) : 'Локальное подключение', row.planType].filter(Boolean).join(' · '), 'mobile-usage-meta'));
     let status;
     if (row.gateway) {
       status = row.reason === 'missing-key' ? 'Не задан API-ключ' : row.status === 'available' ? 'Каталог API доступен' : row.status === 'unavailable' ? 'API недоступен' : 'Состояние API неизвестно';
       section.append(el('p', status, 'mobile-usage-amount'), el('p', 'Лимиты неизвестны. Доступность каталога не подтверждает возможность генерации.', 'mobile-usage-meta'));
+    } else if (row.provider === 'opencode') {
+      section.append(el('p', row.memberBudgetText || 'Monthly member budget unavailable', 'mobile-usage-amount'));
+      section.append(el('p', 'Это месячный бюджет участника, не кредитный баланс. Общий баланс API не сообщает.', 'mobile-usage-meta'));
+      if (row.memberBudget?.resetsAt) section.append(el('p', 'Сброс бюджета: ' + new Date(row.memberBudget.resetsAt).toLocaleString('ru-RU'), 'mobile-usage-meta'));
     } else {
       const win = windows(row);
       status = row.quotaStatus === 'unavailable' || !known(row) ? 'Лимит неизвестен' : stale(row) ? 'Последний известный остаток: ' + left(row) + '%' : 'Осталось ' + left(row) + '%';

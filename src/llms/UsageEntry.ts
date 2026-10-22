@@ -1,5 +1,9 @@
 /** Safe subscription quota data shared by desktop and mobile usage indicators. */
 export type UsageEntry = {
+    /** Safe monthly member budget amounts in USD; never workspace balance or subscription quota. */
+    memberBudget?: { available: boolean; spentUsd?: number; limitUsd?: number | null; resetsAt?: number };
+    /** Human-readable monetary budget, shared by desktop and mobile surfaces. */
+    memberBudgetText?: string;
     /** Provider identifier. */
     provider: string;
     /** Credential account identifier. */

@@ -30,7 +30,7 @@ export default async function (
         let entries: types.llms.UsageEntry[] = local.filter(entry => entry.provider !== "hyper").map(({ resetCredits: _resetCredits, ...entry }) => ({ ...entry, models: [] }));
         if (opts.includeConnected) {
             const inventory = (await ctx.fns.llm.listAccounts({})).filter(account => account.provider !== "hyper" && account.provider !== "oneapi");
-            const supported = new Set(["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai", "zai-coding", "minimax-coding"]);
+            const supported = new Set(["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai", "zai-coding", "minimax-coding", "opencode"]);
             const key = (account: { provider: string; account: string }) => JSON.stringify([account.provider, account.account]);
             const connected = new Set(inventory.map(key));
             entries = entries.filter(entry => !supported.has(entry.provider) || connected.has(key(entry)));
@@ -58,7 +58,7 @@ export default async function (
         // A local reference check keeps desktop rendering independent of the
         // full account inventory and provider I/O. Never resolve the key here.
         if (!opts.includeConnected && ctx.fns.settings?.get) {
-            for (const plan of [["zai-coding", "Z.ai", "Coding Plan", "zaiCodingApiKey"], ["minimax-coding", "MiniMax", "M Plan", "minimaxCodingApiKey"]] as const) {
+            for (const plan of [["zai-coding", "Z.ai", "Coding Plan", "zaiCodingApiKey"], ["minimax-coding", "MiniMax", "M Plan", "minimaxCodingApiKey"], ["opencode", "OpenCode Console", "Pay as you go", "opencodeApiKey"]] as const) {
                 const [provider, label, planType, settingKey] = plan;
                 const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: settingKey });
                 const configured = typeof reference === "string" && Boolean(reference.trim());
@@ -75,25 +75,66 @@ export default async function (
         // Use the shared catalogue cache: it refreshes nodes with a five-minute TTL,
         // retains transient failures, and omits denied/disabled/empty catalogues.
         const models = await ctx.fns.llm.listModels({});
-        const planInstance = (provider: "zai-coding" | "minimax-coding") => ctx.fns?.llm?.codingInstance
+        const planInstance = (provider: "zai-coding" | "minimax-coding" | "opencode") => ctx.fns?.llm?.codingInstance
             ? ctx.fns.llm.codingInstance({ provider }).catch(() => ({ instance: null }))
             : Promise.resolve({ instance: null });
-        const [zaiPlan, minimaxPlan] = await Promise.all([planInstance("zai-coding"), planInstance("minimax-coding")]);
+        const [zaiPlan, minimaxPlan, opencodePlan] = await Promise.all([planInstance("zai-coding"), planInstance("minimax-coding"), planInstance("opencode")]);
+        // Budget refresh must not hold UI rendering on provider network I/O.
+        const budgetState = ((ctx.state as any).opencodeBudgetUi ??= { value: { available: false }, startedAt: 0, promise: null });
+        if (entries.some(entry => entry.provider === "opencode") && ctx.fns.llm.opencodeUsage && !budgetState.promise && Date.now() - budgetState.startedAt >= 60_000) {
+            budgetState.startedAt = Date.now();
+            budgetState.promise = ctx.fns.llm.opencodeUsage({})
+                .then(value => { budgetState.value = { available: value.available, spentUsd: value.spentUsd, limitUsd: value.limitUsd, resetsAt: value.resetsAt }; })
+                .catch(() => { budgetState.value = { available: false }; })
+                .finally(() => { budgetState.promise = null; });
+        }
         for (const entry of entries) {
+            // The catalogue prefix follows the provider identity, so compute it
+            // before any ssh account identity is borrowed for usage grouping.
+            const cataloguePrefix = `${entry.provider}${entry.account === "default" ? "" : `/${entry.account}`}:`;
+            // Console billing has no verified quota contract: never turn PAYG into subscription percentages.
+            if (entry.provider === "opencode") {
+                entry.label = "OpenCode Console" + (opencodePlan.instance ? ` · ${opencodePlan.instance}` : "");
+                entry.planType = "Pay as you go";
+                entry.usedPercent = null;
+                entry.resetsAt = null;
+                entry.windows = undefined;
+                entry.updatedAt = 0;
+                entry.tone = "neutral";
+                entry.quotaStatus = "unavailable";
+                const budget = budgetState.value;
+                const valid = budget.available === true && Number.isFinite(budget.spentUsd) && budget.spentUsd >= 0
+                    && (budget.limitUsd === null || Number.isFinite(budget.limitUsd) && budget.limitUsd >= 0);
+                entry.memberBudget = valid ? { available: true, spentUsd: budget.spentUsd, limitUsd: budget.limitUsd,
+                    ...(Number.isFinite(budget.resetsAt) && budget.resetsAt > 0 ? { resetsAt: budget.resetsAt } : {}) } : { available: false };
+                entry.memberBudgetText = valid ? `Monthly member budget $${budget.spentUsd.toFixed(2)} / ${budget.limitUsd === null ? "unlimited" : `$${budget.limitUsd.toFixed(2)}`}` : "Monthly member budget unavailable";
+            }
             if (entry.provider === "zai-coding" || entry.provider === "minimax-coding") {
                 const egress = entry.provider === "minimax-coding" ? minimaxPlan.instance : zaiPlan.instance;
+                // A plan leaving through an SSH instance is remote traffic, not
+                // local: record the ssh account so usage groups file it under that
+                // instance. The model route stays <provider>: because resolveEndpoint
+                // only accepts ssh/ routes for codex and claude-code; it re-adds the
+                // chosen egress instance itself.
+                if (egress && entry.account === "default") entry.account = `ssh.${egress}.default`;
                 entry.label = (entry.provider === "minimax-coding" ? "MiniMax" : "Z.ai") + (egress ? ` · ${egress}` : "");
                 if (entry.usedPercent == null) entry.quotaStatus = "unavailable";
                 else if (!entry.updatedAt || Date.now() - entry.updatedAt > 300_000) entry.quotaStatus = "stale";
             }
-            if (entry.account.startsWith("ssh.")) {
+            // The catalogue prefix follows the provider identity, not the ssh account
+            // borrowed above, so keep it before that rewrite.
+            // Registry-backed SSH accounts keep an ssh/<instance> model route.
+            // Plan providers only borrowed the instance identity above, so their
+            // models still live under the plain <provider>: catalogue.
+            const isPlanEgress = entry.provider === "zai-coding" || entry.provider === "minimax-coding";
+            if (entry.account.startsWith("ssh.") && !isPlanEgress) {
                 const identity = /^ssh\.(.+)\.([^.]+)$/.exec(entry.account);
                 const prefix = identity ? `ssh/${identity[1]}:${entry.provider}/${identity[2]}:` : "";
                 entry.models = prefix ? Object.values(models).flat().filter(model => model.startsWith(prefix)) : [];
                 if (prefix) entry.model = prefix;
                 continue;
             }
-            const prefix = `${entry.provider}${entry.account === "default" ? "" : `/${entry.account}`}:`;
+            const prefix = cataloguePrefix;
             const catalogue = Object.values(models).flat();
             entry.models = catalogue.filter(model => model.startsWith(prefix));
             if (opts.includeConnected && entry.account !== "default" && !entry.models.length) {

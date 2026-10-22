@@ -45,6 +45,8 @@ export default async function (
     thresholds?: { warnAt: number; criticalAt: number; alertAt: number };
     /** Secret-free authorization status for an isolated SSH account; not inference availability. */
     sshStatus?: "pending" | "connected" | "failed";
+    /** SSH instance carrying this account's traffic; set for registry SSH rows and for plans with a chosen egress instance. */
+    sshInstance?: string;
     /** Last verified local CLI authorization status; does not imply model execution or a fresh network check. */
     authStatus?: "pending" | "connected" | "failed";
     /** Gateway API catalogue health; does not imply generation success or quota. */
@@ -131,14 +133,32 @@ export default async function (
         }
     }
 
+    // OpenCode Console is pay-as-you-go inventory, not subscription quota.
+    if ((!filter || filter === "opencode") && ctx.fns.settings?.get) {
+        const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "opencodeApiKey" });
+        if (typeof reference === "string" && reference.trim()) {
+            const item = entry("opencode", "default", "file", byKey, reconnectKeys);
+            item.label = "OpenCode Console";
+            item.planType = "Pay as you go";
+            item.usedPercent = null;
+            item.resetsAt = null;
+            item.windows = null;
+            item.resetCredits = null;
+            item.available = !item.needsReconnect;
+            out.push(item);
+        }
+    }
+
     // A configured Coding Plan key is inventory, not a measured quota or
     // a fresh proof of generation availability. Never read its value for UI.
     if ((!filter || filter === "zai-coding") && ctx.fns.settings?.get) {
         const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "zaiCodingApiKey" });
         if (typeof reference === "string" && reference.trim()) {
             const item = entry("zai-coding", "default", "file", byKey, reconnectKeys);
-            item.label = "Z.ai Coding Plan";
+            item.label = "Z.ai";
             item.planType = "Coding Plan";
+            const { instance } = ctx.fns?.llm?.codingInstance ? await ctx.fns.llm.codingInstance({ provider: "zai-coding" }) : { instance: null };
+            if (instance) { item.source = "ssh"; item.sshInstance = instance; item.label = `SSH · ${instance} · Z.ai`; }
             out.push(item);
         }
     }
@@ -147,8 +167,10 @@ export default async function (
         const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "minimaxCodingApiKey" });
         if (typeof reference === "string" && reference.trim()) {
             const item = entry("minimax-coding", "default", "file", byKey, reconnectKeys);
-            item.label = "MiniMax M Plan";
+            item.label = "MiniMax";
             item.planType = "M Plan";
+            const { instance } = ctx.fns?.llm?.codingInstance ? await ctx.fns.llm.codingInstance({ provider: "minimax-coding" }) : { instance: null };
+            if (instance) { item.source = "ssh"; item.sshInstance = instance; item.label = `SSH · ${instance} · MiniMax`; }
             out.push(item);
         }
     }
@@ -172,6 +194,7 @@ export default async function (
         const item = entry(row.provider, account, "ssh", byKey, reconnectKeys);
         item.label = `${row.instance} · ${row.provider} · ${row.account}`;
         item.model = `ssh/${row.instance}:${row.provider}/${row.account}:`;
+        item.sshInstance = row.instance;
         item.needsReconnect = item.needsReconnect || row.status !== "connected";
         item.available = row.status === "connected" && item.available;
         out.push({ ...item, sshStatus: row.status });

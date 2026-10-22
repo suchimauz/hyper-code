@@ -18,6 +18,8 @@ export default function (
     opts: {
         /** Local usage snapshots and node/provider/account snapshots, with optional freshness status. */
         entries: Array<{
+            /** Safe monetary budget summary, not a subscription percentage. */
+            memberBudgetText?: string;
             provider: string;
             account: string;
             label: string;
@@ -65,6 +67,10 @@ export default function (
         groups.get(key)!.entries.push(entry);
     }
     const ring = (entry: typeof entries[number]) => {
+        if (entry.provider === "opencode") {
+            const text = entry.memberBudgetText ?? "Monthly member budget unavailable";
+            return `<a href="/llms" data-member-budget="opencode" class="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-2xs hover:bg-base-300" aria-label="${esc(`${entry.label} · ${text}`)}"><span aria-hidden="true">${ctx.fns.ui.modelLogo({ model: "opencode:", bare: true, compact: true })}</span><span>${esc(text)}</span></a>`;
+        }
         const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];
         const percent = entry.usedPercent == null ? 0 : Math.max(0, Math.min(100, entry.usedPercent));
         const known = entry.quotaStatus !== "unavailable" && entry.usedPercent != null && Number.isFinite(entry.usedPercent);

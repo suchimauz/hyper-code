@@ -40,3 +40,15 @@ test('mobile endpoint reads real connected Coding Plan inventory without throwin
   expect(data.entries[0].usedPercent).toBe(measured ? 32 : null);
  }
 });
+
+test('OpenCode inventory is reference-only and has no subscription quota', async () => {
+ const ctx = fixture(false);
+ let configured = true;
+ ctx.fns.settings.get = async ({key}: {key:string}) => configured && key === 'opencodeApiKey' ? 'secret://test/opencode' : null;
+ const rows = await listAccounts(ctx,null,{provider:'opencode'});
+ expect(rows).toHaveLength(1);
+ expect(rows[0]).toMatchObject({provider:'opencode',account:'default',model:'opencode:',label:'OpenCode Console',planType:'Pay as you go',usedPercent:null,windows:null,resetsAt:null,available:true});
+ expect(JSON.stringify(rows)).not.toContain('secret://');
+ configured=false;
+ expect(await listAccounts(ctx,null,{provider:'opencode'})).toEqual([]);
+});

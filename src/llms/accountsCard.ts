@@ -19,7 +19,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** MiniMax M Plan request settings shown next to the plan account. */
     minimax?: { serviceTier: string; maxTokens: number };
     /** Coding-plan egress instances: current selection per provider plus trusted instance names. */
-    planInstances?: { zai: string | null; minimax: string | null; instances: string[] };
+    planInstances?: { zai: string | null; minimax: string | null; opencode?: string | null; instances: string[] };
     /** Current timestamp in ms. */ now?: number;
 }): string {
     const now = opts.now ?? Date.now();
@@ -31,8 +31,13 @@ export default function (ctx: Context, _session: Session | null, opts: {
         return ctx.fns.ui.popup({ method: "llms.removeAccount", params: { provider: a.provider, account: a.account }, tone: "danger", size: "xs", html: `<i class="ph ph-trash" aria-hidden="true"></i><span>Remove</span>` });
     };
     const row = (a: typeof opts.accounts[number]) => {
-        const remote = a.source === "ssh" ? /^ssh\/([^:]+):(?:codex|claude-code)\/([^:]+):/.exec(a.model) : null;
-        const pending = remote ? [...(ctx.state.sshAccount?.flows?.values() ?? [])].find(flow => flow.instance === remote[1] && flow.account === remote[2] && flow.provider === a.provider && flow.status === "pending") : undefined;
+        // Registry SSH rows carry an ssh/<instance>:<provider>/<account>: route. Coding
+        // plans only name their egress instance and keep their own key locally, so
+        // they have no route to parse and no registry account to reconnect.
+        const route = a.source === "ssh" ? /^ssh\/([^:]+):(?:codex|claude-code)\/([^:]+):/.exec(a.model) : null;
+        const egress = a.source === "ssh" ? (a.sshInstance ?? /^ssh\/([^:]+):/.exec(a.model)?.[1] ?? null) : null;
+        const remote = route ? [route[1], route[2]] : null;
+        const pending = remote ? [...(ctx.state.sshAccount?.flows?.values() ?? [])].find(flow => flow.instance === remote[0] && flow.account === remote[1] && flow.provider === a.provider && flow.status === "pending") : undefined;
         const used = a.usedPercent;
         const quota = !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
         // The same thresholds as the rings and the mobile strip, so one account
@@ -42,8 +47,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const alertAt = a.thresholds?.alertAt ?? 75;
         const status = !a.available || (used != null && used >= alertAt) ? "limit" : used != null && used >= criticalAt ? "critical" : used != null && used >= warnAt ? "warning" : "ready";
         const storage = storageLabel(a.source);
-        const reconnect = pending ? ctx.fns.ui.popup({ method: "sshAccount.progressPopup", params: { id: pending.id }, tone: "default", size: "xs", html: "Continue login" }) : (a.needsReconnect || remote) && (a.source !== "ssh" || remote)
-            ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: remote ? remote[2] : a.account, ...(remote ? { instance: remote[1] } : {}) }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
+        const reconnect = pending ? ctx.fns.ui.popup({ method: "sshAccount.progressPopup", params: { id: pending.id }, tone: "default", size: "xs", html: "Continue login" }) : remote && (a.needsReconnect || a.source === "ssh")
+            ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: remote[1], instance: remote[0] }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
             : "";
         const resetCount = a.provider === "codex" && a.source !== "ssh" ? a.resetCredits?.availableCount : undefined;
         const resetDetails = a.provider === "codex" && a.resetCredits?.credits?.length ? `<details class="text-3xs text-subtle"><summary class="cursor-pointer">details</summary><div class="absolute z-20 mt-1 max-w-xs space-y-1 rounded-lg border border-ui-border bg-base-100 p-2 shadow-xl">${a.resetCredits.credits.map((credit: any) => `<div><div class="font-medium text-muted">${esc(credit.title || credit.resetType || "Codex reset")}</div>${credit.description ? `<div>${esc(credit.description)}</div>` : ""}${credit.expiresAt ? `<div>expires ${esc(new Date(typeof credit.expiresAt === "number" ? (credit.expiresAt < 10_000_000_000 ? credit.expiresAt * 1000 : credit.expiresAt) : credit.expiresAt).toLocaleString())}</div>` : ""}</div>`).join("")}</div></details>` : "";
@@ -62,7 +67,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const actions = `<span class="llm-account-actions flex flex-wrap items-center gap-1">${reset}${reconnect}${remove(a)}</span>`;
         return ctx.fns.procs.ui.row({ entity: "llm-account", id: `${a.provider}/${a.account}`, status: a.needsReconnect ? "error" : status, cells: [
             { role: "account", text: remote ? remote[2] : a.account === "default" ? "main" : a.account, class: "w-28 shrink-0 font-mono text-xs font-medium" },
-            ...(remote ? [{ role: "instance", text: `SSH · ${remote[1]}`, title: "Credentials stay on this SSH instance", class: "badge badge-sm shrink-0 text-muted" }] : []),
+            ...(egress ? [{ role: "instance", text: `SSH · ${egress}`, title: "This plan's traffic leaves through this SSH instance", class: "badge badge-sm shrink-0 text-muted" }] : []),
             ...(a.planType ? [{ role: "plan", text: planName(a.provider, a.planType), title: `Subscription plan: ${a.planType}`, class: "badge badge-sm shrink-0 capitalize text-muted" }] : []),
             { role: "prefix", text: prefix(a), title: prefix(a), class: "min-w-0 flex-1 truncate font-mono text-2xs text-faint" },
             { role: "storage", text: storage.text, title: storage.title, class: "hidden shrink-0 text-3xs text-faint lg:block" },
@@ -83,10 +88,12 @@ export default function (ctx: Context, _session: Session | null, opts: {
     };
     const localRow = (a: typeof opts.accounts[number]) => {
         const models = Object.values(opts.models ?? {}).flat().filter(model => model.startsWith(prefix(a)));
-        const planInstance = a.provider !== "zai-coding" && a.provider !== "minimax-coding" || !opts.planInstances ? "" : ctx.fns.llms.planInstanceSettings({ provider: a.provider, instance: a.provider === "zai-coding" ? opts.planInstances.zai : opts.planInstances.minimax, instances: opts.planInstances.instances });
-        return `<div class="llm-account">${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div>${minimaxSettings(a)}${planInstance}</div>`;
+        const planInstance = a.provider !== "zai-coding" && a.provider !== "minimax-coding" && a.provider !== "opencode" || !opts.planInstances ? "" : ctx.fns.llms.planInstanceSettings({ provider: a.provider, instance: a.provider === "opencode" ? opts.planInstances.opencode ?? null : a.provider === "zai-coding" ? opts.planInstances.zai : opts.planInstances.minimax, instances: opts.planInstances.instances });
+        const refreshModels = a.provider === "opencode" ? `<div class="px-3 pb-3">${ctx.fns.ui.popup({ method: "llms.refreshOpencodeModels", params: {}, tone: "default", size: "xs", html: "Refresh models" })}</div>` : "";
+        return `<div class="llm-account">${row(a)}${refreshModels}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div>${minimaxSettings(a)}${planInstance}</div>`;
     };
     const providers = [
+        { id: "opencode", title: "OpenCode Console", icon: "opencode:", accounts: opts.accounts.filter(a => a.provider === "opencode"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
         { id: "grok", title: "Grok", icon: "xai:grok", accounts: opts.accounts.filter(a => a.provider === "xai"), add: addButton(ctx, "xai", "Add Grok account") },
@@ -152,6 +159,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const catalogueOnlySections = catalogueOnly.map(group => {
         const plan = group.provider === "zai-coding" ? { title: "Z.ai Coding Plan", meta: "Subscription catalogue · entitlement not verified · quota not measured" }
             : group.provider === "minimax-coding" ? { title: "MiniMax M Plan", meta: "Subscription catalogue · entitlement not verified · quota not measured" }
+            : group.provider === "opencode" ? { title: "OpenCode Console", meta: "Pay as you go · balance and usage unavailable" }
             : { title: group.provider, meta: "Local / API catalogue · quota not measured" };
         return `<section data-catalogue="${esc(group.provider)}">${ctx.fns.procs.ui.heading({ title: plan.title, meta: plan.meta })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100 p-3">${modelList(group.models)}</div></section>`;
     }).join("");
