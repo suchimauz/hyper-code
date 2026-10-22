@@ -1,7 +1,7 @@
 /**
  * Refreshes cached subscription quota for one or all configured LLM accounts
  *
- * Fetch live quota windows from provider-specific subscription usage endpoints for Codex, Claude, xAI/SuperGrok and Z.ai Coding Plan, then persist them through llm.recordUsage. Connected SSH accounts use the remote bridge; their credentials never enter this process. Use before rendering /llms or the sidebar; requests are cached briefly and individual account failures are returned without failing the whole refresh.
+ * Fetch live quota windows from provider-specific subscription usage endpoints for Codex, Claude, xAI/SuperGrok, Z.ai Coding Plan and MiniMax M Plan, then persist them through llm.recordUsage. Connected SSH accounts use the remote bridge; their credentials never enter this process. Use before rendering /llms or the sidebar; requests are cached briefly and individual account failures are returned without failing the whole refresh.
  * @param opts.provider Only refresh this provider.
  * @param opts.account Only refresh this credential account.
  * @param opts.maxAgeMs Reuse a recent successful refresh for this many milliseconds. @default 60000 @minimum 0 @maximum 3600000
@@ -35,7 +35,7 @@ export default async function (
     const results = await Promise.all(accounts.map(async (item: any) => {
         const provider = String(item.provider);
         const account = String(item.account || "default");
-        if (!["codex", "claude-code", "anthropic-oauth", "xai", "zai-coding"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
+        if (!["codex", "claude-code", "anthropic-oauth", "xai", "zai-coding", "minimax-coding"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
         const cacheKey = `llm:usage-refresh:${provider}:${account}`;
         const cached = ((await ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = ?", params: [cacheKey] })) as any[])[0];
         if (cached && now - Number(cached.value ?? 0) < maxAgeMs) return { provider, account, status: "cached" as const, error: null };
@@ -53,6 +53,11 @@ export default async function (
             else if (provider === "zai-coding") {
                 if (account !== "default") throw new Error("Z.ai Coding supports only the default account");
                 const quota = await ctx.fns.llm.zaiCodingUsage({ timeoutMs });
+                await ctx.fns.llm.recordUsage({ provider, account, rateLimits: quota, planType: quota.planType, now });
+            }
+            else if (provider === "minimax-coding") {
+                if (account !== "default") throw new Error("MiniMax M Plan supports only the default account");
+                const quota = await ctx.fns.llm.minimaxCodingUsage({ timeoutMs });
                 await ctx.fns.llm.recordUsage({ provider, account, rateLimits: quota, planType: quota.planType, now });
             }
             else await refreshClaude(ctx, provider as "claude-code" | "anthropic-oauth", account, timeoutMs, now);

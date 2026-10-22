@@ -26,7 +26,7 @@ export default async function (
         let entries: types.llms.UsageEntry[] = local.filter(entry => entry.provider !== "hyper").map(({ resetCredits: _resetCredits, ...entry }) => ({ ...entry, models: [] }));
         if (opts.includeConnected) {
             const inventory = (await ctx.fns.llm.listAccounts({})).filter(account => account.provider !== "hyper" && account.provider !== "oneapi");
-            const supported = new Set(["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai", "zai-coding"]);
+            const supported = new Set(["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai", "zai-coding", "minimax-coding"]);
             const key = (account: { provider: string; account: string }) => JSON.stringify([account.provider, account.account]);
             const connected = new Set(inventory.map(key));
             entries = entries.filter(entry => !supported.has(entry.provider) || connected.has(key(entry)));
@@ -53,15 +53,15 @@ export default async function (
         // A local reference check keeps desktop rendering independent of the
         // full account inventory and provider I/O. Never resolve the key here.
         if (!opts.includeConnected && ctx.fns.settings?.get) {
-            for (const plan of [["zai-coding", "Z.ai Coding Plan", "zaiCodingApiKey"], ["minimax-coding", "MiniMax M Plan", "minimaxCodingApiKey"]] as const) {
-                const [provider, label, settingKey] = plan;
+            for (const plan of [["zai-coding", "Z.ai Coding Plan", "Coding Plan", "zaiCodingApiKey"], ["minimax-coding", "MiniMax M Plan", "M Plan", "minimaxCodingApiKey"]] as const) {
+                const [provider, label, planType, settingKey] = plan;
                 const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: settingKey });
                 const configured = typeof reference === "string" && Boolean(reference.trim());
                 entries = entries.filter(entry => entry.provider !== provider || configured);
                 if (configured && !entries.some(entry => entry.provider === provider && entry.account === "default")) {
                     entries.push({ provider, account: "default", label,
                         model: `${provider}:`, models: [], usedPercent: null, resetsAt: null,
-                        planType: "Coding Plan", parkedAgents: 0, tone: "neutral", updatedAt: 0,
+                        planType, parkedAgents: 0, tone: "neutral", updatedAt: 0,
                         quotaStatus: "unavailable" });
                 }
             }

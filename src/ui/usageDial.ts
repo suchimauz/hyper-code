@@ -82,7 +82,7 @@ export default function (
                     : entry.tone === "warning"
                         ? `${remaining}% remaining`
                         : `${remaining}% remaining — sufficient capacity`;
-        const dual = entry.provider === "zai-coding";
+        const dual = entry.provider === "zai-coding" || entry.provider === "minimax-coding";
         const freshWindow = (window?: types.llm.UsageWindow) => window && Number.isFinite(window.usedPercent) && (!window.resetsAt || window.resetsAt > now) ? window : undefined;
         const short = freshWindow(entry.windows?.primary);
         const weekly = freshWindow(entry.windows?.secondary);
