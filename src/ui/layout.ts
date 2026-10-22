@@ -394,13 +394,16 @@ export default async function (ctx: Context, session: Session | null, opts: {
 .mobile-usage-amount { margin: .75rem 0 .25rem; font-size: 16px; font-weight: 500; }
 .mobile-usage-amount[data-tone="neutral"] { color: var(--color-muted); }
 .mobile-usage-amount[data-tone="warning"] { color: var(--color-warning); }
+.mobile-usage-amount[data-tone="critical"] { color: var(--color-critical); }
 .mobile-usage-amount[data-tone="error"] { color: var(--color-error); }
 .mobile-usage-card progress { display: block; width: 100%; height: .375rem; border: 0; border-radius: 1rem; overflow: hidden; background: var(--color-base-300); accent-color: var(--color-base-content); }
 .mobile-usage-card progress::-webkit-progress-bar { background: var(--color-base-300); }
 .mobile-usage-card progress::-webkit-progress-value { background: var(--color-base-content); }
 .mobile-usage-card progress[data-tone="warning"] { accent-color: var(--color-warning); }
+.mobile-usage-card progress[data-tone="critical"] { accent-color: var(--color-critical); }
 .mobile-usage-card progress[data-tone="error"] { accent-color: var(--color-error); }
 .mobile-usage-card progress[data-tone="warning"]::-webkit-progress-value { background: var(--color-warning); }
+.mobile-usage-card progress[data-tone="critical"]::-webkit-progress-value { background: var(--color-critical); }
 .mobile-usage-card progress[data-tone="error"]::-webkit-progress-value { background: var(--color-error); }
 .mobile-usage-card summary { min-height: 44px; padding: .75rem 0 .5rem; cursor: pointer; font-size: 14px; }
 .mobile-usage-card ul { margin: 0; padding: 0; list-style: none; }
@@ -419,6 +422,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
   .mobile-usage-ring { position: relative; display: flex; flex: none; width: 28px; height: 28px; align-items: center; justify-content: center; }
   .mobile-usage-ring-track { position: absolute; inset: 0; width: 28px; height: 28px; transform: rotate(-90deg); }
   .mobile-usage-chip[data-tone="warning"] { color: var(--color-warning); }
+  .mobile-usage-chip[data-tone="critical"] { color: var(--color-critical); }
   .mobile-usage-chip[data-tone="error"] { color: var(--color-error); }
   .mobile-usage-chip[data-quota-state="stale"] [data-usage-fill] { opacity: .35; }
   .mobile-usage-ring > .mobile-usage-logo { position: relative; width: 16px; height: 16px; line-height: 1; }
@@ -721,7 +725,13 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
    It lives in the top layer (Popover API): the dock's backdrop-filter creates a
    stacking context, so no z-index inside the dock can lift anything above the
    chat column. The quotaTip script pins it to the ring with fixed coordinates. */
-.quota-tip { position:fixed; inset:auto; display:flex; flex-direction:column; gap:3px; min-width:12.5rem; max-width:17rem; padding:.5rem .65rem .55rem; border:1px solid var(--ui-border-strong, var(--color-ui-border)); border-radius:.6rem; background:var(--color-base-100); box-shadow:0 10px 28px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .08); font-size:11px; line-height:1.45; color:var(--color-muted); pointer-events:none; opacity:1; transform:none; transition:opacity .12s ease, transform .12s ease, overlay .12s allow-discrete; }
+.quota-tip { position:fixed; inset:auto; margin:0; width:auto; height:auto; overflow:visible; display:flex; flex-direction:column; gap:3px; min-width:12.5rem; max-width:17rem; padding:.5rem .65rem .55rem; border:1px solid var(--ui-border-strong, var(--color-ui-border)); border-radius:.6rem; background:var(--color-base-100); box-shadow:0 10px 28px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .08); font-size:11px; line-height:1.45; color:var(--color-muted); pointer-events:none; opacity:1; transform:none; transition:opacity .12s ease, transform .12s ease, overlay .12s allow-discrete; }
+/* Author styles outrank the UA sheet, so the closed state must be restated
+   explicitly — otherwise every card is visible on load and hidePopover() has
+   nothing to close. overflow:visible matters too: the UA popover default is
+   overflow:auto, which turns the caret hanging 5px below the card into a
+   scrollbar. */
+.quota-tip:not(:popover-open) { display:none; }
 @starting-style { .quota-tip:popover-open { opacity:0; transform:translateY(3px); } }
 .quota-tip::after { content:""; position:absolute; left:14px; bottom:-5px; width:9px; height:9px; border-right:1px solid var(--ui-border-strong, var(--color-ui-border)); border-bottom:1px solid var(--ui-border-strong, var(--color-ui-border)); background:var(--color-base-100); transform:rotate(-45deg); }
 .quota-tip-head { font-weight:600; font-size:11.5px; color:var(--color-base-content); letter-spacing:.01em; }

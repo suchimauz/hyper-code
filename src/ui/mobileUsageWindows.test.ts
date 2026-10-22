@@ -9,7 +9,7 @@ const dualRow = {
     model: "minimax-coding:", models: ["minimax-coding:MiniMax-M3.1-Flash"],
     usedPercent: 41, resetsAt: Date.now() + 3600000, planType: "M Plan",
     updatedAt: Date.now(), parkedAgents: 0, tone: "neutral",
-    thresholds: { warnAt: 50, alertAt: 75 },
+    thresholds: { warnAt: 30, criticalAt: 60, alertAt: 75 },
     windows: { primary: { usedPercent: 41, resetsAt: Date.now() + 3600000 }, secondary: { usedPercent: 5, resetsAt: Date.now() + 86400000 } },
 };
 

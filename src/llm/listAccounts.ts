@@ -39,8 +39,8 @@ export default async function (
     resetCredits: types.llm.UsageSnapshot["resetCredits"];
     parkedAgents: number;
     needsReconnect: boolean;
-    /** The warning and alert percentages every usage surface colours by. */
-    thresholds?: { warnAt: number; alertAt: number };
+    /** The warning, critical and alert percentages every usage surface colours by. */
+    thresholds?: { warnAt: number; criticalAt: number; alertAt: number };
     /** Secret-free authorization status for an isolated SSH account; not inference availability. */
     sshStatus?: "pending" | "connected" | "failed";
     /** Last verified local CLI authorization status; does not imply model execution or a fresh network check. */
@@ -199,7 +199,7 @@ function entry(provider: string, account: string, source: "file" | "oauth" | "ke
         parkedAgents: known?.parkedAgents ?? 0,
         // One threshold pair for every surface that shows a quota: the rings,
         // the account cards and the mobile strip colour alike.
-        thresholds: known?.thresholds ?? { warnAt: 50, alertAt: 75 },
+        thresholds: known?.thresholds ?? { warnAt: 30, criticalAt: 60, alertAt: 75 },
     };
 }
 

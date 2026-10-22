@@ -31,16 +31,18 @@ export default async function (
     planType: string | null;
     resetCredits: types.llm.UsageSnapshot["resetCredits"];
     parkedAgents: number;
-    tone: "neutral" | "warning" | "error";
+    tone: "neutral" | "warning" | "critical" | "error";
     updatedAt: number;
     windows: types.llm.UsageSnapshot["windows"];
     /** The thresholds this row's tone was computed from, so every surface paints it the same way. */
-    thresholds: { warnAt: number; alertAt: number };
+    thresholds: { warnAt: number; criticalAt: number; alertAt: number };
 }>> {
     const now = opts?.now ?? Date.now();
     // Thresholds are settings, not constants: how early "too much" starts
-    // depends on the plan and on how the person works.
-    const warnAt = Number(await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "usageWarnPercent", fallback: 50 }));
+    // depends on the plan and on how the person works. Four steps, so a
+    // quota visibly heats up instead of staying green until it is nearly gone.
+    const warnAt = Number(await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "usageWarnPercent", fallback: 30 }));
+    const criticalAt = Number(await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "usageCriticalPercent", fallback: 60 }));
     const alertAt = Number(await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "usageAlertPercent", fallback: 75 }));
     const rows = (await ctx.fns.procs.db.select({
         sql: "SELECT key, value FROM kv WHERE key LIKE 'llm:usage:%'",
@@ -77,10 +79,10 @@ export default async function (
             planType: snapshot.planType ?? null,
             resetCredits: snapshot.resetCredits ?? null,
             parkedAgents: 0,
-            tone: usedPercent == null ? "neutral" : usedPercent >= alertAt ? "error" : usedPercent >= warnAt ? "warning" : "neutral",
+            tone: usedPercent == null ? "neutral" : usedPercent >= alertAt ? "error" : usedPercent >= criticalAt ? "critical" : usedPercent >= warnAt ? "warning" : "neutral",
             updatedAt: Number(snapshot.updatedAt ?? 0),
             windows: { primary, secondary },
-            thresholds: { warnAt, alertAt },
+            thresholds: { warnAt, criticalAt, alertAt },
         } as const);
     }
 

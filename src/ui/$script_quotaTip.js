@@ -16,6 +16,10 @@
   var show = function (ring) {
     var tip = ring.querySelector('.quota-tip');
     if (!tip || !tip.showPopover) return;
+    // Belt and braces beside popover=auto: never two cards at once.
+    document.querySelectorAll('.quota-tip:popover-open').forEach(function (open) {
+      if (open !== tip) { try { open.hidePopover(); } catch (e) { /* already closed */ } }
+    });
     place(tip, ring);
     try { tip.showPopover(); } catch (e) { /* already open */ }
   };

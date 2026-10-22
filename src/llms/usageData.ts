@@ -25,7 +25,7 @@ export default async function (
         const local = await ctx.fns.llm.usageOverview({ connectedOnly: true });
         // One threshold pair for every surface: the rings, the account cards
         // and the mobile strip must colour the same account identically.
-        const thresholds = { warnAt: 50, alertAt: 75 };
+        const thresholds = { warnAt: 30, criticalAt: 60, alertAt: 75 };
         if (local.length) Object.assign(thresholds, local[0].thresholds ?? {});
         let entries: types.llms.UsageEntry[] = local.filter(entry => entry.provider !== "hyper").map(({ resetCredits: _resetCredits, ...entry }) => ({ ...entry, models: [] }));
         if (opts.includeConnected) {
@@ -119,7 +119,7 @@ export default async function (
                     resetsAt: usage?.resetsAt ?? null, planType: usage?.planType ?? null,
                     parkedAgents: usage?.parkedAgents ?? 0,
                     updatedAt: measuredAt,
-                    tone: usedPercent != null && usedPercent >= thresholds.alertAt ? "error" : usedPercent != null && usedPercent >= thresholds.warnAt ? "warning" : "neutral",
+                    tone: usedPercent != null && usedPercent >= thresholds.alertAt ? "error" : usedPercent != null && usedPercent >= thresholds.criticalAt ? "critical" : usedPercent != null && usedPercent >= thresholds.warnAt ? "warning" : "neutral",
                     quotaStatus: usedPercent == null ? "unavailable" : stale ? "stale" : undefined,
                     thresholds,
                 });

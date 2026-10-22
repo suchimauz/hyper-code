@@ -35,9 +35,10 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const quota = !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
         // The same thresholds as the rings and the mobile strip, so one account
         // never looks yellow on the page and green in the dock.
-        const warnAt = a.thresholds?.warnAt ?? 50;
+        const warnAt = a.thresholds?.warnAt ?? 30;
+        const criticalAt = a.thresholds?.criticalAt ?? 60;
         const alertAt = a.thresholds?.alertAt ?? 75;
-        const status = !a.available || (used != null && used >= alertAt) ? "limit" : used != null && used >= warnAt ? "warning" : "ready";
+        const status = !a.available || (used != null && used >= alertAt) ? "limit" : used != null && used >= criticalAt ? "critical" : used != null && used >= warnAt ? "warning" : "ready";
         const storage = storageLabel(a.source);
         const reconnect = pending ? ctx.fns.ui.popup({ method: "sshAccount.progressPopup", params: { id: pending.id }, tone: "default", size: "xs", html: "Continue login" }) : (a.needsReconnect || remote) && (a.source !== "ssh" || remote)
             ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: remote ? remote[2] : a.account, ...(remote ? { instance: remote[1] } : {}) }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
@@ -52,7 +53,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
             ...(a.planType ? [{ role: "plan", text: planName(a.provider, a.planType), title: `Subscription plan: ${a.planType}`, class: "badge badge-sm shrink-0 capitalize text-muted" }] : []),
             { role: "prefix", text: prefix(a), title: prefix(a), class: "min-w-0 flex-1 truncate font-mono text-2xs text-faint" },
             { role: "storage", text: storage.text, title: storage.title, class: "hidden shrink-0 text-3xs text-faint lg:block" },
-            { role: "quota", text: quota, class: `shrink-0 text-2xs ${status === "limit" ? "text-error" : status === "warning" ? "text-warning" : used == null ? "text-faint" : "text-success"}` },
+            { role: "quota", text: quota, class: `shrink-0 text-2xs ${status === "limit" ? "text-error" : status === "critical" ? "text-critical" : status === "warning" ? "text-warning" : used == null ? "text-faint" : "text-success"}` },
             ...(a.needsReconnect ? [{ role: "auth", text: "authentication required", class: "shrink-0 text-2xs font-medium text-error" }] : []),
             ...(a.parkedAgents ? [{ role: "parked", text: `${a.parkedAgents} parked`, class: "badge badge-sm shrink-0 text-warning" }] : []),
         ], right: actions });

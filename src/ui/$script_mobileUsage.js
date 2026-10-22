@@ -26,8 +26,10 @@
     return { short, weekly, dual: Boolean(row.windows && row.windows.secondary) || row.provider === 'zai-coding' || row.provider === 'minimax-coding' };
   };
   // Shared thresholds arrive from the server; missing quota is never green.
-  const fillTone = (percent, row) => percent == null || !Number.isFinite(percent) ? 'neutral' : percent >= (row.thresholds?.alertAt ?? 75) ? 'error' : percent >= (row.thresholds?.warnAt ?? 50) ? 'warning' : 'success';
-  const toneColour = tone => tone === 'error' ? 'var(--color-error)' : tone === 'warning' ? 'var(--color-warning)' : tone === 'success' ? 'var(--color-success)' : 'var(--color-base-content-faint, #888)';
+  // Four steps, so the ring heats up instead of staying green until the quota
+  // is nearly gone: green, yellow, orange, red.
+  const fillTone = (percent, row) => percent == null || !Number.isFinite(percent) ? 'neutral' : percent >= (row.thresholds?.alertAt ?? 75) ? 'error' : percent >= (row.thresholds?.criticalAt ?? 60) ? 'critical' : percent >= (row.thresholds?.warnAt ?? 30) ? 'warning' : 'success';
+  const toneColour = tone => tone === 'error' ? 'var(--color-error)' : tone === 'critical' ? 'var(--color-critical)' : tone === 'warning' ? 'var(--color-warning)' : tone === 'success' ? 'var(--color-success)' : 'var(--color-base-content-faint, #888)';
   const logo = row => {
     const span = el('span', '', 'mobile-usage-logo'); span.setAttribute('aria-hidden', 'true');
     // This HTML is produced only by ui.modelLogo; account/model strings are always textContent.

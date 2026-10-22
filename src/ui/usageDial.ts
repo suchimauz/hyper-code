@@ -34,24 +34,27 @@ export default function (
             resetsAt: number | null;
             planType: string | null;
             parkedAgents: number;
-            tone: "neutral" | "warning" | "error";
+            tone: "neutral" | "warning" | "critical" | "error";
             /** Shared quota colour thresholds from usageOverview. */
-            thresholds?: { warnAt: number; alertAt: number };
+            thresholds?: { warnAt: number; criticalAt: number; alertAt: number };
         }>;
         /** Current timestamp in ms; defaults to Date.now(). */
         now?: number;
         /**
          * Quota thresholds shared with every other usage surface.
-         * Defaults to the settings' own values (50% warning, 75% alert).
+         * Defaults to the settings' own values (30% warning, 60% critical,
+         * 75% alert).
          */
-        thresholds?: { warnAt: number; alertAt: number };
+        thresholds?: { warnAt: number; criticalAt: number; alertAt: number };
     },
 ): string {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
     const entries = opts.entries ?? [];
     if (!entries.length) return "";
     const now = opts.now ?? Date.now();
-    const toneClass = (percent: number | null, thresholds: { warnAt: number; alertAt: number }) => percent == null || !Number.isFinite(percent) ? "text-faint" : percent >= thresholds.alertAt ? "text-error" : percent >= thresholds.warnAt ? "text-warning" : "text-success";
+    // Four steps, so the ring heats up instead of staying green until the
+    // quota is nearly gone: green, yellow, orange, red.
+    const toneClass = (percent: number | null, thresholds: { warnAt: number; criticalAt: number; alertAt: number }) => percent == null || !Number.isFinite(percent) ? "text-faint" : percent >= thresholds.alertAt ? "text-error" : percent >= thresholds.criticalAt ? "text-critical" : percent >= thresholds.warnAt ? "text-warning" : "text-success";
 
     const groups = new Map<string, { label: string; entries: typeof entries }>();
     for (const entry of entries) {
@@ -66,7 +69,7 @@ export default function (
         const percent = entry.usedPercent == null ? 0 : Math.max(0, Math.min(100, entry.usedPercent));
         const known = entry.quotaStatus !== "unavailable" && entry.usedPercent != null && Number.isFinite(entry.usedPercent);
         const parked = entry.parkedAgents > 0;
-        const thresholds = entry.thresholds ?? opts.thresholds ?? { warnAt: 50, alertAt: 75 };
+        const thresholds = entry.thresholds ?? opts.thresholds ?? { warnAt: 30, criticalAt: 60, alertAt: 75 };
         const unavailable = entry.quotaStatus === "unavailable";
         const muted = unavailable || entry.quotaStatus === "stale";
         const colour = parked ? "text-error" : muted ? "text-faint" : toneClass(known ? percent : null, thresholds);

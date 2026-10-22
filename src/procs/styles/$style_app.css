@@ -30,6 +30,10 @@
   --color-success: var(--theme-success);
   --color-warning: var(--theme-warning);
   --color-error: var(--theme-danger);
+  /* The step between warning and error: a quota that is more than half spent
+     but not yet at the alert line. Mixed from the two semantic colours so it
+     stays legible in both the light and the dark theme. */
+  --color-critical: color-mix(in oklab, var(--theme-warning) 55%, var(--theme-danger));
 
   --color-bg-primary: var(--color-base-200);
   --color-bg-tertiary: var(--color-base-200);

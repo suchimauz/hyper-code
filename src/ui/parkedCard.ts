@@ -26,7 +26,7 @@ export default function (
         /** Models grouped by provider, as returned by llm.listModels. */
         models?: Record<string, string[]>;
         /** Credential accounts, as returned by llm.listAccounts. */
-        accounts?: Array<{ provider: string; account: string; label: string; model: string; available: boolean; usedPercent: number | null; resetsAt: number | null; parkedAgents: number; thresholds?: { warnAt: number; alertAt: number } }>;
+        accounts?: Array<{ provider: string; account: string; label: string; model: string; available: boolean; usedPercent: number | null; resetsAt: number | null; parkedAgents: number; thresholds?: { warnAt: number; criticalAt: number; alertAt: number } }>;
         /** Current timestamp in ms; defaults to Date.now(). */
         now?: number;
     },
@@ -70,9 +70,10 @@ export default function (
         const known = a.usedPercent != null;
         // The same thresholds and the same colours as the rings and the
         // account cards, so a plan never changes colour between screens.
-        const warnAt = a.thresholds?.warnAt ?? 50;
+        const warnAt = a.thresholds?.warnAt ?? 30;
+        const criticalAt = a.thresholds?.criticalAt ?? 60;
         const alertAt = a.thresholds?.alertAt ?? 75;
-        const tone = !a.available ? "text-error" : known && a.usedPercent! >= alertAt ? "text-error" : known && a.usedPercent! >= warnAt ? "text-warning" : known ? "text-success" : "text-faint";
+        const tone = !a.available ? "text-error" : known && a.usedPercent! >= alertAt ? "text-error" : known && a.usedPercent! >= criticalAt ? "text-critical" : known && a.usedPercent! >= warnAt ? "text-warning" : known ? "text-success" : "text-faint";
         const state = !a.available
             ? `exhausted${a.resetsAt ? ` · resets in ${humanDelay(a.resetsAt - now)}` : ""}`
             : known ? `available ${Math.round(100 - a.usedPercent!)}%` : "no data";

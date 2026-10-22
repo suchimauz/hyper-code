@@ -23,12 +23,12 @@ export type UsageEntry = {
     /** Number of agents waiting on this credential. */
     parkedAgents: number;
     /** Display severity of the measured quota. */
-    tone: "neutral" | "warning" | "error";
+    tone: "neutral" | "warning" | "critical" | "error";
     /**
-     * The warning and alert percentages this tone was computed from, so every
-     * surface colours the same account identically.
+     * The warning, critical and alert percentages this tone was computed from,
+     * so every surface colours the same account identically.
      */
-    thresholds?: { warnAt: number; alertAt: number };
+    thresholds?: { warnAt: number; criticalAt: number; alertAt: number };
     /** Snapshot timestamp in milliseconds, or zero if absent. */
     updatedAt: number;
     /** Explicit account availability; false may mean exhausted quota or reconnect required, not network failure. */
