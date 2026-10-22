@@ -56,6 +56,42 @@ export default async function (
         // Claude 5 rejects thinking.type "disabled" (400): "off" there means sending no thinking field at all.
         body.thinking = { type: "disabled" };
     }
+    // MiniMax M Plan speaks the same Anthropic dialect but has its own rules:
+    // M3.1-Flash always thinks and rejects thinking.type "disabled" (400),
+    // M3 thinks only when asked and honours effort, M2.x cannot think less.
+    const upstreamProvider = ep.provider === "hyper" ? (ep.upstream ?? "") : ep.provider;
+    if (upstreamProvider === "minimax-coding") {
+        const modelId = String(ep.modelId).toLowerCase();
+        const isM31 = /^minimax-m3\.1-flash/.test(modelId);
+        const isM3 = /^minimax-m3(?:\.|$)/.test(modelId);
+        // M2.x always reasons and ignores the requested depth.
+        if (!isM3 && !isM31) {
+            delete body.thinking;
+            delete body.output_config;
+        } else if (isM31) {
+            // Always-on thinking: "disabled" would be rejected outright.
+            body.thinking = { type: "adaptive" };
+            body.output_config = { effort: reasoning.applied === "off" ? "low" : (reasoning.applied === "xhigh" ? "max" : reasoning.applied) };
+        } else {
+            // M3: thinking off by default, enabled with "adaptive".
+            if (reasoning.applied === "off") {
+                delete body.thinking;
+                delete body.output_config;
+            } else {
+                body.thinking = { type: "adaptive" };
+                body.output_config = { effort: reasoning.applied === "xhigh" ? "max" : reasoning.applied };
+            }
+        }
+        // Thinking tokens count against max_tokens, so the budget must leave
+        // room for the visible answer as well as the reasoning.
+        const maxTokens = await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 });
+        body.max_tokens = Math.max(2048, Math.min(131072, Number(maxTokens) || 16384));
+        // M3.1-Flash does not accept a tier; the others do.
+        if (!isM31) {
+            const tier = await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" });
+            if (tier === "priority" || tier === "standard") body.service_tier = tier;
+        }
+    }
     // Native tool_use blocks, in JSON protocol mode only (see agent.wireTools).
     const tools = ctx.fns.agent.wireTools({ agent, api: "anthropic" });
     if (tools.length) body.tools = tools;
@@ -173,6 +209,15 @@ export default async function (
         } else if (type === "message_delta") {
             if (msg.delta?.stop_reason) finishReason = msg.delta.stop_reason;
             if (msg.usage?.output_tokens != null) usage.completion_tokens = msg.usage.output_tokens;
+            // MiniMax reports the real input count only in the final
+            // message_delta; its message_start carries zeros. The later figure
+            // is the authoritative one, so it replaces the earlier total.
+            const u = msg.usage;
+            if (u && (u.input_tokens != null || u.cache_read_input_tokens != null || u.cache_creation_input_tokens != null)) {
+                usage.prompt_tokens = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+                usage.cache_read_tokens = u.cache_read_input_tokens ?? 0;
+                usage.cache_write_tokens = u.cache_creation_input_tokens ?? 0;
+            }
         }
     }
 

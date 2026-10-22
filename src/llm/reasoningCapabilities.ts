@@ -43,6 +43,25 @@ export default async function (
         rawModelId = identity?.[3] ?? entry.id;
     }
     const modelId = rawModelId.toLowerCase();
+    // MiniMax M Plan (Anthropic-compatible endpoint). The wire mode is
+    // "anthropic-adaptive" (thinking + output_config.effort), but the level
+    // set is MiniMax's own: low, medium, high, xhigh and max — "off" and
+    // "minimal" are rejected by the gateway, and "xhigh" is Hyper's
+    // user-facing Max choice mapped to the wire value "max".
+    //   M3.1-Flash  always thinks; thinking.type "disabled" is a 400.
+    //   M3          thinks only when thinking.type "adaptive" is sent;
+    //               thinking stays off otherwise, so "off" is legal here.
+    //   M2.x        cannot disable thinking; effort is accepted but ignored.
+    if (provider === "minimax-coding") {
+        if (/^minimax-m3\.1-flash/.test(modelId)) {
+            return { supported: ["auto", "low", "medium", "high", "xhigh"], defaultEffort: "xhigh", mode: "anthropic-adaptive" };
+        }
+        if (/^minimax-m3(?:\.|$)/.test(modelId)) {
+            return { supported: ["auto", "off", "low", "medium", "high", "xhigh"], defaultEffort: "off", mode: "anthropic-adaptive" };
+        }
+        // M2.x always reasons and ignores the requested depth.
+        return { supported: ["auto", "off"], defaultEffort: "off", mode: "none" };
+    }
     // GLM-5.3 and Flash share low/high/max; reasoning cannot be disabled.
     // xhigh is Hyper's existing user-facing Max choice, mapped on the wire.
     if (provider === "zai-coding" && /^glm-5\.3(?:-flashx?)?$/.test(modelId)) {

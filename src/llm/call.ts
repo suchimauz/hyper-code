@@ -238,6 +238,17 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
     }
     if (!apiKey) throw new Error(`${endpoint.provider}: no credentials`);
     const body: any = { model: endpoint.modelId, max_tokens: opts.max_tokens ?? 2048, messages: [{ role: "user", content: opts.user }] };
+    // MiniMax counts thinking tokens against max_tokens: a small budget is
+    // spent entirely on reasoning and the visible text comes back empty. Its
+    // reasoning is a fixed trait of the model, so every MiniMax request gets
+    // a floor large enough to leave room for the answer itself.
+    if (upstream === "minimax-coding") {
+        const configured = Number(await ctx.fns.settings?.getNumber?.({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }) ?? 16384);
+        const requested = Number(opts.max_tokens ?? 0);
+        body.max_tokens = Math.max(requested || configured, 8192);
+        body.thinking = { type: "adaptive" };
+        body.output_config = { effort: "low" };
+    }
     if (subscription) {
         // Match the identity required by the working agent transport. Omitting
         // it can produce a misleading 429 even when the subscription has quota.

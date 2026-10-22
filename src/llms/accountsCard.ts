@@ -16,6 +16,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
+    /** MiniMax M Plan request settings shown next to the plan account. */
+    minimax?: { serviceTier: string; maxTokens: number };
     /** Current timestamp in ms. */ now?: number;
 }): string {
     const now = opts.now ?? Date.now();
@@ -53,9 +55,17 @@ export default function (ctx: Context, _session: Session | null, opts: {
     };
 
     const modelList = (models: string[]) => models.length ? `<ul class="llm-model-list mt-2 flex flex-wrap gap-1" aria-label="Available models">${models.map(model => `<li class="max-w-full break-all rounded bg-base-200 px-2 py-1 font-mono text-2xs">${esc(model)}</li>`).join("")}</ul>` : `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
+    // MiniMax M Plan exposes settings that change how requests are made:
+    // the admission tier and the output budget (thinking tokens count
+    // against it). They are shown next to the account so the person can see
+    // and change them where the plan itself lives.
+    const minimaxSettings = (a: typeof opts.accounts[number]) => {
+        if (a.provider !== "minimax-coding" || !opts.minimax) return "";
+        return ctx.fns.llms.minimaxSettings({ serviceTier: opts.minimax.serviceTier, maxTokens: opts.minimax.maxTokens });
+    };
     const localRow = (a: typeof opts.accounts[number]) => {
         const models = Object.values(opts.models ?? {}).flat().filter(model => model.startsWith(prefix(a)));
-        return `<div class="llm-account">${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div></div>`;
+        return `<div class="llm-account">${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div>${minimaxSettings(a)}</div>`;
     };
     const providers = [
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },

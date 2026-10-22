@@ -11,5 +11,9 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
     const accounts = await ctx.fns.llm.listAccounts({});
     const models = await ctx.fns.llm.listModels({});
     const nodes = await ctx.fns.node.list({});
-    return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes }), { headers: { "content-type": "text/html; charset=utf-8" } });
+    const minimax = {
+        serviceTier: (await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" })) ?? "standard",
+        maxTokens: await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }),
+    };
+    return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax }), { headers: { "content-type": "text/html; charset=utf-8" } });
 }

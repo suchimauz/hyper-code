@@ -16,6 +16,15 @@ export default async function (
     if (!identity) return null;
     const id = identity.modelId.toLowerCase();
     const provider = identity.provider;
+    // MiniMax M Plan: the M3 generation (M3, M3.1-Flash) has a 1M-token
+    // window; the older M2.x line is a 204,800-token model. The M3 window is
+    // the model limit, but 512K is the recommended working size, so the
+    // conservative 512K is used for auto-compaction thresholds.
+    if (provider === "minimax-coding") {
+        if (/^minimax-m3/.test(id)) return 512_000;
+        if (/^minimax-m2/.test(id)) return 204_800;
+        return null;
+    }
     if (/claude|opus|sonnet|haiku|fable/.test(id)) return 200_000;
     if (provider === "codex" || /^gpt-(5|6)|daybreak/.test(id)) return 272_000;
     if (/^gpt-4\.1|gemini/.test(id)) return 1_000_000;
