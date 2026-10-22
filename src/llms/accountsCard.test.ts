@@ -60,3 +60,18 @@ test("gateway health is API availability, never exhausted quota or verified gene
         expect(html).not.toContain("llms.removeAccount");
     }
 });
+
+test("omits the other local connections section without changing the model catalogue", () => {
+    const accounts: Parameters<typeof accountsCard>[2]["accounts"] = [
+        { provider: "lmstudio", account: "default", label: "Local connection fixture", model: "lmstudio:local-test-model", source: "file", available: true, usedPercent: null, planType: null, resetsAt: null, parkedAgents: 0 },
+    ];
+    const models = { lmstudio: ["lmstudio:local-test-model"], openrouter: ["openrouter:catalogue-test-model"] };
+    const html = accountsCard(ctx, null, { accounts, models });
+    expect(html).not.toContain("Other local connections");
+    expect(html).not.toContain("Local connection fixture");
+    expect(html).toContain('data-provider="codex"');
+    expect(html).toContain('data-catalogue="openrouter"');
+    expect(html).toContain("openrouter:catalogue-test-model");
+    expect(accounts).toHaveLength(1);
+    expect(models.lmstudio).toEqual(["lmstudio:local-test-model"]);
+});

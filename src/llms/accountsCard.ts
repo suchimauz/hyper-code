@@ -114,9 +114,6 @@ export default function (ctx: Context, _session: Session | null, opts: {
         };
         return `<section class="llm-node-catalogue" data-node="${esc(node.name)}">${ctx.fns.procs.ui.heading({ title: `Hyper node · ${node.name}`, meta: `${groups.size} ${groups.size === 1 ? "account" : "accounts"} in ${node.lastError ? "cached" : "available"} catalogue${node.lastError ? " · node unavailable" : ""}` })}<div class="mt-2 divide-y divide-ui-border rounded-xl border border-ui-border bg-base-100">${[...groups.values()].map(group => `<div class="llm-node-account p-3" data-node-account="${esc(`${group.provider}/${group.account}`)}"><div class="text-sm font-medium">${esc(group.account)}</div><div class="text-2xs text-muted">${esc(group.provider)} · node ${esc(node.name)} · ${group.models.length} models</div>${accountQuota(group)}${modelList(group.models)}</div>`).join("")}</div></section>`;
     }).join("");
-    const knownProviders = new Set(["codex", "claude-code", "anthropic-oauth", "xai", "kimi-coding", "oneapi", "hyper"]);
-    const otherLocals = opts.accounts.filter(a => !knownProviders.has(a.provider));
-    const extraLocalSection = otherLocals.length ? `<section>${ctx.fns.procs.ui.heading({ title: "Other local connections", meta: "Available catalogue models" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100">${otherLocals.map(localRow).join("")}</div></section>` : "";
 
     const catalogueOnly = Object.entries(opts.models ?? {}).filter(([provider]) => provider !== "oneapi" && !provider.startsWith("hyper/") && !provider.startsWith("ssh/"))
         .map(([provider, models]) => ({ provider, models: models.filter(model => !opts.accounts.some(a => a.provider !== "hyper" && model.startsWith(prefix(a)))) }))
@@ -130,7 +127,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ...(f.userCode ? [{ role: "device-code", text: f.userCode, class: "select-all shrink-0 rounded bg-base-200 px-2 py-1 font-mono text-sm font-semibold tracking-wider" }] : []),
     ], right: ctx.fns.ui.popup({ method: "llms.loginProgressFor", params: { provider: f.provider, account: f.account }, tone: "default", size: "xs", html: "Continue login" }) })).join("");
 
-    const html = `<div class="llm-accounts space-y-6">${providerSections}${extraLocalSection}${catalogueOnlySections}${gatewaySection}${nodeSections}<script src="/llms/localDates.js" defer></script>${flowRows ? `<section>${ctx.fns.procs.ui.heading({ title: "Logins in progress", meta: "Safe authorization status only." })}<div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${flowRows}</div></section>` : ""}</div>`;
+    const html = `<div class="llm-accounts space-y-6">${providerSections}${catalogueOnlySections}${gatewaySection}${nodeSections}<script src="/llms/localDates.js" defer></script>${flowRows ? `<section>${ctx.fns.procs.ui.heading({ title: "Logins in progress", meta: "Safe authorization status only." })}<div class="mt-2 overflow-hidden rounded-xl border border-ui-border bg-base-100">${flowRows}</div></section>` : ""}</div>`;
     // Morph, not replace: the 10 s refresh must not snap an open "details" shut.
     return ctx.fns.ui.live({ id: "llm-accounts", url: "/llms/accounts", topic: "llm-accounts", swap: "outerMorph", every: 10, attrs: 'class="block"', html });
 }
