@@ -13,15 +13,16 @@ const payload = {
   },
 };
 
-function setup(body: any = payload, status = 200) {
+function setup(body: any = payload, status = 200, me: any = { user_level_name: 'Pro' }) {
   const requests: any[] = [];
+  const respond = (o: any) => Response.json(String(o.url).endsWith('/me') ? me : body, { status });
   const ctx: any = { fns: {
     secrets: { resolveSetting: async () => 'test-key' },
     llm: {
       accountCredentialPath: () => ({ file: '/tmp/kimi-code.json' }),
-      connectFetch: async (o: any) => { requests.push({ via: 'local', o }); return Response.json(body, { status }); },
+      connectFetch: async (o: any) => { requests.push({ via: 'local', o }); return respond(o); },
     },
-    sshAccount: { fetch: async (o: any) => { requests.push({ via: 'ssh', o }); return Response.json(body, { status }); } },
+    sshAccount: { fetch: async (o: any) => { requests.push({ via: 'ssh', o }); return respond(o); } },
   } };
   return { ctx, requests };
 }
@@ -29,7 +30,7 @@ function setup(body: any = payload, status = 200) {
 test('Kimi quota scales used_ratio fractions into 5h, weekly and monthly windows', async () => {
   const { ctx } = setup();
   const r = await usage(ctx, null, {});
-  expect(r.planType).toBe('Kimi Coding');
+  expect(r.planType).toBe('Pro');
   expect(r.primary!.used_percent).toBe(25);
   expect(r.primary!.window_minutes).toBe(300);
   expect(r.secondary!.used_percent).toBe(40);
@@ -39,16 +40,31 @@ test('Kimi quota scales used_ratio fractions into 5h, weekly and monthly windows
   expect(r.tertiary!.resets_at).toBe(Date.parse(reset(43200)) / 1000);
 });
 
+test('Kimi quota falls back to the generic plan name when the profile fails or lacks a level', async () => {
+  const failingMe: any = { fns: {
+    secrets: { resolveSetting: async () => 'test-key' },
+    llm: {
+      accountCredentialPath: () => ({ file: '/tmp/kimi-code.json' }),
+      connectFetch: async (o: any) => String(o.url).endsWith('/me') ? Promise.reject(new Error('me down')) : Response.json(payload),
+    },
+  } };
+  expect((await usage(failingMe, null, {})).planType).toBe('Kimi Coding');
+  const noLevel = setup(payload, 200, { nickname: 'x' });
+  expect((await usage(noLevel.ctx, null, {})).planType).toBe('Kimi Coding');
+});
+
 test('Kimi quota asks the remote instance for its own credential', async () => {
   const { ctx, requests } = setup();
   const r = await usage(ctx, null, { account: 'ssh.edge.work' });
-  expect(requests).toHaveLength(1);
+  expect(requests).toHaveLength(2);
   expect(requests[0].via).toBe('ssh');
   expect(requests[0].o.ssh).toEqual({ instance: 'edge', provider: 'kimi-coding', account: 'work' });
   expect(requests[0].o.url).toBe('https://api.kimi.com/coding/v1/usages');
   // The remote bridge defaults to POST; this endpoint only answers GET.
   expect(requests[0].o.init.method).toBe('GET');
+  expect(requests[1].o.url).toBe('https://api.kimi.com/coding/v1/me');
   expect(r.primary!.used_percent).toBe(25);
+  expect(r.planType).toBe('Pro');
 });
 
 test('Kimi quota rejects failures and unrecognized bodies instead of inventing windows', async () => {
