@@ -62,6 +62,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
         { id: "grok", title: "Grok", icon: "xai:grok", accounts: opts.accounts.filter(a => a.provider === "xai"), add: addButton(ctx, "xai", "Add Grok account") },
         { id: "kimi", title: "Kimi Coding", icon: "kimi-coding:k3", accounts: opts.accounts.filter(a => a.provider === "kimi-coding"), add: ctx.fns.procs.ui.button({ action: "add-kimi", label: "+ Add account", tone: "default", size: "sm", disabled: true, title: "Kimi multi-login is not wired yet" }) },
+        { id: "zai-coding", title: "Z.ai Coding Plan", icon: "zai-coding:", accounts: opts.accounts.filter(a => a.provider === "zai-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
     ];
     const providerSections = providers.map(p => {
         const title = `${ctx.fns.ui.modelLogo?.({ model: p.icon, bare: true }) ?? ""}<span>${esc(p.title)}</span>`;
@@ -118,7 +119,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const catalogueOnly = Object.entries(opts.models ?? {}).filter(([provider]) => provider !== "oneapi" && !provider.startsWith("hyper/") && !provider.startsWith("ssh/"))
         .map(([provider, models]) => ({ provider, models: models.filter(model => !opts.accounts.some(a => a.provider !== "hyper" && model.startsWith(prefix(a)))) }))
         .filter(group => group.models.length);
-    const catalogueOnlySections = catalogueOnly.map(group => `<section data-catalogue="${esc(group.provider)}">${ctx.fns.procs.ui.heading({ title: group.provider, meta: "Local / API catalogue · quota not measured" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100 p-3">${modelList(group.models)}</div></section>`).join("");
+    const catalogueOnlySections = catalogueOnly.map(group => `<section data-catalogue="${esc(group.provider)}">${ctx.fns.procs.ui.heading({ title: group.provider === "zai-coding" ? "Z.ai Coding Plan" : group.provider, meta: group.provider === "zai-coding" ? "Subscription catalogue · entitlement not verified · quota not measured" : "Local / API catalogue · quota not measured" })}<div class="mt-2 rounded-xl border border-ui-border bg-base-100 p-3">${modelList(group.models)}</div></section>`).join("");
 
     const flowRows = (opts.logins ?? []).map(f => ctx.fns.procs.ui.row({ entity: "llm-login", id: `${f.provider}/${f.account}`, status: f.status, cells: [
         { role: "provider", text: providerName(f.provider), class: "w-36 shrink-0 font-medium" },

@@ -40,6 +40,18 @@ const mkCtx = (env: Record<string, string> = {}) => {
 };
 
 describe("ai.resolveEndpoint", () => {
+    test("Z.ai Coding uses the subscription endpoint and its own key setting", async () => {
+        const ctx = mkCtx();
+        const keys: string[] = [];
+        ctx.fns.secrets.resolveSetting = async (opts) => { keys.push(opts.key); return "coding-token"; };
+        const r = await resolve(ctx, null, { model: "zai-coding:glm-5.3" });
+        expect(r.url).toBe("https://api.z.ai/api/coding/paas/v4/chat/completions");
+        expect(r.api).toBe("openai");
+        expect(r.kind).toBe("subscription");
+        expect(r.apiKey).toBe("coding-token");
+        expect(keys).toEqual(["zaiCodingApiKey"]);
+    });
+
     test("One API uses configured root, secret and OpenAI wire format", async () => {
         const ctx = mkCtx();
         ctx.fns.settings.getString = async () => "http://gateway.test/v1/";

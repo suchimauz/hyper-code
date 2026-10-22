@@ -21,3 +21,10 @@ describe("llm.reasoningCapabilities gpt-6", () => {
         expect(r.downgraded).toBe(true);
     });
 });
+test('Z.ai GLM-5.3 family offers Low High Max, defaults Max and never Off', async () => {
+ for (const id of ['glm-5.3','glm-5.3-flash','glm-5.3-flashx']) {
+  const r=await capabilities({} as Context,null,{model:`zai-coding:${id}`});
+  expect(r.supported).toEqual(['auto','low','high','xhigh']);expect(r.defaultEffort).toBe('xhigh');
+ }
+ const old=await capabilities({} as Context,null,{model:'zai-coding:glm-4.5'});expect(old.mode).toBe('none');
+});

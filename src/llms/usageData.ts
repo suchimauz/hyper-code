@@ -50,6 +50,20 @@ export default async function (
                 snapshots.set(key(account), entry);
             }
         }
+        // A local reference check keeps desktop rendering independent of the
+        // full account inventory and provider I/O. Never resolve the key here.
+        if (!opts.includeConnected && ctx.fns.settings?.get) {
+            const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "zaiCodingApiKey" });
+            const configured = typeof reference === "string" && Boolean(reference.trim());
+            entries = entries.filter(entry => entry.provider !== "zai-coding" || configured);
+            if (configured && !entries.some(entry => entry.provider === "zai-coding" && entry.account === "default")) {
+                entries.push({ provider: "zai-coding", account: "default", label: "Z.ai Coding Plan",
+                    model: "zai-coding:", models: [], usedPercent: null, resetsAt: null,
+                    planType: "Coding Plan", parkedAgents: 0, tone: "neutral", updatedAt: 0,
+                    quotaStatus: "unavailable" });
+            }
+        }
+
         // Use the shared catalogue cache: it refreshes nodes with a five-minute TTL,
         // retains transient failures, and omits denied/disabled/empty catalogues.
         const models = await ctx.fns.llm.listModels({});

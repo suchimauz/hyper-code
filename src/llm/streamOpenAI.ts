@@ -27,9 +27,21 @@ export default async function (
     const { system: sys, messages: convo } = await ctx.fns.agent.buildLlmRequest({ agent });
     const messages: any[] = [];
     if (sys) messages.push({ role: "system", content: sys });
-    messages.push(...ctx.fns.llm.toOpenAIMessages({ messages: convo }));
-
     const ep = await ctx.fns.llm.resolveEndpoint({ model: agent.model });
+    const wireMessages = ctx.fns.llm.toOpenAIMessages({ messages: convo });
+    if ((ep.upstream ?? ep.provider) === "zai-coding") {
+        // Reasoning is retained with the canonical tool-call JSON, so it survives
+        // session saves and forks without leaking provider fields to other APIs.
+        const assistantCalls = convo.filter(m => m.role === "assistant" && m.tool_calls?.length);
+        let callTurn = 0;
+        for (const message of wireMessages) {
+            if (message.role !== "assistant" || !message.tool_calls?.length) continue;
+            const source = assistantCalls[callTurn++];
+            const reasoning = source?.tool_calls?.[0]?.reasoning_content;
+            if (typeof reasoning === "string") message.reasoning_content = reasoning;
+        }
+    }
+    messages.push(...wireMessages);
 
     const body: any = {
         model: ep.modelId,
@@ -37,6 +49,11 @@ export default async function (
         stream: true,
         stream_options: { include_usage: true },
     };
+    if ((ep.upstream ?? ep.provider) === "zai-coding" && /^glm-5\.3(?:-flashx?)?$/.test(ep.modelId)) {
+        const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort ?? "auto" });
+        body.thinking = { type: "enabled" };
+        body.reasoning_effort = reasoning.applied === "xhigh" ? "max" : reasoning.applied;
+    }
     // OpenAI-compatible providers do not consistently accept OpenAI's cache
     // extension. Groq currently rejects prompt_cache_key with HTTP 400.
     if (ep.provider === "openai") body.prompt_cache_key = await ctx.fns.agent.cacheRoot({ agent });
@@ -111,7 +128,10 @@ export default async function (
     }
 
     if (!sawChoice) throw new Error(`${ep.provider} returned no completion choices (expected SSE or JSON)`);
-    const toolCalls = slots.filter(Boolean).map(s => ({ id: s.id, name: s.name, args: parseArgs(s.buf) }));
+    const toolCalls = slots.filter(Boolean).map((s, index) => ({
+        id: s.id, name: s.name, args: parseArgs(s.buf),
+        ...((ep.upstream ?? ep.provider) === "zai-coding" && index === 0 && thinking ? { reasoning_content: thinking } : {}),
+    }));
     return { text, thinking, finishReason, usage, toolCalls, requestedModel: ep.modelId, responseModel };
 }
 

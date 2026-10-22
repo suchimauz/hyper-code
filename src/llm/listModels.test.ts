@@ -2,6 +2,16 @@ import { test, expect, describe } from "bun:test";
 import listModels from "./listModels";
 
 describe("llm.listModels", () => {
+    test("includes live Z.ai Coding models under a separate provider", async () => {
+        const ctx = { env: { LMSTUDIO_URL: "http://127.0.0.1:9" }, fns: { settings: { get: async () => [] }, llm: {
+            gatewayHealth: async () => ({ models: [], status: "unknown" }),
+            resolveEndpoint: async () => ({ kind: "api", apiKey: null }),
+            zaiCodingModels: async () => ["glm-5.3", "glm-5.3-flash"],
+        } } } as unknown as Context;
+        const groups = await listModels(ctx, null);
+        expect(groups["zai-coding"]).toEqual(["zai-coding:glm-5.3", "zai-coding:glm-5.3-flash"]);
+    });
+
     test("omits static remote catalogues when their credentials are absent", async () => {
         const ctx = { env: { LMSTUDIO_URL: "http://127.0.0.1:9" }, fns: { settings: { get: async () => [] }, llm: {
             gatewayHealth: async () => ({ models: [], status: "unknown" }),

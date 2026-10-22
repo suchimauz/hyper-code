@@ -109,6 +109,13 @@ function decodeJwtExp(token: string): number | null {
 }
 
 const PROVIDERS: Record<string, ProviderConfig> = {
+    "zai-coding": {
+        api: "openai",
+        kind: "subscription",
+        // Keep subscription traffic separate from the standard, metered API.
+        resolveBaseUrl: () => "https://api.z.ai/api/coding/paas/v4",
+        resolveApiKey: declaredSecret('zaiCodingApiKey'),
+    },
     lmstudio: {
         api: "openai",
         kind: "local",

@@ -62,6 +62,12 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
     const gateway = await ctx.fns.llm.gatewayHealth({});
     if (gateway.models.length) out.oneapi = [...new Set([...(out.oneapi ?? []), ...gateway.models.map(id => `oneapi:${id}`)])].sort();
 
+    // Query only the Coding Plan catalogue; standard API billing is never used.
+    if (ctx.fns.llm.zaiCodingModels) {
+        const ids = await ctx.fns.llm.zaiCodingModels({});
+        if (ids.length) out["zai-coding"] = ids.map(id => `zai-coding:${id}`);
+    }
+
     // Remote curated defaults are exposed only when their endpoint has usable
     // credentials. Static catalogues describe capabilities, not availability.
     const configured = async (model: string) => {

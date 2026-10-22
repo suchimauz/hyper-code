@@ -43,6 +43,11 @@ export default async function (
         rawModelId = identity?.[3] ?? entry.id;
     }
     const modelId = rawModelId.toLowerCase();
+    // GLM-5.3 and Flash share low/high/max; reasoning cannot be disabled.
+    // xhigh is Hyper's existing user-facing Max choice, mapped on the wire.
+    if (provider === "zai-coding" && /^glm-5\.3(?:-flashx?)?$/.test(modelId)) {
+        return { supported: ["auto", "low", "high", "xhigh"], defaultEffort: "xhigh", mode: "openai-effort" };
+    }
     // gpt-6 family rejects effort "none"/"minimal": only low..max on the wire.
     if ((provider === "codex" || provider === "openai") && /^gpt-6/.test(modelId)) {
         return { supported: ["auto", "low", "medium", "high", "xhigh"], defaultEffort: "medium", mode: "openai-effort" };

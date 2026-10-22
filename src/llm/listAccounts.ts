@@ -127,6 +127,18 @@ export default async function (
         }
     }
 
+    // A configured Coding Plan key is inventory, not a measured quota or
+    // a fresh proof of generation availability. Never read its value for UI.
+    if ((!filter || filter === "zai-coding") && ctx.fns.settings?.get) {
+        const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "zaiCodingApiKey" });
+        if (typeof reference === "string" && reference.trim()) {
+            const item = entry("zai-coding", "default", "file", byKey, reconnectKeys);
+            item.label = "Z.ai Coding Plan";
+            item.planType = "Coding Plan";
+            out.push(item);
+        }
+    }
+
     if ((!filter || filter === "oneapi") && ctx.fns.llm.gatewayHealth) {
         const gatewayHealth = await ctx.fns.llm.gatewayHealth({});
         const item = entry("oneapi", "default", "file", new Map(), new Set());

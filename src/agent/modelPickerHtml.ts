@@ -54,6 +54,7 @@ export default async function (
         openai: "OpenAI API",
         openrouter: "OpenRouter",
         oneapi: "Asoft LLM Gate",
+        "zai-coding": "Z.ai Coding Plan",
         "kimi-coding": "Kimi Coding",
         kimi: "Kimi API",
         groq: "Groq",

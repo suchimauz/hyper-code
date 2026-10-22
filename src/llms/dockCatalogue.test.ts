@@ -3,6 +3,7 @@ import card from "./accountsCard";
 import dial from "../ui/usageDial";
 import route from "./$route_usage_GET";
 import usageData from "./usageData";
+import logo from '../ui/modelLogo';
 
 const escape = ({text}: {text: string}) => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const ctx: any = {state: {llmUsageRefresh:{startedAt:Date.now()}}, fns:{procs:{ui:{escape, heading:({title}:any)=>title, empty:()=>'', button:()=>'', row:()=>''}},ui:{live:({html}:any)=>html, modelLogo:()=>'<i></i>', popup:()=>''}}};
@@ -19,4 +20,12 @@ test('gateway dock is a neutral circle, status dot and escaped model tooltip wit
 });
 test('subscription rings preserve quota and add account/model tooltip',()=>{
  const html=dial(ctx,null,{entries:[{provider:'codex',account:'alice',label:'mini · alice',node:'mini',models:['hyper/mini:gpt'],usedPercent:17,resetsAt:null,planType:null,parkedAgents:0,tone:'neutral'}]});expect(html).toContain('17% used');expect(html).toContain('stroke-dasharray');expect(html).toContain('hyper/mini:gpt');expect(html).toContain('account alice');
+});
+test('Z.ai has a branded connection section and an unknown-quota dock icon', async () => {
+ const a:any={provider:'zai-coding',account:'default',label:'Z.ai Coding Plan',model:'zai-coding:',source:'file',available:true,usedPercent:null,planType:'Coding Plan',resetsAt:null,parkedAgents:0};
+ const c:any={state:{llmUsageRefresh:{startedAt:Date.now()}},fns:{...ctx.fns,settings:{get:async()=>'secret://test/zai'},ui:{...ctx.fns.ui,modelLogo:(o:any)=>logo(c,null,o)},llm:{usageOverview:async()=>[],listAccounts:async()=>[a],listModels:async()=>({'zai-coding':['zai-coding:glm-5.3']})},node:{list:async()=>[]}}};
+ const html=card(c,null,{accounts:[a],models:{'zai-coding':['zai-coding:glm-5.3']}});
+ expect(html).toContain('data-provider="zai-coding"');expect(html).toContain('Z.ai Coding Plan');expect(html).not.toContain('ph-cpu');
+ const data=await usageData(c,null,{});expect(data.entries[0]).toMatchObject({provider:'zai-coding',usedPercent:null,quotaStatus:'unavailable'});
+ const dock=dial(c,null,{entries:data.entries});expect(dock).toContain('quota unavailable');expect(dock).toContain('zai-coding:glm-5.3');expect(dock).not.toContain('stroke-dasharray');expect(dock).not.toContain('ph-cpu');
 });

@@ -32,6 +32,9 @@ export default function (ctx: Context, _session: Session | null, opts: {
     // Provider prefix decides the mark; the loose `includes` fallbacks only
     // catch bare model ids. kimi-coding: is the Kimi subscription and must not
     // fall through to the generic chip.
+    // Z.ai mark from https://z-cdn.chatglm.cn/z-ai/static/logo.svg (30×30).
+    const zai = 'M15.47 7.1l-1.3 1.85c-.2.29-.54.47-.9.47h-7.1V7.09L15.47 7.1z M24.3 7.1L13.14 22.91H5.7L16.86 7.1z M14.53 22.91l1.31-1.86c.2-.29.54-.47.9-.47h7.09v2.33z';
+    const isZai = key.startsWith('zai-coding:') || key.startsWith('zai-coding/');
     const path = key.startsWith('codex:') || key.startsWith('codex/') || key.startsWith('openai:') || key.startsWith('openai/') || key.includes('gpt-')
             ? openai
             : key.startsWith('claude-code:') || key.startsWith('claude-code/') || key.startsWith('anthropic:') || key.startsWith('anthropic/') || key.startsWith('anthropic-oauth:') || key.startsWith('anthropic-oauth/') || key.includes('claude')
@@ -40,12 +43,12 @@ export default function (ctx: Context, _session: Session | null, opts: {
                     ? grok
                     : key.startsWith('kimi:') || key.startsWith('kimi/') || key.startsWith('kimi-coding:') || key.startsWith('kimi-coding/') || key.startsWith('moonshot:') || key.includes('kimi')
                         ? kimi
-                        : null;
+                        : isZai ? zai : null;
 
     const motion = opts.active ? ' animate-spin' : '';
     const markSize = opts.compact ? 'size-2.5' : 'size-3.5';
     const mark = path
-        ? `<svg viewBox="0 0 24 24" fill="currentColor" class="${markSize} fill-current${motion}" aria-hidden="true"><path d="${path}"></path></svg>`
+        ? `<svg viewBox="${isZai ? '3 3 24 24' : '0 0 24 24'}" fill="currentColor" class="${markSize} fill-current${motion}" aria-hidden="true"><path d="${path}"></path></svg>`
         : `<i class="ph ph-cpu ${markSize} ${opts.compact ? 'text-xs' : 'text-sm'}${motion}" aria-hidden="true"></i>`;
 
     const frameSize = opts.compact ? 'size-4' : 'size-6';
