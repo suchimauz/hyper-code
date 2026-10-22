@@ -14,7 +14,9 @@ describe('web transient stream', () => {
             const response = await ctx.fns.procs.http.dispatch({ url: `/agent/${agent.id}/stream.html` });
             const html = await response.text();
             expect(html.match(/id="msg-stream"/g)).toHaveLength(1);
-            expect(html).toContain('role="status"');
+            expect(html).toContain('data-streaming-message');
+            expect(html).toContain('data-stream-activity');
+            expect(html).toContain('<animate attributeName="opacity"');
             expect(html).toContain(`data-live-topic="agent:${agent.id}:stream"`);
             expect(html).not.toContain('<script>');
         }

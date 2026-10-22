@@ -20,7 +20,11 @@ test('RAM-only fragment escapes partial prose, replaces one region and clears wi
   const html=await response.text();
   expect(html.match(/id="msg-stream"/g)).toHaveLength(1);
   expect(html).toContain('&lt;script&gt;unsafe&lt;/script&gt; partial');
-  expect(html).not.toContain('<script>');expect(html).toContain('role="status"');
+  expect(html).not.toContain('<script>');expect(html).toContain('data-streaming-message');
+  expect(html).toContain('assistant chat-glass');expect(html).toContain('data-stream-activity');
+  expect(html.match(/<circle /g)).toHaveLength(3);expect(html).toContain('<animate attributeName="opacity"');
+  expect(html).toContain('border-inline-start:3px solid');
+  expect(html).not.toContain('Streaming response');expect(html).not.toContain('role="status"');
   expect(html).toContain('data-live-topic="agent:sample:stream"');
   expect(response.headers.get('cache-control')).toBe('no-store');
  }
@@ -44,7 +48,7 @@ async function extracted(){
  const start=source.indexOf('        const mobileStream =');
  const end=source.indexOf('        const { text, usage, finishReason',start);
  expect(start).toBeGreaterThan(0);expect(end).toBeGreaterThan(start);
- return new Function('ctx','agent','ac','setTimeout','clearTimeout',new Bun.Transpiler({loader:'ts'}).transformSync('return (async()=>{while(true){\n'+source.slice(start,end)+'\nbreak;}})();'));
+ return new Function('ctx','agent','ac','setTimeout','clearTimeout',new Bun.Transpiler({loader:'ts'}).transformSync('return (async()=>{let discardTransient;while(true){\n'+source.slice(start,end)+'\nbreak;}})();'));
 }
 for(const mode of ['success','error','abort'] as const)test('run coalesces 100 deltas and clears on '+mode,async()=>{
  const run=await extracted();const agent:any={id:'sample',scratchpad:{}};const ac=new AbortController();const notices:any[]=[];const timers=new Map<number,()=>void>();let timerId=0;
@@ -65,6 +69,43 @@ for(const mode of ['success','error','abort'] as const)test('run coalesces 100 d
   return {text:'x'.repeat(100)+'y',toolCalls:[]};
  }}}};
  if(mode==='success')await run(ctx,agent,ac,set,clear);else await expect(run(ctx,agent,ac,set,clear)).rejects.toBe(original);
- expect(agent.scratchpad.mobileStream).toBeUndefined();expect(agent.samplingAbortController).toBeNull();expect(timers.size).toBe(0);
- expect(notices.length).toBeGreaterThanOrEqual(2);
+ if(mode==='success'){
+  expect(agent.scratchpad.mobileStream.phase).toBe('finalizing');
+  expect(agent.scratchpad.mobileStream.text).toHaveLength(101);expect(notices).toHaveLength(1);
+ }else{expect(agent.scratchpad.mobileStream).toBeUndefined();expect(notices.length).toBeGreaterThanOrEqual(2);}
+ expect(agent.samplingAbortController).toBeNull();expect(timers.size).toBe(0);
+});
+
+test('stream renders safe Markdown in the shared assistant style without active links or external images',async()=>{
+ const {ctx,agent}=fixture();
+ agent.scratchpad.mobileStream={text:'**Готово**\n\n- первый\n- второй\n\n`code`\n\n[link](javascript:alert(1)) ![photo](https://example.com/x.png) <img src=x onerror=alert(1)>',revision:1};
+ const html=await render(ctx,null,{agentId:'sample'});
+ expect(html).toContain('<strong>Готово</strong>');expect(html).toContain('<ul>');expect(html).toContain('<code>code</code>');
+ expect(html).not.toContain('href=');expect(html).not.toContain('<img');expect(html).not.toContain('<script');
+ expect(html).toContain('rounded-2xl');expect(html).toContain('prose prose-sm');expect(html).toContain('aria-busy="true"');
+});
+
+test('activity follows the last words inline, including lists and emphasis, but stays out of code',async()=>{
+ const {ctx,agent}=fixture();
+ for(const text of ['Первый абзац\n\nПоследние **слова**','- первый\n- последний']){
+  agent.scratchpad.mobileStream={text,revision:1};
+  const html=await render(ctx,null,{agentId:'sample'});
+  expect(html).toMatch(/<span data-stream-activity[\s\S]*?<\/span><\/(?:p|li)>/);
+  expect(html).toContain('display:inline-flex');
+  expect(html.match(/data-stream-activity/g)).toHaveLength(1);
+ }
+ agent.scratchpad.mobileStream={text:'```ts\nconst x = 1;\n```',revision:2};
+ const code=await render(ctx,null,{agentId:'sample'});
+ expect(code.indexOf('data-stream-activity')).toBeGreaterThan(code.indexOf('</pre>'));
+});
+
+test('late stream refresh cannot erase the bubble before durable tail replacement',async()=>{
+ const {ctx,agent}=fixture();
+ agent.scratchpad.streamHandoff=true;
+ const response=await route(ctx,null,{req:new Request('http://localhost/agent/sample/stream.html'),params:{id:'sample'}});
+ expect(response.status).toBe(204);expect(await response.text()).toBe('');
+ const final=await (await eventsRoute(ctx,null,{req:new Request('http://localhost/agent/sample/events.html?offset=0'),params:{id:'sample'}})).text();
+ expect(final).toContain('final answer');expect(final).toContain('hx-swap-oob="outerHTML"');expect(final).not.toContain('data-streaming-message');
+ const source=await Bun.file(new URL('./run.ts',import.meta.url)).text();
+ expect(source.indexOf('clearStream(true);')).toBeLessThan(source.indexOf('await ctx.fns.session.appendAssistantEvent'));
 });

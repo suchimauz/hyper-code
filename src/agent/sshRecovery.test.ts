@@ -85,7 +85,7 @@ test('run clears partial mobileStream on thrown streaming error and preserves th
     const source = await Bun.file(new URL('./run.ts', import.meta.url)).text();
     const start = source.indexOf('        const mobileStream =');
     const end = source.indexOf('        const { text, usage, finishReason', start);
-    const isolatedStream = new Function('ctx', 'agent', 'ac', new Bun.Transpiler({ loader: 'ts' }).transformSync('return (async () => { while (true) {\n' + source.slice(start, end) + '\nbreak; } })();'));
+    const isolatedStream = new Function('ctx', 'agent', 'ac', new Bun.Transpiler({ loader: 'ts' }).transformSync('return (async () => { let discardTransient; while (true) {\n' + source.slice(start, end) + '\nbreak; } })();'));
     const agent = { id: 'fixture', scratchpad: {}, samplingAbortController: null };
     const error = ssh('ambiguous', false);
     let caught: any;

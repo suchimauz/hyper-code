@@ -33,6 +33,7 @@ export default async function (
     agentCtx.session = ctx.fns.session.forAgent({ agent });
     ctx = agentCtx;
     const ac = new AbortController();
+    let discardTransient: (() => void) | undefined;
     agent.abortController = ac;
     agent.activeRunCount = (agent.activeRunCount ?? 0) + 1;
     try {
@@ -178,20 +179,24 @@ export default async function (
         // every token would hammer Postgres; the final assistant event remains
         // the durable source of truth. A monotonically increasing revision lets
         // pollers replace one transient bubble without creating duplicates.
-        const mobileStream = { text: "", revision: 0, startedAt: Date.now() };
+        const mobileStream = { text: "", revision: 0, startedAt: Date.now(), phase: 'streaming' };
+        delete agent.scratchpad.streamHandoff;
         agent.scratchpad.mobileStream = mobileStream;
         const sampling = new AbortController();
         agent.samplingAbortController = sampling;
         // Stream notifications address only the RAM fragment, not DB-backed regions.
         let streamTimer: ReturnType<typeof setTimeout> | undefined;
         const notifyStream = () => ctx.fns.procs.events.emit({ topic: `agent:${agent.id}:stream`, event: { type: "refresh" } });
-        const clearStream = () => {
+        const clearStream = (handoff = false) => {
             clearTimeout(streamTimer);
             streamTimer = undefined;
             if (agent.scratchpad.mobileStream === mobileStream) delete agent.scratchpad.mobileStream;
-            notifyStream();
+            if (handoff) agent.scratchpad.streamHandoff = true;
+            else { delete agent.scratchpad.streamHandoff; notifyStream(); }
         };
-        sampling.signal.addEventListener("abort", clearStream, { once: true });
+        const abortStream = () => clearStream();
+        discardTransient = abortStream;
+        sampling.signal.addEventListener("abort", abortStream, { once: true });
         const onRunAbort = () => sampling.abort(ac.signal.reason ?? "run_aborted");
         ac.signal.addEventListener("abort", onRunAbort, { once: true });
         let streamed: any;
@@ -221,9 +226,12 @@ export default async function (
         } finally {
             if (agent.samplingAbortController === sampling) agent.samplingAbortController = null;
             ac.signal.removeEventListener("abort", onRunAbort);
-            sampling.signal.removeEventListener("abort", clearStream);
+            sampling.signal.removeEventListener("abort", abortStream);
         }
-        clearStream();
+        // Keep visible text until the durable tail replaces it in one swap.
+        clearTimeout(streamTimer);
+        streamTimer = undefined;
+        mobileStream.phase = 'finalizing';
         const { text, usage, finishReason, toolCalls = [] } = streamed;
         await ctx.fns.session.recordContextUsage({ id: agent.id, usage });
         const prose = String(text ?? '');
@@ -234,6 +242,7 @@ export default async function (
         // meaningless and the schema would complain about the wrong thing —
         // NOTHING runs, and the model is told what actually happened.
         if (finishReason === 'length' && toolCalls.some((c: any) => c?.args?.__unparsed !== undefined)) {
+            clearStream();
             await ctx.fns.session.appendErrorEvent({ id: agent.id, error: 'reply truncated at token limit — tool calls not executed' });
             await ctx.fns.session.appendMessage({ id: agent.id, message: {
                 role: 'user',
@@ -249,6 +258,7 @@ export default async function (
         // The assistant turn is ONE row, carrying both what it said and what it
         // called — that pairing is what the next request replays.
         if (!prose.trim() && toolCalls.length === 0) {
+            clearStream();
             return { text: prose, usage, consumedUserIdx };
         }
 
@@ -265,11 +275,16 @@ export default async function (
             const instructionIndicators = {
                 statusLine: activeStatus.split("\n").find((line: string) => line.startsWith("User status line: "))?.slice("User status line: ".length) || null,
             };
+            // The durable tail now owns replacement; do not broadcast an empty
+            // transient fragment between the streamed and persisted messages.
+            clearStream(true);
             await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
                 text: prose, html, usage, messageIdx: append.idx, instructionIndicators,
             } });
             await ctx.fns.session.syncAgentState({ agent });
         }
+        clearStream(!!prose.trim());
+        discardTransient = undefined;
 
             const goal = agent.goal;
         if (toolCalls.length === 0) {
@@ -423,6 +438,7 @@ export default async function (
         if (await compactAtBoundary()) return { text: '', usage: null, consumedUserIdx };
     }
     } finally {
+        discardTransient?.();
         agent.activeRunCount = Math.max(0, (agent.activeRunCount ?? 1) - 1);
         if (agent.abortController === ac) agent.abortController = null;
     }
