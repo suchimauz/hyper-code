@@ -115,3 +115,17 @@ test('Go unavailable stays unknown and PAYG keeps its monetary branch', async ()
     expect(payg.document.body.textContent).toContain('PAYG $10');
     expect(payg.document.body.textContent).toContain('Console billing');
 });
+
+test('Kimi mobile rings and details omit windows absent from the backend',async()=>{
+ for(const includeShort of [true,false]){
+  const row={...dualRow,provider:'kimi-coding',windows:{tertiary:{usedPercent:50,resetsAt:Date.now()+86400000},...(includeShort?{primary:{usedPercent:20,resetsAt:Date.now()+3600000}}:{})}};
+  const w=await mount([row]);
+  expect(w.document.querySelector('[data-quota-window="monthly"]')).not.toBeNull();
+  expect(w.document.querySelector('[data-quota-window="weekly"]')).toBeNull();
+  expect(Boolean(w.document.querySelector('[data-quota-window="5h"]'))).toBe(includeShort);
+  (w.document.querySelector('[data-mobile-usage-open]') as any).click();
+  const card=w.document.querySelector('.mobile-usage-card')!;
+  expect(card.textContent).toContain('Месяц');expect(card.textContent).not.toContain('Неделя');
+  expect(card.textContent!.includes('5 ч')).toBe(includeShort);
+ }
+});

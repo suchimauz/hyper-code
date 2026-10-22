@@ -73,6 +73,16 @@ test('Kimi quota rejects failures and unrecognized bodies instead of inventing w
   await expect(usage(setup({ usages: { limit_5h: { used_ratio: 0.5 } } }).ctx, null, {})).rejects.toThrow('No recognized');
 });
 
+test('new Kimi plans omit weekly and missing 5h windows instead of inventing quota', async () => {
+  for (const includeShort of [true, false]) {
+    const usages = { limit_month_total: payload.usages.limit_month_total, ...(includeShort ? { limit_5h: payload.usages.limit_5h } : {}) };
+    const result = await usage(setup({ usages }).ctx, null, {});
+    expect(result.secondary).toBeUndefined();
+    expect(Boolean(result.primary)).toBe(includeShort);
+    expect(result.tertiary?.used_percent).toBe(50);
+  }
+});
+
 test('Kimi quota rejects an account that is neither local nor an ssh identity', async () => {
   const { ctx } = setup();
   await expect(usage(ctx, null, { account: 'plain-name' })).rejects.toThrow('Not a Kimi Coding account');

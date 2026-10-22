@@ -41,3 +41,16 @@ test('invalid desired state and missing route never write policy',async()=>{
  const {c,writes}=ctx();for(const fields of [{model:'openai:a',disabled:'toggle'},{model:'',disabled:'true'},{model:'openai:a'}])expect((await route(c,null,{req:request(fields as Record<string,string>)})).status).toBe(400);
  expect(writes).toHaveLength(0);
 });
+
+test('table disabled-row styling follows persisted state after disable and re-enable HTMX replacements',async()=>{
+ const css=await Bun.file(new URL('../procs/styles/$style_app.css',import.meta.url)).text();
+ expect(css).toContain('tr:has([data-model-policy][data-model-disabled="true"]) > :not(.llm-model-enabled) { opacity:.5; }');
+ expect(css).toContain('tr:has([data-model-policy][data-model-disabled="true"]) .llm-model-name { color:var(--color-muted); }');
+ const {c}=ctx();const html=control(c,null,{model:'openai:model',disabled:false,switchOnly:true});
+ expect(html).toContain('name="switchOnly" value="true"');expect(html).not.toContain('font-mono');
+ const r=await route(c,null,{req:request({model:'openai:model',disabled:'true',switchOnly:'true'})});
+ const replaced=await r.text();expect(replaced).toContain('name="switchOnly" value="true"');expect(replaced).not.toContain('font-mono');expect(replaced).not.toContain(' checked');
+ expect(replaced).toContain('data-model-disabled="true"');
+ const enabled=await route(c,null,{req:request({model:'openai:model',disabled:'false',switchOnly:'true'})});
+ const enabledHtml=await enabled.text();expect(enabledHtml).toContain('data-model-disabled="false"');expect(enabledHtml).toContain(' checked');
+});

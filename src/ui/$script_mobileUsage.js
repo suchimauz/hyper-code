@@ -26,7 +26,12 @@
     const short = freshWindow(row, row.windows && row.windows.primary);
     const weekly = freshWindow(row, row.windows && row.windows.secondary);
     const monthly = freshWindow(row, row.windows && row.windows.tertiary);
-    return { short, weekly, monthly, triple: Boolean(row.windows && row.windows.tertiary), dual: Boolean(row.windows && (row.windows.secondary || row.windows.tertiary)) || row.provider === 'zai-coding' || row.provider === 'minimax-coding' };
+    const kimi = row.provider === 'kimi-coding' ? [
+      row.windows?.tertiary ? { key: 'monthly', label: 'Месяц', window: monthly } : null,
+      row.windows?.secondary ? { key: 'weekly', label: 'Неделя', window: weekly } : null,
+      row.windows?.primary ? { key: '5h', label: '5 ч', window: short } : null,
+    ].filter(Boolean) : null;
+    return { short, weekly, monthly, kimi, triple: Boolean(row.windows && row.windows.tertiary), dual: Boolean(kimi?.length) || Boolean(row.windows && (row.windows.secondary || row.windows.tertiary)) || row.provider === 'zai-coding' || row.provider === 'minimax-coding' };
   };
   // Shared thresholds arrive from the server; missing quota is never green.
   // Four steps, so the ring heats up instead of staying green until the quota
@@ -83,7 +88,9 @@
     const track = (radius, label) => '<circle data-quota-window="' + label + '" class="mobile-usage-ring-track-line" cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".18"/>';
     // Two measured windows: the weekly one outside, the short one inside —
     // the same arrangement as the desktop dock.
-    const rings = payg(row) ? '' : win.dual
+    const rings = payg(row) ? '' : win.kimi?.length
+      ? win.kimi.map((w, i) => track(12 - i * 3, w.key) + circle(12 - i * 3, w.window?.usedPercent, w.key)).join('')
+      : win.dual
       ? (win.triple ? track(12, 'monthly') + circle(12, win.monthly?.usedPercent, 'monthly') : '') + track(win.triple ? 9 : 12, 'weekly') + circle(win.triple ? 9 : 12, win.weekly?.usedPercent, 'weekly') + track(win.triple ? 6 : 9, '5h') + circle(win.triple ? 6 : 9, win.short?.usedPercent, '5h')
       : (measured ? track(12, 'quota') + circle(12, row.usedPercent, 'quota') : track(12, 'quota'));
     ring.innerHTML = '<svg viewBox="0 0 28 28" class="mobile-usage-ring-track">' + rings + '</svg>';
@@ -179,7 +186,9 @@
       body.append(tipRow('Квота', null, null, row));
     } else {
       // Each measured window gets its own line, like the desktop tooltip.
-      if (win.dual) {
+      if (win.kimi?.length) {
+        [...win.kimi].reverse().forEach(w => body.append(tipRow(w.label, w.window?.usedPercent ?? null, w.window?.resetsAt, row)));
+      } else if (win.dual) {
         body.append(tipRow('5 ч', win.short ? win.short.usedPercent : null, win.short?.resetsAt, row));
         body.append(tipRow('Неделя', win.weekly ? win.weekly.usedPercent : null, win.weekly?.resetsAt, row));
         if (win.triple) body.append(tipRow('Месяц', win.monthly ? win.monthly.usedPercent : null, win.monthly?.resetsAt, row));

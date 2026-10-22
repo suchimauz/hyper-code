@@ -12,6 +12,7 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
     const {disabledModels} = await ctx.fns.llm.modelPolicy({action:'list'});
     const models = await ctx.fns.llm.listModels({});
     const nodes = await ctx.fns.node.list({});
+    const prices = await ctx.fns.llm.modelPrices({models:Object.values(models).flat().filter(model => /^(?:(?:ssh|hyper)\/[^:]+:)*opencode(?:\/[\w.-]+)?:/.test(model)),nodes});
     const [zaiPlan, minimaxPlan, opencodePlan, instanceRows] = await Promise.all([
         ctx.fns.llm.codingInstance({ provider: "zai-coding" }).catch(() => ({ instance: null })),
         ctx.fns.llm.codingInstance({ provider: "minimax-coding" }).catch(() => ({ instance: null })),
@@ -23,5 +24,5 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
         serviceTier: (await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" })) ?? "standard",
         maxTokens: await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }),
     };
-    return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax, planInstances, disabledModels }), { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax, planInstances, disabledModels, prices }), { headers: { "content-type": "text/html; charset=utf-8" } });
 }

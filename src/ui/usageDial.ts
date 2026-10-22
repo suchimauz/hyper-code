@@ -92,7 +92,12 @@ export default function (
         const weekly = unavailable ? undefined : freshWindow(entry.windows?.secondary);
         const monthly = unavailable ? undefined : freshWindow(entry.windows?.tertiary);
         const triple = Boolean(entry.windows?.tertiary);
-        const dual = triple || Boolean(entry.windows?.secondary) || entry.provider === "zai-coding" || entry.provider === "minimax-coding";
+        const kimiWindows = entry.provider === 'kimi-coding' ? [
+            entry.windows?.tertiary ? {label:'Monthly',key:'monthly',window:monthly} : null,
+            entry.windows?.secondary ? {label:'Weekly',key:'weekly',window:weekly} : null,
+            entry.windows?.primary ? {label:'5h',key:'5h',window:short} : null,
+        ].filter((w): w is {label:string;key:string;window:types.llm.UsageWindow|undefined} => w !== null) : null;
+        const dual = Boolean(kimiWindows?.length) || triple || Boolean(entry.windows?.secondary) || entry.provider === "zai-coding" || entry.provider === "minimax-coding";
         const quotaCircle = (radius: number, window: types.llm.UsageWindow | undefined, label: string) => {
             const length = 2 * Math.PI * radius;
             const percent = window ? Math.max(0, Math.min(100, window.usedPercent)) : null;
@@ -100,7 +105,7 @@ export default function (
             const tone = parked ? "text-error" : muted ? "text-faint" : toneClass(percent, thresholds);
             return `<g data-quota-window="${label}" class="${tone}"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.18"></circle>${percent == null ? "" : `<circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="${(length*percent/100).toFixed(2)} ${length.toFixed(2)}"></circle>`}</g>`;
         };
-        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${triple ? quotaCircle(12,monthly,"monthly") : ""}${quotaCircle(triple ? 9 : 12,weekly,"weekly")}${quotaCircle(triple ? 6 : 9,short,"5h")}</svg>` : "";
+        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${kimiWindows ? kimiWindows.map((w,i)=>quotaCircle(12-i*3,w.window,w.key)).join('') : `${triple ? quotaCircle(12,monthly,"monthly") : ""}${quotaCircle(triple ? 9 : 12,weekly,"weekly")}${quotaCircle(triple ? 6 : 9,short,"5h")}`}</svg>` : "";
 
         // The hover card keeps only what the eye came for — the name, the
         // limits and the reset moment. The model catalogue lives one click
@@ -121,10 +126,12 @@ export default function (
         };
         const rows = unavailable
             ? [{ tone: "text-faint", text: "quota unavailable — usage unknown", html: `<span class="quota-tip-row text-faint"><i class="quota-tip-dot" aria-hidden="true"></i><span>quota unavailable — usage unknown</span></span>` }]
+            : kimiWindows?.length
+                ? [...kimiWindows].reverse().map(w=>tipRow(w.label,w.window?.usedPercent ?? null,w.window?.resetsAt ?? null))
             : dual
                 ? [tipRow("5h", short?.usedPercent ?? null, short?.resetsAt ?? null), tipRow("Weekly", weekly?.usedPercent ?? null, weekly?.resetsAt ?? null)]
                 : [tipRow("Quota", known ? percent : null, entry.resetsAt)];
-        if (!unavailable && triple) rows.push(tipRow("Monthly", monthly?.usedPercent ?? null, monthly?.resetsAt ?? null));
+        if (!unavailable && triple && !kimiWindows) rows.push(tipRow("Monthly", monthly?.usedPercent ?? null, monthly?.resetsAt ?? null));
         if (parked) rows.push({ tone: "text-error", text: `${entry.parkedAgents} agent(s) parked`, html: `<span class="quota-tip-row text-error"><i class="ph ph-pause" aria-hidden="true"></i><span>${entry.parkedAgents} agent(s) parked</span></span>` });
         const head = `${entry.label}${entry.planType ? ` · ${entry.planType}` : ""}`;
         const machine = entry.node ? `Hyper node ${entry.node}` : ssh ? `SSH ${ssh}` : null;

@@ -18,6 +18,6 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     }
     await ctx.fns.llm.modelPolicy({action:'set',model,disabled:disabled === 'true'});
     if (opts.req.headers.get('HX-Request') !== 'true') return new Response(null,{status:303,headers:{location:'/llms'}});
-    const html = ctx.fns.llms.modelControl({model,disabled:disabled === 'true'});
+    const html = ctx.fns.llms.modelControl({model,disabled:disabled === 'true',switchOnly:form.get('switchOnly') === 'true'});
     return new Response(html,{headers:{'content-type':'text/html; charset=utf-8'}});
 }

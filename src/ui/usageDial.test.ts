@@ -41,3 +41,13 @@ test('Go uses measured subscription rings including monthly instead of the PAYG 
  const payg=dial(ctx,null,{entries:[{...entry,planType:null}],now});
  expect(payg).toContain('data-member-budget="opencode"');expect(payg).toContain('PAYG $10');expect(payg).not.toContain('data-quota-window');
 });
+
+test('Kimi renders only returned windows: monthly outside, optional 5h inside, no invented weekly',()=>{
+ const now=Date.now(), resetsAt=now+86400000;
+ for(const includeShort of [true,false]){
+  const html=dial(ctx,null,{entries:[{...base,provider:'kimi-coding',windows:{tertiary:{usedPercent:50,resetsAt},...(includeShort?{primary:{usedPercent:20,resetsAt}}:{})}}],now});
+  expect(html).toContain('data-quota-window="monthly"');expect(html).toContain('Monthly</span><span>50% used');
+  expect(html).not.toContain('data-quota-window="weekly"');expect(html).not.toContain('Weekly</span>');
+  expect(html.includes('data-quota-window="5h"')).toBe(includeShort);expect(html.includes('5h</span>')).toBe(includeShort);
+ }
+});
