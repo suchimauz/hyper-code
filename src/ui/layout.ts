@@ -416,6 +416,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
 .chat-composer[data-composer-send-ready]:not([data-composer-has-content]) [data-composer-running-controls] [data-composer-send] { display: none !important; }
 @media (max-width: 700px), (max-width: 1023px) and (pointer: coarse) {
   .mobile-usage-strip { display: flex; flex: none; align-items: center; gap: .5rem; min-width: 0; width: 100%; height: 44px; min-height: 44px; box-sizing: border-box; padding: .25rem max(.75rem, env(safe-area-inset-right)) .25rem max(.75rem, env(safe-area-inset-left)); border: 0; border-bottom: 1px solid var(--color-ui-border); background: var(--color-base-100); text-align: left; color: var(--color-base-content); font-size: 12px; cursor: pointer; }
+  .mobile-usage-strip[data-home-mobile-usage] { margin-top: 2.25rem; border-top: 1px solid var(--color-ui-border); }
   [data-mobile-usage-items] { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
   .mobile-usage-chip { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; min-width: 0; padding: 0; color: var(--color-muted); }
   .mobile-usage-chip[hidden] { display: none; }

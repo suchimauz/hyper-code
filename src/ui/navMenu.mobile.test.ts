@@ -147,3 +147,29 @@ test('desktop automatic selection still reveals the default row', async () => {
         f.client.__navOpen(); expect(reveals).toBe(1);
     } finally { await f.window.happyDOM.close(); }
 });
+
+test('menu quota strip sits below search, shares chat-strip data and returns to the open menu',async()=>{
+ const f=setup();const w=f.window,d=w.document;
+ try{
+  const strip=d.querySelector('[data-nav-mobile-usage]')!;
+  expect(d.getElementById('nav-q')!.closest('div')!.nextElementSibling).toBe(strip);
+  expect(strip.nextElementSibling?.id).toBe('nav-results');
+  const chat=d.createElement('button');chat.setAttribute('data-mobile-usage-open','');chat.innerHTML='<span data-mobile-usage-items></span><span data-mobile-usage-count></span>';d.body.append(chat);
+  let reads=0;w.setInterval=(()=>0) as any;
+  w.fetch=(async()=>{reads++;return {ok:true,json:async()=>({entries:[{provider:'codex',account:'default',label:'Codex',usedPercent:25,updatedAt:Date.now(),resetsAt:Date.now()+3600000,parkedAgents:0,models:[]}],gateway:null})};}) as any;
+  const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};
+  w.eval(await Bun.file(new URL('./$script_mobileUsage.js',import.meta.url)).text());await tick();
+  f.client.__navOpen();await tick();
+  expect(reads).toBe(1);
+  expect(strip.querySelectorAll('[data-usage-chip]')).toHaveLength(1);expect(chat.querySelectorAll('[data-usage-chip]')).toHaveLength(1);
+  (strip as any).focus();strip.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+  (strip as any).click();await tick();
+  expect(d.querySelector('.mobile-usage-dialog')).not.toBeNull();
+  expect(f.client.__navIsOpen()).toBe(true);
+  const back=d.querySelector('[data-usage-back]')!;
+  back.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+  expect(f.client.__navIsOpen()).toBe(true);
+  (back as any).click();
+  expect(d.querySelector('.mobile-usage-dialog')).toBeNull();expect(d.activeElement).toBe(strip);expect(f.client.__navIsOpen()).toBe(true);
+ }finally{await w.happyDOM.close();}
+});

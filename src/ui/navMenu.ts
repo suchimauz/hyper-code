@@ -5,6 +5,7 @@
  * Render the global navigation dialog with search, widget tabs and keyboard navigation.
  * Use in the shared page shell. Touch users open search explicitly; the close button,
  * focus restoration and visible-viewport sizing keep the menu usable with an iPhone keyboard.
+ * On mobile, a shared read-only account/quota strip sits between search and widget tabs.
  * Opted-in default Home grids move the existing chats tile first on mobile and restore its
  * original DOM position on desktop; custom layouts and edit mode keep their supplied order.
  */
@@ -22,6 +23,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
       <button id="nav-theme-toggle" data-action="toggle-theme" type="button" class="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-base-200" aria-pressed="false" aria-label="Переключить тему" title="Переключить тему"><i class="ph ph-moon" aria-hidden="true"></i></button>
       <button id="nav-close" type="button" class="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-base-200" aria-label="Close menu" title="Close menu"><i class="ph ph-x text-lg" aria-hidden="true"></i></button>
     </div>
+    <button type="button" class="mobile-usage-strip" data-mobile-usage-open data-nav-mobile-usage aria-haspopup="dialog" aria-expanded="false" aria-label="Аккаунты и лимиты"><span data-mobile-usage-items><span class="mobile-usage-placeholder">Загрузка…</span></span><span data-mobile-usage-count aria-hidden="true">…</span></button>
     <div id="nav-results" class="min-h-0 flex-1 overflow-y-auto"></div>
     <details class="border-t border-ui-border px-4 py-2 text-xs">
       <summary class="cursor-pointer">Push notifications · this device</summary>
@@ -201,6 +203,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
   window.__navOpen = function () {
     if (!window.__navIsOpen()) returnFocus = document.activeElement;
     overlay().classList.remove('hidden');
+    document.dispatchEvent(new CustomEvent('mobile-usage:sync'));
     orderWidgets();
     if (touch()) document.getElementById('nav-results').scrollTop = 0;
     void selectCurrent();
@@ -235,7 +238,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
     mark();
   });
   window.addEventListener('keydown', event => {
-    if (!window.__navIsOpen()) return;
+    if (!window.__navIsOpen() || event.target.closest?.('.mobile-usage-dialog')) return;
     const key = event.key.toLowerCase();
     if (event.key === 'Escape') { event.preventDefault(); window.__navClose(); return; }
     if (event.key === 'ArrowDown' || ((event.metaKey || event.ctrlKey) && key === 'j')) { event.preventDefault(); move(1); return; }
@@ -247,7 +250,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
       return;
     }
     if (event.key === 'Enter') {
-      if (event.target.closest?.('#nav-close, #nav-theme-toggle, #nav-results form')) return;
+      if (event.target.closest?.('#nav-close, #nav-theme-toggle, #nav-results form, [data-nav-mobile-usage]')) return;
       event.preventDefault(); openSelected(event.metaKey || event.ctrlKey);
     }
   }, true);

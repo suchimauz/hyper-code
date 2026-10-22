@@ -293,6 +293,7 @@
     hosts.forEach(fit); void load();
   }
   document.addEventListener('click', event => { const trigger = event.target.closest?.('[data-mobile-usage-open]'); if (trigger) { event.preventDefault(); open(trigger); } });
+  document.addEventListener('mobile-usage:sync', sync);
   for (const event of ['htmx:after:process', 'htmx:after:swap', 'htmx:history:restore']) document.addEventListener(event, sync);
   for (const media of [narrow, touch]) media.addEventListener('change', sync);
   window.addEventListener('resize', () => hosts.forEach(fit)); window.addEventListener('pageshow', sync);
