@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import accountsCard from "./accountsCard";
 import control from './modelControl';
 
-const ctx: any = { fns: {
+const ctx: any = { state: { sshAccount: { flows: new Map() } }, fns: {
     procs: { ui: {
         escape: ({ text }: any) => String(text),
         row: (o: any) => JSON.stringify(o),
@@ -46,9 +46,9 @@ test("shows a reconnect action only on the broken account", () => {
         { provider: "codex", account: "healthy", label: "healthy", model: "codex/healthy:gpt", source: "file", available: true, usedPercent: 20, planType: "team", resetsAt: null, parkedAgents: 0, needsReconnect: false },
     ] });
     expect(html).toContain("authentication required");
-    expect(html).toContain("llms.loginPopupFor");
+    expect(html).toContain('llms.loginPopupFor');
     expect(html).toContain('\\"account\\":\\"persona\\"');
-    expect(html).not.toContain('llms.loginPopupFor\\",\\"params\\":{\\"provider\\":\\"codex\\",\\"account\\":\\"healthy\\"');
+    expect(html).not.toContain('loginPopupFor\\",\\"params\\":{\\"provider\\":\\"codex\\",\\"account\\":\\"healthy\\"');
 });
 
 test("gateway health is API availability, never exhausted quota or verified generation", () => {
@@ -105,4 +105,78 @@ test('Connections keeps disabled models visible with enable controls and exact a
  expect(html).toContain('data-model-policy="openai/b:b" data-model-disabled="false"');
  expect(html).toContain('Enable openai:a');expect(html).toContain('Disable openai/b:b');
  expect(html).toContain('/llms/model-state');
+});
+
+test('only OpenCode uses compact prices tables; all other providers retain original model cards',()=>{
+ const html=accountsCard(ctx,null,{accounts:[],models:{opencode:['opencode:priced','opencode:unknown','opencode:included'],openai:['openai:ordinary'],codex:['codex:other'],lmstudio:['lmstudio:local']},prices:{'opencode:priced':{billing:'subscription',go:{requests5h:110,monthlyUsd:15},plus:{requests5h:440,monthlyUsd:60},source:'https://opencode.ai/go',updatedAt:1000},'opencode:included':{billing:'subscription',go:{requests5h:'unlimited',monthlyUsd:'unlimited'},plus:{requests5h:'unlimited',monthlyUsd:'unlimited'}}}});
+ for(const value of ['<table','Est. requests / 5h','Monthly usage','Go Plus','110','440','$15','$60','∞','switchOnly','role="switch"','— unpublished','llm-go-bar','not PAYG prices'])expect(html).toContain(value);
+ expect(html).not.toContain('USD / 1M');expect(html).not.toContain('Cache read');expect(html).not.toContain('models.dev');
+ expect(html.match(/<table/g)).toHaveLength(1);
+ expect(html).toContain('title="opencode:priced">priced</th>');
+ expect(html).not.toContain('title="openai:ordinary">ordinary</th>');
+ expect(html).toContain('llm-model-list');expect(html).toContain('title="openai:ordinary">ordinary</span>');
+ expect(html).toContain('title="codex:other">other</span>');expect(html).not.toContain('disabled</span>');
+});
+test('non-OpenCode-only catalogues have no pricing tables',()=>{
+ const html=accountsCard(ctx,null,{accounts:[],models:{openai:['openai:ordinary'],lmstudio:['lmstudio:local']}});
+ expect(html).not.toContain('<table');expect(html).not.toContain('USD / 1M');expect(html).toContain('llm-model-list');
+});
+
+test('OpenCode table follows official rank rather than model discovery order; unknown models stay last',()=>{
+ const html=accountsCard(ctx,null,{accounts:[],models:{opencode:['opencode:unknown','opencode:large','opencode:small']},prices:{'opencode:large':{billing:'subscription',order:2},'opencode:small':{billing:'subscription',order:0}}});
+ expect(html.indexOf('title="opencode:small">')).toBeLessThan(html.indexOf('title="opencode:large">'));
+ expect(html.indexOf('title="opencode:large">')).toBeLessThan(html.indexOf('title="opencode:unknown">'));
+});
+
+test('OpenCode bars match the official nonlinear scale and preserve each Go/Plus ratio',()=>{
+ const prices = {
+  'opencode:kimi-k3':{billing:'subscription' as const,go:{requests5h:110,monthlyUsd:15},plus:{requests5h:440,monthlyUsd:60}},
+  'opencode:muse':{billing:'subscription' as const,go:{requests5h:45300,monthlyUsd:60},plus:{requests5h:90600,monthlyUsd:120}},
+ };
+ const html=accountsCard(ctx,null,{accounts:[],models:{opencode:['opencode:kimi-k3','opencode:muse']},prices});
+ const widths=[...html.matchAll(/class="llm-go-bar llm-go-bar-(?:go|plus)" style="width:([\d.]+)%"/g)].map(m=>Number(m[1]));
+ expect(widths).toHaveLength(4);
+ expect(widths[0]).toBeCloseTo(1.6805449593076367,10);
+ expect(widths[1]).toBeCloseTo(6.722179837230547,10);
+ expect(widths[2]).toBeCloseTo(41,10);expect(widths[3]).toBeCloseTo(82,10);
+ expect(widths[0]!/widths[1]!).toBeCloseTo(110/440,12);
+ const filtered=accountsCard(ctx,null,{accounts:[],models:{opencode:['opencode:kimi-k3']},prices});
+ expect(filtered).toContain(`width:${widths[0]}%`);expect(filtered).toContain(`width:${widths[1]}%`);
+});
+
+test('OpenCode unknown or zero bars are empty and unlimited bars are full',()=>{
+ const html=accountsCard(ctx,null,{accounts:[],models:{opencode:['opencode:unknown','opencode:zero','opencode:free']},prices:{
+  'opencode:zero':{billing:'subscription',go:{requests5h:0,monthlyUsd:0},plus:{requests5h:0,monthlyUsd:0}},
+  'opencode:free':{billing:'subscription',go:{requests5h:'unlimited',monthlyUsd:'unlimited'},plus:{requests5h:'unlimited',monthlyUsd:'unlimited'}},
+ }});
+ const widths=[...html.matchAll(/class="llm-go-bar llm-go-bar-(?:go|plus)" style="width:([\d.]+)%"/g)].map(m=>Number(m[1]));
+ expect(widths).toEqual([0,0,0,0,100,100]);
+ expect(html).not.toContain('width:NaN');expect(html).not.toContain('width:Infinity');
+});
+
+test("SSH accounts show their account name and a remove action like local named accounts", () => {
+    const html = accountsCard(ctx, null, { accounts: [
+        { provider: "codex", account: "ssh.box.work", label: "box · codex · work", model: "ssh/box:codex/work:", source: "ssh", available: true, usedPercent: 10, planType: "pro", resetsAt: null, parkedAgents: 0, sshInstance: "box" },
+        { provider: "kimi-coding", account: "ssh.box.kimi", label: "box · kimi-coding · kimi", model: "ssh/box:kimi-coding/kimi:", source: "ssh", available: true, usedPercent: 30, planType: "Pro", resetsAt: null, parkedAgents: 0, sshInstance: "box" },
+    ] });
+    expect(html).toContain('"role":"account","text":"work"');
+    expect(html).toContain('"role":"account","text":"kimi"');
+    expect(html).toContain("llms.removeAccount");
+    expect(html).toContain('\\"account\\":\\"ssh.box.work\\"');
+    expect(html).toContain('\\"account\\":\\"ssh.box.kimi\\"');
+});
+
+test("default local CLI accounts stay non-removable", () => {
+    const html = accountsCard(ctx, null, { accounts: [
+        { provider: "codex", account: "default", label: "default", model: "codex:gpt", source: "file", available: true, usedPercent: 10, planType: "pro", resetsAt: null, parkedAgents: 0 },
+    ] });
+    expect(html).not.toContain("llms.removeAccount");
+});
+
+test('Kimi connection shows monthly and only explicitly reported rolling windows',()=>{
+ for(const includeShort of [true,false]){
+  const html=accountsCard(ctx,null,{accounts:[{provider:'kimi-coding',account:'default',label:'Kimi',model:'kimi-coding:',source:'file',available:true,usedPercent:50,planType:'Pro',resetsAt:null,parkedAgents:0,windows:{tertiary:{usedPercent:50,windowMinutes:43200,resetsAt:Date.now()+86400000},...(includeShort?{primary:{usedPercent:20,windowMinutes:300,resetsAt:Date.now()+3600000}}:{})}}]});
+  expect(html).toContain('quota-monthly');expect(html).not.toContain('quota-weekly');
+  expect(html.includes('quota-5h')).toBe(includeShort);
+ }
 });

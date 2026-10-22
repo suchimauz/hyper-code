@@ -53,7 +53,7 @@ test('SSH accounts are provider grouped with target badge, remote reconnect and 
  for(const provider of ['codex','claude-code'] as const) {
  const account: any = {provider,account:'ssh.box.work',label:'remote',model:`ssh/box:${provider}/work:`,source:'ssh',available:true,usedPercent:null,planType:null,resetsAt:null,parkedAgents:0,needsReconnect:true};
  const html = card(ctx,null,{accounts:[account]});
- expect(html).toContain(`data-provider="${provider === 'codex' ? 'codex' : 'claude'}"`); expect(html).toContain('SSH · box'); expect(html).toContain('llms.loginPopupFor'); expect(html).toContain('\\"instance\\":\\"box\\"'); expect(html).not.toContain('llms.removeAccount'); expect(html).not.toContain('/llms/codex/reset');
+ expect(html).toContain(`data-provider="${provider === 'codex' ? 'codex' : 'claude'}"`); expect(html).toContain('SSH · box'); expect(html).toContain('llms.loginPopupFor'); expect(html).toContain('\\"instance\\":\\"box\\"'); expect(html).toContain('llms.removeAccount'); expect(html).not.toContain('/llms/codex/reset');
  ctx.state.sshAccount.flows.set('flow',{id:'flow',provider,instance:'box',account:'work',status:'pending'});
  expect(card(ctx,null,{accounts:[account]})).toContain('sshAccount.progressPopup');
  }

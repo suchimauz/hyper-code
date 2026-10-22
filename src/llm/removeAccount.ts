@@ -5,54 +5,53 @@ import { rmSync } from "node:fs";
 // the user's normal CLI installation and are intentionally not removable here.
 /** Removes one isolated subscription account and its secret-free metadata. */
 /**
- * Delete a named managed or CLI subscription account.
+ * Delete a named managed, CLI or SSH-registry subscription account.
  *
- * Refuses while an unarchived or in-flight agent selects the credential;
- * idle archived sessions remain historical references, not credential users.
- * Managed Anthropic
- * OAuth is deleted from encrypted Postgres storage; named Codex credentials are
- * removed with their isolated CODEX_HOME; named Claude Code credentials are
- * removed from the account-specific macOS Keychain service and config directory.
- * Default external CLI accounts must be removed by their owning CLI.
+ * Refuses while an unarchived or in-flight agent selects the credential, unless
+ * opts.archiveUsers archives those agents first; agents with work still in
+ * flight or queued always block. Managed Anthropic OAuth is deleted from
+ * encrypted Postgres storage; named Codex credentials are removed with their
+ * isolated CODEX_HOME; named Claude Code credentials are removed from the
+ * account-specific macOS Keychain service and config directory; SSH accounts
+ * drop only their secret-free registry row. Default external CLI accounts must
+ * be removed by their owning CLI.
  *
  * @param opts.provider Runtime credential provider.
- * @param opts.account Credential slot to remove.
+ * @param opts.account Credential slot to remove, or ssh.<instance>.<account> for a registry account.
+ * @param opts.archiveUsers Archive agents that still select the credential instead of refusing. @default false
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
     /** Runtime provider: anthropic-oauth, xai, claude-code, codex, or kimi-coding. */
     provider: "anthropic-oauth" | "xai" | "claude-code" | "codex" | "kimi-coding";
-    /** Credential slot. */
+    /** Credential slot, or ssh.<instance>.<account> for a registry account. */
     account: string;
-}): Promise<{ removed: true; provider: string; account: string }> {
+    /** Archive agents that still select the credential instead of refusing. @default false */
+    archiveUsers?: boolean;
+}): Promise<{ removed: true; provider: string; account: string; archived: string[] }> {
     const provider = opts.provider;
     const account = String(opts.account ?? "").trim() || "default";
-    const agents = (await ctx.fns.procs.db.select({
-        sql: "SELECT id, model, archived_at, run_state FROM agents",
-        params: [],
-    })) as Array<{ id: string; model: string | null; archived_at: number | null; run_state: string }>;
-    const rowsById = new Map(agents.map((row) => [String(row.id), row]));
-    const users: Array<{ id: string; model: string | null }> = agents.filter((row) => {
-        const parsed = splitModel(String(row.model ?? ""));
-        return (row.archived_at == null || row.run_state === "running")
-            && parsed.provider === provider && parsed.account === account;
-    });
-    // Archive only updates the database; cached Agent objects have no archive
-    // flag. Ignore a known archived row only when memory is also quiescent.
-    // Stale/missing rows must not hide an in-flight credential user. Older
-    // direct runs left abortController behind after returning, so its presence
-    // alone is not proof of activity; activeRunCount tracks unsettled runs.
-    for (const [id, live] of Object.entries((ctx.state.agent ?? {}) as Record<string, types.agent.Agent>)) {
-        const row = rowsById.get(id);
-        const inFlight = live.isStreaming || (live.activeRunCount ?? 0) > 0
-            || live.samplingAbortController != null || live.currentJobId != null
-            || live.drainPromise != null;
-        if (row?.archived_at != null && row.run_state !== "running" && !inFlight) continue;
-        const parsed = splitModel(String(live.model ?? ""));
-        if (parsed.provider === provider && parsed.account === account && !users.some((u) => String(u.id) === id)) users.push({ id, model: live.model });
+    const users = await ctx.fns.llm.accountUsers({ provider, account });
+    const archived: string[] = [];
+    if (users.length && !opts.archiveUsers) throw new Error(`account is used by agent(s): ${users.map((x) => x.id).join(", ")} — switch their model first`);
+    if (users.length) {
+        // Archival is conditional on a quiescent row, so an agent that starts
+        // running between the check and the update aborts the whole removal.
+        const failed: Array<{ id: string; error: string }> = [];
+        for (const user of users) {
+            try { await ctx.fns.session.archive({ id: user.id }); archived.push(user.id); }
+            catch (error: any) { failed.push({ id: user.id, error: String(error?.message ?? error) }); }
+        }
+        if (failed.length) throw new Error(`cannot archive agent(s): ${failed.map((f) => `${f.id} (${f.error})`).join(", ")} — stop their work first`);
     }
-    if (users.length) throw new Error(`account is used by agent(s): ${users.map((x) => x.id).join(", ")} — switch their model first`);
 
-    if (provider === "anthropic-oauth") {
+    // An ssh.<instance>.<account> slot owns only secret-free registry metadata;
+    // the credential itself remains on the host.
+    const ssh = /^ssh\.([^.]+)\.([^.]+)$/.exec(account);
+    if (ssh) {
+        const kind = provider as "codex" | "claude-code" | "kimi-coding";
+        if (!["codex", "claude-code", "kimi-coding"].includes(provider)) throw new Error(`SSH accounts are unsupported for ${provider}`);
+        await ctx.fns.sshAccount.registry({ action: "remove", instance: ssh[1], provider: kind, account: ssh[2] });
+    } else if (provider === "anthropic-oauth") {
         await ctx.fns.llm.logoutAnthropicOAuth({ account });
     } else if (provider === "xai") {
         await ctx.fns.llm.logoutXaiOAuth({ account });
@@ -75,10 +74,5 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     flows?.delete(`${provider}:${account}`);
     ctx.fns.procs.events.refresh({ topic: "llm-accounts", reason: "account removed" });
     ctx.fns.procs.events.refresh({ topic: "llm-usage", reason: "account removed" });
-    return { removed: true, provider, account };
-}
-
-function splitModel(model: string): { provider: string; account: string } {
-    const m = /^([a-z][\w-]*)(?:\/([\w.-]+))?:/.exec(model);
-    return { provider: m?.[1] ?? "lmstudio", account: m?.[2] ?? "default" };
+    return { removed: true, provider, account, archived };
 }

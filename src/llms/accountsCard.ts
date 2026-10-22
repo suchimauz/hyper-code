@@ -15,6 +15,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; windows?: types.llm.UsageSnapshot["windows"] | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; sshInstance?: string; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>; thresholds?: { warnAt: number; criticalAt?: number; alertAt: number } }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
+    /** Published OpenCode Go / Go Plus comparison figures keyed by exact route. */ prices?: Record<string, types.llm.ModelPrice>;
     /** Exact locally disabled routes; kept visible with an enable action. @default [] */ disabledModels?: string[];
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
     /** MiniMax M Plan request settings shown next to the plan account. */
@@ -28,14 +29,16 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const prefix = (a: typeof opts.accounts[number]) => a.source === "ssh" ? a.model : `${a.provider}${a.account === "default" ? "" : `/${a.account}`}:`;
 
     const remove = (a: typeof opts.accounts[number]) => {
-        if (a.source === "ssh" || (a.source !== "oauth" && a.account === "default")) return "";
+        // SSH registry rows are secret-free metadata and always removable;
+        // local removal stays limited to named managed/CLI credentials.
+        if (a.source !== "ssh" && a.source !== "oauth" && a.account === "default") return "";
         return ctx.fns.ui.popup({ method: "llms.removeAccount", params: { provider: a.provider, account: a.account }, tone: "danger", size: "xs", html: `<i class="ph ph-trash" aria-hidden="true"></i><span>Remove</span>` });
     };
     const row = (a: typeof opts.accounts[number]) => {
         // Registry SSH rows carry an ssh/<instance>:<provider>/<account>: route. Coding
         // plans only name their egress instance and keep their own key locally, so
         // they have no route to parse and no registry account to reconnect.
-        const route = a.source === "ssh" ? /^ssh\/([^:]+):(?:codex|claude-code)\/([^:]+):/.exec(a.model) : null;
+        const route = a.source === "ssh" ? /^ssh\/([^:]+):(?:codex|claude-code|kimi-coding)\/([^:]+):/.exec(a.model) : null;
         const egress = a.source === "ssh" ? (a.sshInstance ?? /^ssh\/([^:]+):/.exec(a.model)?.[1] ?? null) : null;
         const remote = route ? [route[1], route[2]] : null;
         const pending = remote ? [...(ctx.state.sshAccount?.flows?.values() ?? [])].find(flow => flow.instance === remote[0] && flow.account === remote[1] && flow.provider === a.provider && flow.status === "pending") : undefined;
@@ -48,8 +51,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const alertAt = a.thresholds?.alertAt ?? 75;
         const status = !a.available || (used != null && used >= alertAt) ? "limit" : used != null && used >= criticalAt ? "critical" : used != null && used >= warnAt ? "warning" : "ready";
         const storage = storageLabel(a.source);
-        const reconnect = pending ? ctx.fns.ui.popup({ method: "sshAccount.progressPopup", params: { id: pending.id }, tone: "default", size: "xs", html: "Continue login" }) : remote && (a.needsReconnect || a.source === "ssh")
-            ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: remote[1], instance: remote[0] }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
+        const reconnect = pending ? ctx.fns.ui.popup({ method: "sshAccount.progressPopup", params: { id: pending.id }, tone: "default", size: "xs", html: "Continue login" }) : a.needsReconnect || a.source === "ssh"
+            ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: remote ? remote[1] : a.account, ...(remote ? { instance: remote[0] } : {}) }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
             : "";
         const resetCount = a.provider === "codex" && a.source !== "ssh" ? a.resetCredits?.availableCount : undefined;
         const resetDetails = a.provider === "codex" && a.resetCredits?.credits?.length ? `<details class="text-3xs text-subtle"><summary class="cursor-pointer">details</summary><div class="absolute z-20 mt-1 max-w-xs space-y-1 rounded-lg border border-ui-border bg-base-100 p-2 shadow-xl">${a.resetCredits.credits.map((credit: any) => `<div><div class="font-medium text-muted">${esc(credit.title || credit.resetType || "Codex reset")}</div>${credit.description ? `<div>${esc(credit.description)}</div>` : ""}${credit.expiresAt ? `<div>expires ${esc(new Date(typeof credit.expiresAt === "number" ? (credit.expiresAt < 10_000_000_000 ? credit.expiresAt * 1000 : credit.expiresAt) : credit.expiresAt).toLocaleString())}</div>` : ""}</div>`).join("")}</div></details>` : "";
@@ -62,12 +65,12 @@ export default function (ctx: Context, _session: Session | null, opts: {
             const resets = w.resetsAt ? ` · ${humanDelay(w.resetsAt - now)}` : "";
             return { role: `quota-${label}`, text: `${label} ${pct}%${resets}`, class: `shrink-0 text-2xs font-mono ${tone}` };
         };
-        const dual = (a.provider === "zai-coding" || a.provider === "minimax-coding" || (a.provider === 'opencode' && a.planType === 'Go subscription')) && (a.windows?.primary || a.windows?.secondary || a.windows?.tertiary)
+        const dual = (a.provider === "zai-coding" || a.provider === "minimax-coding" || a.provider === "kimi-coding" || (a.provider === 'opencode' && a.planType === 'Go subscription')) && (a.windows?.primary || a.windows?.secondary || a.windows?.tertiary)
             ? [a.windows?.primary ? windowCell("5h", a.windows.primary) : null, a.windows?.secondary ? windowCell("weekly", a.windows.secondary) : null, a.windows?.tertiary ? windowCell('monthly', a.windows.tertiary) : null].filter(Boolean) as Array<{ role: string; text: string; class: string }>
             : null;
         const actions = `<span class="llm-account-actions flex flex-wrap items-center gap-1">${reset}${reconnect}${remove(a)}</span>`;
         return ctx.fns.procs.ui.row({ entity: "llm-account", id: `${a.provider}/${a.account}`, status: a.needsReconnect ? "error" : status, cells: [
-            { role: "account", text: remote ? remote[2] : a.account === "default" ? "main" : a.account, class: "w-28 shrink-0 font-mono text-xs font-medium" },
+            { role: "account", text: remote ? remote[1] : a.account === "default" ? "main" : a.account, class: "w-28 shrink-0 font-mono text-xs font-medium" },
             ...(egress ? [{ role: "instance", text: `SSH · ${egress}`, title: "This plan's traffic leaves through this SSH instance", class: "badge badge-sm shrink-0 text-muted" }] : []),
             ...(a.planType ? [{ role: "plan", text: planName(a.provider, a.planType), title: `Subscription plan: ${a.planType}`, class: "badge badge-sm shrink-0 capitalize text-muted" }] : []),
             { role: "prefix", text: prefix(a), title: prefix(a), class: "min-w-0 flex-1 truncate font-mono text-2xs text-faint" },
@@ -80,7 +83,37 @@ export default function (ctx: Context, _session: Session | null, opts: {
 
     const canonical = (model: string) => model.startsWith('hyper/') ? model : model.includes(':') ? model.replace(/^([a-z][\w-]*)\/default:/, '$1:') : 'lmstudio:' + model;
     const disabledModels = new Set((opts.disabledModels ?? []).map(canonical));
-    const modelList = (models: string[]) => models.length ? `<ul class="llm-model-list mt-2 flex flex-wrap gap-1" aria-label="Available models">${models.map(model => `<li class="max-w-full">${ctx.fns.llms.modelControl({model,disabled:disabledModels.has(canonical(model))})}</li>`).join("")}</ul>` : `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
+    const figure = (value?: number | 'unlimited', usd = false) => value === 'unlimited' ? '∞' : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `${usd ? '$' : ''}${value.toLocaleString('en-US')}` : '—';
+    const modelList = (models: string[]) => {
+        if (!models.length) return `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
+        const isOpenCode = (model: string) => /^(?:(?:ssh|hyper)\/[^:]+:)*opencode(?:\/[\w.-]+)?:/.test(model);
+        const ordinary = models.filter(model => !isOpenCode(model));
+        const cards = ordinary.length ? `<ul class="llm-model-list mt-2 flex flex-wrap gap-1" aria-label="Available models">${ordinary.map(model => `<li class="max-w-full">${ctx.fns.llms.modelControl({model,disabled:disabledModels.has(canonical(model))})}</li>`).join('')}</ul>` : '';
+        models = models.filter(isOpenCode).sort((a,b) => (opts.prices?.[a]?.order ?? Number.MAX_SAFE_INTEGER) - (opts.prices?.[b]?.order ?? Number.MAX_SAFE_INTEGER));
+        if (!models.length) return cards;
+        // Match opencode.ai/go: compress the Plus range, then preserve the
+        // actual Go/Plus ratio within each pair. Use the complete snapshot so
+        // filtering an account's models cannot rescale the same allowance.
+        const maxRequests = Math.max(101, ...Object.values(opts.prices ?? {}).map(p => p.plus?.requests5h).filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0));
+        const position = (n: number | 'unlimited' | undefined) => n === 'unlimited' ? 100 : typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.min(100, 4 + Math.pow(Math.log10(Math.max(n / 100, 1)) / Math.log10(maxRequests / 100), 2.2) * 78) : 0;
+        const rows = models.map(model => {
+            const prefix = /^(?:(?:ssh|hyper)\/[^:]+:)*(?:[a-z][\w-]*(?:\/[\w.-]+)?:)/.exec(model)?.[0] ?? '';
+            const price = opts.prices?.[model];
+            const note = price?.note ?? 'Official Go estimate unavailable';
+            const source = price?.updatedAt ? ` · Updated ${new Date(price.updatedAt).toISOString()}` : '';
+            const plusRequests = price?.plus?.requests5h;
+            const lanes = (['go','plus'] as const).map(tier => {
+                const n = price?.[tier]?.requests5h;
+                const width = tier === 'go' && typeof n === 'number' && Number.isFinite(n) && n >= 0 && typeof plusRequests === 'number' && Number.isFinite(plusRequests) && plusRequests > 0
+                    ? Math.min(100, position(plusRequests) * n / plusRequests)
+                    : position(n);
+                return `<span class="llm-go-lane"><span class="llm-go-bar llm-go-bar-${tier}" style="width:${width}%"></span></span>`;
+            }).join('');
+            const costs = `<td class="llm-go-bars" aria-hidden="true">${lanes}</td><td class="llm-model-rate" title="${esc(note+source)}"><span class="llm-go-number">${figure(price?.go?.requests5h)}</span><span class="llm-go-number llm-go-plus">${figure(price?.plus?.requests5h)}</span></td><td class="llm-model-rate" title="${esc(note+source)}"><span class="llm-go-number">${figure(price?.go?.monthlyUsd,true)}</span><span class="llm-go-number llm-go-plus">${figure(price?.plus?.monthlyUsd,true)}</span></td>`;
+            return `<tr><th scope="row" class="llm-model-name" title="${esc(model)}">${esc(model.slice(prefix.length))}</th>${costs}<td class="llm-model-enabled">${ctx.fns.llms.modelControl({model,disabled:disabledModels.has(canonical(model)),switchOnly:true})}</td></tr>`;
+        }).join('');
+        return `${cards}<div class="llm-model-table-wrap mt-2"><table class="llm-model-table" aria-label="OpenCode Go estimated requests and monthly usage"><caption><a href="https://opencode.ai/go" target="_blank" rel="noopener noreferrer">OpenCode Go</a> · <span class="llm-go-legend">Go</span> / <span class="llm-go-plus">Go Plus</span> · estimates, not remaining quota · — unpublished</caption><thead><tr><th scope="col">Model</th><th scope="col" colspan="2">Est. requests / 5h</th><th scope="col">Monthly usage</th><th scope="col"><span class="sr-only">Enabled</span></th></tr></thead><tbody>${rows}</tbody></table><p class="llm-go-footnote">Go / Go Plus comparison, not PAYG prices. Shared limits; do not add model allowances. Bars use OpenCode’s nonlinear scale; each Go / Go Plus pair preserves its request ratio.</p></div>`;
+    };
     // MiniMax M Plan exposes settings that change how requests are made:
     // the admission tier and the output budget (thinking tokens count
     // against it). They are shown next to the account so the person can see
