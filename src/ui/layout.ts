@@ -476,6 +476,9 @@ export default async function (ctx: Context, session: Session | null, opts: {
   .project-mobile-bar { display: flex; align-items: center; gap: .25rem; min-width: 0; height: 2.75rem; padding: 0 .5rem 0 3.5rem; background: var(--color-base-100); color: var(--color-muted); }
   .project-mobile-name { display: flex; align-items: center; gap: .4rem; min-width: 0; flex: 1; overflow: hidden; min-height: 2.75rem; font-size: .8125rem; }
   .project-mobile-name .project-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .project-mobile-activity { display: inline-flex; flex-shrink: 0; }
+  .project-activity-spin { display: inline-block; animation: chat-icon-spin 1.1s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .project-activity-spin { animation: none; } }
   .project-mobile-switcher { position: relative; flex: none; }
   .project-mobile-switcher > summary { display: flex; align-items: center; justify-content: center; gap: .35rem; min-height: 2.75rem; min-width: 2.75rem; padding-inline: .5rem; font-size: .8125rem; list-style: none; cursor: pointer; border-radius: .6rem; }
   .project-mobile-switcher > summary::-webkit-details-marker { display: none; }
@@ -483,7 +486,6 @@ export default async function (ctx: Context, session: Session | null, opts: {
   .project-mobile-menu { position: absolute; right: 0; top: 100%; z-index: 50; width: min(21rem, calc(100vw - 1.2rem - env(safe-area-inset-left) - env(safe-area-inset-right))); max-height: min(50dvh, calc(var(--chat-viewport-height, 100dvh) - 7rem)); overflow-y: auto; overscroll-behavior: contain; padding: .35rem; border: 1px solid var(--color-ui-border); border-radius: .85rem; background: var(--color-base-100); box-shadow: 0 8px 24px rgb(0 0 0 / .12); }
   .project-mobile-chat { display: flex; align-items: center; gap: .5rem; min-height: 2.75rem; padding: .65rem; border-radius: .5rem; font-size: 1rem; }
   .project-mobile-chat .project-title { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .project-mobile-chat .project-mobile-running { display: inline-flex; flex-shrink: 0; color: var(--color-primary); }
   .project-mobile-chat .project-mobile-unread { flex-shrink: 0; }
   .project-mobile-chat[aria-current="page"] { background: var(--color-base-200); color: var(--color-base-content); font-weight: 600; }
   .project-mobile-bar :is(a,summary):focus-visible { outline: 2px solid var(--color-base-content); outline-offset: -2px; }

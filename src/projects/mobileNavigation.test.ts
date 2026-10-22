@@ -54,7 +54,7 @@ test('mobile chat list shows the selected model even when the chat has its own a
   expect(row.querySelector('.project-mobile-model .chat-icon')).not.toBeNull();
   expect(row.querySelector('.project-mobile-model')?.getAttribute('title')).toBe(model);
   expect(row.querySelector('.project-mobile-model')?.innerHTML).not.toContain('data:image/svg+xml,');
-  expect(row.querySelector('.project-mobile-running')).not.toBeNull();expect(row.querySelector('.project-mobile-unread')).not.toBeNull();
+  expect(row.querySelector('.project-mobile-model .chat-icon-ring')).not.toBeNull();expect(row.querySelector('.project-mobile-running')).toBeNull();expect(row.querySelector('.project-mobile-unread')).not.toBeNull();
   expect(row.querySelector('.project-title')?.textContent).toBe('DeepSeek chat');
  }finally{await w.happyDOM.close();}
 });
