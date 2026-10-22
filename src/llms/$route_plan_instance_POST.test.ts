@@ -31,3 +31,13 @@ test("local clears the setting; unpinned, unknown or wrong providers are rejecte
     await expect(route(ctx, null, { req: mkReq({ provider: "zai-coding", instance: "loose" }) })).rejects.toThrow();
     expect(calls).toHaveLength(1);
 });
+
+test('OpenCode persists only local or trusted egress under its own setting', async () => {
+ const {ctx,calls}=mkCtx([{name:'edge',pinned:true},{name:'loose',pinned:false}]);
+ await route(ctx,null,{req:mkReq({provider:'opencode',instance:'edge'})});
+ expect(calls[0]).toMatchObject({key:'opencodeInstance',value:'edge'});
+ await route(ctx,null,{req:mkReq({provider:'opencode',instance:'local'})});
+ expect(calls[1]).toMatchObject({key:'opencodeInstance',value:''});
+ await expect(route(ctx,null,{req:mkReq({provider:'opencode',instance:'loose'})})).rejects.toThrow();
+ expect(calls).toHaveLength(2);
+});

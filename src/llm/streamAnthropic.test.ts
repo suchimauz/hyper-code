@@ -144,3 +144,18 @@ describe('SSH replay safety', () => {
         expect(calls).toBe(1);
     });
 });
+
+test("Go Anthropic stream passes stable session, required output budget and reasoning", async () => {
+    let request: any;
+    const ctx: any = mkCtx();
+    ctx.fns.llm.resolveEndpoint = async () => ({ provider: "opencode", api: "anthropic", modelId: "go-model", apiKey: "fake", url: "https://go.invalid/messages" });
+    ctx.fns.llm.opencodeReasoningBody = async () => ({ thinking: { type: "adaptive" }, output_config: { effort: "high" } });
+    ctx.fns.llm.opencodeFetch = async (r: any) => { request = r; return sseResponse(); };
+    await stream(ctx, null, { agent: { ...agent(), model: "opencode:go-model" } });
+    expect(request.sessionId).toBe("a1");
+    expect(request.url).toBe("https://go.invalid/messages");
+    const body = JSON.parse(request.init.body);
+    expect(body.max_tokens).toBe(16384);
+    expect(body.thinking).toEqual({ type: "adaptive" });
+    expect(body.output_config).toEqual({ effort: "high" });
+});

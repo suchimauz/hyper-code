@@ -6,7 +6,8 @@
  * remain a separate system block. Use for runtime synthesis that is not an agent turn. Transient failures are
  * retried on the selected route first; Claude subscription calls then try the
  * same model through the alternate managed OAuth route before models from the
- * `llm.fallbackModels` setting are tried in order.
+ * `llm.fallbackModels` setting are tried in order. OpenCode never switches to
+ * another provider; its session identifier stays stable across request retries.
  */
 export default async function (
     ctx: Context,
@@ -24,13 +25,15 @@ export default async function (
         max_tokens?: number;
         /** Groq GPT-OSS reasoning budget; use low for short completions so reasoning does not consume the whole output limit. Ignored by other providers. */
         groqReasoningEffort?: "low" | "medium" | "high";
+        /** OpenCode reasoning preference; emits only cached catalog-supported wire settings. @default auto */
+        reasoningEffort?: types.llm.ReasoningEffort;
         /** OpenRouter reasoning effort for models that require thinking; only sent to OpenRouter. */
         openrouterReasoningEffort?: "minimal" | "low" | "medium" | "high";
         /** OpenAI-style response format, including `json_schema`. */
         response_format?: any;
         /** Disable the configured fallback model chain for this request. @default false */
         noFallback?: boolean;
-        /** Stable request/session identifier for subscription providers. */
+        /** Stable request/session identifier; OpenCode generates one per call when omitted and reuses it across retries. */
         sessionId?: string;
         /** Total request deadline across retries; aborts provider HTTP requests and response reads. Credential refresh is checked after it returns. Omit for no deadline. @minimum 1 @maximum 3600000 */
         timeoutMs?: number;
@@ -48,7 +51,11 @@ export default async function (
     if (/^(?:ssh\/[^:]+:)?cursor(?:\/|:)/.test(primary)) {
         throw Object.assign(new Error('Provider unavailable'), { retryable: false, replaySafe: false });
     }
-    const configuredFallbacks = opts.noFallback ? "" : await (ctx.fns.settings.getString?.({
+    // A Go plan request must never cross into a billed provider fallback.
+    const isOpenCode = /^opencode(?:\/|:)/.test(primary);
+    const sessionId = opts.sessionId ?? (isOpenCode ? Bun.randomUUIDv7() : undefined);
+    const noFallback = opts.noFallback || isOpenCode;
+    const configuredFallbacks = noFallback ? "" : await (ctx.fns.settings.getString?.({
         module: "llm", scopeType: "global", key: "fallbackModels",
         fallback: "codex:gpt-5.4-mini,kimi-coding:kimi-for-coding",
     }) ?? Promise.resolve(""));
@@ -66,7 +73,7 @@ export default async function (
                 count++;
                 try {
                     signal?.throwIfAborted();
-                    const result = await callModel(ctx, { ...opts, model, user, signal });
+                    const result = await callModel(ctx, { ...opts, model, user, signal, sessionId });
                     attempts.push({ model, count });
                     return attempted.length === 1 && count === 1
                         ? { ...result, model }
@@ -82,7 +89,7 @@ export default async function (
             signal?.throwIfAborted();
             lastError = error;
             attempts.push({ model, count });
-            if (opts.noFallback || !shouldFallback(error) || model === models.at(-1)) throw error;
+            if (noFallback || !shouldFallback(error) || model === models.at(-1)) throw error;
         }
     }
     throw lastError;
@@ -96,6 +103,7 @@ async function callModel(ctx: Context, opts: any): Promise<{ text: string; finis
 
     if (endpoint.api === "mock") return normalizeStructured({ text: user, finishReason: "stop", usage: null, raw: { mock: true } }, opts.response_format);
     const result = (endpoint.provider === "hyper" ? endpoint.upstream : endpoint.provider) === "xai" ? await xaiResponses(ctx, endpoint, { ...opts, user, system })
+        : endpoint.api === 'gemini' ? { ...await ctx.fns.llm.callGemini({...opts,model,user,system}), raw: null }
         : endpoint.api === "responses" ? await responses(ctx, endpoint, { ...opts, user, system })
             : endpoint.api === "anthropic" ? await anthropic(ctx, endpoint, { ...opts, user, system })
                 : await openAI(ctx, endpoint, { ...opts, user, system });
@@ -154,7 +162,7 @@ async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
         },
         body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await readResponsesSSE(response);
     if (endpoint.provider === "xai") ctx.fns.llm.refreshUsage?.({ provider: endpoint.provider, account: endpoint.account, maxAgeMs: 60_000 })?.catch(() => undefined);
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
@@ -162,8 +170,8 @@ async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
 
 
 async function responses(ctx: Context, endpoint: any, opts: any) {
-    const token = endpoint.provider === "hyper" || endpoint.ssh ? endpoint.apiKey : await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
-    if (!token) throw new Error("codex: no access_token");
+    const token = endpoint.provider === "hyper" || endpoint.provider === "opencode" || endpoint.ssh ? endpoint.apiKey : await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
+    if (!token && endpoint.provider !== "opencode") throw new Error("codex: no access_token");
     const body: any = {
         model: endpoint.modelId,
         store: false,
@@ -172,17 +180,22 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
         input: [{ type: "message", role: "user", content: [{ type: "input_text", text: opts.user }] }],
         text: { verbosity: "low" },
     };
+    if (endpoint.provider === "opencode") Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: opts.model, modelId: endpoint.modelId, api: "responses", effort: opts.reasoningEffort }));
     const format = responsesFormat(opts.response_format);
     if (format) body.text.format = format;
+    if (endpoint.provider === "opencode") {
+        if (opts.max_tokens != null) body.max_output_tokens = opts.max_tokens;
+        if (opts.temperature != null) body.temperature = opts.temperature;
+    }
     // ChatGPT Codex backend controls output limits and sampling; neither
     // max_output_tokens nor temperature is accepted by the subscription API.
-    const transport = endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
     const response = await transport(endpoint.url, {
         signal: opts.signal,
         method: "POST",
         headers: {
             authorization: `Bearer ${token}`,
-            ...(endpoint.provider === "hyper" ? {} : {
+            ...(endpoint.provider === "hyper" || endpoint.provider === "opencode" ? {} : {
                 ...(endpoint.ssh ? {} : { "chatgpt-account-id": accountId(token) }),
                 originator: "codex_cli_rs",
                 "OpenAI-Beta": "responses=experimental",
@@ -192,7 +205,7 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
         },
         body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await readResponsesSSE(response);
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
 }
@@ -200,6 +213,7 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
 async function openAI(ctx: Context, endpoint: any, opts: any) {
     const messages = [...(opts.system ? [{ role: "system", content: opts.system }] : []), { role: "user", content: opts.user }];
     const body: any = { model: endpoint.modelId, messages, stream: false };
+    if (endpoint.provider === "opencode") Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: opts.model, modelId: endpoint.modelId, api: "openai", effort: opts.reasoningEffort }));
     if (opts.temperature != null) body.temperature = opts.temperature;
     if (opts.max_tokens != null) body.max_tokens = opts.max_tokens;
     if (endpoint.provider === "groq" && /^openai\/gpt-oss-(20b|120b)$/.test(endpoint.modelId) && opts.groqReasoningEffort) body.reasoning_effort = opts.groqReasoningEffort;
@@ -207,10 +221,10 @@ async function openAI(ctx: Context, endpoint: any, opts: any) {
     if (opts.response_format != null) body.response_format = opts.response_format;
     // A coding plan can leave through a chosen SSH instance; the plan key
     // rides the bridge, so the authorization header stays as built here.
-    const transport = endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
     let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) });
-    response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) }));
-    if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (endpoint.provider !== "opencode") response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) }));
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await response.json();
     const choice = raw?.choices?.[0] ?? {};
     return { text: String(choice?.message?.content ?? ""), finishReason: choice?.finish_reason ?? null, usage: raw?.usage, raw };
@@ -239,8 +253,9 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
         headers["x-app"] = "cli";
         headers["anthropic-dangerous-direct-browser-access"] = "true";
     }
-    if (!apiKey) throw new Error(`${endpoint.provider}: no credentials`);
+    if (!apiKey && endpoint.provider !== "opencode") throw new Error(`${endpoint.provider}: no credentials`);
     const body: any = { model: endpoint.modelId, max_tokens: opts.max_tokens ?? 2048, messages: [{ role: "user", content: opts.user }] };
+    if (endpoint.provider === "opencode") Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: opts.model, modelId: endpoint.modelId, api: "anthropic", effort: opts.reasoningEffort }));
     // MiniMax counts thinking tokens against max_tokens: a small budget is
     // spent entirely on reasoning and the visible text comes back empty. Its
     // reasoning is a fixed trait of the model, so every MiniMax request gets
@@ -259,10 +274,10 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
         if (opts.system) body.system.push({ type: "text", text: opts.system });
     } else if (opts.system) body.system = opts.system;
     if (opts.temperature != null) body.temperature = opts.temperature;
-    const transport = endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
     let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) });
-    response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) }));
-    if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (endpoint.provider !== "opencode") response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) }));
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await response.json();
     return { text: (raw.content ?? []).filter((x: any) => x.type === "text").map((x: any) => x.text).join(""), finishReason: raw.stop_reason ?? null, usage: raw.usage, raw };
 }

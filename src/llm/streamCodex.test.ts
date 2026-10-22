@@ -106,3 +106,15 @@ describe('SSH replay safety', () => {
         expect(calls).toBe(1);
     });
 });
+
+test("Go Responses stream passes agent session without subscription-only output settings", async () => {
+    let request: any;
+    const ctx: any = mkCtx();
+    ctx.fns.llm.resolveEndpoint = async () => ({ provider: "opencode", api: "responses", modelId: "go-model", apiKey: "fake", url: "https://go.invalid/responses" });
+    ctx.fns.llm.opencodeReasoningBody = async () => ({ reasoning: { effort: "high" } });
+    ctx.fns.llm.opencodeFetch = async (r: any) => { request = r; return sseResponse(); };
+    await stream(ctx, null, { agent: { ...agent(), model: "opencode:go-model" } });
+    expect(request.sessionId).toBe("a1");
+    expect(request.url).toBe("https://go.invalid/responses");
+    expect(JSON.parse(request.init.body).reasoning).toEqual({ effort: "high" });
+});

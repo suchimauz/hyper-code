@@ -3,7 +3,7 @@ export type Message = {
     role: string;
     content?: string | Array<Record<string, any>> | null;
     idx?: number;
-    tool_calls?: Array<{ id: string; name: string; args: any }>;
+    tool_calls?: Array<{ id: string; name: string; args: any; /** Opaque Gemini signature returned by the provider. */ thoughtSignature?: string; /** Original Gemini parts, including signatures, replayed unchanged for a tool turn. */ geminiParts?: Array<Record<string, any>> }>;
     tool_call_id?: string;
     message_type?: string;
     excluded_from_llm?: boolean;

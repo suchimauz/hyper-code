@@ -233,3 +233,41 @@ for (const api of ['anthropic','openai','responses']) test(`deadline aborts ${ap
  await expect(call(ctx,null,{user:'x',model:'kimi-coding:k3',noFallback:true,timeoutMs:30})).rejects.toThrow();expect(calls).toBe(1);expect(aborted).toBe(true);
  } finally {globalThis.fetch=previous;}
 });
+
+// Go contract tests: no network, credentials or live generation.
+for (const api of ["openai", "anthropic", "responses"]) {
+    test(`Go ${api} forwards explicit session and endpoint without billing fallback`, async () => {
+        const requests: any[] = [];
+        const endpoint = { api, provider: "opencode", modelId: "go-model", url: `https://go.invalid/${api}`, apiKey: "fake" };
+        const ctx: any = { fns: { llm: {
+            resolveEndpoint: async () => endpoint,
+            opencodeReasoningBody: async () => ({ marker: "reasoning-preserved" }),
+            opencodeFetch: async (request: any) => {
+                requests.push(request);
+                if (api === "responses") return new Response('data: {"type":"response.completed","response":{"status":"completed","output_text":"ok"}}\n\ndata: [DONE]\n\n');
+                return Response.json(api === "anthropic" ? { content: [{ type: "text", text: "ok" }], stop_reason: "end_turn" } : { choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+            },
+        } } };
+        const result = await call(ctx, null, { model: "opencode:go-model", user: "hello", sessionId: "stable-session", max_tokens: 321 });
+        expect(result.text).toBe("ok");
+        expect(requests).toHaveLength(1);
+        expect(requests[0].url).toBe(endpoint.url);
+        expect(requests[0].sessionId).toBe("stable-session");
+        const body = JSON.parse(requests[0].init.body);
+        expect(body.marker).toBe("reasoning-preserved");
+        expect(body[api === "responses" ? "max_output_tokens" : "max_tokens"]).toBe(321);
+    });
+}
+
+test("Go retries keep session stable and never try configured paid fallbacks", async () => {
+    const sessions: any[] = [], models: string[] = [];
+    const ctx: any = { fns: { settings: { getString: async () => { throw new Error("must not read paid fallback chain"); } }, llm: {
+        resolveEndpoint: async ({ model }: any) => { models.push(model); return { api: "openai", provider: "opencode", modelId: "go-model", url: "https://go.invalid", apiKey: "fake" }; },
+        opencodeReasoningBody: async () => ({}),
+        opencodeFetch: async ({ sessionId }: any) => { sessions.push(sessionId); return new Response("", { status: 503 }); },
+    } } };
+    await expect(call(ctx, null, { model: "opencode:go-model", user: "hello" })).rejects.toThrow("opencode 503");
+    expect(sessions).toHaveLength(3);
+    expect(new Set(sessions).size).toBe(1);
+    expect(models.every(model => model === "opencode:go-model")).toBe(true);
+});

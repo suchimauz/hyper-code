@@ -54,6 +54,7 @@ export default async function (
         body.thinking = { type: "enabled" };
         body.reasoning_effort = reasoning.applied === "xhigh" ? "max" : reasoning.applied;
     }
+    if (ep.provider === "opencode") Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: agent.model, modelId: ep.modelId, api: "openai", effort: agent.reasoningEffort }));
     // OpenAI-compatible providers do not consistently accept OpenAI's cache
     // extension. Groq currently rejects prompt_cache_key with HTTP 400.
     if (ep.provider === "openai") body.prompt_cache_key = await ctx.fns.agent.cacheRoot({ agent });
@@ -68,13 +69,14 @@ export default async function (
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (ep.apiKey) headers["authorization"] = `Bearer ${ep.apiKey}`;
 
-    const res = await ctx.fns.llm.connectFetch({ url: ep.url, init: {
+    const transport = ep.provider === "opencode" ? ctx.fns.llm.opencodeFetch : ctx.fns.llm.connectFetch;
+    const res = await transport({ url: ep.url, ...(ep.provider === "opencode" ? { sessionId: agent.id } : {}), init: {
         method: "POST",
         headers,
         body: JSON.stringify(body),
         signal: opts.signal,
     } });
-    if (!res.ok) throw new Error(`${ep.provider} ${res.status}: ${await res.text()}`);
+    if (!res.ok) throw new Error(ep.provider === "opencode" ? `opencode ${res.status}` : `${ep.provider} ${res.status}: ${await res.text()}`);
     if (!res.body) throw new Error("empty response body");
 
     let text = "";

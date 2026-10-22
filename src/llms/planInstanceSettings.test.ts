@@ -23,3 +23,9 @@ test("falls back to local when the saved instance is gone and disables without i
     expect(empty).toContain("disabled");
     expect(empty).toContain("no trusted SSH instances");
 });
+
+test('OpenCode picker preserves provider identity', () => {
+ const html=render(ctx,null,{provider:'opencode',instance:'edge',instances:['edge']});
+ expect(html).toContain('name="provider" value="opencode"');
+ expect(html).toContain('<option value="edge" selected>');
+});

@@ -11,12 +11,13 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
     const accounts = await ctx.fns.llm.listAccounts({});
     const models = await ctx.fns.llm.listModels({});
     const nodes = await ctx.fns.node.list({});
-    const [zaiPlan, minimaxPlan, instanceRows] = await Promise.all([
+    const [zaiPlan, minimaxPlan, opencodePlan, instanceRows] = await Promise.all([
         ctx.fns.llm.codingInstance({ provider: "zai-coding" }).catch(() => ({ instance: null })),
         ctx.fns.llm.codingInstance({ provider: "minimax-coding" }).catch(() => ({ instance: null })),
+        ctx.fns.llm.codingInstance({ provider: "opencode" }).catch(() => ({ instance: null })),
         ctx.fns.sshInstance.list({}).catch(() => []),
     ]);
-    const planInstances = { zai: zaiPlan.instance, minimax: minimaxPlan.instance, instances: (instanceRows as any[]).filter(i => i?.pinnedHostKey).map(i => String(i.name)) };
+    const planInstances = { zai: zaiPlan.instance, minimax: minimaxPlan.instance, opencode: opencodePlan.instance, instances: (instanceRows as any[]).filter(i => i?.pinnedHostKey).map(i => String(i.name)) };
     const minimax = {
         serviceTier: (await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" })) ?? "standard",
         maxTokens: await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }),

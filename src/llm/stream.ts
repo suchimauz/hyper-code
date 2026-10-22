@@ -36,6 +36,7 @@ export default async function (
         const wireOpts = { ...opts, onEvent };
         let result: any;
         if (ep.api === "mock") result = await ctx.fns.llm.streamMock(wireOpts);
+        else if (ep.api === 'gemini') result = await ctx.fns.llm.streamGemini(wireOpts);
         else if (ep.api === "anthropic") result = await ctx.fns.llm.streamAnthropic(wireOpts);
         else if ((ep.provider === "hyper" ? ep.upstream : ep.provider) === "xai") result = await ctx.fns.llm.streamXai(wireOpts);
         else if (ep.api === "responses") result = await ctx.fns.llm.streamCodex(wireOpts);

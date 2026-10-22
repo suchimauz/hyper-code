@@ -83,3 +83,10 @@ test('OpenCode Console shows PAYG unavailable rather than subscription usage', (
  expect(html).toContain('usage unavailable');
  expect(html).not.toContain('quota-5h');
 });
+
+test('Go connection names subscription, links Console Go and preserves SSH picker',()=>{
+ const html=accountsCard(ctx,null,{accounts:[{provider:'opencode',account:'default',label:'OpenCode Go',model:'opencode:',source:'file',available:true,usedPercent:null,planType:'Go subscription',resetsAt:null,parkedAgents:0}],models:{opencode:['opencode:glm']}});
+ for(const text of ['OpenCode Go','Go subscription','Go quota unavailable','Console Go','https://opencode.ai/console','/settings/declared']) expect(html).toContain(text);
+ expect(html).not.toContain('Pay as you go');
+ expect(html).not.toContain('Monthly member budget');
+});

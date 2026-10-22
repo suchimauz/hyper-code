@@ -79,8 +79,10 @@ export default async function (
             ? ctx.fns.llm.codingInstance({ provider }).catch(() => ({ instance: null }))
             : Promise.resolve({ instance: null });
         const [zaiPlan, minimaxPlan, opencodePlan] = await Promise.all([planInstance("zai-coding"), planInstance("minimax-coding"), planInstance("opencode")]);
-        // Budget refresh must not hold UI rendering on provider network I/O.
-        const budgetState = ((ctx.state as any).opencodeBudgetUi ??= { value: { available: false }, startedAt: 0, promise: null });
+        const opencodeGo = ctx.fns.settings?.get ? await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "opencodePlan" }) === "go" : false;
+        // Separate plan caches: a previous PAYG result must never become Go allowance.
+        const budgetKey = opencodeGo ? "opencodeGoUi" : "opencodeBudgetUi";
+        const budgetState = ((ctx.state as any)[budgetKey] ??= { value: { available: false }, startedAt: 0, promise: null });
         if (entries.some(entry => entry.provider === "opencode") && ctx.fns.llm.opencodeUsage && !budgetState.promise && Date.now() - budgetState.startedAt >= 60_000) {
             budgetState.startedAt = Date.now();
             budgetState.promise = ctx.fns.llm.opencodeUsage({})
@@ -94,8 +96,8 @@ export default async function (
             const cataloguePrefix = `${entry.provider}${entry.account === "default" ? "" : `/${entry.account}`}:`;
             // Console billing has no verified quota contract: never turn PAYG into subscription percentages.
             if (entry.provider === "opencode") {
-                entry.label = "OpenCode Console" + (opencodePlan.instance ? ` · ${opencodePlan.instance}` : "");
-                entry.planType = "Pay as you go";
+                entry.label = (opencodeGo ? "OpenCode Go" : "OpenCode Console") + (opencodePlan.instance ? ` · ${opencodePlan.instance}` : "");
+                entry.planType = opencodeGo ? "Go subscription" : "Pay as you go";
                 entry.usedPercent = null;
                 entry.resetsAt = null;
                 entry.windows = undefined;
@@ -103,11 +105,11 @@ export default async function (
                 entry.tone = "neutral";
                 entry.quotaStatus = "unavailable";
                 const budget = budgetState.value;
-                const valid = budget.available === true && Number.isFinite(budget.spentUsd) && budget.spentUsd >= 0
+                const valid = !opencodeGo && budget.available === true && Number.isFinite(budget.spentUsd) && budget.spentUsd >= 0
                     && (budget.limitUsd === null || Number.isFinite(budget.limitUsd) && budget.limitUsd >= 0);
                 entry.memberBudget = valid ? { available: true, spentUsd: budget.spentUsd, limitUsd: budget.limitUsd,
                     ...(Number.isFinite(budget.resetsAt) && budget.resetsAt > 0 ? { resetsAt: budget.resetsAt } : {}) } : { available: false };
-                entry.memberBudgetText = valid ? `Monthly member budget $${budget.spentUsd.toFixed(2)} / ${budget.limitUsd === null ? "unlimited" : `$${budget.limitUsd.toFixed(2)}`}` : "Monthly member budget unavailable";
+                entry.memberBudgetText = opencodeGo ? "Go quota unavailable" : valid ? `Monthly member budget $${budget.spentUsd.toFixed(2)} / ${budget.limitUsd === null ? "unlimited" : `$${budget.limitUsd.toFixed(2)}`}` : "Monthly member budget unavailable";
             }
             if (entry.provider === "zai-coding" || entry.provider === "minimax-coding") {
                 const egress = entry.provider === "minimax-coding" ? minimaxPlan.instance : zaiPlan.instance;

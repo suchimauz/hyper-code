@@ -74,6 +74,11 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
         if (ids.length) out["minimax-coding"] = ids.map(id => `minimax-coding:${id}`);
     }
 
+    if (ctx.fns.llm.opencodeModels) {
+        const ids = await ctx.fns.llm.opencodeModels({});
+        if (ids.length) out.opencode = ids.map(id => `opencode:${id}`);
+    }
+
     // Remote curated defaults are exposed only when their endpoint has usable
     // credentials. Static catalogues describe capabilities, not availability.
     const configured = async (model: string) => {

@@ -12,7 +12,7 @@
  * @param opts.now Current time in ms, for testing.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
-    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; windows?: types.llm.UsageSnapshot["windows"] | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>; thresholds?: { warnAt: number; criticalAt?: number; alertAt: number } }>;
+    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; windows?: types.llm.UsageSnapshot["windows"] | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; sshInstance?: string; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>; thresholds?: { warnAt: number; criticalAt?: number; alertAt: number } }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
@@ -39,7 +39,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const remote = route ? [route[1], route[2]] : null;
         const pending = remote ? [...(ctx.state.sshAccount?.flows?.values() ?? [])].find(flow => flow.instance === remote[0] && flow.account === remote[1] && flow.provider === a.provider && flow.status === "pending") : undefined;
         const used = a.usedPercent;
-        const quota = !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
+        const quota = a.provider === "opencode" && a.planType === "Go subscription" ? "Go quota unavailable" : !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
         // The same thresholds as the rings and the mobile strip, so one account
         // never looks yellow on the page and green in the dock.
         const warnAt = a.thresholds?.warnAt ?? 30;
@@ -89,11 +89,11 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const localRow = (a: typeof opts.accounts[number]) => {
         const models = Object.values(opts.models ?? {}).flat().filter(model => model.startsWith(prefix(a)));
         const planInstance = a.provider !== "zai-coding" && a.provider !== "minimax-coding" && a.provider !== "opencode" || !opts.planInstances ? "" : ctx.fns.llms.planInstanceSettings({ provider: a.provider, instance: a.provider === "opencode" ? opts.planInstances.opencode ?? null : a.provider === "zai-coding" ? opts.planInstances.zai : opts.planInstances.minimax, instances: opts.planInstances.instances });
-        const refreshModels = a.provider === "opencode" ? `<div class="px-3 pb-3">${ctx.fns.ui.popup({ method: "llms.refreshOpencodeModels", params: {}, tone: "default", size: "xs", html: "Refresh models" })}</div>` : "";
+        const refreshModels = a.provider === "opencode" ? `<div class="px-3 pb-3"><a href="/settings/declared" class="text-xs text-muted">Plan mode: ${a.planType === "Go subscription" ? "Go subscription" : "Pay as you go"} · change</a> · <a href="https://opencode.ai/console" target="_blank" rel="noopener noreferrer" class="text-xs text-muted">${a.planType === "Go subscription" ? "Console Go" : "Console billing"}</a> ${ctx.fns.ui.popup({ method: "llms.refreshOpencodeModels", params: {}, tone: "default", size: "xs", html: "Refresh models" })}</div>` : "";
         return `<div class="llm-account">${row(a)}${refreshModels}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div>${minimaxSettings(a)}${planInstance}</div>`;
     };
     const providers = [
-        { id: "opencode", title: "OpenCode Console", icon: "opencode:", accounts: opts.accounts.filter(a => a.provider === "opencode"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
+        { id: "opencode", title: opts.accounts.some(a => a.provider === "opencode" && a.planType === "Go subscription") ? "OpenCode Go" : "OpenCode Console", icon: "opencode:", accounts: opts.accounts.filter(a => a.provider === "opencode"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
         { id: "grok", title: "Grok", icon: "xai:grok", accounts: opts.accounts.filter(a => a.provider === "xai"), add: addButton(ctx, "xai", "Add Grok account") },

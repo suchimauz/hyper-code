@@ -45,7 +45,7 @@ export default async function (
             if (allow.size && !allow.has(provider)) continue;
             let ep;
             try { ep = await ctx.fns.llm.resolveEndpoint({ model: full }); } catch { continue; }
-            if (ep.api === "mock" || ep.kind === "local" || seen.has(id)) continue;
+            if (ep.api === "mock" || ep.api === "gemini" || provider === 'opencode' || ep.kind === "local" || seen.has(id)) continue;
             seen.add(id);
             out.push({ id, api: ep.api, provider, account, kind: ep.kind });
         }

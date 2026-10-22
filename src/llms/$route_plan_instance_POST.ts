@@ -1,7 +1,7 @@
 /**
  * Saves the coding-plan egress instance choice
  *
- * Store which SSH instance carries Z.ai or MiniMax coding-plan traffic. "local" (or empty) keeps calls on this machine; any other value must name a trusted SSH instance, otherwise the form is rejected unchanged. The response re-renders the same picker fragment with the saved selection.
+ * Store which SSH instance carries Z.ai, MiniMax coding-plan, or OpenCode Console traffic. "local" (or empty) keeps calls on this machine; any other value must name a trusted SSH instance, otherwise the form is rejected unchanged. The response re-renders the same picker fragment with the saved selection.
  * @param opts.req Incoming HTTP request carrying the form fields provider and instance.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
@@ -10,8 +10,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 }): Promise<Response> {
     const form = await opts.req.formData();
     const provider = String(form.get("provider") ?? "");
-    if (provider !== "zai-coding" && provider !== "minimax-coding") throw new Error("Unknown coding plan provider");
-    const key = provider === "zai-coding" ? "zaiCodingInstance" : "minimaxCodingInstance";
+    if (provider !== "zai-coding" && provider !== "minimax-coding" && provider !== "opencode") throw new Error("Unknown coding plan provider");
+    const key = provider === "opencode" ? "opencodeInstance" : provider === "zai-coding" ? "zaiCodingInstance" : "minimaxCodingInstance";
     const requested = String(form.get("instance") ?? "").trim();
     const instances = (await ctx.fns.sshInstance.list({})).filter((i: any) => i.pinnedHostKey).map((i: any) => String(i.name));
     const value = !requested || requested === "local" ? "" : instances.includes(requested) ? requested : null;

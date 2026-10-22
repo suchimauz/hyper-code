@@ -113,7 +113,7 @@
         ? ' · недельный ' + (win.weekly ? Math.max(0, 100 - win.weekly.usedPercent) + '%' : 'неизвестен') + ' · 5 ч ' + (win.short ? Math.max(0, 100 - win.short.usedPercent) + '%' : 'неизвестен')
         : '';
       chip.title = (row.label || name(row)) + ' · ' + (measured ? (outdated ? 'последний известный остаток ' : 'остаток ') + amount(row) : 'лимит неизвестен') + winTitle;
-      if (row.provider === 'opencode') chip.title = (row.label || name(row)) + ' · ' + (row.memberBudgetText || 'Monthly member budget unavailable; prepaid balance unavailable');
+      if (row.provider === 'opencode') chip.title = (row.label || name(row)) + ' · ' + (row.planType === 'Go subscription' ? 'Go quota unavailable' : row.memberBudgetText || 'Monthly member budget unavailable; prepaid balance unavailable');
       if (row.needsReconnect) chip.title += ' · требуется повторное подключение';
       chip.setAttribute('role', 'img'); chip.setAttribute('aria-label', chip.title); box.append(chip);
     }
@@ -136,9 +136,12 @@
       status = row.reason === 'missing-key' ? 'Не задан API-ключ' : row.status === 'available' ? 'Каталог API доступен' : row.status === 'unavailable' ? 'API недоступен' : 'Состояние API неизвестно';
       section.append(el('p', status, 'mobile-usage-amount'), el('p', 'Лимиты неизвестны. Доступность каталога не подтверждает возможность генерации.', 'mobile-usage-meta'));
     } else if (row.provider === 'opencode') {
-      section.append(el('p', row.memberBudgetText || 'Monthly member budget unavailable', 'mobile-usage-amount'));
-      section.append(el('p', 'Это месячный бюджет участника, не кредитный баланс. Общий баланс API не сообщает.', 'mobile-usage-meta'));
-      if (row.memberBudget?.resetsAt) section.append(el('p', 'Сброс бюджета: ' + new Date(row.memberBudget.resetsAt).toLocaleString('ru-RU'), 'mobile-usage-meta'));
+      const go = row.planType === 'Go subscription';
+      section.append(el('p', go ? 'Go quota unavailable' : row.memberBudgetText || 'Monthly member budget unavailable', 'mobile-usage-amount'));
+      section.append(el('p', go ? 'Квота подписки Go недоступна через API. Бюджет PAYG не является лимитом Go.' : 'Это месячный бюджет участника, не кредитный баланс. Общий баланс API не сообщает.', 'mobile-usage-meta'));
+      const consoleLink = el('a', go ? 'Console Go' : 'Console billing', 'mobile-usage-meta');
+      consoleLink.href = 'https://opencode.ai/console'; consoleLink.target = '_blank'; consoleLink.rel = 'noopener noreferrer'; section.append(consoleLink);
+      if (!go && row.memberBudget?.resetsAt) section.append(el('p', 'Сброс бюджета: ' + new Date(row.memberBudget.resetsAt).toLocaleString('ru-RU'), 'mobile-usage-meta'));
     } else {
       const win = windows(row);
       status = row.quotaStatus === 'unavailable' || !known(row) ? 'Лимит неизвестен' : stale(row) ? 'Последний известный остаток: ' + left(row) + '%' : 'Осталось ' + left(row) + '%';

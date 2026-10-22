@@ -48,7 +48,9 @@ export default async function (
     };
 
     // "auto" as the applied level (Claude 5 default) sends nothing: the model decides, as before levels existed.
-    if (reasoning.mode === "anthropic-adaptive" && (reasoning.applied as string) === "auto") {
+    if (ep.provider === "opencode") {
+        Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: agent.model, modelId: ep.modelId, api: "anthropic", effort: agent.reasoningEffort }));
+    } else if (reasoning.mode === "anthropic-adaptive" && (reasoning.applied as string) === "auto") {
     } else if (reasoning.mode === "anthropic-adaptive" && reasoning.applied !== "off") {
         body.thinking = { type: "adaptive" };
         body.output_config = { effort: reasoning.applied === "xhigh" ? "max" : reasoning.applied };
@@ -144,14 +146,15 @@ export default async function (
     }
 
     const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
-    const transport = ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh,...request}) : ctx.fns.llm.connectFetch;
-    const res = await transport({ url: ep.url, init: {
+    const transport = ep.provider === "opencode" ? ctx.fns.llm.opencodeFetch : ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh,...request}) : ctx.fns.llm.connectFetch;
+    const res = await transport({ url: ep.url, ...(ep.provider === "opencode" ? { sessionId: agent.id } : {}), init: {
         method: "POST",
         headers,
         body: JSON.stringify(body),
         signal: opts.signal,
     } });
     if (!res.ok) {
+        if (ep.provider === "opencode") throw new Error(`opencode ${res.status}`);
         // Same classification path as streamCodex: a spent Claude subscription
         // window must arrive at the worker as a parkable failure carrying its
         // reset moment, not as an opaque "provider 429: {…}" string.

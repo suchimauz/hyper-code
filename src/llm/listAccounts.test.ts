@@ -52,3 +52,10 @@ test('OpenCode inventory is reference-only and has no subscription quota', async
  configured=false;
  expect(await listAccounts(ctx,null,{provider:'opencode'})).toEqual([]);
 });
+
+test('Go inventory follows explicit plan without claiming a measured allowance',async()=>{
+ const ctx=fixture(false);
+ ctx.fns.settings.get=async ({key}:any)=>key==='opencodeApiKey'?'secret://test/opencode':key==='opencodePlan'?'go':null;
+ const rows=await listAccounts(ctx,null,{provider:'opencode'});
+ expect(rows[0]).toMatchObject({label:'OpenCode Go',planType:'Go subscription',usedPercent:null,windows:null,resetsAt:null});
+});

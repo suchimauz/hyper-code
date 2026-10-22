@@ -68,7 +68,9 @@ export default function (
     }
     const ring = (entry: typeof entries[number]) => {
         if (entry.provider === "opencode") {
-            const text = entry.memberBudgetText ?? "Monthly member budget unavailable";
+            const go = entry.planType === "Go subscription";
+            const text = go ? "Go quota unavailable" : entry.memberBudgetText ?? "Monthly member budget unavailable";
+            if (go) return `<a href="https://opencode.ai/console" target="_blank" rel="noopener noreferrer" data-go-quota="unavailable" class="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-2xs hover:bg-base-300" aria-label="${esc(`${entry.label} · ${text} · Console Go`)}"><span aria-hidden="true">${ctx.fns.ui.modelLogo({ model: "opencode:", bare: true, compact: true })}</span><span>OpenCode Go · ${esc(text)} · Console Go</span></a>`;
             return `<a href="/llms" data-member-budget="opencode" class="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-2xs hover:bg-base-300" aria-label="${esc(`${entry.label} · ${text}`)}"><span aria-hidden="true">${ctx.fns.ui.modelLogo({ model: "opencode:", bare: true, compact: true })}</span><span>${esc(text)}</span></a>`;
         }
         const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];

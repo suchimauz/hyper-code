@@ -119,3 +119,19 @@ describe("OpenAI-compatible gateway normalization", () => {
         await expect(run(Response.json({ error: { message: "private upstream detail" } }))).rejects.toThrow("returned an error");
     });
 });
+
+test("Go OpenAI stream passes agent session and the resolved endpoint", async () => {
+    let request: any;
+    const ctx: any = mkCtx();
+    ctx.fns.agent.buildLlmRequest = async () => ({ system: "sys", messages: [{ role: "user", content: "hi" }] });
+    ctx.fns.agent.wireTools = () => [];
+    ctx.fns.llm.resolveEndpoint = async () => ({ provider: "opencode", api: "openai", modelId: "go-model", apiKey: "fake", url: "https://go.invalid/chat" });
+    ctx.fns.llm.toOpenAIMessages = ({ messages }: any) => messages;
+    ctx.fns.llm.opencodeReasoningBody = async () => ({ reasoning_effort: "high" });
+    ctx.fns.llm.opencodeFetch = async (r: any) => { request = r; return Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }); };
+    const result = await stream(ctx, null, { agent: { id: "go-session", model: "opencode:go-model", messages: [], scratchpad: {} } as any });
+    expect(result.text).toBe("ok");
+    expect(request.sessionId).toBe("go-session");
+    expect(request.url).toBe("https://go.invalid/chat");
+    expect(JSON.parse(request.init.body).reasoning_effort).toBe("high");
+});

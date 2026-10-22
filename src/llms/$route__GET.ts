@@ -37,12 +37,13 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     await ctx.fns.llm.refreshUsage({ accounts: inventory.map((a: any) => ({ provider: a.provider, account: a.account })) }).catch(() => undefined);
     const accounts = await ctx.fns.llm.listAccounts({}).catch(() => inventory);
     // Coding-plan egress: current per-provider instance plus trusted instance names.
-    const [zaiPlan, minimaxPlan, instanceRows] = await Promise.all([
+    const [zaiPlan, minimaxPlan, opencodePlan, instanceRows] = await Promise.all([
         ctx.fns.llm.codingInstance({ provider: "zai-coding" }).catch(() => ({ instance: null })),
         ctx.fns.llm.codingInstance({ provider: "minimax-coding" }).catch(() => ({ instance: null })),
+        ctx.fns.llm.codingInstance({ provider: "opencode" }).catch(() => ({ instance: null })),
         ctx.fns.sshInstance.list({}).catch(() => []),
     ]);
-    const planInstances = { zai: zaiPlan.instance, minimax: minimaxPlan.instance, instances: (instanceRows as any[]).filter(i => i?.pinnedHostKey).map(i => String(i.name)) };
+    const planInstances = { zai: zaiPlan.instance, minimax: minimaxPlan.instance, opencode: opencodePlan.instance, instances: (instanceRows as any[]).filter(i => i?.pinnedHostKey).map(i => String(i.name)) };
     const logins = ctx.fns.llm.accountLoginStatus?.({}) ?? [];
     const models = await ctx.fns.llm.listModels({});
     const nodes = await ctx.fns.node.list({});

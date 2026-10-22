@@ -42,6 +42,11 @@ export default async function (
         provider = entry.provider;
         rawModelId = identity?.[3] ?? entry.id;
     }
+    if (provider === "opencode") {
+        const catalog = await ctx.fns.llm.opencodeCatalog({ cachedOnly: true });
+        return catalog.models.find(entry => entry.id === rawModelId)?.reasoning
+            ?? { supported: ["auto", "off"], defaultEffort: "off", mode: "none" };
+    }
     const modelId = rawModelId.toLowerCase();
     // MiniMax M Plan (Anthropic-compatible endpoint). The wire mode is
     // "anthropic-adaptive" (thinking + output_config.effort), but the level

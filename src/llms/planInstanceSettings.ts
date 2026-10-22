@@ -1,21 +1,21 @@
 /**
  * Renders the coding-plan egress instance picker form
  *
- * Draw one select next to a Z.ai or MiniMax coding-plan account: "local" keeps calls on this machine, an SSH instance name carries them through that host's network. Use wherever the plan account is shown, and as the response of the save route.
+ * Draw one select next to a Z.ai or MiniMax coding-plan account, or OpenCode Console account: "local" keeps calls on this machine, an SSH instance name carries them through that host's network. Use wherever the plan account is shown, and as the response of the save route.
  * @param opts.provider Coding plan provider the picker belongs to.
  * @param opts.instance Currently selected instance name, or null for local.
  * @param opts.instances Trusted SSH instance names available for egress.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
     /** Coding plan provider the picker belongs to. */
-    provider: "zai-coding" | "minimax-coding";
+    provider: "zai-coding" | "minimax-coding" | "opencode";
     /** Currently selected instance name, or null for local. */
     instance: string | null;
     /** Trusted SSH instance names available for egress. */
     instances: string[];
 }): string {
     const esc = (x: any) => ctx.fns.procs.ui.escape({ text: String(x ?? "") });
-    const provider = opts.provider === "minimax-coding" ? "minimax-coding" : "zai-coding";
+    const provider = opts.provider;
     const current = opts.instance && opts.instances.includes(opts.instance) ? opts.instance : "local";
     const options = ["local", ...opts.instances].map((name) =>
         `<option value="${esc(name)}"${name === current ? " selected" : ""}>${esc(name === "local" ? "local · this machine" : name)}</option>`).join("");

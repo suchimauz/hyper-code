@@ -38,7 +38,9 @@ export default function (ctx: Context, _session: Session | null, opts: {
     // MiniMax mark from Simple Icons (CC0), normalized to 24×24.
     const minimax = 'M11.43 3.92a.86.86 0 1 0-1.718 0v14.236a1.999 1.999 0 0 1-3.997 0V9.022a.86.86 0 1 0-1.718 0v3.87a1.999 1.999 0 0 1-3.997 0V11.49a.57.57 0 0 1 1.139 0v1.404a.86.86 0 0 0 1.719 0V9.022a1.999 1.999 0 0 1 3.997 0v9.134a.86.86 0 0 0 1.719 0V3.92a1.998 1.998 0 1 1 3.996 0v11.788a.57.57 0 1 1-1.139 0zm10.572 3.105a2 2 0 0 0-1.999 1.997v7.63a.86.86 0 0 1-1.718 0V3.923a1.999 1.999 0 0 0-3.997 0v16.16a.86.86 0 0 1-1.719 0V18.08a.57.57 0 1 0-1.138 0v2a1.998 1.998 0 0 0 3.996 0V3.92a.86.86 0 0 1 1.719 0v12.73a1.999 1.999 0 0 0 3.996 0V9.023a.86.86 0 1 1 1.72 0v6.686a.57.57 0 0 0 1.138 0V9.022a2 2 0 0 0-1.998-1.997';
     const isMinimax = key.startsWith('minimax-coding:') || key.startsWith('minimax-coding/') || key.startsWith('minimax:') || key.startsWith('minimax/');
-    const path = key.startsWith('codex:') || key.startsWith('codex/') || key.startsWith('openai:') || key.startsWith('openai/') || key.includes('gpt-')
+    // A neutral terminal mark identifies the Console gateway, not an upstream brand.
+    const isOpenCode = key.startsWith('opencode:') || key.startsWith('opencode/');
+    const path = isOpenCode ? 'M2 3h20v18H2V3zm2 2v14h16V5H4zm2 3 4 4-4 4 1.4 1.4L12.8 12 7.4 6.6 6 8zm7 7h5v2h-5v-2z' : key.startsWith('codex:') || key.startsWith('codex/') || key.startsWith('openai:') || key.startsWith('openai/') || key.includes('gpt-')
             ? openai
             : key.startsWith('claude-code:') || key.startsWith('claude-code/') || key.startsWith('anthropic:') || key.startsWith('anthropic/') || key.startsWith('anthropic-oauth:') || key.startsWith('anthropic-oauth/') || key.includes('claude')
                 ? anthropic

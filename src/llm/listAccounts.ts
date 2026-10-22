@@ -133,13 +133,14 @@ export default async function (
         }
     }
 
-    // OpenCode Console is pay-as-you-go inventory, not subscription quota.
+    // Inventory follows the selected billing plan; neither plan implies measured quota.
     if ((!filter || filter === "opencode") && ctx.fns.settings?.get) {
         const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "opencodeApiKey" });
         if (typeof reference === "string" && reference.trim()) {
             const item = entry("opencode", "default", "file", byKey, reconnectKeys);
-            item.label = "OpenCode Console";
-            item.planType = "Pay as you go";
+            const go = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "opencodePlan" }) === "go";
+            item.label = go ? "OpenCode Go" : "OpenCode Console";
+            item.planType = go ? "Go subscription" : "Pay as you go";
             item.usedPercent = null;
             item.resetsAt = null;
             item.windows = null;
@@ -213,6 +214,7 @@ function entry(provider: string, account: string, source: "file" | "oauth" | "ke
         label: account === "default" ? provider : `${provider} · ${account}`,
         model: known?.model ?? `${provider}${account === "default" ? "" : `/${account}`}:`,
         source,
+        sshInstance: undefined as string | undefined,
         // "Available" means there is quota left to switch INTO — the whole point
         // of listing accounts while one of them is exhausted.
         available: !needsReconnect && !(known?.parkedAgents > 0) && (usedPercent == null || usedPercent < 100),

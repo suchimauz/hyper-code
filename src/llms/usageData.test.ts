@@ -182,3 +182,22 @@ test('OpenCode budget is cached, safe and never mapped to quota percent', async 
  ctx.state.opencodeBudgetUi.value={available:true,spentUsd:1.25,limitUsd:null};
  expect((await usageData(ctx,null,{})).entries.find((e:any)=>e.provider==='opencode')!.memberBudgetText).toContain('unlimited');
 });
+
+test('Go subscription never inherits cached PAYG member budgets on either usage surface', async () => {
+ const {ctx}=setup();
+ const account={provider:'opencode',account:'default',label:'OpenCode Go',model:'opencode:',planType:'Go subscription',parkedAgents:0,available:true};
+ ctx.fns.settings={get:async ({key}:any)=>key==='opencodeApiKey'?'secret://test/opencode':key==='opencodePlan'?'go':null};
+ ctx.fns.llm.usageOverview=async()=>[];
+ ctx.fns.llm.listAccounts=async()=>[account];
+ ctx.fns.llm.codingInstance=async()=>({instance:'go-edge'});
+ ctx.state.opencodeBudgetUi={value:{available:true,spentUsd:1.25,limitUsd:null},startedAt:Date.now()};
+ // Even an accidentally monetary API result must not become subscription allowance.
+ ctx.fns.llm.opencodeUsage=async()=>({available:true,spentUsd:9,limitUsd:null});
+ for(const includeConnected of [false,true]) {
+  const {entries}=await usageData(ctx,null,{includeConnected});
+  const entry=entries.find((e:any)=>e.provider==='opencode')!;
+  expect(entry).toMatchObject({label:'OpenCode Go · go-edge',planType:'Go subscription',memberBudgetText:'Go quota unavailable',memberBudget:{available:false},usedPercent:null,resetsAt:null,quotaStatus:'unavailable'});
+  expect(JSON.stringify(entry)).not.toContain('unlimited');
+  expect(JSON.stringify(entry)).not.toContain('spentUsd');
+ }
+});

@@ -42,7 +42,7 @@ export default async function (
 
     // Fail here, loudly, instead of on the agent's next turn.
     const endpoint = await ctx.fns.llm.resolveEndpoint({ model });
-    if (!endpoint.apiKey && !endpoint.ssh && endpoint.kind !== "local" && endpoint.provider !== "claude-code" && endpoint.provider !== "anthropic-oauth") {
+    if (!endpoint.apiKey && !endpoint.ssh && endpoint.kind !== "local" && endpoint.provider !== "opencode" && endpoint.provider !== "claude-code" && endpoint.provider !== "anthropic-oauth") {
         throw new Error(`setModel: no credential for ${endpoint.provider}/${endpoint.account} — add a key or log in first`);
     }
 

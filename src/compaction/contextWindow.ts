@@ -16,6 +16,10 @@ export default async function (
     if (!identity) return null;
     const id = identity.modelId.toLowerCase();
     const provider = identity.provider;
+    if (provider === "opencode") {
+        const catalog = await ctx.fns.llm.opencodeCatalog({ cachedOnly: true });
+        return catalog.models.find(entry => entry.id === identity.modelId)?.context ?? null;
+    }
     // MiniMax M Plan: the M3 generation (M3, M3.1-Flash) has a 1M-token
     // window; the older M2.x line is a 204,800-token model. The M3 window is
     // the model limit, but 512K is the recommended working size, so the

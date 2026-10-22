@@ -18,14 +18,14 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     provider: string;
     account: string;
     kind: "subscription" | "api" | "local";
-    api: "openai" | "anthropic" | "responses" | "mock";
+    api: "openai" | "anthropic" | "responses" | "gemini" | "mock";
     /** For hyper/<node> models: the provider the node uses upstream (e.g. claude-code). */
     upstream?: string;
     /** Node-scoped upstream quota identity; transport account remains the node name. */
     quotaAccount?: string;
     /** Remote SSH execution route. For codex/claude-code credentials live on the
      * remote host; for the coding plans the local plan key rides the bridge. */
-    ssh?: { instance: string; provider: "codex" | "claude-code" | "zai-coding" | "minimax-coding"; account: string };
+    ssh?: { instance: string; provider: "codex" | "claude-code" | "zai-coding" | "minimax-coding" | "opencode"; account: string };
 }> {
     const model = opts.model;
     if (/^(?:ssh\/[^:]+:)?cursor(?:\/|:)/.test(model)) throw Object.assign(new Error("Provider unavailable"), { retryable: false, replaySafe: false });
@@ -66,6 +66,22 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         if (!baseUrl) throw new Error('One API is not configured: set llm.oneapiBaseUrl including /v1');
         return { url: `${baseUrl}/chat/completions`, apiKey: await declaredSecret('oneapiApiKey')(ctx), modelId, provider, account, kind: "api", api: "openai" };
     }
+    if (provider === 'opencode') {
+        if (account !== 'default') throw new Error('OpenCode uses the configured Console key');
+        const apiKey = await declaredSecret('opencodeApiKey')(ctx);
+        const catalog = await ctx.fns.llm.opencodeCatalog({});
+        const entry = catalog.models.find(e => e.id === modelId);
+        if (!entry) throw new Error('OpenCode model is unavailable or uses an unsupported protocol');
+        if (!apiKey && !entry.public) throw new Error('OpenCode key is not configured');
+        const url = entry.baseUrl + (entry.api === 'gemini' ? '/models/' + encodeURIComponent(modelId) + ':generateContent' : entry.api === 'anthropic' ? '/messages' : entry.api === 'responses' ? '/responses' : '/chat/completions');
+        const plan = await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodePlan'}) === 'go' ? 'go' : 'payg';
+        const {instance} = await ctx.fns.llm.codingInstance({provider:'opencode'});
+        if (instance) {
+            const instances = await ctx.fns.sshInstance.list({});
+            if (!instances.some(i => i.name === instance && i.pinnedHostKey)) throw new Error('OpenCode SSH instance is missing or not trusted');
+        }
+        return {url,apiKey,modelId,provider,account,kind:plan === 'go' ? 'subscription' : 'api',api:entry.api,...(instance ? {ssh:{instance,provider:'opencode' as const,account:'default'}} : {})};
+    }
     const p = PROVIDERS[provider];
     if (!p) throw new Error(`unknown provider: ${provider}`);
 
@@ -92,7 +108,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 }
 
 type ProviderConfig = {
-    api: "openai" | "anthropic" | "responses" | "mock";
+    api: "openai" | "anthropic" | "responses" | "gemini" | "mock";
     // subscription = fixed quota per rolling window; a 429 means "wait until it
     // resets", money cannot fix it, so agents get parked. api = pay-per-token;
     // a 429 is short throttling and stays a normal retry. local = no limits.
