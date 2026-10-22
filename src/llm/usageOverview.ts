@@ -4,7 +4,7 @@
 /**
  * Collect the recorded quota of every subscription credential.
  *
- * Returns the worst of the two rolling windows per credential. Reads only the
+ * Returns the worst unexpired primary, secondary or tertiary window per credential. Reads only the
  * small stored snapshot set; it never scans agents and never calls a provider.
  *
  * Use connectedOnly for live quota indicators: historical Codex snapshots must
@@ -63,7 +63,8 @@ export default async function (
         const fresh = (w?: types.llm.UsageWindow) => (w && (!w.resetsAt || w.resetsAt > now) ? w : undefined);
         const primary = fresh(snapshot.windows?.primary);
         const secondary = fresh(snapshot.windows?.secondary);
-        const worst = [primary, secondary]
+        const tertiary = fresh(snapshot.windows?.tertiary);
+        const worst = [primary, secondary, tertiary]
             .filter(Boolean)
             .sort((a, b) => (b!.usedPercent ?? 0) - (a!.usedPercent ?? 0))[0];
 
@@ -81,7 +82,7 @@ export default async function (
             parkedAgents: 0,
             tone: usedPercent == null ? "neutral" : usedPercent >= alertAt ? "error" : usedPercent >= criticalAt ? "critical" : usedPercent >= warnAt ? "warning" : "neutral",
             updatedAt: Number(snapshot.updatedAt ?? 0),
-            windows: { primary, secondary },
+            windows: { primary, secondary, tertiary },
             thresholds: { warnAt, criticalAt, alertAt },
         } as const);
     }

@@ -80,10 +80,9 @@ export default async function (
             : Promise.resolve({ instance: null });
         const [zaiPlan, minimaxPlan, opencodePlan] = await Promise.all([planInstance("zai-coding"), planInstance("minimax-coding"), planInstance("opencode")]);
         const opencodeGo = ctx.fns.settings?.get ? await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "opencodePlan" }) === "go" : false;
-        // Separate plan caches: a previous PAYG result must never become Go allowance.
-        const budgetKey = opencodeGo ? "opencodeGoUi" : "opencodeBudgetUi";
-        const budgetState = ((ctx.state as any)[budgetKey] ??= { value: { available: false }, startedAt: 0, promise: null });
-        if (entries.some(entry => entry.provider === "opencode") && ctx.fns.llm.opencodeUsage && !budgetState.promise && Date.now() - budgetState.startedAt >= 60_000) {
+        // PAYG member budget is separate from the durable Go quota snapshots.
+        const budgetState = ((ctx.state as any).opencodeBudgetUi ??= { value: { available: false }, startedAt: 0, promise: null });
+        if (!opencodeGo && entries.some(entry => entry.provider === "opencode") && ctx.fns.llm.opencodeUsage && !budgetState.promise && Date.now() - budgetState.startedAt >= 60_000) {
             budgetState.startedAt = Date.now();
             budgetState.promise = ctx.fns.llm.opencodeUsage({})
                 .then(value => { budgetState.value = { available: value.available, spentUsd: value.spentUsd, limitUsd: value.limitUsd, resetsAt: value.resetsAt }; })
@@ -94,10 +93,17 @@ export default async function (
             // The catalogue prefix follows the provider identity, so compute it
             // before any ssh account identity is borrowed for usage grouping.
             const cataloguePrefix = `${entry.provider}${entry.account === "default" ? "" : `/${entry.account}`}:`;
-            // Console billing has no verified quota contract: never turn PAYG into subscription percentages.
+            // Go uses normal subscription snapshots; only PAYG has a monetary budget.
             if (entry.provider === "opencode") {
                 entry.label = (opencodeGo ? "OpenCode Go" : "OpenCode Console") + (opencodePlan.instance ? ` · ${opencodePlan.instance}` : "");
                 entry.planType = opencodeGo ? "Go subscription" : "Pay as you go";
+                if (opencodeGo) {
+                    delete entry.memberBudget;
+                    delete entry.memberBudgetText;
+                    if (entry.usedPercent == null) entry.quotaStatus = 'unavailable';
+                    else if (!entry.updatedAt || Date.now() - entry.updatedAt > 300_000) entry.quotaStatus = 'stale';
+                    else delete entry.quotaStatus;
+                } else {
                 entry.usedPercent = null;
                 entry.resetsAt = null;
                 entry.windows = undefined;
@@ -109,7 +115,9 @@ export default async function (
                     && (budget.limitUsd === null || Number.isFinite(budget.limitUsd) && budget.limitUsd >= 0);
                 entry.memberBudget = valid ? { available: true, spentUsd: budget.spentUsd, limitUsd: budget.limitUsd,
                     ...(Number.isFinite(budget.resetsAt) && budget.resetsAt > 0 ? { resetsAt: budget.resetsAt } : {}) } : { available: false };
-                entry.memberBudgetText = opencodeGo ? "Go quota unavailable" : valid ? `Monthly member budget $${budget.spentUsd.toFixed(2)} / ${budget.limitUsd === null ? "unlimited" : `$${budget.limitUsd.toFixed(2)}`}` : "Monthly member budget unavailable";
+                entry.memberBudgetText = valid ? `Monthly member budget $${budget.spentUsd.toFixed(2)} / ${budget.limitUsd === null ? "unlimited" : `$${budget.limitUsd.toFixed(2)}`}` : "Monthly member budget unavailable";
+                }
+                if (opencodePlan.instance && entry.account === 'default') entry.account = `ssh.${opencodePlan.instance}.default`;
             }
             if (entry.provider === "zai-coding" || entry.provider === "minimax-coding") {
                 const egress = entry.provider === "minimax-coding" ? minimaxPlan.instance : zaiPlan.instance;
@@ -128,7 +136,7 @@ export default async function (
             // Registry-backed SSH accounts keep an ssh/<instance> model route.
             // Plan providers only borrowed the instance identity above, so their
             // models still live under the plain <provider>: catalogue.
-            const isPlanEgress = entry.provider === "zai-coding" || entry.provider === "minimax-coding";
+            const isPlanEgress = entry.provider === "zai-coding" || entry.provider === "minimax-coding" || entry.provider === 'opencode';
             if (entry.account.startsWith("ssh.") && !isPlanEgress) {
                 const identity = /^ssh\.(.+)\.([^.]+)$/.exec(entry.account);
                 const prefix = identity ? `ssh/${identity[1]}:${entry.provider}/${identity[2]}:` : "";

@@ -26,7 +26,7 @@ export default function (
             model?: string;
             /** Available catalogue model IDs for this provider/account; the full list lives on /llms, not in the hover card. */
             models?: string[];
-            /** Short (5h) and long (weekly) windows; Z.ai renders these as concentric rings. */
+            /** Measured 5h, weekly and optional monthly quota windows, rendered as concentric rings. */
             windows?: types.llm.UsageSnapshot["windows"];
             /** Hyper node name for remote credentials; omitted for local credentials. */
             node?: string;
@@ -67,10 +67,8 @@ export default function (
         groups.get(key)!.entries.push(entry);
     }
     const ring = (entry: typeof entries[number]) => {
-        if (entry.provider === "opencode") {
-            const go = entry.planType === "Go subscription";
-            const text = go ? "Go quota unavailable" : entry.memberBudgetText ?? "Monthly member budget unavailable";
-            if (go) return `<a href="https://opencode.ai/console" target="_blank" rel="noopener noreferrer" data-go-quota="unavailable" class="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-2xs hover:bg-base-300" aria-label="${esc(`${entry.label} · ${text} · Console Go`)}"><span aria-hidden="true">${ctx.fns.ui.modelLogo({ model: "opencode:", bare: true, compact: true })}</span><span>OpenCode Go · ${esc(text)} · Console Go</span></a>`;
+        if (entry.provider === "opencode" && entry.planType !== "Go subscription") {
+            const text = entry.memberBudgetText ?? "Monthly member budget unavailable";
             return `<a href="/llms" data-member-budget="opencode" class="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-2xs hover:bg-base-300" aria-label="${esc(`${entry.label} · ${text}`)}"><span aria-hidden="true">${ctx.fns.ui.modelLogo({ model: "opencode:", bare: true, compact: true })}</span><span>${esc(text)}</span></a>`;
         }
         const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];
@@ -92,7 +90,9 @@ export default function (
         const freshWindow = (window?: types.llm.UsageWindow) => window && Number.isFinite(window.usedPercent) && (!window.resetsAt || window.resetsAt > now) ? window : undefined;
         const short = unavailable ? undefined : freshWindow(entry.windows?.primary);
         const weekly = unavailable ? undefined : freshWindow(entry.windows?.secondary);
-        const dual = Boolean(entry.windows?.secondary) || entry.provider === "zai-coding" || entry.provider === "minimax-coding";
+        const monthly = unavailable ? undefined : freshWindow(entry.windows?.tertiary);
+        const triple = Boolean(entry.windows?.tertiary);
+        const dual = triple || Boolean(entry.windows?.secondary) || entry.provider === "zai-coding" || entry.provider === "minimax-coding";
         const quotaCircle = (radius: number, window: types.llm.UsageWindow | undefined, label: string) => {
             const length = 2 * Math.PI * radius;
             const percent = window ? Math.max(0, Math.min(100, window.usedPercent)) : null;
@@ -100,7 +100,7 @@ export default function (
             const tone = parked ? "text-error" : muted ? "text-faint" : toneClass(percent, thresholds);
             return `<g data-quota-window="${label}" class="${tone}"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.18"></circle>${percent == null ? "" : `<circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="${(length*percent/100).toFixed(2)} ${length.toFixed(2)}"></circle>`}</g>`;
         };
-        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${quotaCircle(12,weekly,"weekly")}${quotaCircle(9,short,"5h")}</svg>` : "";
+        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${triple ? quotaCircle(12,monthly,"monthly") : ""}${quotaCircle(triple ? 9 : 12,weekly,"weekly")}${quotaCircle(triple ? 6 : 9,short,"5h")}</svg>` : "";
 
         // The hover card keeps only what the eye came for — the name, the
         // limits and the reset moment. The model catalogue lives one click
@@ -124,6 +124,7 @@ export default function (
             : dual
                 ? [tipRow("5h", short?.usedPercent ?? null, short?.resetsAt ?? null), tipRow("Weekly", weekly?.usedPercent ?? null, weekly?.resetsAt ?? null)]
                 : [tipRow("Quota", known ? percent : null, entry.resetsAt)];
+        if (!unavailable && triple) rows.push(tipRow("Monthly", monthly?.usedPercent ?? null, monthly?.resetsAt ?? null));
         if (parked) rows.push({ tone: "text-error", text: `${entry.parkedAgents} agent(s) parked`, html: `<span class="quota-tip-row text-error"><i class="ph ph-pause" aria-hidden="true"></i><span>${entry.parkedAgents} agent(s) parked</span></span>` });
         const head = `${entry.label}${entry.planType ? ` · ${entry.planType}` : ""}`;
         const machine = entry.node ? `Hyper node ${entry.node}` : ssh ? `SSH ${ssh}` : null;

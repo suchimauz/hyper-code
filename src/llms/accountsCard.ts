@@ -39,7 +39,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const remote = route ? [route[1], route[2]] : null;
         const pending = remote ? [...(ctx.state.sshAccount?.flows?.values() ?? [])].find(flow => flow.instance === remote[0] && flow.account === remote[1] && flow.provider === a.provider && flow.status === "pending") : undefined;
         const used = a.usedPercent;
-        const quota = a.provider === "opencode" && a.planType === "Go subscription" ? "Go quota unavailable" : !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
+        const quota = !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
         // The same thresholds as the rings and the mobile strip, so one account
         // never looks yellow on the page and green in the dock.
         const warnAt = a.thresholds?.warnAt ?? 30;
@@ -61,8 +61,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
             const resets = w.resetsAt ? ` · ${humanDelay(w.resetsAt - now)}` : "";
             return { role: `quota-${label}`, text: `${label} ${pct}%${resets}`, class: `shrink-0 text-2xs font-mono ${tone}` };
         };
-        const dual = (a.provider === "zai-coding" || a.provider === "minimax-coding") && (a.windows?.primary || a.windows?.secondary)
-            ? [a.windows?.primary ? windowCell("5h", a.windows.primary) : null, a.windows?.secondary ? windowCell("weekly", a.windows.secondary) : null].filter(Boolean) as Array<{ role: string; text: string; class: string }>
+        const dual = (a.provider === "zai-coding" || a.provider === "minimax-coding" || (a.provider === 'opencode' && a.planType === 'Go subscription')) && (a.windows?.primary || a.windows?.secondary || a.windows?.tertiary)
+            ? [a.windows?.primary ? windowCell("5h", a.windows.primary) : null, a.windows?.secondary ? windowCell("weekly", a.windows.secondary) : null, a.windows?.tertiary ? windowCell('monthly', a.windows.tertiary) : null].filter(Boolean) as Array<{ role: string; text: string; class: string }>
             : null;
         const actions = `<span class="llm-account-actions flex flex-wrap items-center gap-1">${reset}${reconnect}${remove(a)}</span>`;
         return ctx.fns.procs.ui.row({ entity: "llm-account", id: `${a.provider}/${a.account}`, status: a.needsReconnect ? "error" : status, cells: [

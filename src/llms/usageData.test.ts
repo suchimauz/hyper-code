@@ -196,8 +196,29 @@ test('Go subscription never inherits cached PAYG member budgets on either usage 
  for(const includeConnected of [false,true]) {
   const {entries}=await usageData(ctx,null,{includeConnected});
   const entry=entries.find((e:any)=>e.provider==='opencode')!;
-  expect(entry).toMatchObject({label:'OpenCode Go · go-edge',planType:'Go subscription',memberBudgetText:'Go quota unavailable',memberBudget:{available:false},usedPercent:null,resetsAt:null,quotaStatus:'unavailable'});
+  expect(entry).toMatchObject({label:'OpenCode Go · go-edge',account:'ssh.go-edge.default',planType:'Go subscription',usedPercent:null,resetsAt:null,quotaStatus:'unavailable'});
+  expect(entry.memberBudget).toBeUndefined();
+  expect(entry.memberBudgetText).toBeUndefined();
   expect(JSON.stringify(entry)).not.toContain('unlimited');
   expect(JSON.stringify(entry)).not.toContain('spentUsd');
  }
+});
+
+test('Go preserves all measured windows and normal quota tone on both surfaces',async()=>{
+ const {ctx}=setup();const now=Date.now();
+ const account={provider:'opencode',account:'default',label:'OpenCode Go',model:'opencode:',planType:'Go subscription',parkedAgents:0,available:true};
+ const windows={primary:{usedPercent:2,windowMinutes:300,resetsAt:now+10000},secondary:{usedPercent:30,windowMinutes:10080,resetsAt:now+20000},tertiary:{usedPercent:80,windowMinutes:43200,resetsAt:now+30000}};
+ ctx.fns.settings={get:async({key}:any)=>key==='opencodeApiKey'?'secret://test/key':key==='opencodePlan'?'go':null};
+ ctx.fns.llm.usageOverview=async()=>[{...account,windows,usedPercent:80,resetsAt:now+30000,updatedAt:now,tone:'error'}];
+ ctx.fns.llm.listAccounts=async()=>[account];ctx.fns.llm.listModels=async()=>({opencode:['opencode:glm']});
+ ctx.fns.llm.codingInstance=async()=>({instance:'edge'});
+ let budgets=0;ctx.fns.llm.opencodeUsage=async()=>{budgets++;return {available:true,spentUsd:99};};
+ for(const includeConnected of [false,true]){
+  const row=(await usageData(ctx,null,{includeConnected})).entries.find((e:any)=>e.provider==='opencode')!;
+  expect(row).toMatchObject({usedPercent:80,resetsAt:now+30000,tone:'error',windows,models:['opencode:glm'],account:'ssh.edge.default'});
+  expect(row.quotaStatus).toBeUndefined();expect(row.memberBudget).toBeUndefined();
+ }
+ expect(budgets).toBe(0);
+ ctx.fns.llm.usageOverview=async()=>[{...account,windows,usedPercent:80,updatedAt:now-301000,tone:'error'}];
+ expect((await usageData(ctx,null,{})).entries.find((e:any)=>e.provider==='opencode')!.quotaStatus).toBe('stale');
 });

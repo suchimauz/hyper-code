@@ -25,3 +25,19 @@ test('dual rings support any provider and use per-window configured thresholds',
  const partial=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:100,resetsAt:now-1},secondary:{usedPercent:20,resetsAt:now+10000}}}],now});
  expect(partial).toContain('quota-tip-name">5h</span><span>no data</span>');expect(partial).toContain('quota-tip-name">Weekly</span><span>20% used</span>');
 });
+
+test('Go uses measured subscription rings including monthly instead of the PAYG budget',()=>{
+ const now=Date.now(), resetsAt=now+86400000;
+ const entry={...base,provider:'opencode',planType:'Go subscription',memberBudgetText:'PAYG $10',usedPercent:85,resetsAt,windows:{primary:{usedPercent:20,resetsAt},secondary:{usedPercent:40,resetsAt},tertiary:{usedPercent:85,resetsAt}}};
+ const html=dial(ctx,null,{entries:[entry],now});
+ expect(html).toContain('data-quota-window="monthly" class="text-error"');
+ expect(html).toContain('Monthly</span><span>85% used');
+ expect(html).toContain('5h</span><span>20% used');
+ expect(html).not.toContain('PAYG $10');expect(html).not.toContain('Go quota unavailable');
+ const stale=dial(ctx,null,{entries:[{...entry,quotaStatus:'stale'}],now});
+ expect(stale).toContain('85% used (last known)');
+ const unavailable=dial(ctx,null,{entries:[{...entry,quotaStatus:'unavailable'}],now});
+ expect(unavailable).toContain('quota unavailable — usage unknown');expect(unavailable).not.toContain('85% used');
+ const payg=dial(ctx,null,{entries:[{...entry,planType:null}],now});
+ expect(payg).toContain('data-member-budget="opencode"');expect(payg).toContain('PAYG $10');expect(payg).not.toContain('data-quota-window');
+});

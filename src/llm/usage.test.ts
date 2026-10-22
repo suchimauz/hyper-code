@@ -101,6 +101,42 @@ describe("llm.recordUsage", () => {
 });
 
 describe("llm.usageOverview", () => {
+    test("monthly quota dominates weekly and disappears after expiry", async () => {
+        const ctx: any = await mkTestCtx();
+        const monthlyReset = NOW + 86_400_000;
+        const snapshot = await ctx.fns.llm.recordUsage({
+            provider: "zai-coding",
+            rateLimits: {
+                primary: { used_percent: 10, window_minutes: 300, resets_at: (NOW + 3_600_000) / 1000 },
+                secondary: { used_percent: 40, window_minutes: 10080, resets_at: (NOW + 5 * 86_400_000) / 1000 },
+                tertiary: { used_percent: 92, window_minutes: 43200, resets_at: monthlyReset / 1000 },
+            },
+            now: NOW,
+        });
+        expect(snapshot.windows.tertiary).toEqual({ usedPercent: 92, windowMinutes: 43200, resetsAt: monthlyReset });
+        const [entry] = await ctx.fns.llm.usageOverview({ now: NOW });
+        expect(entry.usedPercent).toBe(92);
+        expect(entry.resetsAt).toBe(monthlyReset);
+        expect(entry.tone).toBe("error");
+        expect(entry.windows.tertiary).toEqual(snapshot.windows.tertiary);
+        const [expired] = await ctx.fns.llm.usageOverview({ now: monthlyReset });
+        expect(expired.windows.tertiary).toBeUndefined();
+        expect(expired.usedPercent).toBe(40);
+        expect(expired.resetsAt).toBe(NOW + 5 * 86_400_000);
+    });
+
+    test("a tertiary-only snapshot is recorded and becomes neutral when expired", async () => {
+        const ctx: any = await mkTestCtx();
+        const snapshot = await ctx.fns.llm.recordUsage({
+            provider: "zai-coding", rateLimits: { tertiary: { used_percent: 62, window_minutes: 43200, resets_at: (NOW + 1000) / 1000 } }, now: NOW,
+        });
+        expect(snapshot.windows.tertiary.usedPercent).toBe(62);
+        const [expired] = await ctx.fns.llm.usageOverview({ now: NOW + 1000 });
+        expect(expired.usedPercent).toBeNull();
+        expect(expired.tone).toBe("neutral");
+        expect(expired.windows.tertiary).toBeUndefined();
+    });
+
     test("reports the worst window, not the flattering one", async () => {
         const ctx: any = await mkTestCtx();
         await ctx.fns.llm.recordUsage({

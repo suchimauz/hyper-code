@@ -80,3 +80,38 @@ test("the account card names the weekly and the 5h limit separately", async () =
     expect(text).toContain("Недельный лимит");
     expect(text).toContain("Лимит за 5 часов");
 });
+
+test('Go uses all three quota windows, including monthly, without PAYG text', async () => {
+    const resetsAt = Date.now() + 86400000;
+    const go = { ...dualRow, provider: 'opencode', label: 'OpenCode Go', planType: 'Go subscription', memberBudgetText: 'PAYG $10', usedPercent: 85,
+        windows: { primary: { usedPercent: 20, resetsAt }, secondary: { usedPercent: 40, resetsAt }, tertiary: { usedPercent: 85, resetsAt } } };
+    const w = await mount([go]);
+    const chip = w.document.querySelector('[data-usage-chip]')!;
+    expect(chip.getAttribute('data-tone')).toBe('error');
+    expect(chip.getAttribute('aria-label')).toContain('месячный 15%');
+    expect(chip.querySelector('[data-quota-window="monthly"][data-usage-fill]')?.getAttribute('r')).toBe('12');
+    expect(chip.querySelector('[data-quota-window="weekly"][data-usage-fill]')?.getAttribute('r')).toBe('9');
+    expect(chip.querySelector('[data-quota-window="5h"][data-usage-fill]')?.getAttribute('r')).toBe('6');
+    (w.document.querySelector('[data-mobile-usage-open]') as any).click();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    const text = w.document.body.textContent ?? '';
+    expect(text).toContain('Месячный лимит: осталось 15%');
+    expect(text).toContain('Недельный лимит: осталось 60%');
+    expect(text).toContain('Лимит за 5 часов: осталось 80%');
+    expect(text).not.toContain('Go quota unavailable');expect(text).not.toContain('PAYG $10');
+});
+
+test('Go unavailable stays unknown and PAYG keeps its monetary branch', async () => {
+    const w = await mount([{ ...dualRow, provider: 'opencode', planType: 'Go subscription', quotaStatus: 'unavailable' }]);
+    expect(w.document.querySelector('[data-usage-fill]')).toBeNull();
+    (w.document.querySelector('[data-mobile-usage-open]') as any).click();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(w.document.body.textContent).toContain('Лимит неизвестен');
+    expect(w.document.body.textContent).not.toContain('Недельный лимит: осталось');
+    const payg = await mount([{ ...dualRow, provider: 'opencode', planType: null, memberBudgetText: 'PAYG $10' }]);
+    expect(payg.document.querySelector('[data-usage-fill]')).toBeNull();
+    (payg.document.querySelector('[data-mobile-usage-open]') as any).click();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(payg.document.body.textContent).toContain('PAYG $10');
+    expect(payg.document.body.textContent).toContain('Console billing');
+});

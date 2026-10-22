@@ -59,3 +59,10 @@ test('Go inventory follows explicit plan without claiming a measured allowance',
  const rows=await listAccounts(ctx,null,{provider:'opencode'});
  expect(rows[0]).toMatchObject({label:'OpenCode Go',planType:'Go subscription',usedPercent:null,windows:null,resetsAt:null});
 });
+
+test('Go inventory retains measured monthly worst window and exhaustion',async()=>{
+ const ctx=fixture(false);ctx.fns.settings.get=async({key}:any)=>key==='opencodeApiKey'?'secret://test/opencode':key==='opencodePlan'?'go':null;
+ const windows={tertiary:{usedPercent:100,windowMinutes:43200,resetsAt:Date.now()+100000}};
+ ctx.fns.llm.usageOverview=async()=>[{provider:'opencode',account:'default',usedPercent:100,resetsAt:windows.tertiary.resetsAt,windows,planType:'Go subscription',parkedAgents:0}];
+ expect((await listAccounts(ctx,null,{provider:'opencode'}))[0]).toMatchObject({usedPercent:100,available:false,windows});
+});

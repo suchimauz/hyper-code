@@ -8,10 +8,12 @@ export type UsageSnapshot = {
     provider: string;
     /** Credential account within the provider, "default" when unnamed. */
     account: string;
-    /** Rolling windows: primary is the short one (5h), secondary the long one (7d). */
+    /** Provider quota windows: primary is short (5h), secondary weekly, tertiary monthly when reported. */
     windows: {
         primary?: types.llm.UsageWindow;
         secondary?: types.llm.UsageWindow;
+        /** Optional monthly quota, using the provider's nominal window length. */
+        tertiary?: types.llm.UsageWindow;
     };
     /** Subscription plan reported by the provider, e.g. "prolite". */
     planType?: string | null;

@@ -35,7 +35,7 @@ export default async function (
     available: boolean;
     usedPercent: number | null;
     resetsAt: number | null;
-    /** Both rolling quota windows when the provider reports them (5h/weekly coding plans); null otherwise. */
+    /** Measured quota windows, including a monthly tertiary window when reported. */
     windows: types.llm.UsageSnapshot["windows"] | null;
     planType: string | null;
     resetCredits: types.llm.UsageSnapshot["resetCredits"];
@@ -141,11 +141,15 @@ export default async function (
             const go = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "opencodePlan" }) === "go";
             item.label = go ? "OpenCode Go" : "OpenCode Console";
             item.planType = go ? "Go subscription" : "Pay as you go";
-            item.usedPercent = null;
-            item.resetsAt = null;
-            item.windows = null;
+            if (!go) {
+                item.usedPercent = null;
+                item.resetsAt = null;
+                item.windows = null;
+                item.available = !item.needsReconnect;
+            }
             item.resetCredits = null;
-            item.available = !item.needsReconnect;
+            const {instance} = ctx.fns.llm.codingInstance ? await ctx.fns.llm.codingInstance({provider:'opencode'}) : {instance:null};
+            if (instance) { item.source = 'ssh'; item.sshInstance = instance; item.label = `SSH · ${instance} · ${go ? 'OpenCode Go' : 'OpenCode Console'}`; }
             out.push(item);
         }
     }

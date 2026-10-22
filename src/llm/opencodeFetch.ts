@@ -4,12 +4,12 @@
  * Enforce exact documented endpoints, reject redirects, and keep Go subscription
  * traffic separate from pay-as-you-go. Credentials travel only to opencode.ai,
  * locally or through a pinned SSH bridge. Never impersonates an official client.
- * @param opts.url Exact documented inference, catalogue or read-only member-budget URL.
+ * @param opts.url Exact allowed inference, catalogue, Go usage or read-only member-budget URL.
  * @param opts.init HTTP method, JSON payload and cancellation signal.
  * @param opts.sessionId Stable conversation identifier; forwarded as x-opencode-session. Omit for a standalone request.
  */
 export default async function (ctx: Context, session: Session | null, opts: {
-    /** Exact documented inference, catalogue or read-only member-budget URL. */
+    /** Exact allowed inference, catalogue, Go usage or read-only member-budget URL. */
     url: string;
     /** HTTP method, JSON payload and cancellation signal. */
     init: RequestInit;
@@ -21,7 +21,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
     const plan = await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodePlan'}) === 'go' ? 'go' : 'payg';
     const isGo = url.pathname.startsWith('/inference/go/');
     const path = isGo ? url.pathname.replace('/inference/go/', '/inference/') : url.pathname;
-    const read = ['/inference/v1/models','/console/api/v1/budgets/members'].includes(path);
+    const read = ['/inference/v1/models','/console/api/v1/budgets/members'].includes(path) || (isGo && path === '/inference/v1/usage');
     const post = ['/inference/openai/v1/chat/completions','/inference/openai/v1/responses','/inference/anthropic/v1/messages'].includes(path);
     const gemini = /^\/inference\/google\/v1beta\/models\/([A-Za-z0-9][A-Za-z0-9._-]{0,127}):(generateContent|streamGenerateContent)$/.exec(path);
     const queryOk = !url.search || (gemini?.[2] === 'streamGenerateContent' && url.search === '?alt=sse');

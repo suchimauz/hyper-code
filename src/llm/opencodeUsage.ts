@@ -13,7 +13,7 @@ export default async function (
     },
 ): Promise<{available:boolean;spentUsd?:number;limitUsd?:number|null;resetsAt?:number;reason?:string}> {
     const plan = await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodePlan'}) ?? 'payg';
-    if (plan === 'go') return {available:false,reason:'Go subscription quota is available in Console; no documented quota API'};
+    if (plan === 'go') return {available:false,reason:'Go quota is separate from member budgets; use llm.opencodeGoUsage'};
     try {
     const res=await ctx.fns.llm.opencodeFetch({url:'https://opencode.ai/console/api/v1/budgets/members',init:{method:'GET',signal:AbortSignal.timeout(Math.max(500,Math.min(30000,opts.timeoutMs ?? 8000)))}});
     if(!res.ok) return {available:false,reason:'Member budget unavailable (HTTP '+res.status+')'};

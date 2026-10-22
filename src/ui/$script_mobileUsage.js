@@ -9,6 +9,7 @@
   const el = (tag, text, cls) => { const node = document.createElement(tag); if (text) node.textContent = text; if (cls) node.className = cls; return node; };
   const providers = { codex: 'Codex', 'claude-code': 'Claude Code', anthropic: 'Anthropic', 'anthropic-oauth': 'Claude', openai: 'OpenAI', oneapi: 'Asoft LLM Gate', 'zai-coding': 'Z.ai', 'minimax-coding': 'MiniMax' };
   const provider = row => providers[row.provider] || row.provider;
+  const payg = row => row.provider === 'opencode' && row.planType !== 'Go subscription';
   const sshInstance = row => (row.node ? null : (/^ssh\.(.+)\.[^.]+$/.exec(row.account) || [])[1] || null);
   const identity = row => JSON.stringify([row.node || '', sshInstance(row) || '', row.provider, row.account]);
   const name = row => row.node ? row.node + ' · ' + row.account : sshInstance(row) ? sshInstance(row) + ' · ' + provider(row) : row.account === 'default' ? provider(row) : row.account;
@@ -24,7 +25,8 @@
   const windows = row => {
     const short = freshWindow(row, row.windows && row.windows.primary);
     const weekly = freshWindow(row, row.windows && row.windows.secondary);
-    return { short, weekly, dual: Boolean(row.windows && row.windows.secondary) || row.provider === 'zai-coding' || row.provider === 'minimax-coding' };
+    const monthly = freshWindow(row, row.windows && row.windows.tertiary);
+    return { short, weekly, monthly, triple: Boolean(row.windows && row.windows.tertiary), dual: Boolean(row.windows && (row.windows.secondary || row.windows.tertiary)) || row.provider === 'zai-coding' || row.provider === 'minimax-coding' };
   };
   // Shared thresholds arrive from the server; missing quota is never green.
   // Four steps, so the ring heats up instead of staying green until the quota
@@ -83,7 +85,7 @@
       const win = windows(row);
       // The ring colour follows the fill of the window it draws, so a nearly
       // spent plan reads the same on the phone as on the desktop dock.
-      const worst = Math.max(win.short ? win.short.usedPercent : 0, win.weekly ? win.weekly.usedPercent : 0, measured ? row.usedPercent : 0);
+      const worst = Math.max(win.short ? win.short.usedPercent : 0, win.weekly ? win.weekly.usedPercent : 0, win.monthly ? win.monthly.usedPercent : 0, measured ? row.usedPercent : 0);
       chip.dataset.tone = row.parkedAgents ? 'error' : outdated || !measured ? 'neutral' : fillTone(worst, row);
       chip.style.color = toneColour(chip.dataset.tone);
       chip.dataset.quotaState = outdated ? 'stale' : measured ? 'known' : 'unknown';
@@ -98,8 +100,8 @@
       const track = (radius, label) => '<circle data-quota-window="' + label + '" class="mobile-usage-ring-track-line" cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".18"/>';
       // Two measured windows: the weekly one outside, the short one inside —
       // the same arrangement as the desktop dock.
-      const rings = row.provider === 'opencode' ? '' : win.dual
-        ? track(12, 'weekly') + circle(12, win.weekly?.usedPercent, 'weekly') + track(9, '5h') + circle(9, win.short?.usedPercent, '5h')
+      const rings = payg(row) ? '' : win.dual
+        ? (win.triple ? track(12, 'monthly') + circle(12, win.monthly?.usedPercent, 'monthly') : '') + track(win.triple ? 9 : 12, 'weekly') + circle(win.triple ? 9 : 12, win.weekly?.usedPercent, 'weekly') + track(win.triple ? 6 : 9, '5h') + circle(win.triple ? 6 : 9, win.short?.usedPercent, '5h')
         : (measured ? track(12, 'quota') + circle(12, row.usedPercent, 'quota') : track(12, 'quota'));
       // Same 28px spent-quota ring as desktop, with no account name or percentage beside it.
       ring.innerHTML = '<svg viewBox="0 0 28 28" class="mobile-usage-ring-track">' + rings + '</svg>';
@@ -110,10 +112,10 @@
       if (row.gateway) { const dot = el('span', '', 'mobile-usage-gateway'); dot.dataset.status = row.status; ring.append(dot); }
       chip.append(ring);
       const winTitle = win.dual
-        ? ' · недельный ' + (win.weekly ? Math.max(0, 100 - win.weekly.usedPercent) + '%' : 'неизвестен') + ' · 5 ч ' + (win.short ? Math.max(0, 100 - win.short.usedPercent) + '%' : 'неизвестен')
+        ? ' · недельный ' + (win.weekly ? Math.max(0, 100 - win.weekly.usedPercent) + '%' : 'неизвестен') + ' · 5 ч ' + (win.short ? Math.max(0, 100 - win.short.usedPercent) + '%' : 'неизвестен') + (win.triple ? ' · месячный ' + (win.monthly ? Math.max(0, 100 - win.monthly.usedPercent) + '%' : 'неизвестен') : '')
         : '';
       chip.title = (row.label || name(row)) + ' · ' + (measured ? (outdated ? 'последний известный остаток ' : 'остаток ') + amount(row) : 'лимит неизвестен') + winTitle;
-      if (row.provider === 'opencode') chip.title = (row.label || name(row)) + ' · ' + (row.planType === 'Go subscription' ? 'Go quota unavailable' : row.memberBudgetText || 'Monthly member budget unavailable; prepaid balance unavailable');
+      if (payg(row)) chip.title = (row.label || name(row)) + ' · ' + (row.memberBudgetText || 'Monthly member budget unavailable; prepaid balance unavailable');
       if (row.needsReconnect) chip.title += ' · требуется повторное подключение';
       chip.setAttribute('role', 'img'); chip.setAttribute('aria-label', chip.title); box.append(chip);
     }
@@ -135,27 +137,23 @@
     if (row.gateway) {
       status = row.reason === 'missing-key' ? 'Не задан API-ключ' : row.status === 'available' ? 'Каталог API доступен' : row.status === 'unavailable' ? 'API недоступен' : 'Состояние API неизвестно';
       section.append(el('p', status, 'mobile-usage-amount'), el('p', 'Лимиты неизвестны. Доступность каталога не подтверждает возможность генерации.', 'mobile-usage-meta'));
-    } else if (row.provider === 'opencode') {
-      const go = row.planType === 'Go subscription';
-      section.append(el('p', go ? 'Go quota unavailable' : row.memberBudgetText || 'Monthly member budget unavailable', 'mobile-usage-amount'));
-      section.append(el('p', go ? 'Квота подписки Go недоступна через API. Бюджет PAYG не является лимитом Go.' : 'Это месячный бюджет участника, не кредитный баланс. Общий баланс API не сообщает.', 'mobile-usage-meta'));
-      const consoleLink = el('a', go ? 'Console Go' : 'Console billing', 'mobile-usage-meta');
+    } else if (payg(row)) {
+      section.append(el('p', row.memberBudgetText || 'Monthly member budget unavailable', 'mobile-usage-amount'));
+      section.append(el('p', 'Это месячный бюджет участника, не кредитный баланс. Общий баланс API не сообщает.', 'mobile-usage-meta'));
+      const consoleLink = el('a', 'Console billing', 'mobile-usage-meta');
       consoleLink.href = 'https://opencode.ai/console'; consoleLink.target = '_blank'; consoleLink.rel = 'noopener noreferrer'; section.append(consoleLink);
-      if (!go && row.memberBudget?.resetsAt) section.append(el('p', 'Сброс бюджета: ' + new Date(row.memberBudget.resetsAt).toLocaleString('ru-RU'), 'mobile-usage-meta'));
+      if (row.memberBudget?.resetsAt) section.append(el('p', 'Сброс бюджета: ' + new Date(row.memberBudget.resetsAt).toLocaleString('ru-RU'), 'mobile-usage-meta'));
     } else {
       const win = windows(row);
       status = row.quotaStatus === 'unavailable' || !known(row) ? 'Лимит неизвестен' : stale(row) ? 'Последний известный остаток: ' + left(row) + '%' : 'Осталось ' + left(row) + '%';
       section.append(el('p', status, 'mobile-usage-amount'));
-      // Both measured windows are listed, the weekly one first, so the phone
-      // shows the same two limits the desktop dock draws as two rings.
-      if (win.short && win.weekly) {
-        const weekly = el('p', 'Недельный лимит: осталось ' + Math.max(0, 100 - win.weekly.usedPercent) + '%', 'mobile-usage-amount');
-        weekly.dataset.tone = fillTone(win.weekly.usedPercent, row);
-        const short = el('p', 'Лимит за 5 часов: осталось ' + Math.max(0, 100 - win.short.usedPercent) + '%', 'mobile-usage-amount');
-        short.dataset.tone = fillTone(win.short.usedPercent, row);
-        section.append(weekly, short);
-        if (win.weekly.resetsAt) section.append(el('p', 'Недельный лимит восстановится через ' + delayOf(win.weekly.resetsAt), 'mobile-usage-meta'));
-        if (win.short.resetsAt) section.append(el('p', 'Лимит за 5 часов восстановится через ' + delayOf(win.short.resetsAt), 'mobile-usage-meta'));
+      // Each reported window is listed independently, including partial snapshots.
+      if (row.quotaStatus !== 'unavailable') for (const [window, label] of [[win.short, 'Лимит за 5 часов'], [win.weekly, 'Недельный лимит'], [win.monthly, 'Месячный лимит']]) {
+        if (!window) continue;
+        const value = el('p', label + ': осталось ' + Math.max(0, 100 - window.usedPercent) + '%', 'mobile-usage-amount');
+        value.dataset.tone = stale(row) ? 'neutral' : fillTone(window.usedPercent, row);
+        section.append(value);
+        if (window.resetsAt) section.append(el('p', label + ' восстановится через ' + delayOf(window.resetsAt), 'mobile-usage-meta'));
       }
       if (row.needsReconnect) section.append(el('p', 'Требуется повторное подключение аккаунта.', 'mobile-usage-meta'));
       if (known(row) && row.quotaStatus !== 'unavailable') {

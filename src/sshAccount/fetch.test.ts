@@ -148,6 +148,21 @@ for auth in [None,'','Bearer STDIN_SECRET']:
  run(go+'v1/models','GET',None,True,auth=auth)
 run(go+'v1/models','POST')
 run(go+'v1/models','GET','{}')
+# Authenticated read-only Go usage is not shared with the PAYG route.
+usage=go+'v1/usage'
+run(usage,'GET',None,True)
+for auth in [None,'','   ']:run(usage,'GET',None,auth=auth)
+for method in ['POST','PUT','DELETE','HEAD','get','']:
+ run(usage,method,None)
+run(usage,'GET','{}')
+run(usage,'GET','')
+for suffix in ['?','?a=b','?alt=sse','#','#fragment','/','/extra']:
+ run(usage+suffix,'GET',None)
+for path in ['/inference/v1/usage','/inference/go/go/v1/usage','/inference/go/v1/%75sage','/inference/go/v1/../v1/usage']:
+ run(base+path,'GET',None)
+for origin in ['http://opencode.ai','https://opencode.ai:443','https://opencode.ai.evil','https://user:pass@opencode.ai']:
+ run(origin+'/inference/go/v1/usage','GET',None)
+# Every valid call, including usage, asserts NoRedirect returns None above.
 print('OpenCode bridge security checks passed')
 `;
  const proc=Bun.spawn(['python3','-c',python],{env:{...process.env,BRIDGE_SCRIPT:JSON.stringify(script)},stdout:'pipe',stderr:'pipe'});

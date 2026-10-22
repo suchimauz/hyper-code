@@ -31,7 +31,7 @@ export default async function (
         account?: string;
         /** Response headers to read the quota from. */
         headers?: Headers | Record<string, string> | null;
-        /** Codex rate_limits payload: { primary, secondary } windows. */
+        /** Normalized quota payload with optional primary, secondary and tertiary windows (used_percent, window_minutes, resets_at in epoch seconds). */
         rateLimits?: any;
         /** Record the window as fully spent. @default false */
         spent?: boolean;
@@ -93,7 +93,7 @@ export default async function (
     if (!windows.primary && Number.isFinite(codexPercent)) {
         windows.primary = { usedPercent: clampPercent(codexPercent), windowMinutes: null, resetsAt: null };
     }
-    for (const [key, raw] of [["primary", opts.rateLimits?.primary], ["secondary", opts.rateLimits?.secondary]] as const) {
+    for (const [key, raw] of [["primary", opts.rateLimits?.primary], ["secondary", opts.rateLimits?.secondary], ["tertiary", opts.rateLimits?.tertiary]] as const) {
         if (!raw) continue;
         const used = Number(raw.used_percent);
         if (!Number.isFinite(used)) continue;
@@ -117,12 +117,13 @@ export default async function (
         source = "error";
     }
 
-    if (!windows.primary && !windows.secondary) return null;
+    if (!windows.primary && !windows.secondary && !windows.tertiary) return null;
 
     const key = `llm:usage:${provider}:${account}`;
     const previous = await read(ctx, key);
     const warnedAt = keepWarning(previous, windows, now);
-    const worst = Math.max(windows.primary?.usedPercent ?? 0, windows.secondary?.usedPercent ?? 0);
+    const worstWindow = Object.values(windows).sort((a, b) => b.usedPercent - a.usedPercent)[0];
+    const worst = worstWindow?.usedPercent ?? 0;
     // One warning per window, per credential — not per request. The threshold
     // deliberately sits well before the wall: crossing it is the last moment at
     // which switching model is a choice rather than a reaction.
@@ -153,7 +154,7 @@ export default async function (
         params: [key, JSON.stringify(snapshot), now],
     });
     if (shouldWarn) {
-        const resetsAt = windows.primary?.resetsAt ?? windows.secondary?.resetsAt ?? null;
+        const resetsAt = worstWindow?.resetsAt ?? null;
         await ctx.fns.ui.notify({
             level: "warn",
             message: `${provider}${account === "default" ? "" : `/${account}`}: ${Math.round(worst)}% of quota used`,
@@ -181,7 +182,7 @@ async function read(ctx: Context, key: string): Promise<types.llm.UsageSnapshot 
 function keepWarning(previous: types.llm.UsageSnapshot | null, _windows: types.llm.UsageSnapshot["windows"], now: number): number | null {
     const at = previous?.warnedAt ?? null;
     if (!at) return null;
-    const resets = Math.max(previous?.windows?.primary?.resetsAt ?? 0, previous?.windows?.secondary?.resetsAt ?? 0);
+    const resets = Math.max(previous?.windows?.primary?.resetsAt ?? 0, previous?.windows?.secondary?.resetsAt ?? 0, previous?.windows?.tertiary?.resetsAt ?? 0);
     if (resets && resets < now) return null;
     return at;
 }
