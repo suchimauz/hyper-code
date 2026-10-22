@@ -35,7 +35,7 @@ export default async function (
     const results = await Promise.all(accounts.map(async (item: any) => {
         const provider = String(item.provider);
         const account = String(item.account || "default");
-        if (!["codex", "claude-code", "anthropic-oauth", "xai", "zai-coding", "minimax-coding", "opencode"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
+        if (!["codex", "claude-code", "anthropic-oauth", "xai", "zai-coding", "minimax-coding", "kimi-coding", "opencode"].includes(provider)) return { provider, account, status: "unsupported" as const, error: null };
         if (provider === 'opencode' && await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodePlan'}) !== 'go') return { provider, account, status: 'unsupported' as const, error: null };
         const cacheKey = `llm:usage-refresh:${provider}:${account}`;
         const cached = ((await ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = ?", params: [cacheKey] })) as any[])[0];
@@ -44,9 +44,10 @@ export default async function (
             if (account.startsWith('ssh.')) {
                 const remote = (await ctx.fns.sshAccount.registry({action:'list'})).find(row => row.provider === provider && `ssh.${row.instance}.${row.account}` === account);
                 if (!remote || remote.status !== 'connected') throw new Error('SSH account is not connected');
-                if (remote.provider !== 'codex' && remote.provider !== 'claude-code') throw new Error('SSH usage is unsupported for this provider');
+                if (remote.provider !== 'codex' && remote.provider !== 'claude-code' && remote.provider !== 'kimi-coding') throw new Error('SSH usage is unsupported for this provider');
                 const response = await ctx.fns.sshAccount.fetchUsage({instance:remote.instance,provider:remote.provider,account:remote.account,timeoutMs});
                 if (provider === 'codex') await refreshCodex(ctx, account, timeoutMs, now, response);
+                else if (provider === 'kimi-coding') { const quota = await ctx.fns.llm.kimiCodingUsage({ account, timeoutMs }); await ctx.fns.llm.recordUsage({ provider, account, rateLimits: quota, planType: quota.planType, now }); }
                 else await refreshClaude(ctx, 'claude-code', account, timeoutMs, now, response);
             }
             else if (provider === "codex") await refreshCodex(ctx, account, timeoutMs, now);
@@ -64,6 +65,10 @@ export default async function (
             else if (provider === "minimax-coding") {
                 if (account !== "default") throw new Error("MiniMax M Plan supports only the default account");
                 const quota = await ctx.fns.llm.minimaxCodingUsage({ timeoutMs });
+                await ctx.fns.llm.recordUsage({ provider, account, rateLimits: quota, planType: quota.planType, now });
+            }
+            else if (provider === "kimi-coding") {
+                const quota = await ctx.fns.llm.kimiCodingUsage({ account, timeoutMs });
                 await ctx.fns.llm.recordUsage({ provider, account, rateLimits: quota, planType: quota.planType, now });
             }
             else await refreshClaude(ctx, provider as "claude-code" | "anthropic-oauth", account, timeoutMs, now);

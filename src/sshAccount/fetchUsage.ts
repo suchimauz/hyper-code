@@ -1,7 +1,7 @@
 /**
  * Fetches subscription quota through SSH without exporting remote credentials
  *
- * Use for connected Codex or Claude accounts on a pinned SSH instance. Requests only fixed HTTPS usage endpoints with GET through the remote credential refresh bridge. Buffers at most one MiB and enforces an overall deadline. Returns provider status and body for quota parsers.
+ * Use for connected Codex, Claude or Kimi Coding accounts on a pinned SSH instance. Requests only fixed HTTPS usage endpoints with GET through the remote credential refresh bridge. Buffers at most one MiB and enforces an overall deadline. Returns provider status and body for quota parsers.
  * @param opts.instance Exact registered SSH instance name.
  * @param opts.provider Provider whose remote credentials authorize the request.
  * @param opts.account Exact remote account name, not a synthetic local account ID.
@@ -14,7 +14,7 @@ export default async function (
         /** Exact registered SSH instance name. */
         instance: string;
         /** Provider whose remote credentials authorize the request. */
-        provider: "codex" | "claude-code";
+        provider: "codex" | "claude-code" | "kimi-coding";
         /** Exact remote account name, not a synthetic local account ID. */
         account: string;
         /** Overall deadline including SSH startup, remote refresh and body consumption. @default 5000 @minimum 500 @maximum 30000 */
@@ -23,8 +23,8 @@ export default async function (
 ): Promise<Response> {
     const ms=opts.timeoutMs ?? 5000;
     if (!Number.isFinite(ms) || ms<500 || ms>30000) throw new Error('Usage timeout must be between 500 and 30000 milliseconds');
-    if (!['codex','claude-code'].includes(opts.provider)) throw new Error('Unsupported SSH usage provider');
-    const url=opts.provider==='codex'?'https://chatgpt.com/backend-api/wham/usage':'https://api.anthropic.com/api/oauth/usage';
+    if (!['codex','claude-code','kimi-coding'].includes(opts.provider)) throw new Error('Unsupported SSH usage provider');
+    const url=opts.provider==='codex'?'https://chatgpt.com/backend-api/wham/usage':opts.provider==='kimi-coding'?'https://api.kimi.com/coding/v1/usages':'https://api.anthropic.com/api/oauth/usage';
     const controller=new AbortController();
     let timer:ReturnType<typeof setTimeout>|undefined;
     const work=async()=>{
