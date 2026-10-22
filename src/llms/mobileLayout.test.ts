@@ -16,3 +16,23 @@ test('Connections stacks real account/node fields and gives all mobile actions 4
   }finally{await w.happyDOM.close();}
  }
 });
+
+test('Connections background covers the page scroller and its content cannot flex-shrink to the viewport',async()=>{
+ const css=await Bun.file(new URL('../procs/styles/$style_app.css',import.meta.url)).text();
+ const w=new Window();
+ try{
+  w.document.body.innerHTML='<div id="frame"><section id="page-view"><main id="main"><div class="llm-connections"></div></main></section></div>';
+  const style=w.document.createElement('style');
+  style.textContent=':root { --color-base-200: rgb(240, 240, 240); }'+css.slice(css.indexOf('/* Keep the Connections surface'),css.indexOf('.llm-model-table-wrap'));
+  w.document.head.append(style);
+  const scroller=w.getComputedStyle(w.document.querySelector('#main')!);
+  const page=w.getComputedStyle(w.document.querySelector('.llm-connections')!);
+  expect(scroller.backgroundColor).toBe('rgb(240, 240, 240)');
+  expect(page.flexShrink).toBe('0');expect(page.flexGrow).toBe('1');expect(page.minHeight).toBe('0');
+  const frame=w.getComputedStyle(w.document.querySelector('#page-view')!);
+  expect(frame.minHeight).toBe('0');expect(frame.overflow).toBe('hidden');
+  expect(w.getComputedStyle(w.document.querySelector('#frame')!).overflow).toBe('hidden');
+  w.document.querySelector('.llm-connections')!.remove();
+  expect(w.getComputedStyle(w.document.querySelector('#main')!).backgroundColor).not.toBe('rgb(240, 240, 240)');
+ }finally{await w.happyDOM.close();}
+});

@@ -610,6 +610,12 @@ summary::-webkit-details-marker { display: none; }
 @media (pointer:coarse) { .llm-model-switch { flex-basis:44px; width:44px; height:44px; } }
 @media (prefers-reduced-motion:reduce) { .llm-model-switch-track,.llm-model-switch-track::after { transition:none; } }
 /* Dense, aligned model prices; neutral surfaces and tabular numerals keep the costs scannable. */
+/* Keep the Connections surface continuous through long content and mobile safe-area padding. */
+#frame:has(> #page-view > #main > .llm-connections) { overflow:hidden; }
+#page-view:has(> #main > .llm-connections) { min-height:0; overflow:hidden; }
+#main:has(> .llm-connections) { background:var(--color-base-200); }
+#main > .llm-connections { flex:1 0 auto; min-height:0; }
+
 .llm-model-table-wrap { max-width:100%; overflow-x:auto; border:1px solid var(--ui-border); border-radius:.5rem; }
 .llm-model-table { width:100%; border-collapse:collapse; font-size:.6875rem; line-height:1.35; }
 .llm-model-table caption { padding:.3rem .5rem; text-align:left; color:var(--color-muted); font-size:.625rem; border-bottom:1px solid var(--ui-border); }
