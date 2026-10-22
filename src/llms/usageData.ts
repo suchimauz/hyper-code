@@ -58,7 +58,7 @@ export default async function (
         // A local reference check keeps desktop rendering independent of the
         // full account inventory and provider I/O. Never resolve the key here.
         if (!opts.includeConnected && ctx.fns.settings?.get) {
-            for (const plan of [["zai-coding", "Z.ai Coding Plan", "Coding Plan", "zaiCodingApiKey"], ["minimax-coding", "MiniMax M Plan", "M Plan", "minimaxCodingApiKey"]] as const) {
+            for (const plan of [["zai-coding", "Z.ai", "Coding Plan", "zaiCodingApiKey"], ["minimax-coding", "MiniMax", "M Plan", "minimaxCodingApiKey"]] as const) {
                 const [provider, label, planType, settingKey] = plan;
                 const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: settingKey });
                 const configured = typeof reference === "string" && Boolean(reference.trim());
@@ -77,7 +77,7 @@ export default async function (
         const models = await ctx.fns.llm.listModels({});
         for (const entry of entries) {
             if (entry.provider === "zai-coding" || entry.provider === "minimax-coding") {
-                entry.label = entry.provider === "minimax-coding" ? "MiniMax M Plan" : "Z.ai Coding Plan";
+                entry.label = entry.provider === "minimax-coding" ? "MiniMax" : "Z.ai";
                 if (entry.usedPercent == null) entry.quotaStatus = "unavailable";
                 else if (!entry.updatedAt || Date.now() - entry.updatedAt > 300_000) entry.quotaStatus = "stale";
             }

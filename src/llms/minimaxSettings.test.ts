@@ -19,7 +19,7 @@ const ctx: any = { fns: {
     llms: { minimaxSettings: (o: any) => minimaxSettings(ctx, null, o) },
 } };
 
-const minimaxAccount = { provider: "minimax-coding", account: "default", label: "MiniMax M Plan", model: "minimax-coding:", source: "file" as const, available: true, usedPercent: 12, planType: "M Plan", resetsAt: null, parkedAgents: 0 };
+const minimaxAccount = { provider: "minimax-coding", account: "default", label: "MiniMax", model: "minimax-coding:", source: "file" as const, available: true, usedPercent: 12, planType: "M Plan", resetsAt: null, parkedAgents: 0 };
 
 test("the MiniMax plan account carries its request settings", () => {
     const html = accountsCard(ctx, null, { accounts: [minimaxAccount], models: {}, minimax: { serviceTier: "priority", maxTokens: 32768 } });

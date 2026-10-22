@@ -136,8 +136,22 @@ describe("llm.usageOverview", () => {
         expect((await ctx.fns.llm.usageOverview({ now: NOW }))[0].tone).toBe("error");
 
         await ctx.fns.settings.set({ module: "llm", scopeType: "global", key: "usageAlertPercent", value: 90 });
+        await ctx.fns.settings.set({ module: "llm", scopeType: "global", key: "usageCriticalPercent", value: 85 });
         await ctx.fns.settings.set({ module: "llm", scopeType: "global", key: "usageWarnPercent", value: 80 });
         expect((await ctx.fns.llm.usageOverview({ now: NOW }))[0].tone).toBe("neutral");
+    });
+
+    test("the quota heats up in four steps, not two", async () => {
+        const ctx: any = await mkTestCtx();
+        const tone = async (used: number) => {
+            await ctx.fns.llm.recordUsage({ provider: "codex", rateLimits: { primary: { used_percent: used } }, now: NOW });
+            return (await ctx.fns.llm.usageOverview({ now: NOW }))[0].tone;
+        };
+        // Green below a third, yellow at a third, orange past 60%, red at 75%.
+        expect(await tone(10)).toBe("neutral");
+        expect(await tone(30)).toBe("warning");
+        expect(await tone(60)).toBe("critical");
+        expect(await tone(75)).toBe("error");
     });
 
     test("includes an active xAI agent in the sidebar before a snapshot exists", async () => {

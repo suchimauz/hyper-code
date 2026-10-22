@@ -7,7 +7,7 @@
   const hosts = new Set();
   let data = null, failure = false, pending = null, lastRead = 0, active = null, queued = 0, dirty = false;
   const el = (tag, text, cls) => { const node = document.createElement(tag); if (text) node.textContent = text; if (cls) node.className = cls; return node; };
-  const providers = { codex: 'Codex', 'claude-code': 'Claude Code', anthropic: 'Anthropic', 'anthropic-oauth': 'Claude', openai: 'OpenAI', oneapi: 'Asoft LLM Gate' };
+  const providers = { codex: 'Codex', 'claude-code': 'Claude Code', anthropic: 'Anthropic', 'anthropic-oauth': 'Claude', openai: 'OpenAI', oneapi: 'Asoft LLM Gate', 'zai-coding': 'Z.ai', 'minimax-coding': 'MiniMax' };
   const provider = row => providers[row.provider] || row.provider;
   const identity = row => JSON.stringify([row.node || '', row.provider, row.account]);
   const name = row => row.node ? row.node + ' · ' + row.account : row.account === 'default' ? provider(row) : row.account;

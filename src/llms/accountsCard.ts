@@ -77,8 +77,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
         { id: "grok", title: "Grok", icon: "xai:grok", accounts: opts.accounts.filter(a => a.provider === "xai"), add: addButton(ctx, "xai", "Add Grok account") },
         { id: "kimi", title: "Kimi Coding", icon: "kimi-coding:k3", accounts: opts.accounts.filter(a => a.provider === "kimi-coding"), add: ctx.fns.procs.ui.button({ action: "add-kimi", label: "+ Add account", tone: "default", size: "sm", disabled: true, title: "Kimi multi-login is not wired yet" }) },
-        { id: "zai-coding", title: "Z.ai Coding Plan", icon: "zai-coding:", accounts: opts.accounts.filter(a => a.provider === "zai-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
-        { id: "minimax-coding", title: "MiniMax M Plan", icon: "minimax-coding:", accounts: opts.accounts.filter(a => a.provider === "minimax-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
+        { id: "zai-coding", title: "Z.ai", icon: "zai-coding:", accounts: opts.accounts.filter(a => a.provider === "zai-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
+        { id: "minimax-coding", title: "MiniMax", icon: "minimax-coding:", accounts: opts.accounts.filter(a => a.provider === "minimax-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
     ];
     const providerSections = providers.map(p => {
         const title = `${ctx.fns.ui.modelLogo?.({ model: p.icon, bare: true }) ?? ""}<span>${esc(p.title)}</span>`;

@@ -5,7 +5,7 @@ const source = await Bun.file(new URL("./$script_mobileUsage.js", import.meta.ur
 
 /** A row with both measured windows: a weekly one outside and a 5h one inside. */
 const dualRow = {
-    provider: "minimax-coding", account: "default", label: "MiniMax M Plan",
+    provider: "minimax-coding", account: "default", label: "MiniMax",
     model: "minimax-coding:", models: ["minimax-coding:MiniMax-M3.1-Flash"],
     usedPercent: 41, resetsAt: Date.now() + 3600000, planType: "M Plan",
     updatedAt: Date.now(), parkedAgents: 0, tone: "neutral",
@@ -51,9 +51,9 @@ test("the weekly ring is filled by the weekly window and the inner ring by the 5
 test("both rings are coloured by the shared thresholds, not by the provider", async () => {
     const w = await mount([dualRow]);
     const chip = w.document.querySelector("[data-usage-chip]")! as HTMLElement;
-    // The weekly window is at 5% and the 5h one at 41% — both below the 50%
-    // warning threshold, so the chip stays green.
-    expect(chip.getAttribute("data-tone")).toBe("success");
+    // The weekly window is at 5% and the 5h one at 41% — the latter is past
+    // the 30% warning threshold, so the chip is yellow.
+    expect(chip.getAttribute("data-tone")).toBe("warning");
 });
 
 test("a nearly spent weekly window turns the chip red", async () => {

@@ -4,7 +4,7 @@ import mobileRoute from '../llms/$route_mobileUsage_GET';
 import usageData from '../llms/usageData';
 
 function fixture(measured: boolean) {
- const snapshot = { provider: 'zai-coding', account: 'default', label: 'Z.ai', model: 'zai-coding:', usedPercent: 32, resetsAt: null, planType: 'lite', parkedAgents: 0, tone: 'neutral', updatedAt: Date.now(), thresholds: { warnAt: 40, alertAt: 80 } };
+ const snapshot = { provider: 'zai-coding', account: 'default', label: 'Z.ai', model: 'zai-coding:', usedPercent: 32, resetsAt: null, planType: 'lite', parkedAgents: 0, tone: 'neutral', updatedAt: Date.now(), thresholds: { warnAt: 40, criticalAt: 70, alertAt: 80 } };
  const ctx: any = { state: {}, fns: {
   llm: {
    usageOverview: async () => measured ? [snapshot] : [],
@@ -26,7 +26,7 @@ test('Coding Plan inventory inherits measured thresholds and safely defaults wit
  for (const measured of [true, false]) {
   const rows = await listAccounts(fixture(measured), null, { provider: 'zai-coding' });
   expect(rows).toHaveLength(1);
-  expect(rows[0]!.thresholds).toEqual(measured ? { warnAt: 40, alertAt: 80 } : { warnAt: 50, alertAt: 75 });
+  expect(rows[0]!.thresholds).toEqual(measured ? { warnAt: 40, criticalAt: 70, alertAt: 80 } : { warnAt: 30, criticalAt: 60, alertAt: 75 });
  }
 });
 
