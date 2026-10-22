@@ -93,11 +93,11 @@ export default function (ctx: Context, _session: Session | null, opts: {
         return `<div class="llm-account">${row(a)}${refreshModels}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div>${minimaxSettings(a)}${planInstance}</div>`;
     };
     const providers = [
-        { id: "opencode", title: opts.accounts.some(a => a.provider === "opencode" && a.planType === "Go subscription") ? "OpenCode Go" : "OpenCode Console", icon: "opencode:", accounts: opts.accounts.filter(a => a.provider === "opencode"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
         { id: "grok", title: "Grok", icon: "xai:grok", accounts: opts.accounts.filter(a => a.provider === "xai"), add: addButton(ctx, "xai", "Add Grok account") },
         { id: "kimi", title: "Kimi Coding", icon: "kimi-coding:k3", accounts: opts.accounts.filter(a => a.provider === "kimi-coding"), add: ctx.fns.procs.ui.button({ action: "add-kimi", label: "+ Add account", tone: "default", size: "sm", disabled: true, title: "Kimi multi-login is not wired yet" }) },
+        { id: "opencode", title: opts.accounts.some(a => a.provider === "opencode" && a.planType === "Go subscription") ? "OpenCode Go" : "OpenCode Console", icon: "opencode:", accounts: opts.accounts.filter(a => a.provider === "opencode"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
         { id: "zai-coding", title: "Z.ai", icon: "zai-coding:", accounts: opts.accounts.filter(a => a.provider === "zai-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
         { id: "minimax-coding", title: "MiniMax", icon: "minimax-coding:", accounts: opts.accounts.filter(a => a.provider === "minimax-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
     ];
