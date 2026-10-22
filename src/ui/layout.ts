@@ -385,29 +385,29 @@ export default async function (ctx: Context, session: Session | null, opts: {
 .mobile-usage-dialog :is(button, summary):focus-visible, .mobile-usage-strip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; border-radius: .4rem; }
 .mobile-usage-notice { flex: none; margin: 0; padding: .625rem 1rem; color: var(--color-muted); font-size: 13px; line-height: 1.45; border-bottom: 1px solid var(--color-ui-border); }
 .mobile-usage-content { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 1rem 1rem; }
-.mobile-usage-card { padding: 1rem 0; border-bottom: 1px solid var(--color-ui-border); overflow-wrap: anywhere; }
+.mobile-usage-card { display: flex; align-items: flex-start; gap: .875rem; padding: .875rem 0; border-bottom: 1px solid var(--color-ui-border); overflow-wrap: anywhere; }
 .mobile-usage-card:last-child { border: 0; }
-.mobile-usage-card h3 { display: flex; align-items: center; gap: .5rem; font-size: 17px; font-weight: 600; margin: 0 0 .35rem; }
+.mobile-usage-card-icon { flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-top: .1rem; border-radius: .8rem; background: var(--color-base-200); }
+.mobile-usage-dialog .mobile-usage-card-ring.mobile-usage-card-ring { width: 36px; height: 36px; }
+.mobile-usage-dialog .mobile-usage-card-ring .mobile-usage-ring-track { width: 36px; height: 36px; inset: 0; }
+.mobile-usage-dialog .mobile-usage-card-ring .mobile-usage-logo, .mobile-usage-dialog .mobile-usage-card-ring .mobile-usage-logo > span { width: 20px; height: 20px; }
+.mobile-usage-dialog .mobile-usage-card-ring .mobile-usage-logo svg { width: 18px; height: 18px; }
+.mobile-usage-dialog .mobile-usage-card-ring .mobile-usage-logo i, .mobile-usage-dialog .mobile-usage-card-ring .mobile-usage-provider-glyph { font-size: 17px; }
+.mobile-usage-card-body { min-width: 0; flex: 1; }
+.mobile-usage-card h3 { font-size: 15px; font-weight: 600; margin: 0 0 .15rem; }
 .mobile-usage-logo { display: inline-flex; flex: none; width: 16px; height: 16px; align-items: center; justify-content: center; }
 .mobile-usage-logo svg { width: 16px; height: 16px; }
-.mobile-usage-meta { color: var(--color-muted); font-size: 13px; line-height: 1.5; margin: .25rem 0; }
-.mobile-usage-amount { margin: .75rem 0 .25rem; font-size: 16px; font-weight: 500; }
-.mobile-usage-amount[data-tone="neutral"] { color: var(--color-muted); }
-.mobile-usage-amount[data-tone="warning"] { color: var(--color-warning); }
-.mobile-usage-amount[data-tone="critical"] { color: var(--color-critical); }
-.mobile-usage-amount[data-tone="error"] { color: var(--color-error); }
-.mobile-usage-card progress { display: block; width: 100%; height: .375rem; border: 0; border-radius: 1rem; overflow: hidden; background: var(--color-base-300); accent-color: var(--color-base-content); }
-.mobile-usage-card progress::-webkit-progress-bar { background: var(--color-base-300); }
-.mobile-usage-card progress::-webkit-progress-value { background: var(--color-base-content); }
-.mobile-usage-card progress[data-tone="warning"] { accent-color: var(--color-warning); }
-.mobile-usage-card progress[data-tone="critical"] { accent-color: var(--color-critical); }
-.mobile-usage-card progress[data-tone="error"] { accent-color: var(--color-error); }
-.mobile-usage-card progress[data-tone="warning"]::-webkit-progress-value { background: var(--color-warning); }
-.mobile-usage-card progress[data-tone="critical"]::-webkit-progress-value { background: var(--color-critical); }
-.mobile-usage-card progress[data-tone="error"]::-webkit-progress-value { background: var(--color-error); }
-.mobile-usage-card summary { min-height: 44px; padding: .75rem 0 .5rem; cursor: pointer; font-size: 14px; }
+.mobile-usage-meta { color: var(--color-muted); font-size: 12px; line-height: 1.45; margin: .15rem 0; }
+.mobile-usage-meta-plain { font-size: 13px; }
+.mobile-usage-tip-row { display: flex; align-items: baseline; gap: .4rem; margin: .2rem 0; font-size: 13px; line-height: 1.45; }
+.mobile-usage-tip-dot { flex: none; align-self: center; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.mobile-usage-tip-row[data-tone="neutral"] { color: var(--color-muted); }
+.mobile-usage-tip-name { flex: none; min-width: 3rem; font-weight: 500; color: var(--color-base-content); }
+.mobile-usage-tip-reset { margin-left: auto; padding-left: .75rem; color: var(--color-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mobile-usage-note { color: var(--color-error); }
+.mobile-usage-card summary { min-height: 36px; padding: .5rem 0 .25rem; cursor: pointer; font-size: 13px; color: var(--color-muted); }
 .mobile-usage-card ul { margin: 0; padding: 0; list-style: none; }
-.mobile-usage-card li { padding: .375rem 0; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.mobile-usage-card li { padding: .25rem 0; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
 
 .chat-composer [data-chat-jump-wrap] { display: none; }
 .chat-table-block, .chat-table-scroll { display: contents; }

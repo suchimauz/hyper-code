@@ -77,8 +77,8 @@ test("the account card names the weekly and the 5h limit separately", async () =
     (w.document.querySelector("[data-mobile-usage-open]") as any).click();
     for (let i = 0; i < 12; i++) await Promise.resolve();
     const text = w.document.body.textContent ?? "";
-    expect(text).toContain("Недельный лимит");
-    expect(text).toContain("Лимит за 5 часов");
+    expect(text).toContain("Неделя");
+    expect(text).toContain("5 ч");
 });
 
 test('Go uses all three quota windows, including monthly, without PAYG text', async () => {
@@ -95,9 +95,9 @@ test('Go uses all three quota windows, including monthly, without PAYG text', as
     (w.document.querySelector('[data-mobile-usage-open]') as any).click();
     for (let i = 0; i < 12; i++) await Promise.resolve();
     const text = w.document.body.textContent ?? '';
-    expect(text).toContain('Месячный лимит: осталось 15%');
-    expect(text).toContain('Недельный лимит: осталось 60%');
-    expect(text).toContain('Лимит за 5 часов: осталось 80%');
+    expect(text).toContain('Месяц'); expect(text).toContain('израсходовано 85%');
+    expect(text).toContain('Неделя'); expect(text).toContain('израсходовано 40%');
+    expect(text).toContain('5 ч'); expect(text).toContain('израсходовано 20%');
     expect(text).not.toContain('Go quota unavailable');expect(text).not.toContain('PAYG $10');
 });
 
@@ -106,8 +106,8 @@ test('Go unavailable stays unknown and PAYG keeps its monetary branch', async ()
     expect(w.document.querySelector('[data-usage-fill]')).toBeNull();
     (w.document.querySelector('[data-mobile-usage-open]') as any).click();
     for (let i = 0; i < 12; i++) await Promise.resolve();
-    expect(w.document.body.textContent).toContain('Лимит неизвестен');
-    expect(w.document.body.textContent).not.toContain('Недельный лимит: осталось');
+    expect(w.document.body.textContent).toContain('нет данных');
+    expect(w.document.body.textContent).not.toContain('израсходовано');
     const payg = await mount([{ ...dualRow, provider: 'opencode', planType: null, memberBudgetText: 'PAYG $10' }]);
     expect(payg.document.querySelector('[data-usage-fill]')).toBeNull();
     (payg.document.querySelector('[data-mobile-usage-open]') as any).click();

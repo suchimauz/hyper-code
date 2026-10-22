@@ -67,6 +67,33 @@
     count.title = hidden ? 'Ещё аккаунтов: ' + hidden : 'Всего подключений: ' + items.length;
   }
   const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(entries => entries.forEach(entry => fit(entry.target))) : null;
+  // Same ring the strip chips draw, reusable at any size: the prominent
+  // connection icon at the left of each dialog row.
+  function ringIcon(row, cls) {
+    const outdated = stale(row), measured = known(row) && row.quotaStatus !== 'unavailable';
+    const win = windows(row);
+    const ring = el('span', '', cls || 'mobile-usage-ring'); ring.setAttribute('aria-hidden', 'true');
+    const circle = (radius, percent, label) => {
+      const length = 2 * Math.PI * radius;
+      const filled = (Math.max(0, Math.min(100, percent)) / 100 * length).toFixed(2);
+      if (!Number.isFinite(percent) || row.quotaStatus === 'unavailable') return '';
+      const tone = row.parkedAgents ? 'error' : outdated ? 'neutral' : fillTone(percent, row);
+      return '<circle data-quota-window="' + label + '" data-tone="' + tone + '" style="color:' + toneColour(tone) + '" data-usage-fill cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="' + filled + ' ' + length.toFixed(2) + '"/>';
+    };
+    const track = (radius, label) => '<circle data-quota-window="' + label + '" class="mobile-usage-ring-track-line" cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".18"/>';
+    // Two measured windows: the weekly one outside, the short one inside —
+    // the same arrangement as the desktop dock.
+    const rings = payg(row) ? '' : win.dual
+      ? (win.triple ? track(12, 'monthly') + circle(12, win.monthly?.usedPercent, 'monthly') : '') + track(win.triple ? 9 : 12, 'weekly') + circle(win.triple ? 9 : 12, win.weekly?.usedPercent, 'weekly') + track(win.triple ? 6 : 9, '5h') + circle(win.triple ? 6 : 9, win.short?.usedPercent, '5h')
+      : (measured ? track(12, 'quota') + circle(12, row.usedPercent, 'quota') : track(12, 'quota'));
+    ring.innerHTML = '<svg viewBox="0 0 28 28" class="mobile-usage-ring-track">' + rings + '</svg>';
+    if (row.parkedAgents) ring.append(el('span', 'Ⅱ', 'mobile-usage-pause'));
+    else if (row.gateway) ring.append(el('i', '', 'ph ph-plugs-connected mobile-usage-provider-glyph'));
+    else ring.append(logo(row));
+    if (row.node) ring.append(el('span', '↔', 'mobile-usage-proxy'));
+    if (row.gateway) { const dot = el('span', '', 'mobile-usage-gateway'); dot.dataset.status = row.status; ring.append(dot); }
+    return ring;
+  }
   function paintStrip(host) {
     if (!host.isConnected) return;
     const box = host.querySelector('[data-mobile-usage-items]'), count = host.querySelector('[data-mobile-usage-count]');
@@ -89,28 +116,8 @@
       chip.dataset.tone = row.parkedAgents ? 'error' : outdated || !measured ? 'neutral' : fillTone(worst, row);
       chip.style.color = toneColour(chip.dataset.tone);
       chip.dataset.quotaState = outdated ? 'stale' : measured ? 'known' : 'unknown';
-      const ring = el('span', '', 'mobile-usage-ring'); ring.setAttribute('aria-hidden', 'true');
-      const circle = (radius, percent, label) => {
-        const length = 2 * Math.PI * radius;
-        const filled = (Math.max(0, Math.min(100, percent)) / 100 * length).toFixed(2);
-        if (!Number.isFinite(percent) || row.quotaStatus === 'unavailable') return '';
-        const tone = row.parkedAgents ? 'error' : outdated ? 'neutral' : fillTone(percent, row);
-        return '<circle data-quota-window="' + label + '" data-tone="' + tone + '" style="color:' + toneColour(tone) + '" data-usage-fill cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="' + filled + ' ' + length.toFixed(2) + '"/>';
-      };
-      const track = (radius, label) => '<circle data-quota-window="' + label + '" class="mobile-usage-ring-track-line" cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".18"/>';
-      // Two measured windows: the weekly one outside, the short one inside —
-      // the same arrangement as the desktop dock.
-      const rings = payg(row) ? '' : win.dual
-        ? (win.triple ? track(12, 'monthly') + circle(12, win.monthly?.usedPercent, 'monthly') : '') + track(win.triple ? 9 : 12, 'weekly') + circle(win.triple ? 9 : 12, win.weekly?.usedPercent, 'weekly') + track(win.triple ? 6 : 9, '5h') + circle(win.triple ? 6 : 9, win.short?.usedPercent, '5h')
-        : (measured ? track(12, 'quota') + circle(12, row.usedPercent, 'quota') : track(12, 'quota'));
       // Same 28px spent-quota ring as desktop, with no account name or percentage beside it.
-      ring.innerHTML = '<svg viewBox="0 0 28 28" class="mobile-usage-ring-track">' + rings + '</svg>';
-      if (row.parkedAgents) ring.append(el('span', 'Ⅱ', 'mobile-usage-pause'));
-      else if (row.gateway) { const glyph = el('i', '', 'ph ph-plugs-connected mobile-usage-provider-glyph'); ring.append(glyph); }
-      else ring.append(logo(row));
-      if (row.node) ring.append(el('span', '↔', 'mobile-usage-proxy'));
-      if (row.gateway) { const dot = el('span', '', 'mobile-usage-gateway'); dot.dataset.status = row.status; ring.append(dot); }
-      chip.append(ring);
+      chip.append(ringIcon(row));
       const winTitle = win.dual
         ? ' · недельный ' + (win.weekly ? Math.max(0, 100 - win.weekly.usedPercent) + '%' : 'неизвестен') + ' · 5 ч ' + (win.short ? Math.max(0, 100 - win.short.usedPercent) + '%' : 'неизвестен') + (win.triple ? ' · месячный ' + (win.monthly ? Math.max(0, 100 - win.monthly.usedPercent) + '%' : 'неизвестен') : '')
         : '';
@@ -129,56 +136,73 @@
     const mins = Math.max(0, Math.ceil((resetsAt - Date.now()) / 60000));
     return mins >= 60 ? Math.floor(mins / 60) + ' ч ' + mins % 60 + ' мин' : mins + ' мин';
   }
+  // One window line, worded like the desktop quota tooltip rows:
+  // "5 h — израсходовано N% · сброс 21 окт., 15:30".
+  const ruStamp = value => new Date(value).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  function tipRow(label, usedPercent, resetsAt, row) {
+    const line = el('p', '', 'mobile-usage-tip-row');
+    const outdated = stale(row);
+    const tone = row.parkedAgents ? 'error' : outdated ? 'neutral' : fillTone(usedPercent, row);
+    line.dataset.tone = tone; line.style.color = toneColour(tone);
+    line.append(el('i', '', 'mobile-usage-tip-dot'));
+    line.append(el('span', label, 'mobile-usage-tip-name'));
+    const used = usedPercent == null || !Number.isFinite(usedPercent) ? 'нет данных' : 'израсходовано ' + Math.round(usedPercent) + '%' + (outdated ? ' (последнее известное)' : '');
+    line.append(el('span', used));
+    if (resetsAt && resetsAt > Date.now()) line.append(el('span', 'сброс ' + ruStamp(resetsAt), 'mobile-usage-tip-reset'));
+    return line;
+  }
   function card(row) {
+    // Same density as the desktop quota tooltip: a prominent connection icon
+    // on the left, then the name, where it connects, and one line per window.
     const section = el('section', '', 'mobile-usage-card'); section.dataset.usageKey = identity(row);
-    const heading = el('h3'); heading.append(logo(row), el('span', row.label || name(row))); section.append(heading);
-    section.append(el('p', [provider(row), row.node ? row.node : sshInstance(row) || 'default', row.node ? 'Через ' + row.node : sshInstance(row) ? 'Через ' + sshInstance(row) : 'Локальное подключение', row.planType].filter(Boolean).join(' · '), 'mobile-usage-meta'));
-    let status;
+    const icon = el('span', '', 'mobile-usage-card-icon');
+    const outdated = stale(row), measured = known(row) && row.quotaStatus !== 'unavailable';
+    const win = windows(row);
+    const worst = Math.max(win.short ? win.short.usedPercent : 0, win.weekly ? win.weekly.usedPercent : 0, win.monthly ? win.monthly.usedPercent : 0, measured ? row.usedPercent : 0);
+    icon.style.color = toneColour(row.parkedAgents ? 'error' : outdated || !measured ? 'neutral' : fillTone(worst, row));
+    icon.append(ringIcon(row, 'mobile-usage-ring mobile-usage-card-ring'));
+    const body = el('div', '', 'mobile-usage-card-body');
+    body.append(el('h3', row.label || name(row)));
+    const machine = row.node ? 'Hyper · ' + row.node : sshInstance(row) ? 'SSH · ' + sshInstance(row) : null;
+    const sub = [provider(row), machine, row.planType].filter(Boolean).join(' · ');
+    body.append(el('p', sub, 'mobile-usage-meta'));
     if (row.gateway) {
-      status = row.reason === 'missing-key' ? 'Не задан API-ключ' : row.status === 'available' ? 'Каталог API доступен' : row.status === 'unavailable' ? 'API недоступен' : 'Состояние API неизвестно';
-      section.append(el('p', status, 'mobile-usage-amount'), el('p', 'Лимиты неизвестны. Доступность каталога не подтверждает возможность генерации.', 'mobile-usage-meta'));
+      const status = row.reason === 'missing-key' ? 'Не задан API-ключ' : row.status === 'available' ? 'Каталог API доступен' : row.status === 'unavailable' ? 'API недоступен' : 'Состояние API неизвестно';
+      body.append(el('p', status + '. Лимиты неизвестны.', 'mobile-usage-tip-row mobile-usage-meta-plain'));
     } else if (payg(row)) {
-      section.append(el('p', row.memberBudgetText || 'Monthly member budget unavailable', 'mobile-usage-amount'));
-      section.append(el('p', 'Это месячный бюджет участника, не кредитный баланс. Общий баланс API не сообщает.', 'mobile-usage-meta'));
+      const line = el('p', row.memberBudgetText || 'Monthly member budget unavailable', 'mobile-usage-tip-row mobile-usage-meta-plain');
+      body.append(line);
       const consoleLink = el('a', 'Console billing', 'mobile-usage-meta');
-      consoleLink.href = 'https://opencode.ai/console'; consoleLink.target = '_blank'; consoleLink.rel = 'noopener noreferrer'; section.append(consoleLink);
-      if (row.memberBudget?.resetsAt) section.append(el('p', 'Сброс бюджета: ' + new Date(row.memberBudget.resetsAt).toLocaleString('ru-RU'), 'mobile-usage-meta'));
+      consoleLink.href = 'https://opencode.ai/console'; consoleLink.target = '_blank'; consoleLink.rel = 'noopener noreferrer'; body.append(consoleLink);
+      if (row.memberBudget?.resetsAt) body.append(el('p', 'Сброс бюджета: ' + ruStamp(row.memberBudget.resetsAt), 'mobile-usage-meta'));
+    } else if (row.quotaStatus === 'unavailable' || !measured) {
+      body.append(tipRow('Квота', null, null, row));
     } else {
-      const win = windows(row);
-      status = row.quotaStatus === 'unavailable' || !known(row) ? 'Лимит неизвестен' : stale(row) ? 'Последний известный остаток: ' + left(row) + '%' : 'Осталось ' + left(row) + '%';
-      section.append(el('p', status, 'mobile-usage-amount'));
-      // Each reported window is listed independently, including partial snapshots.
-      if (row.quotaStatus !== 'unavailable') for (const [window, label] of [[win.short, 'Лимит за 5 часов'], [win.weekly, 'Недельный лимит'], [win.monthly, 'Месячный лимит']]) {
-        if (!window) continue;
-        const value = el('p', label + ': осталось ' + Math.max(0, 100 - window.usedPercent) + '%', 'mobile-usage-amount');
-        value.dataset.tone = stale(row) ? 'neutral' : fillTone(window.usedPercent, row);
-        section.append(value);
-        if (window.resetsAt) section.append(el('p', label + ' восстановится через ' + delayOf(window.resetsAt), 'mobile-usage-meta'));
+      // Each measured window gets its own line, like the desktop tooltip.
+      if (win.dual) {
+        body.append(tipRow('5 ч', win.short ? win.short.usedPercent : null, win.short?.resetsAt, row));
+        body.append(tipRow('Неделя', win.weekly ? win.weekly.usedPercent : null, win.weekly?.resetsAt, row));
+        if (win.triple) body.append(tipRow('Месяц', win.monthly ? win.monthly.usedPercent : null, win.monthly?.resetsAt, row));
+      } else {
+        body.append(tipRow('Квота', row.usedPercent, row.resetsAt, row));
       }
-      if (row.needsReconnect) section.append(el('p', 'Требуется повторное подключение аккаунта.', 'mobile-usage-meta'));
-      if (known(row) && row.quotaStatus !== 'unavailable') {
-        const meter = el('progress'); meter.max = 100; meter.value = left(row); meter.setAttribute('aria-label', 'Остаток лимита' + (stale(row) ? ' по устаревшим данным' : '')); meter.dataset.tone = stale(row) ? 'neutral' : row.tone; section.append(meter);
-      }
-      if (stale(row)) section.append(el('p', 'Данные устарели — текущий остаток неизвестен.', 'mobile-usage-meta'));
-      if (row.resetsAt) {
-        const mins = Math.max(0, Math.ceil((row.resetsAt - Date.now()) / 60000));
-        const delay = mins >= 60 ? Math.floor(mins / 60) + ' ч ' + mins % 60 + ' мин' : mins + ' мин';
-        section.append(el('p', mins ? 'Восстановление через ' + delay + ' · ' + new Date(row.resetsAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Срок восстановления прошёл — ожидаются новые данные.', 'mobile-usage-meta'));
-      } else section.append(el('p', 'Время восстановления неизвестно', 'mobile-usage-meta'));
-      if (row.parkedAgents) section.append(el('p', 'Ждут восстановления лимита: ' + row.parkedAgents, 'mobile-usage-meta'));
-      section.append(el('p', age(row.updatedAt), 'mobile-usage-meta'));
+      const notes = [];
+      if (row.needsReconnect) notes.push('требуется повторное подключение');
+      if (row.parkedAgents) notes.push('ожидают лимита: ' + row.parkedAgents);
+      if (notes.length) body.append(el('p', notes.join(' · '), 'mobile-usage-meta mobile-usage-note'));
     }
+    section.append(icon, body);
     const models = [...new Set(row.models || [])];
     const details = el('details'); details.dataset.usageModels = identity(row); details.append(el('summary', 'Доступные модели · ' + models.length));
     if (models.length) { const list = el('ul'); for (const model of models) list.append(el('li', model)); details.append(list); }
     else details.append(el('p', 'Каталог моделей пока недоступен.', 'mobile-usage-meta'));
-    section.append(details); return section;
+    body.append(details); return section;
   }
   function paintDialog() {
     if (!active) return;
     const { content, status, refresh } = active;
     refresh.disabled = Boolean(pending);
-    status.textContent = failure ? 'Не удалось обновить. Показаны последние полученные данные. Проверьте соединение и нажмите «Обновить».' : pending ? 'Обновление…' : 'Только просмотр. Модель чата не изменяется. Проценты показывают остаток лимита.';
+    status.textContent = failure ? 'Не удалось обновить. Показаны последние полученные данные. Проверьте соединение и нажмите «Обновить».' : pending ? 'Обновление…' : 'Только просмотр. Модель чата не изменяется.';
     if (!data) { content.textContent = failure ? 'Информация недоступна.' : 'Загрузка аккаунтов…'; return; }
     const scroll = content.scrollTop, opened = new Set([...content.querySelectorAll('details[open]')].map(d => d.dataset.usageModels));
     const focusedKey = document.activeElement?.closest('[data-usage-models]')?.dataset.usageModels;

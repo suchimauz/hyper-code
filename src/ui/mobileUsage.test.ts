@@ -43,8 +43,9 @@ test('old local snapshots are stale even after a successful GET and reconnect re
   f.change({ entries: [entry(0, { updatedAt: 1, needsReconnect: true })], gateway: null });
   f.click('[data-mobile-usage-open]'); await f.tick();
   expect(f.d.querySelector('[data-usage-chip]')!.getAttribute('data-quota-state')).toBe('stale');
-  expect(f.d.querySelector('dialog')!.textContent).toContain('Требуется повторное подключение');
-  expect(f.d.querySelector('dialog')!.textContent).toContain('Данные устарели');
+  const text = f.d.querySelector('dialog')!.textContent;
+  expect(text).toContain('требуется повторное подключение');
+  expect(text).toContain('(последнее известное)');
  } finally { await f.w.happyDOM.close(); }
 });
 
@@ -101,10 +102,10 @@ test('unknown, stale, exhausted, proxy and API availability are distinct; untrus
   f.change({ entries: [entry(0, { usedPercent: null, models: [] }), entry(1, { node: 'team', quotaStatus: 'stale', usedPercent: 80, label: '<img src=x onerror=alert(1)>', models: ['<script>evil</script>'] }), entry(2, { usedPercent: 100 })], gateway: { status: 'available', reason: 'models-ok', models: ['openai/gpt-demo'] } });
   f.click('[data-mobile-usage-open]'); await f.tick();
   const text = f.d.querySelector('dialog')!.textContent;
-  expect(text).toContain('Лимит неизвестен'); expect(text).toContain('Последний известный остаток: 20%'); expect(text).toContain('Осталось 0%');
-  expect(text).toContain('Через team'); expect(text).toContain('не подтверждает возможность генерации');
+  expect(text).toContain('нет данных'); expect(text).toContain('израсходовано 80% (последнее известное)'); expect(text).toContain('израсходовано 100%');
+  expect(text).toContain('Hyper · team'); expect(text).toContain('Лимиты неизвестны');
   expect(text).toContain('<script>evil</script>'); expect(f.d.querySelector('dialog img, dialog script')).toBeNull();
-  expect(f.d.querySelectorAll('progress').length).toBe(2);
+  expect(f.d.querySelectorAll('.mobile-usage-tip-row').length).toBeGreaterThanOrEqual(3);
   expect(f.d.querySelectorAll('.mobile-usage-card').length).toBe(4);
  } finally { await f.w.happyDOM.close(); }
 });
@@ -120,7 +121,7 @@ test('refresh preserves expanded models, modal scroll and focus; offline retains
   expect(f.d.querySelector('.mobile-usage-content')!.scrollTop).toBe(95);
   f.offline(true); f.click('[data-usage-refresh]'); await f.tick();
   expect(f.d.querySelector('[role="status"]')!.textContent).toContain('Не удалось обновить');
-  expect(f.d.querySelector('.mobile-usage-amount')!.textContent).toContain('Последний известный');
+  expect(f.d.querySelector('.mobile-usage-tip-row')!.textContent).toContain('(последнее известное)');
   expect(f.d.querySelector('[data-usage-chip]')!.getAttribute('data-quota-state')).toBe('stale');
   f.offline(false); f.click('[data-usage-refresh]'); await f.tick();
   expect(f.d.querySelector('[data-usage-chip]')!.getAttribute('data-quota-state')).toBe('known');
