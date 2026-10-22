@@ -38,7 +38,7 @@ test('Z.ai dual rings put weekly outside and 5h inside with explicit tooltip and
  let html=dial(ctx,null,{entries:[entry],now});
  expect(html).toContain('data-quota-window="weekly" class="text-success"><circle cx="14" cy="14" r="12"');
  expect(html).toContain('data-quota-window="5h" class="text-success"><circle cx="14" cy="14" r="9"');
- expect(html).toContain('Weekly: 7% used');expect(html).toContain('5h: 20% used');expect(html).toContain('resets in');
- html=dial(ctx,null,{entries:[{...entry,windows:{},usedPercent:null,quotaStatus:'unavailable'}],now});expect(html).not.toContain('stroke-dasharray');expect(html).toContain('Weekly: quota unavailable');
+ expect(html).toContain('quota-tip-name">Weekly</span><span>7% used</span>');expect(html).toContain('quota-tip-name">5h</span><span>20% used</span>');const ru=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});expect(html).toContain(`resets ${ru.format(new Date(now+3600000))}`);
+ html=dial(ctx,null,{entries:[{...entry,windows:{},usedPercent:null,quotaStatus:'unavailable'}],now});expect(html).not.toContain('stroke-dasharray');expect(html).toContain('quota unavailable — usage unknown');
  html=dial(ctx,null,{entries:[{...entry,windows:{primary:{usedPercent:100,resetsAt:now-1}}}],now});expect(html).not.toContain('stroke-dasharray');
 });

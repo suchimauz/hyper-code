@@ -678,6 +678,7 @@ ${opts.headExtra ?? ""}
 <script src="/ui/mobileInspector.js" defer></script>
 <script src="/ui/mobileMessage.js" defer></script>
 <script src="/ui/chatSearch.js" defer></script>
+<script src="/ui/quotaTip.js" defer></script>
 <script src="/ui/mobileUsage.js" defer></script>
 <script src="/ui/webPush.js" defer></script>
 <script src="/screen/client.js" defer></script>
@@ -716,6 +717,19 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
 #dock #llm-usage { display:flex; align-items:flex-start; gap:4px; flex-wrap:wrap; }
 #dock #llm-usage>[role="group"] { flex-direction:row; flex-wrap:wrap; justify-content:flex-start; gap:5px; border-top:0; padding-top:0; }
 #dock #llm-usage>div:not([role="group"]) { padding-top:0; }
+/* Quota ring hover card: the name, the limits and the reset moment — nothing else.
+   It lives in the top layer (Popover API): the dock's backdrop-filter creates a
+   stacking context, so no z-index inside the dock can lift anything above the
+   chat column. The quotaTip script pins it to the ring with fixed coordinates. */
+.quota-tip { position:fixed; inset:auto; display:flex; flex-direction:column; gap:3px; min-width:12.5rem; max-width:17rem; padding:.5rem .65rem .55rem; border:1px solid var(--ui-border-strong, var(--color-ui-border)); border-radius:.6rem; background:var(--color-base-100); box-shadow:0 10px 28px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .08); font-size:11px; line-height:1.45; color:var(--color-muted); pointer-events:none; opacity:1; transform:none; transition:opacity .12s ease, transform .12s ease, overlay .12s allow-discrete; }
+@starting-style { .quota-tip:popover-open { opacity:0; transform:translateY(3px); } }
+.quota-tip::after { content:""; position:absolute; left:14px; bottom:-5px; width:9px; height:9px; border-right:1px solid var(--ui-border-strong, var(--color-ui-border)); border-bottom:1px solid var(--ui-border-strong, var(--color-ui-border)); background:var(--color-base-100); transform:rotate(-45deg); }
+.quota-tip-head { font-weight:600; font-size:11.5px; color:var(--color-base-content); letter-spacing:.01em; }
+.quota-tip-sub { font-size:10px; color:var(--color-base-content-faint, #888); margin-top:-2px; }
+.quota-tip-row { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.quota-tip-dot { flex:none; width:7px; height:7px; border-radius:50%; background:currentColor; }
+.quota-tip-name { flex:none; min-width:2.6rem; color:var(--color-base-content); font-weight:500; }
+.quota-tip-reset { margin-left:auto; padding-left:10px; color:var(--color-base-content-faint, #888); font-variant-numeric:tabular-nums; }
 .project-all-chats { display:flex; align-items:center; gap:9px; padding:9px; margin-bottom:8px; text-align:left; border-radius:6px; }
 #project-tabs-host { flex-shrink:0; min-width:0; }
 .project-tabs { display:flex; align-items:stretch; min-height:44px; border-bottom:1px solid var(--color-ui-border); background:var(--color-base-200); }
