@@ -28,3 +28,37 @@ test('Z.ai GLM-5.3 family offers Low High Max, defaults Max and never Off', asyn
  }
  const old=await capabilities({} as Context,null,{model:'zai-coding:glm-4.5'});expect(old.mode).toBe('none');
 });
+
+describe('llm.reasoningCapabilities kimi-coding', () => {
+    // The catalogue advertises supports_thinking_type "only", but the live
+    // endpoint accepts thinking.type "disabled" and then answers without a
+    // thinking block, so Off is offered on every Kimi model.
+    test('every Kimi model can turn reasoning off', async () => {
+        for (const id of ['kimi-for-coding', 'kimi-for-coding-highspeed', 'k3', 'k3-256k']) {
+            const r = await capabilities({} as Context, null, { model: `kimi-coding:${id}` });
+            expect(r.supported).toContain('off');
+        }
+    });
+
+    test('models with think_efforts offer Low High and Max, defaulting to High', async () => {
+        for (const id of ['kimi-for-coding', 'k3', 'k3-256k']) {
+            const r = await capabilities({} as Context, null, { model: `kimi-coding:${id}` });
+            expect(r.supported).toEqual(['auto', 'off', 'low', 'high', 'xhigh']);
+            expect(r.defaultEffort).toBe('high');
+            expect(r.mode).toBe('anthropic-adaptive');
+        }
+    });
+
+    // kimi-for-coding-highspeed publishes no think_efforts, so it must not
+    // offer levels the catalogue never declared.
+    test('the highspeed line offers no effort levels', async () => {
+        const r = await capabilities({} as Context, null, { model: 'kimi-coding:kimi-for-coding-highspeed' });
+        expect(r.supported).toEqual(['auto', 'off']);
+    });
+
+    test('a Kimi SSH route resolves capabilities like the local one', async () => {
+        const local = await capabilities({} as Context, null, { model: 'kimi-coding:k3' });
+        const remote = await capabilities({} as Context, null, { model: 'ssh/box:kimi-coding/work:k3' });
+        expect(remote).toEqual(local);
+    });
+});

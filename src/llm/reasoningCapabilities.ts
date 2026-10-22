@@ -18,7 +18,7 @@ export default async function (
     let provider = m?.[1] ?? "lmstudio";
     let rawModelId = m?.[3] ?? model;
     if (provider === 'ssh') {
-        const route = /^(codex|claude-code)\/[\w.-]+:(.+)$/.exec(rawModelId);
+        const route = /^(codex|claude-code|kimi-coding)\/[\w.-]+:(.+)$/.exec(rawModelId);
         if (!route) return {supported:['auto','off'],defaultEffort:'off',mode:'none'};
         provider = route[1]!; rawModelId = route[2]!;
     }
@@ -67,6 +67,18 @@ export default async function (
         // M2.x always reasons and ignores the requested depth.
         return { supported: ["auto", "off"], defaultEffort: "off", mode: "none" };
     }
+    // Kimi Coding is Anthropic-messages shaped. The catalogue advertises
+    // supports_thinking_type "only", but the live endpoint accepts
+    // thinking.type "disabled" on every model and then answers without a
+    // thinking block, so reasoning is genuinely optional here.
+    // Effort is low/high/max; Hyper's xhigh is the user's Max choice and maps
+    // to max on the wire. Only the models whose catalogue carries
+    // think_efforts support choosing a level at all.
+    if (provider === "kimi-coding") {
+        const effort = /^(kimi-for-coding|k3|k3-256k)$/.test(modelId);
+        return { supported: ["auto", "off", ...(effort ? ["low", "high", "xhigh"] as const : [])], defaultEffort: effort ? "high" : "auto", mode: "anthropic-adaptive" };
+    }
+
     // GLM-5.3 and Flash share low/high/max; reasoning cannot be disabled.
     // xhigh is Hyper's existing user-facing Max choice, mapped on the wire.
     if (provider === "zai-coding" && /^glm-5\.3(?:-flashx?)?$/.test(modelId)) {

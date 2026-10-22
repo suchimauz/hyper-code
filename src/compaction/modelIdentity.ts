@@ -15,7 +15,7 @@ export default async function (
     const m = /^([a-z][\w-]*)(?:\/([\w.-]+))?:(.+)$/.exec(opts.model);
     if (!m) return { provider: "", account: "default", modelId: opts.model, relay: false };
     if (m[1] === "ssh") {
-        const route = /^(codex|claude-code)\/([A-Za-z0-9][A-Za-z0-9_-]{0,39}):([^:\s]+)$/.exec(m[3]!);
+        const route = /^(codex|claude-code|kimi-coding)\/([A-Za-z0-9][A-Za-z0-9_-]{0,39}):([^:\s]+)$/.exec(m[3]!);
         if (!route || route[2] === "." || route[2] === "..") return null;
         const instance = m[2] ?? "default";
         const entries = await ctx.fns.sshAccount.registry({ action: "list" });

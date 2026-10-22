@@ -29,6 +29,13 @@ export default async function (
         if (/^minimax-m2/.test(id)) return 204_800;
         return null;
     }
+    // Kimi Coding reports its real window per model: K2.8 and K3 are 1M, while
+    // the Highspeed line and k3-256k are capped at 262K. The generic Kimi rule
+    // below would answer 128K for all of them and compact far too early.
+    if (provider === "kimi-coding") {
+        if (/k3-256k|highspeed/.test(id)) return 262_144;
+        return 1_048_576;
+    }
     if (/claude|opus|sonnet|haiku|fable/.test(id)) return 200_000;
     if (provider === "codex" || /^gpt-(5|6)|daybreak/.test(id)) return 272_000;
     if (/^gpt-4\.1|gemini/.test(id)) return 1_000_000;
