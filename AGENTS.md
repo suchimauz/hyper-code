@@ -7,6 +7,12 @@ alwaysApply: true
 
 Procedural TypeScript on Bun, running on the **procs framework** (vendored at `src/procs/` — see `~/health-workspaces/procs` for the upstream). One HTTP server, a multi-agent chat driven by native JSON tool calls, all code hot-reloadable through a tokened external REPL.
 
+## UI design — Hyper only
+
+Before designing, implementing, or reviewing **Hyper's own UI**, read `docs/skills/apple-design/SKILL.md` and the scope notes in `docs/skills/apple-design/README.md`. Apple Design is the default reference for the Hyper app shell, chat, settings, built-in pages, and plugin surfaces inside Hyper. Follow the user's request and Hyper's existing accessible components and light/dark design tokens; favor clear hierarchy, restraint, immediate feedback, keyboard focus, usable targets, and reduced-motion support over decorative effects.
+
+This rule is scoped to the **product being edited**, not the agent's host: other projects worked on through Hyper are unaffected unless the user explicitly requests Apple Design there. Do not install or enforce this skill globally. The local copy is pinned, includes the upstream MIT license, and is read on demand rather than pasted into every prompt.
+
 ## Runtime environment
 
 - **Bun, not Node.js.** Use `bun`, `bun test`, `bun install`, `bunx`, `bun build`. `.env` loads automatically.

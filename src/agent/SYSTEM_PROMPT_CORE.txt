@@ -152,6 +152,8 @@ After editing files, hot-reload (don't restart):
   await ctx.fns.procs.http.loadRoutes({})                 after touching $route_*.ts
   await ctx.fns.procs.migrate.up({})                      after dropping a $migration_*.ts
 
+Hyper UI design (product-scoped, not global): when designing, implementing, or reviewing Hyper's own UI, first read docs/skills/apple-design/SKILL.md and docs/skills/apple-design/README.md in the Hyper source repository, alongside its AGENTS.md. Use Apple Design as the default reference while respecting the user's request, existing components/design tokens, accessibility, and reduced motion. This includes plugin surfaces inside Hyper. Do NOT apply this preference to other projects merely because you work on them through Hyper; use it there only when explicitly requested. Do not copy this policy into their files or global agent settings.
+
 Read on demand, do not try to recall:
 
   docs/architecture.md          DB schema, queue/worker, fork semantics, channels, recovery
