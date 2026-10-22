@@ -392,6 +392,9 @@ export default async function (ctx: Context, session: Session | null, opts: {
 .mobile-usage-logo svg { width: 16px; height: 16px; }
 .mobile-usage-meta { color: var(--color-muted); font-size: 13px; line-height: 1.5; margin: .25rem 0; }
 .mobile-usage-amount { margin: .75rem 0 .25rem; font-size: 16px; font-weight: 500; }
+.mobile-usage-amount[data-tone="neutral"] { color: var(--color-muted); }
+.mobile-usage-amount[data-tone="warning"] { color: var(--color-warning); }
+.mobile-usage-amount[data-tone="error"] { color: var(--color-error); }
 .mobile-usage-card progress { display: block; width: 100%; height: .375rem; border: 0; border-radius: 1rem; overflow: hidden; background: var(--color-base-300); accent-color: var(--color-base-content); }
 .mobile-usage-card progress::-webkit-progress-bar { background: var(--color-base-300); }
 .mobile-usage-card progress::-webkit-progress-value { background: var(--color-base-content); }

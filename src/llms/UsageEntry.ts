@@ -24,6 +24,11 @@ export type UsageEntry = {
     parkedAgents: number;
     /** Display severity of the measured quota. */
     tone: "neutral" | "warning" | "error";
+    /**
+     * The warning and alert percentages this tone was computed from, so every
+     * surface colours the same account identically.
+     */
+    thresholds?: { warnAt: number; alertAt: number };
     /** Snapshot timestamp in milliseconds, or zero if absent. */
     updatedAt: number;
     /** Explicit account availability; false may mean exhausted quota or reconnect required, not network failure. */

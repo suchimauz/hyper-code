@@ -156,9 +156,29 @@ test('compact strip uses desktop-sized spent rings without visible account label
   const host = f.d.querySelector('[data-mobile-usage-open]')!;
   expect(host.querySelector('.mobile-usage-name, .mobile-usage-value')).toBeNull();
   expect(host.textContent).not.toContain('work'); expect(host.textContent).not.toContain('%'); expect(host.textContent).not.toContain('Лимиты');
-  expect(host.querySelector('[data-usage-fill]')!.getAttribute('stroke-dasharray')).toBe('18.9 75.4');
+  const dash=host.querySelector('[data-usage-fill]')!.getAttribute('stroke-dasharray')!.split(' ').map(Number);
+  expect(dash[0]!/dash[1]!).toBeCloseTo(.25,2);
   expect(host.querySelector('[data-usage-chip]')!.getAttribute('aria-label')).toContain('остаток 75%');
  } finally { await f.w.happyDOM.close(); }
+});
+
+test('mobile dual rings use separate thresholds and remain safe with an expired short window', async () => {
+ const f=await fixture(1);
+ try {
+  const future=Date.now()+3600000;
+  f.change({entries:[entry(0,{thresholds:{warnAt:40,alertAt:80},windows:{primary:{usedPercent:50,resetsAt:future},secondary:{usedPercent:90,resetsAt:future}}})],gateway:null});
+  f.click('[data-mobile-usage-open]');await f.tick();
+  let host=f.d.querySelector('[data-mobile-usage-open]')!;
+  expect(host.querySelector('[data-usage-fill][data-quota-window="weekly"]')!.getAttribute('r')).toBe('12');
+  expect(host.querySelector('[data-usage-fill][data-quota-window="weekly"]')!.getAttribute('data-tone')).toBe('error');
+  expect(host.querySelector('[data-usage-fill][data-quota-window="5h"]')!.getAttribute('r')).toBe('9');
+  expect(host.querySelector('[data-usage-fill][data-quota-window="5h"]')!.getAttribute('data-tone')).toBe('warning');
+  f.click('[data-usage-back]');
+  f.change({entries:[entry(0,{windows:{primary:{usedPercent:100,resetsAt:1},secondary:{usedPercent:20,resetsAt:future}}})],gateway:null});
+  f.click('[data-mobile-usage-open]');await f.tick();host=f.d.querySelector('[data-mobile-usage-open]')!;
+  expect(host.querySelector('[data-usage-fill][data-quota-window="5h"]')).toBeNull();
+  expect(host.querySelector('[data-usage-fill][data-quota-window="weekly"]')).not.toBeNull();
+ } finally {await f.w.happyDOM.close();}
 });
 
 test('temporary detached opener and delayed close event from an older dialog cannot close current overview', async () => {

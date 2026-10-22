@@ -26,7 +26,7 @@ export default function (
         /** Models grouped by provider, as returned by llm.listModels. */
         models?: Record<string, string[]>;
         /** Credential accounts, as returned by llm.listAccounts. */
-        accounts?: Array<{ provider: string; account: string; label: string; model: string; available: boolean; usedPercent: number | null; resetsAt: number | null; parkedAgents: number }>;
+        accounts?: Array<{ provider: string; account: string; label: string; model: string; available: boolean; usedPercent: number | null; resetsAt: number | null; parkedAgents: number; thresholds?: { warnAt: number; alertAt: number } }>;
         /** Current timestamp in ms; defaults to Date.now(). */
         now?: number;
     },
@@ -68,7 +68,11 @@ export default function (
     const spent = (opts.accounts ?? []).find((a) => a.provider === parked.provider && a.account === (parked.account ?? "default"));
     const accountRows = accounts.map((a) => {
         const known = a.usedPercent != null;
-        const tone = !a.available ? "text-error" : known && a.usedPercent! >= 75 ? "text-error" : known && a.usedPercent! >= 50 ? "text-warning" : "text-success";
+        // The same thresholds and the same colours as the rings and the
+        // account cards, so a plan never changes colour between screens.
+        const warnAt = a.thresholds?.warnAt ?? 50;
+        const alertAt = a.thresholds?.alertAt ?? 75;
+        const tone = !a.available ? "text-error" : known && a.usedPercent! >= alertAt ? "text-error" : known && a.usedPercent! >= warnAt ? "text-warning" : known ? "text-success" : "text-faint";
         const state = !a.available
             ? `exhausted${a.resetsAt ? ` · resets in ${humanDelay(a.resetsAt - now)}` : ""}`
             : known ? `available ${Math.round(100 - a.usedPercent!)}%` : "no data";

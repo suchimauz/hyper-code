@@ -12,7 +12,7 @@
  * @param opts.now Current time in ms, for testing.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
-    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>> }>;
+    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>; thresholds?: { warnAt: number; alertAt: number } }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
@@ -33,7 +33,11 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const pending = remote ? [...(ctx.state.sshAccount?.flows?.values() ?? [])].find(flow => flow.instance === remote[1] && flow.account === remote[2] && flow.provider === a.provider && flow.status === "pending") : undefined;
         const used = a.usedPercent;
         const quota = !a.available ? `limit exhausted${a.resetsAt ? ` · resets ${humanDelay(a.resetsAt-now)}` : ""}` : used == null ? "usage unavailable" : `${Math.round(used)}% used · ${Math.round(100-used)}% left`;
-        const status = !a.available || (used != null && used >= 75) ? "limit" : used != null && used >= 50 ? "warning" : "ready";
+        // The same thresholds as the rings and the mobile strip, so one account
+        // never looks yellow on the page and green in the dock.
+        const warnAt = a.thresholds?.warnAt ?? 50;
+        const alertAt = a.thresholds?.alertAt ?? 75;
+        const status = !a.available || (used != null && used >= alertAt) ? "limit" : used != null && used >= warnAt ? "warning" : "ready";
         const storage = storageLabel(a.source);
         const reconnect = pending ? ctx.fns.ui.popup({ method: "sshAccount.progressPopup", params: { id: pending.id }, tone: "default", size: "xs", html: "Continue login" }) : (a.needsReconnect || remote) && (a.source !== "ssh" || remote)
             ? ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider: a.provider === "anthropic-oauth" ? "claude-code" : a.provider, account: remote ? remote[2] : a.account, ...(remote ? { instance: remote[1] } : {}) }, tone: "warning", size: "xs", html: `<i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Reconnect</span>` })
@@ -48,7 +52,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
             ...(a.planType ? [{ role: "plan", text: planName(a.provider, a.planType), title: `Subscription plan: ${a.planType}`, class: "badge badge-sm shrink-0 capitalize text-muted" }] : []),
             { role: "prefix", text: prefix(a), title: prefix(a), class: "min-w-0 flex-1 truncate font-mono text-2xs text-faint" },
             { role: "storage", text: storage.text, title: storage.title, class: "hidden shrink-0 text-3xs text-faint lg:block" },
-            { role: "quota", text: quota, class: `shrink-0 text-2xs ${status === "limit" ? "text-error" : status === "warning" ? "text-warning" : "text-success"}` },
+            { role: "quota", text: quota, class: `shrink-0 text-2xs ${status === "limit" ? "text-error" : status === "warning" ? "text-warning" : used == null ? "text-faint" : "text-success"}` },
             ...(a.needsReconnect ? [{ role: "auth", text: "authentication required", class: "shrink-0 text-2xs font-medium text-error" }] : []),
             ...(a.parkedAgents ? [{ role: "parked", text: `${a.parkedAgents} parked`, class: "badge badge-sm shrink-0 text-warning" }] : []),
         ], right: actions });

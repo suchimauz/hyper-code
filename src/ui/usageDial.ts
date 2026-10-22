@@ -5,7 +5,7 @@
 /**
  * Render a compact ring per subscription credential showing spent quota.
  *
- * Colour follows the fill: neutral below 60%, warning to 85%, error above, and
+ * Colour follows configured thresholds (50% warning / 75% alert by default), and
  * a full ring with a pause icon once agents are parked on it. Returns an empty
  * string when nothing has been recorded yet.
  *
@@ -35,15 +35,23 @@ export default function (
             planType: string | null;
             parkedAgents: number;
             tone: "neutral" | "warning" | "error";
+            /** Shared quota colour thresholds from usageOverview. */
+            thresholds?: { warnAt: number; alertAt: number };
         }>;
         /** Current timestamp in ms; defaults to Date.now(). */
         now?: number;
+        /**
+         * Quota thresholds shared with every other usage surface.
+         * Defaults to the settings' own values (50% warning, 75% alert).
+         */
+        thresholds?: { warnAt: number; alertAt: number };
     },
 ): string {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
     const entries = opts.entries ?? [];
     if (!entries.length) return "";
     const now = opts.now ?? Date.now();
+    const toneClass = (percent: number | null, thresholds: { warnAt: number; alertAt: number }) => percent == null || !Number.isFinite(percent) ? "text-faint" : percent >= thresholds.alertAt ? "text-error" : percent >= thresholds.warnAt ? "text-warning" : "text-success";
 
     const groups = new Map<string, { label: string; entries: typeof entries }>();
     for (const entry of entries) {
@@ -56,11 +64,12 @@ export default function (
     const ring = (entry: typeof entries[number]) => {
         const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];
         const percent = entry.usedPercent == null ? 0 : Math.max(0, Math.min(100, entry.usedPercent));
-        const known = entry.usedPercent != null && Number.isFinite(entry.usedPercent);
+        const known = entry.quotaStatus !== "unavailable" && entry.usedPercent != null && Number.isFinite(entry.usedPercent);
         const parked = entry.parkedAgents > 0;
-        const colour = parked || entry.tone === "error" ? "text-error"
-            : entry.tone === "warning" ? "text-warning"
-                : "text-faint";
+        const thresholds = entry.thresholds ?? opts.thresholds ?? { warnAt: 50, alertAt: 75 };
+        const unavailable = entry.quotaStatus === "unavailable";
+        const muted = unavailable || entry.quotaStatus === "stale";
+        const colour = parked ? "text-error" : muted ? "text-faint" : toneClass(known ? percent : null, thresholds);
         // A stroke-dasharray on a circle of r=12 (circumference ≈ 75.4) needs no
         // JS and no layout: the fill IS the number.
         const circumference = 75.4;
@@ -82,18 +91,23 @@ export default function (
                     : entry.tone === "warning"
                         ? `${remaining}% remaining`
                         : `${remaining}% remaining — sufficient capacity`;
-        const dual = entry.provider === "zai-coding" || entry.provider === "minimax-coding";
+        // Two rings when the provider reports two rolling windows: the weekly
+        // one outside, the short one inside. Driven by the measured windows,
+        // not by a list of providers — otherwise a plan that reports a weekly
+        // window would still show one ring.
         const freshWindow = (window?: types.llm.UsageWindow) => window && Number.isFinite(window.usedPercent) && (!window.resetsAt || window.resetsAt > now) ? window : undefined;
-        const short = freshWindow(entry.windows?.primary);
-        const weekly = freshWindow(entry.windows?.secondary);
+        const short = unavailable ? undefined : freshWindow(entry.windows?.primary);
+        const weekly = unavailable ? undefined : freshWindow(entry.windows?.secondary);
+        const dual = Boolean(entry.windows?.secondary) || entry.provider === "zai-coding" || entry.provider === "minimax-coding";
         const windowTitle = (label: string, window?: types.llm.UsageWindow) => `${label}: ${window ? `${window.usedPercent}% used · ${Math.max(0, 100-window.usedPercent)}% remaining${window.resetsAt ? ` · resets in ${humanDelay(window.resetsAt-now)} (${new Date(window.resetsAt).toISOString()})` : ""}` : "quota unavailable"}`;
-        const quotaCircle = (radius: number, window: types.llm.UsageWindow | undefined, label: string, colour: string) => {
+        const quotaCircle = (radius: number, window: types.llm.UsageWindow | undefined, label: string) => {
             const length = 2 * Math.PI * radius;
             const percent = window ? Math.max(0, Math.min(100, window.usedPercent)) : null;
-            const tone = entry.quotaStatus === "stale" ? "text-faint" : percent != null && percent >= 85 ? "text-error" : percent != null && percent >= 60 ? "text-warning" : colour;
+            // The same severity rule as every other usage surface.
+            const tone = parked ? "text-error" : muted ? "text-faint" : toneClass(percent, thresholds);
             return `<g data-quota-window="${label}" class="${tone}"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.18"></circle>${percent == null ? "" : `<circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="${(length*percent/100).toFixed(2)} ${length.toFixed(2)}"></circle>`}</g>`;
         };
-        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${quotaCircle(12,weekly,"weekly","text-info")}${quotaCircle(9,short,"5h","text-success")}</svg>` : "";
+        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${quotaCircle(12,weekly,"weekly")}${quotaCircle(9,short,"5h")}</svg>` : "";
 
         const title = [
             `${entry.label}${entry.planType ? ` · ${entry.planType}` : ""}`,

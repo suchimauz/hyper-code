@@ -34,6 +34,8 @@ export default async function (
     tone: "neutral" | "warning" | "error";
     updatedAt: number;
     windows: types.llm.UsageSnapshot["windows"];
+    /** The thresholds this row's tone was computed from, so every surface paints it the same way. */
+    thresholds: { warnAt: number; alertAt: number };
 }>> {
     const now = opts?.now ?? Date.now();
     // Thresholds are settings, not constants: how early "too much" starts
@@ -78,6 +80,7 @@ export default async function (
             tone: usedPercent == null ? "neutral" : usedPercent >= alertAt ? "error" : usedPercent >= warnAt ? "warning" : "neutral",
             updatedAt: Number(snapshot.updatedAt ?? 0),
             windows: { primary, secondary },
+            thresholds: { warnAt, alertAt },
         } as const);
     }
 

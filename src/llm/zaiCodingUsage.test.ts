@@ -36,7 +36,7 @@ test('Z.ai dual rings put weekly outside and 5h inside with explicit tooltip and
  const ctx:any={fns:{procs:{ui:{escape:({text}:any)=>String(text)}},ui:{modelLogo:()=>'<svg data-logo></svg>'}}};
  const entry:any={provider:'zai-coding',account:'default',label:'Z.ai Coding Plan',usedPercent:20,resetsAt:now+3600000,planType:'lite',parkedAgents:0,tone:'neutral',windows:{primary:{usedPercent:20,resetsAt:now+3600000},secondary:{usedPercent:7,resetsAt:now+86400000}}};
  let html=dial(ctx,null,{entries:[entry],now});
- expect(html).toContain('data-quota-window="weekly" class="text-info"><circle cx="14" cy="14" r="12"');
+ expect(html).toContain('data-quota-window="weekly" class="text-success"><circle cx="14" cy="14" r="12"');
  expect(html).toContain('data-quota-window="5h" class="text-success"><circle cx="14" cy="14" r="9"');
  expect(html).toContain('Weekly: 7% used');expect(html).toContain('5h: 20% used');expect(html).toContain('resets in');
  html=dial(ctx,null,{entries:[{...entry,windows:{},usedPercent:null,quotaStatus:'unavailable'}],now});expect(html).not.toContain('stroke-dasharray');expect(html).toContain('Weekly: quota unavailable');

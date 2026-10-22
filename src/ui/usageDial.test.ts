@@ -15,3 +15,10 @@ test('local-only skips redundant headings and remote heading is escaped',()=>{
  expect(dial(ctx,null,{entries:[base]})).not.toContain('<h3');
  const html=dial(ctx,null,{entries:[{...base,node:'<bad>'}]});expect(html).toContain('Hyper · &lt;bad&gt;');expect(html).not.toContain('<bad>');
 });
+test('dual rings support any provider and use per-window configured thresholds',()=>{
+ const now=Date.now();const html=dial(ctx,null,{entries:[{...base,provider:'anthropic',thresholds:{warnAt:40,alertAt:80},windows:{primary:{usedPercent:50,resetsAt:now+10000},secondary:{usedPercent:90,resetsAt:now+10000}}}],now});
+ expect(html).toContain('data-quota-window="weekly" class="text-error"');
+ expect(html).toContain('data-quota-window="5h" class="text-warning"');
+ const partial=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:100,resetsAt:now-1},secondary:{usedPercent:20,resetsAt:now+10000}}}],now});
+ expect(partial).toContain('5h: quota unavailable');expect(partial).toContain('Weekly: 20% used');
+});

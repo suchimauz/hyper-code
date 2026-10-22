@@ -16,6 +16,18 @@
   const stale = row => failure || row.quotaStatus === 'stale' || (!row.gateway && known(row) && (!row.updatedAt || Date.now() - row.updatedAt > 5 * 60000)) || Boolean(row.resetsAt && row.resetsAt <= Date.now());
   const left = row => Math.round(Math.max(0, Math.min(100, 100 - row.usedPercent)));
   const amount = row => known(row) && row.quotaStatus !== 'unavailable' ? (stale(row) ? '~' : '') + left(row) + '%' : '—';
+  // The measured short and long quota windows. A plan that reports both (a
+  // 5h window inside a weekly one) shows two rings, exactly like the desktop
+  // dock; a plan with one window shows one ring.
+  const freshWindow = (row, window) => window && typeof window.usedPercent === 'number' && Number.isFinite(window.usedPercent) && (!window.resetsAt || window.resetsAt > Date.now()) ? window : undefined;
+  const windows = row => {
+    const short = freshWindow(row, row.windows && row.windows.primary);
+    const weekly = freshWindow(row, row.windows && row.windows.secondary);
+    return { short, weekly, dual: Boolean(row.windows && row.windows.secondary) || row.provider === 'zai-coding' || row.provider === 'minimax-coding' };
+  };
+  // Shared thresholds arrive from the server; missing quota is never green.
+  const fillTone = (percent, row) => percent == null || !Number.isFinite(percent) ? 'neutral' : percent >= (row.thresholds?.alertAt ?? 75) ? 'error' : percent >= (row.thresholds?.warnAt ?? 50) ? 'warning' : 'success';
+  const toneColour = tone => tone === 'error' ? 'var(--color-error)' : tone === 'warning' ? 'var(--color-warning)' : tone === 'success' ? 'var(--color-success)' : 'var(--color-base-content-faint, #888)';
   const logo = row => {
     const span = el('span', '', 'mobile-usage-logo'); span.setAttribute('aria-hidden', 'true');
     // This HTML is produced only by ui.modelLogo; account/model strings are always textContent.
@@ -65,19 +77,39 @@
     for (const row of accounts) {
       const chip = el('span', '', 'mobile-usage-chip'); chip.dataset.usageChip = '';
       const outdated = stale(row), measured = known(row) && row.quotaStatus !== 'unavailable';
-      chip.dataset.tone = outdated ? 'neutral' : row.parkedAgents ? 'error' : row.tone || 'neutral';
+      const win = windows(row);
+      // The ring colour follows the fill of the window it draws, so a nearly
+      // spent plan reads the same on the phone as on the desktop dock.
+      const worst = Math.max(win.short ? win.short.usedPercent : 0, win.weekly ? win.weekly.usedPercent : 0, measured ? row.usedPercent : 0);
+      chip.dataset.tone = row.parkedAgents ? 'error' : outdated || !measured ? 'neutral' : fillTone(worst, row);
+      chip.style.color = toneColour(chip.dataset.tone);
       chip.dataset.quotaState = outdated ? 'stale' : measured ? 'known' : 'unknown';
       const ring = el('span', '', 'mobile-usage-ring'); ring.setAttribute('aria-hidden', 'true');
-      const filled = (Math.max(0, Math.min(100, row.usedPercent || 0)) / 100 * 75.4).toFixed(1);
+      const circle = (radius, percent, label) => {
+        const length = 2 * Math.PI * radius;
+        const filled = (Math.max(0, Math.min(100, percent)) / 100 * length).toFixed(2);
+        if (!Number.isFinite(percent) || row.quotaStatus === 'unavailable') return '';
+        const tone = row.parkedAgents ? 'error' : outdated ? 'neutral' : fillTone(percent, row);
+        return '<circle data-quota-window="' + label + '" data-tone="' + tone + '" style="color:' + toneColour(tone) + '" data-usage-fill cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="' + filled + ' ' + length.toFixed(2) + '"/>';
+      };
+      const track = (radius, label) => '<circle data-quota-window="' + label + '" class="mobile-usage-ring-track-line" cx="14" cy="14" r="' + radius + '" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".18"/>';
+      // Two measured windows: the weekly one outside, the short one inside —
+      // the same arrangement as the desktop dock.
+      const rings = win.dual
+        ? track(12, 'weekly') + circle(12, win.weekly?.usedPercent, 'weekly') + track(9, '5h') + circle(9, win.short?.usedPercent, '5h')
+        : (measured ? track(12, 'quota') + circle(12, row.usedPercent, 'quota') : track(12, 'quota'));
       // Same 28px spent-quota ring as desktop, with no account name or percentage beside it.
-      ring.innerHTML = '<svg viewBox="0 0 28 28" class="mobile-usage-ring-track"><circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2" opacity=".18"/>' + (measured ? '<circle data-usage-fill cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="' + filled + ' 75.4"/>' : '') + '</svg>';
+      ring.innerHTML = '<svg viewBox="0 0 28 28" class="mobile-usage-ring-track">' + rings + '</svg>';
       if (row.parkedAgents) ring.append(el('span', 'Ⅱ', 'mobile-usage-pause'));
       else if (row.gateway) { const glyph = el('i', '', 'ph ph-plugs-connected mobile-usage-provider-glyph'); ring.append(glyph); }
       else ring.append(logo(row));
       if (row.node) ring.append(el('span', '↔', 'mobile-usage-proxy'));
       if (row.gateway) { const dot = el('span', '', 'mobile-usage-gateway'); dot.dataset.status = row.status; ring.append(dot); }
       chip.append(ring);
-      chip.title = (row.label || name(row)) + ' · ' + (measured ? (outdated ? 'последний известный остаток ' : 'остаток ') + amount(row) : 'лимит неизвестен');
+      const winTitle = win.dual
+        ? ' · недельный ' + (win.weekly ? Math.max(0, 100 - win.weekly.usedPercent) + '%' : 'неизвестен') + ' · 5 ч ' + (win.short ? Math.max(0, 100 - win.short.usedPercent) + '%' : 'неизвестен')
+        : '';
+      chip.title = (row.label || name(row)) + ' · ' + (measured ? (outdated ? 'последний известный остаток ' : 'остаток ') + amount(row) : 'лимит неизвестен') + winTitle;
       if (row.needsReconnect) chip.title += ' · требуется повторное подключение';
       chip.setAttribute('role', 'img'); chip.setAttribute('aria-label', chip.title); box.append(chip);
     }
@@ -86,6 +118,10 @@
   function age(value) {
     if (!value) return 'Время обновления неизвестно';
     return 'Обновлено ' + new Date(value).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+  function delayOf(resetsAt) {
+    const mins = Math.max(0, Math.ceil((resetsAt - Date.now()) / 60000));
+    return mins >= 60 ? Math.floor(mins / 60) + ' ч ' + mins % 60 + ' мин' : mins + ' мин';
   }
   function card(row) {
     const section = el('section', '', 'mobile-usage-card'); section.dataset.usageKey = identity(row);
@@ -96,8 +132,20 @@
       status = row.reason === 'missing-key' ? 'Не задан API-ключ' : row.status === 'available' ? 'Каталог API доступен' : row.status === 'unavailable' ? 'API недоступен' : 'Состояние API неизвестно';
       section.append(el('p', status, 'mobile-usage-amount'), el('p', 'Лимиты неизвестны. Доступность каталога не подтверждает возможность генерации.', 'mobile-usage-meta'));
     } else {
+      const win = windows(row);
       status = row.quotaStatus === 'unavailable' || !known(row) ? 'Лимит неизвестен' : stale(row) ? 'Последний известный остаток: ' + left(row) + '%' : 'Осталось ' + left(row) + '%';
       section.append(el('p', status, 'mobile-usage-amount'));
+      // Both measured windows are listed, the weekly one first, so the phone
+      // shows the same two limits the desktop dock draws as two rings.
+      if (win.short && win.weekly) {
+        const weekly = el('p', 'Недельный лимит: осталось ' + Math.max(0, 100 - win.weekly.usedPercent) + '%', 'mobile-usage-amount');
+        weekly.dataset.tone = fillTone(win.weekly.usedPercent, row);
+        const short = el('p', 'Лимит за 5 часов: осталось ' + Math.max(0, 100 - win.short.usedPercent) + '%', 'mobile-usage-amount');
+        short.dataset.tone = fillTone(win.short.usedPercent, row);
+        section.append(weekly, short);
+        if (win.weekly.resetsAt) section.append(el('p', 'Недельный лимит восстановится через ' + delayOf(win.weekly.resetsAt), 'mobile-usage-meta'));
+        if (win.short.resetsAt) section.append(el('p', 'Лимит за 5 часов восстановится через ' + delayOf(win.short.resetsAt), 'mobile-usage-meta'));
+      }
       if (row.needsReconnect) section.append(el('p', 'Требуется повторное подключение аккаунта.', 'mobile-usage-meta'));
       if (known(row) && row.quotaStatus !== 'unavailable') {
         const meter = el('progress'); meter.max = 100; meter.value = left(row); meter.setAttribute('aria-label', 'Остаток лимита' + (stale(row) ? ' по устаревшим данным' : '')); meter.dataset.tone = stale(row) ? 'neutral' : row.tone; section.append(meter);
