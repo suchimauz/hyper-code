@@ -12,5 +12,6 @@ test('popup script owns secure-input cancellation and has no duplicate target de
 test('secure-input submit does not replace the prompt with an empty loading popup', async () => {
     const source = await Bun.file(new URL('./$script_rpc.js', import.meta.url)).text();
     expect(source).toContain("method === 'secureInput.submit'");
-    expect(source).toContain('if (!secureSubmit)');
+    expect(source).toContain("document.getElementById('app-popup')?.open)");
+    expect(source).toContain('if (!secureSubmit && ');
 });

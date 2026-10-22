@@ -79,7 +79,12 @@
             // form from the DOM. htmx source may be the detached element, but
             // values are already complete and target is explicit.
             const values = { method, params: JSON.stringify(params) };
-            if (!secureSubmit) window.hyperPopup?.loading(title, 'rpc');
+            // A loading shell only when a popup is ALREADY open (re-opening over
+            // one needs feedback). For a fresh open the shell was a second,
+            // wrongly-titled dialog flashing before the real content arrived —
+            // on a phone it read as two modals stacking. The swap handler in
+            // popup.js opens the dialog once, with the content's own title.
+            if (!secureSubmit && document.getElementById('app-popup')?.open) window.hyperPopup?.loading(title, 'rpc');
             htmx.ajax('POST', '/rpc', { target: '#app-popup-body', swap: 'innerHTML', values, headers: window.hyperRpcCsrfHeaders() });
         }
     };

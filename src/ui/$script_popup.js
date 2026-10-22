@@ -73,6 +73,12 @@
         if (!body.innerHTML.trim() && dialog?.dataset.popupKind) window.hyperPopup.close();
     });
 
+    // An HX-Trigger event any response may send to dismiss the popup — used by
+    // actions that start background work (manual compaction) so the modal does
+    // not hang open for the whole job. htmx dispatches it on the trigger
+    // element; it bubbles here.
+    document.addEventListener('hyper-popup-close', () => window.hyperPopup.close());
+
 
     // Secure-input events belong to the popup subsystem. control.js only owns
     // generic runtime UI actions and must not duplicate this lifecycle.

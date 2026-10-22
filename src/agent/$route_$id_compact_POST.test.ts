@@ -9,8 +9,10 @@ describe("POST /agent/:id/compact", () => {
     ctx.state.registry.agent.compactContext = (_c: any, _s: any, o: any) => ({ status: "compacted", tokensBefore: 10, instructions: o.instructions });
     const body = new FormData(); body.set("instructions", "focus tests");
     const res = await ctx.fns.procs.http.dispatch({ method: "POST", url: "/agent/a1/compact", body });
-    expect(res.status).toBe(204);
-    expect(res.headers.get("x-compaction-status")).toBe("compacted");
+    // The response returns at once and dismisses the popup; compaction itself runs in the background.
+    expect(res.status).toBe(200);
+    expect(res.headers.get("hx-trigger")).toBe("hyper-popup-close");
+    await Bun.sleep(10);
     ctx.state.registry.session.getMaxEventIdx = () => -1;
     ctx.state.registry.session.getEvents = () => [];
     ctx.state.registry.session.getFullMessages = () => [];
@@ -21,5 +23,19 @@ describe("POST /agent/:id/compact", () => {
     const form = ctx.fns.chat.compactForm({ agentId: "a1" });
     expect(form).toContain("Compact context");
     expect(form).toContain('hx-post="/agent/a1/compact"');
+  });
+
+  test("background compaction failure is reported, not swallowed", async () => {
+    const ctx = await mkTestCtx();
+    const agent: any = { id: "a2", model: "test:model", messages: [], events: [], scratchpad: {}, workspaceDir: process.cwd(), systemPrompt: "" };
+    (ctx.state as any).agent = { a2: agent };
+    ctx.state.registry.agent.compactContext = () => { throw new Error("compaction already running"); };
+    const notified: string[] = [];
+    ctx.state.registry.ui.notify = async (o: any) => { notified.push(`${o.level}:${o.message}`); };
+    const res = await ctx.fns.procs.http.dispatch({ method: "POST", url: "/agent/a2/compact", body: new FormData() });
+    expect(res.status).toBe(200);
+    await Bun.sleep(10);
+    expect(notified[0]).toContain("compaction already running");
+    expect(notified[0]?.startsWith("error:")).toBe(true);
   });
 });
