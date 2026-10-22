@@ -10,6 +10,8 @@ export type UsageEntry = {
     model: string;
     /** Visible catalogue model IDs for this credential. */
     models: string[];
+    /** Measured short and long quota windows; omitted when no snapshot exists. */
+    windows?: types.llm.UsageSnapshot["windows"];
     /** Remote node name; omitted for local credentials. */
     node?: string;
     /** Measured quota percentage, or null when unknown. */

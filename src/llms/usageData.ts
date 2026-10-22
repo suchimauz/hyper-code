@@ -26,7 +26,7 @@ export default async function (
         let entries: types.llms.UsageEntry[] = local.filter(entry => entry.provider !== "hyper").map(({ resetCredits: _resetCredits, ...entry }) => ({ ...entry, models: [] }));
         if (opts.includeConnected) {
             const inventory = (await ctx.fns.llm.listAccounts({})).filter(account => account.provider !== "hyper" && account.provider !== "oneapi");
-            const supported = new Set(["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai"]);
+            const supported = new Set(["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai", "zai-coding"]);
             const key = (account: { provider: string; account: string }) => JSON.stringify([account.provider, account.account]);
             const connected = new Set(inventory.map(key));
             entries = entries.filter(entry => !supported.has(entry.provider) || connected.has(key(entry)));
@@ -68,6 +68,11 @@ export default async function (
         // retains transient failures, and omits denied/disabled/empty catalogues.
         const models = await ctx.fns.llm.listModels({});
         for (const entry of entries) {
+            if (entry.provider === "zai-coding") {
+                entry.label = "Z.ai Coding Plan";
+                if (entry.usedPercent == null) entry.quotaStatus = "unavailable";
+                else if (!entry.updatedAt || Date.now() - entry.updatedAt > 300_000) entry.quotaStatus = "stale";
+            }
             if (entry.account.startsWith("ssh.")) {
                 const identity = /^ssh\.(.+)\.([^.]+)$/.exec(entry.account);
                 const prefix = identity ? `ssh/${identity[1]}:${entry.provider}/${identity[2]}:` : "";

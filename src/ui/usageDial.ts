@@ -24,6 +24,8 @@ export default function (
             model?: string;
             /** Available catalogue model IDs for this provider/account; shown in the native tooltip. */
             models?: string[];
+            /** Short (5h) and long (weekly) windows; Z.ai renders these as concentric rings. */
+            windows?: types.llm.UsageSnapshot["windows"];
             /** Hyper node name for remote credentials; omitted for local credentials. */
             node?: string;
             /** Remote snapshot is outdated or has no measured quota; omitted for current data. */
@@ -80,11 +82,25 @@ export default function (
                     : entry.tone === "warning"
                         ? `${remaining}% remaining`
                         : `${remaining}% remaining — sufficient capacity`;
+        const dual = entry.provider === "zai-coding";
+        const freshWindow = (window?: types.llm.UsageWindow) => window && Number.isFinite(window.usedPercent) && (!window.resetsAt || window.resetsAt > now) ? window : undefined;
+        const short = freshWindow(entry.windows?.primary);
+        const weekly = freshWindow(entry.windows?.secondary);
+        const windowTitle = (label: string, window?: types.llm.UsageWindow) => `${label}: ${window ? `${window.usedPercent}% used · ${Math.max(0, 100-window.usedPercent)}% remaining${window.resetsAt ? ` · resets in ${humanDelay(window.resetsAt-now)} (${new Date(window.resetsAt).toISOString()})` : ""}` : "quota unavailable"}`;
+        const quotaCircle = (radius: number, window: types.llm.UsageWindow | undefined, label: string, colour: string) => {
+            const length = 2 * Math.PI * radius;
+            const percent = window ? Math.max(0, Math.min(100, window.usedPercent)) : null;
+            const tone = entry.quotaStatus === "stale" ? "text-faint" : percent != null && percent >= 85 ? "text-error" : percent != null && percent >= 60 ? "text-warning" : colour;
+            return `<g data-quota-window="${label}" class="${tone}"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.18"></circle>${percent == null ? "" : `<circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="${(length*percent/100).toFixed(2)} ${length.toFixed(2)}"></circle>`}</g>`;
+        };
+        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${quotaCircle(12,weekly,"weekly","text-info")}${quotaCircle(9,short,"5h","text-success")}</svg>` : "";
+
         const title = [
             `${entry.label}${entry.planType ? ` · ${entry.planType}` : ""}`,
             entry.node ? `Hyper node ${entry.node} · provider ${entry.provider} · account ${entry.account}` : null,
             known ? `${percent}% used${entry.quotaStatus === "stale" ? " (last known)" : ""}` : null,
             verdict,
+            dual ? `Outer ring · ${windowTitle("Weekly",weekly)}\nInner ring · ${windowTitle("5h",short)}` : null,
             left ? `resets in ${left}` : null,
             `Provider ${entry.provider} · account ${entry.account}${entry.node ? ` · node ${entry.node}` : ssh ? ` · SSH ${ssh}` : " · local"}`,
             entry.models?.length ? `\nAvailable models (${entry.models.length}):\n${entry.models.join("\n")}` : null,
@@ -92,13 +108,13 @@ export default function (
 
         return `<a href="/llms" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-base-300" title="${esc(title)}" aria-label="${esc(title)}">
           <span class="relative flex size-7 shrink-0 items-center justify-center ${colour}">
-            <svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">
+            ${dual ? dualSvg : `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">
               <circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2" opacity="0.18"></circle>
               ${known ? `<circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="${filled.toFixed(1)} ${circumference}"></circle>` : ""}
-            </svg>
+            </svg>`}
             ${parked
             ? `<i class="ph ph-pause text-2xs" aria-hidden="true"></i>`
-            : ctx.fns.ui.modelLogo({ model: entry.model ?? (entry.node ? `hyper/${entry.node}:${entry.provider}:` : ssh ? `ssh/${ssh}:${entry.provider}:` : `${entry.provider}:`), bare: true })}
+            : ctx.fns.ui.modelLogo({ model: entry.model ?? (entry.node ? `hyper/${entry.node}:${entry.provider}:` : ssh ? `ssh/${ssh}:${entry.provider}:` : `${entry.provider}:`), bare: true, ...(dual ? { compact: true } : {}) })}
           </span>
         </a>`;
     };
