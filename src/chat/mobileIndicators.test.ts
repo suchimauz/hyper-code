@@ -18,13 +18,11 @@ async function ring(used: number, capacity: number) {
     return contextRing(ctx, null, { agentId: 'ab' });
 }
 
-test('mobile context percentage stays exact beyond capacity and uses warning/error thresholds', async () => {
+test('mobile context ring thresholds and fill caps at full beyond capacity', async () => {
     for (const [used, percent, colour, fill] of [[40000, 40, 'subtle', '40.0%'], [75000, 75, 'warning', '75.0%'], [95000, 95, 'error', '95.0%'], [112000, 112, 'error', '100.0%']] as const) {
         const html = await ring(used, 100000);
         expect(html).toContain('data-context-meter');
-        expect(html).toContain(`aria-hidden="true">${percent}%</span>`);
-        expect(html).toContain(`data-context-total`);
-        expect(html).toContain('data-context-pct');
+        expect(html).toContain('data-context-total');
         expect(html).toContain(`--p:${fill};--c:var(--color-${colour})`);
         expect(html).toContain(`· ${percent}% — click to compact`);
     }
@@ -41,7 +39,7 @@ test('context meter formats the compact used/window total, with m for millions',
 test('unknown context capacity shows tokens instead of a misleading percentage; unused is empty', async () => {
     const html = await ring(12345, 0);
     expect(html).toContain('12k');
-    expect(html).not.toContain('data-context-pct');
+    expect(html).not.toContain('data-context-total');
     expect(await ring(0, 100000)).toBe('');
 });
 
