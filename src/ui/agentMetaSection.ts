@@ -20,6 +20,7 @@
  * @param opts.archivedTeam Archived delegated children, for the team section.
  * @param opts.models Models grouped by provider, for the parked-agent switcher.
  * @param opts.accounts Credential accounts with quota, for the parked-agent switcher.
+ * @param opts.disabledModels Disabled exact routes to exclude from recovery actions.
  * @param opts.extraSettings Trusted HTML blocks answered by the `ui.agentSettings` point, appended to the settings section.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
@@ -35,6 +36,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
     archivedTeam?: Array<{ id: string; title: string; runState: string; status: string; plan: any; summary: string | null; updatedAt: number; archivedAt?: number | null }>;
     /** Models grouped by provider, used by the parked-agent switcher. */
     models?: Record<string, string[]>;
+    /** Disabled exact model routes; omitted means no policy exclusions. */
+    disabledModels?: string[];
     /** Credential accounts with their quota, used by the parked-agent switcher. */
     accounts?: Array<{ provider: string; account: string; label: string; model: string; available: boolean; usedPercent: number | null; resetsAt: number | null; parkedAgents: number }>;
     /** Trusted HTML blocks answered by `ui.agentSettings`, appended to the settings section. */
@@ -105,7 +108,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const addButton = ctx.fns.procs.ui.button({ label: "Add trigger", html: '<i class="ph ph-plus" aria-hidden="true"></i><span>Add trigger</span><i class="ph ph-caret-down text-3xs" aria-hidden="true"></i>', tone: "primary", size: "xs", action: "add-trigger", class: "mt-3 w-full justify-center gap-1.5", attrs: { popovertarget: addPopupId, "aria-haspopup": "dialog", style: `anchor-name:--${addPopupId}` } });
         const add = `${addButton}<div id="${esc(addPopupId)}" popover style="position-anchor:--${esc(addPopupId)}" class="inplace-popup-panel w-72 max-w-[calc(100vw-2rem)]"><div class="mb-2 text-3xs font-semibold uppercase tracking-wide text-faint">New trigger</div><div class="space-y-2"><details class="rounded-lg border border-ui-border"><summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium"><i class="ph ph-alarm"></i><span>Wake-up</span><span class="ml-auto text-3xs text-faint">once</span></summary><div class="border-t border-ui-border p-3">${wakeForm}</div></details><details class="rounded-lg border border-ui-border"><summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium"><i class="ph ph-calendar-clock"></i><span>Schedule</span><span class="ml-auto text-3xs text-faint">cron</span></summary><div class="border-t border-ui-border p-3">${cronForm}</div></details><details class="rounded-lg border border-ui-border"><summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium"><i class="ph ph-eye"></i><span>Watch condition</span><span class="ml-auto text-3xs text-faint">event</span></summary><div class="border-t border-ui-border p-3">${watchForm}</div></details></div></div>`;
         const cancelAll = activeTriggers.length ? `<form hx-post="/agent/${id}/triggers" hx-swap="none" hx-confirm="Cancel all triggers?" class="mt-3">${ctx.fns.procs.ui.button({ label: 'Cancel all', name: 'action', value: 'cancelAll', tone: 'danger', size: 'xs', action: 'cancel-all-triggers' })}</form>` : "";
-        const parkedHtml = ctx.fns.ui.parkedCard?.({ agent, models: opts.models, accounts: opts.accounts }) ?? "";
+        const parkedHtml = ctx.fns.ui.parkedCard?.({ agent, models: opts.models, accounts: opts.accounts, disabledModels: opts.disabledModels }) ?? "";
         return inspectorSection({ title: "Automation", icon: "lightning", badge: activeTriggers.length ? String(activeTriggers.length) : statusBadge({ label: "off" }), html: `${parkedHtml}${parkedHtml ? '<div class="mt-2"></div>' : ''}${rows ? `<ul class="space-y-2">${rows}</ul>` : '<div class="text-2xs text-faint">No active triggers.</div>'}${cancelAll}${add}${history ? `<details class="mt-3"><summary class="cursor-pointer text-2xs font-medium">Recent runs</summary><ul class="mt-2 space-y-2">${history}</ul></details>` : ""}`, collapsible: true, open: !!parkedHtml });
     }
 

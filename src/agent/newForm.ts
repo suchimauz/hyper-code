@@ -8,7 +8,10 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     if (opts.projectId && !project) throw new Error('Project not found');
     const last = ((await ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = 'last-model'" }).catch(() => [])) as any[])[0]?.value;
     const groups = await ctx.fns.llm.listModels({});
-    const usable = new Set(Object.values(groups).flat());
+    const policy = await ctx.fns.llm.modelPolicy({ action: 'list' });
+    const canonical = (model: string) => (model.includes(':') ? model : `lmstudio:${model}`).replace(/^(?!hyper\/)([^/:]+)\/default:/, '$1:');
+    const disabled = new Set(policy.disabledModels.map(canonical));
+    const usable = new Set(Object.values(groups).flat().filter(model => !disabled.has(canonical(model))));
     const configured = (await ctx.fns.settings.modelDefault({})) ?? ctx.env.MODEL ?? '';
     // Preference is useful only while that route is callable on this instance.
     const model = usable.has(last) ? last : usable.has(configured) ? configured : usable.values().next().value ?? '';

@@ -34,7 +34,13 @@ params: Record<string, string> }) {
     ]);
     const [canvas, canvasPanel] = await Promise.all([ctx.fns.canvas.get({ agentId: id }), ctx.fns.canvas.panelHtml({ agentId: id })]);
     const metaCollapsed = String((metaState as any[])[0]?.value ?? "0") === "1";
-    const meta = ctx.fns.ui.agentMetaPanel({ agent, team, archivedTeam, triggers, extraSettings, collapsed: metaCollapsed });
+    const recovery = agent.scratchpad?.parked ? await Promise.all([
+        ctx.fns.llm.listModels({}),
+        ctx.fns.llm.listAccounts({}),
+        ctx.fns.llm.modelPolicy({ action: "list" }),
+    ]) : null;
+    const meta = ctx.fns.ui.agentMetaPanel({ agent, team, archivedTeam, triggers, extraSettings, collapsed: metaCollapsed,
+        models: recovery?.[0], accounts: recovery?.[1], disabledModels: recovery?.[2].disabledModels });
     // id="chat-panel" is the chat client's mount point: /agent/chat.js loads
     // once for the whole app and (re)binds itself to this element after every
     // swap — Enter-to-send, stick-to-bottom, older-message paging and the tool

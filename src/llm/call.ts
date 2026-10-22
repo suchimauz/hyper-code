@@ -48,6 +48,8 @@ export default async function (
     if (!user) throw new Error("llm.call: user is required");
     const primary = String(opts.model ?? await ctx.fns.settings.modelDefault({})).trim();
     if (!primary) throw new Error("llm.call: model is required");
+    // Reject an opted-out primary before reading or constructing any fallback routes.
+    if (ctx.fns.llm.modelPolicy) await ctx.fns.llm.modelPolicy({ action: "assert", model: primary });
     if (/^(?:ssh\/[^:]+:)?cursor(?:\/|:)/.test(primary)) {
         throw Object.assign(new Error('Provider unavailable'), { retryable: false, replaySafe: false });
     }
@@ -122,6 +124,7 @@ function alternateAnthropicModel(model: string): string | null {
 }
 
 function shouldRetrySameModel(error: unknown): boolean {
+    if ((error as { code?: string })?.code === "MODEL_DISABLED_BY_USER") return false;
     if ((error as { retryable?: boolean; replaySafe?: boolean })?.retryable === false || (error as { replaySafe?: boolean })?.replaySafe === false) return false;
     const message = String((error as any)?.message ?? error);
     if (/usage_limit_reached|usage limit (?:has been )?reached|quota_exceeded|credits_depleted|out of credits/i.test(message)) return false;
@@ -129,6 +132,7 @@ function shouldRetrySameModel(error: unknown): boolean {
 }
 
 function shouldFallback(error: unknown): boolean {
+    if ((error as { code?: string })?.code === "MODEL_DISABLED_BY_USER") return false;
     if ((error as { retryable?: boolean; replaySafe?: boolean })?.retryable === false || (error as { replaySafe?: boolean })?.replaySafe === false) return false;
     const message = String((error as any)?.message ?? error);
     if (/\b(?:400|401|403|404|409|413|422)\b/.test(message)) return false;

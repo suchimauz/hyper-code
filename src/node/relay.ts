@@ -57,6 +57,18 @@ export default async function (
         }
         return Response.json({ error: `model not offered to this client: ${model} (${opts.api})` }, { status: 404 });
     }
+    // Enforce the actual entitled route before credentials or any relay transport.
+    const localPrefix = `${entry.provider}/${entry.account}:`;
+    const localModel = entry.id.startsWith(localPrefix) ? entry.id.slice(localPrefix.length) : entry.id;
+    const policyModel = entry.via
+        ? `${entry.via.startsWith("hyper/") ? entry.via : "hyper/" + entry.via}:${entry.id}`
+        : `${entry.provider}${entry.account && entry.account !== "default" ? "/" + entry.account : ""}:${localModel}`;
+    try {
+        if (ctx.fns.llm?.modelPolicy) await ctx.fns.llm.modelPolicy({ action: "assert", model: policyModel });
+    } catch (error) {
+        if ((error as { code?: string })?.code !== "MODEL_DISABLED_BY_USER") throw error;
+        return Response.json({ error: (error as Error).message, code: "MODEL_DISABLED_BY_USER" }, { status: 403 });
+    }
     // Only conversation metadata may cross the authentication boundary; the
     // host/next node still owns authorization and provider identity headers.
     const metadata: Record<string, string> = {};

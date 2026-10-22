@@ -6,6 +6,8 @@
  * its own "via proxy" entry whose accounts are the host's providers.
  * In `agent` mode each model posts to /agent/<id>/model; in `form` mode a
  * click only writes the route into the enclosing form's hidden `model` input.
+ * Policy-disabled routes remain visible (including the current selection),
+ * but have no submit or click action. Default-account aliases share policy.
  *
  * @param opts.current Currently selected model route, e.g. "codex:gpt-6-sol".
  * @param opts.mode "agent" posts the choice for opts.agentId; "form" fills a hidden input.
@@ -28,10 +30,15 @@ export default async function (
     const esc = (value: unknown) => ctx.fns.procs.ui.escape({ text: String(value ?? "") });
     const current = String(opts.current ?? "");
     const currentRoute = parseRoute(current);
-    const [listed, accountRows] = await Promise.all([
+    const [listed, accountRows, policy] = await Promise.all([
         ctx.fns.llm.listModels({}),
         ctx.fns.llm.listAccounts({}).catch(() => [] as any[]),
+        ctx.fns.llm.modelPolicy({ action: "list" }),
     ]);
+    // Only the local default-account alias is interchangeable: named accounts,
+    // SSH instances and Hyper routes are independent policy entries.
+    const canonical = (route: string) => route.startsWith('hyper/') ? route : route.includes(':') ? route.replace(/^([^/:]+)\/default:/, "$1:") : 'lmstudio:' + route;
+    const disabledModels = new Set(policy.disabledModels.map(canonical));
 
     const groups: Record<string, string[]> = {};
     for (const [group, models] of Object.entries(listed ?? {})) {
@@ -100,14 +107,16 @@ export default async function (
             const list = account.models ?? entry.models;
             const rows = list.map(baseModel => {
                 const target = account.models ? baseModel : withAccount(baseModel, entry.provider, account.account);
-                const selected = target === current;
+                const selected = canonical(target) === canonical(current);
+                const policyDisabled = disabledModels.has(canonical(target));
+                const disabled = policyDisabled || account.needsReconnect || (mode === "agent" && selected);
                 const modelId = parseRoute(target).modelId;
                 const label = modelId;
                 const visibleRoute = target;
                 const mark = ctx.fns.ui.modelLogo({ model: target, bare: true });
-                const html = `${mark}<span class="min-w-0 flex-1"><span class="block truncate text-xs font-medium">${esc(label)}</span><span class="block truncate font-mono text-micro text-faint">${esc(visibleRoute)}</span></span>${selected ? '<i class="ph ph-check-circle text-primary" aria-hidden="true"></i>' : '<i class="ph ph-arrow-right text-faint" aria-hidden="true"></i>'}`;
-                const button = ctx.fns.procs.ui.button({ action: "select-model", html, type: mode === "form" ? "button" : "submit", disabled: mode === "form" ? account.needsReconnect : selected || account.needsReconnect, title: account.needsReconnect ? "Reconnect this account in LLM connections before selecting it" : undefined, class: `flex w-full items-center gap-2 rounded-lg text-left ${selected ? "border-primary/30 bg-primary/10 text-primary" : "text-muted"}`, attrs: { "data-model-route": target, ...(selected ? { "aria-current": "true" } : {}), ...(mode === "form" ? { onclick: FORM_SELECT } : {}) } });
-                return mode === "form" ? button : `<form hx-post="/agent/${encodeURIComponent(id)}/model" hx-swap="none" class="contents"><input type="hidden" name="model" value="${esc(target)}"><input type="hidden" name="scope" value="agent">${button}</form>`;
+                const html = `${mark}<span class="min-w-0 flex-1"><span class="block truncate text-xs font-medium">${esc(label)}</span><span class="block truncate font-mono text-micro text-faint">${esc(visibleRoute)}</span></span>${policyDisabled ? '<span class="text-micro text-faint">Disabled</span>' : ""}${selected ? '<i class="ph ph-check-circle text-primary" aria-hidden="true"></i>' : '<i class="ph ph-arrow-right text-faint" aria-hidden="true"></i>'}`;
+                const button = ctx.fns.procs.ui.button({ action: "select-model", html, type: mode === "form" ? "button" : "submit", disabled, title: policyDisabled ? "This model is disabled by model policy" : account.needsReconnect ? "Reconnect this account in LLM connections before selecting it" : undefined, class: `flex w-full items-center gap-2 rounded-lg text-left ${selected ? "border-primary/30 bg-primary/10 text-primary" : "text-muted"}`, attrs: { "data-model-route": target, ...(selected ? { "aria-current": "true" } : {}), ...(mode === "form" && !disabled ? { onclick: FORM_SELECT } : {}) } });
+                return mode === "form" || disabled ? button : `<form hx-post="/agent/${encodeURIComponent(id)}/model" hx-swap="none" class="contents"><input type="hidden" name="model" value="${esc(target)}"><input type="hidden" name="scope" value="agent">${button}</form>`;
             }).join("");
             const heading = account.label ? `${entry.node ?? entry.sshInstance} → ${account.label}` : account.account === "default" ? "main" : account.account;
             const sub = entry.sshInstance ? `remote SSH instance ${entry.sshInstance} · ssh/${entry.sshInstance}:` : entry.node ? `relayed through Hyper node ${entry.node} · hyper/${entry.node}:` : `${entry.provider}${account.account === "default" ? "" : `/${account.account}`}:`;

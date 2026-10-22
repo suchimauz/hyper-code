@@ -14,6 +14,7 @@ test("named-only local Codex remains in rendered picker with a Hyper current rou
     const ctx = { env: {}, state: {}, fns: {
         settings: { get: async () => [] },
         llm: {
+            modelPolicy: async () => ({ disabledModels: [] }),
             gatewayHealth: async () => ({ ok: false, models: [] }),
             listAccounts: async () => rows,
             resolveEndpoint: async () => ({ apiKey: null }),

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import accountsCard from "./accountsCard";
+import control from './modelControl';
 
 const ctx: any = { fns: {
     procs: { ui: {
@@ -15,6 +16,7 @@ const ctx: any = { fns: {
         popup: (o: any) => JSON.stringify(o),
         live: ({ html }: any) => html,
     },
+    llms: { modelControl: (opts: Parameters<typeof control>[2]) => control(ctx,null,opts) },
 } };
 
 test("accounts card groups consistently by provider and renders plan/storage metadata", () => {
@@ -95,4 +97,12 @@ test('Go account displays measured 5h weekly and monthly subscription windows',(
  const html=accountsCard(ctx,null,{accounts:[{provider:'opencode',account:'default',label:'OpenCode Go',model:'opencode:',source:'file',available:true,usedPercent:70,planType:'Go subscription',resetsAt:Date.now()+10000,parkedAgents:0,windows:{primary:{usedPercent:10,windowMinutes:300,resetsAt:Date.now()+10000},secondary:{usedPercent:30,windowMinutes:10080,resetsAt:Date.now()+20000},tertiary:{usedPercent:70,windowMinutes:43200,resetsAt:Date.now()+30000}}}],models:{opencode:['opencode:glm']}});
  for(const text of ['quota-5h','quota-weekly','quota-monthly','5h 10%','weekly 30%','monthly 70%'])expect(html).toContain(text);
  expect(html).not.toContain('quota unavailable');
+});
+
+test('Connections keeps disabled models visible with enable controls and exact account routes',()=>{
+ const html=accountsCard(ctx,null,{accounts:[],models:{openai:['openai:a','openai/b:b']},disabledModels:['openai/default:a']});
+ expect(html).toContain('data-model-policy="openai:a" data-model-disabled="true"');
+ expect(html).toContain('data-model-policy="openai/b:b" data-model-disabled="false"');
+ expect(html).toContain('Enable openai:a');expect(html).toContain('Disable openai/b:b');
+ expect(html).toContain('/llms/model-state');
 });

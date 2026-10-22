@@ -9,6 +9,7 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
         Promise.resolve(ctx.fns.llm.accountLoginStatus({})),
     ]);
     const accounts = await ctx.fns.llm.listAccounts({});
+    const {disabledModels} = await ctx.fns.llm.modelPolicy({action:'list'});
     const models = await ctx.fns.llm.listModels({});
     const nodes = await ctx.fns.node.list({});
     const [zaiPlan, minimaxPlan, opencodePlan, instanceRows] = await Promise.all([
@@ -22,5 +23,5 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
         serviceTier: (await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" })) ?? "standard",
         maxTokens: await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }),
     };
-    return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax, planInstances }), { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax, planInstances, disabledModels }), { headers: { "content-type": "text/html; charset=utf-8" } });
 }

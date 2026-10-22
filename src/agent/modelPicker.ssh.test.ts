@@ -5,6 +5,7 @@ test("SSH picker keeps instances, providers, accounts and both route colons dist
     const routes = ["ssh/alpha:codex/main:gpt-test", "ssh/alpha:claude-code/work:claude-test", "ssh/beta:codex/main:gpt-test"];
     const ctx = { fns: {
         llm: {
+            modelPolicy: async () => ({ disabledModels: [] }),
             listModels: async () => ({ codex: ["codex:gpt-test"], "ssh/alpha": routes.slice(0, 2), "ssh/beta": routes.slice(2) }),
             listAccounts: async () => [{ provider: "codex", account: "ssh.alpha.main", source: "ssh", available: true, usedPercent: 12 }],
         },

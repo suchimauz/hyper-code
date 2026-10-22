@@ -15,6 +15,7 @@
  * @param opts.agent Agent whose scratchpad may carry a parking mark.
  * @param opts.models Available models grouped by provider, from llm.listModels.
  * @param opts.accounts Credential accounts with their quota, from llm.listAccounts.
+ * @param opts.disabledModels Disabled exact routes; default-account aliases share their provider route.
  * @param opts.now Current time in ms, for testing.
  */
 export default function (
@@ -25,6 +26,8 @@ export default function (
         agent: types.agent.Agent;
         /** Models grouped by provider, as returned by llm.listModels. */
         models?: Record<string, string[]>;
+        /** Disabled exact model routes; omitted means no policy exclusions. */
+        disabledModels?: string[];
         /** Credential accounts, as returned by llm.listAccounts. */
         accounts?: Array<{ provider: string; account: string; label: string; model: string; available: boolean; usedPercent: number | null; resetsAt: number | null; parkedAgents: number; thresholds?: { warnAt: number; criticalAt: number; alertAt: number } }>;
         /** Current timestamp in ms; defaults to Date.now(). */
@@ -46,11 +49,15 @@ export default function (
     // Same-family alternatives first: the fastest fix is usually the same class
     // of model billed differently, not a different model.
     const current = String((agent as any).model ?? parked.model ?? "");
-    const suggestions = alternatives(current, parked.provider, opts.models ?? {});
+    const canonical = (model: string) => (model.includes(":") ? model : `lmstudio:${model}`).replace(/^(?!hyper\/)([^/:]+)\/default:/, "$1:");
+    const disabled = new Set((opts.disabledModels ?? []).map(canonical));
+    const isDisabled = (model: string) => disabled.has(canonical(model));
+    const suggestions = alternatives(current, parked.provider, opts.models ?? {}).filter(m => !isDisabled(m));
+    const hasEnabledAlternative = Object.values(opts.models ?? {}).flat().some(m => m !== current && !isDisabled(m));
     const groups = Object.entries(opts.models ?? {})
         .map(([provider, list]) => {
             const options = (list ?? [])
-                .map((m) => `<option value="${esc(m)}"${m === current ? " disabled" : ""}>${esc(m)}</option>`)
+                .map((m) => `<option value="${esc(m)}"${m === current || isDisabled(m) ? " disabled" : ""}>${esc(m)}</option>`)
                 .join("");
             return options ? `<optgroup label="${esc(provider)}">${options}</optgroup>` : "";
         })
@@ -80,9 +87,9 @@ export default function (
         // A sibling login of the SAME provider keeps the model and swaps only
         // the credential; another provider brings its own model along.
         const target = a.provider === parked.provider ? swapAccount(current, a.account) : (a.model.endsWith(":") ? "" : a.model);
-        const button = target && a.available
+        const button = target && a.available && !isDisabled(target)
             ? `<form hx-post="/agent/${id}/model" hx-swap="none" class="contents"><input type="hidden" name="model" value="${esc(target)}"><input type="hidden" name="scope" value="provider">${ctx.fns.procs.ui.button({ action: 'use-model-account', label: 'Use', type: 'submit', size: 'xs' })}</form>`
-            : `<span class="text-3xs text-faint">${a.available ? "no model" : "waiting"}</span>`;
+            : `<span class="text-3xs text-faint">${target && isDisabled(target) ? "disabled" : a.available ? "no model" : "waiting"}</span>`;
         return `<div class="flex items-center gap-1.5 py-0.5">
             ${ctx.fns.ui.modelLogo?.({ model: a.model || `${a.provider}:`, bare: true, compact: true }) ?? ""}
             <span class="min-w-0 flex-1 truncate" title="${esc(a.model)}">${esc(a.provider === parked.provider ? `${a.account} — same provider` : a.label)}</span>
@@ -107,9 +114,9 @@ export default function (
 
     const picker = groups
         ? `<form hx-post="/agent/${id}/model" hx-swap="none" class="mt-2 space-y-1">
-             <select name="model" aria-label="Switch model" class="select select-bordered select-sm w-full font-mono text-2xs">${groups}</select>
+             <select name="model" required aria-label="Switch model" class="select select-bordered select-sm w-full font-mono text-2xs"><option value="" disabled selected>Choose an enabled model</option>${groups}</select>
              <label class="flex items-center gap-1 text-3xs text-subtle"><input type="checkbox" name="scope" value="provider" class="checkbox checkbox-xs" checked>apply to all on ${esc(parked.provider)}${esc(account)}</label>
-             ${ctx.fns.procs.ui.button({ action: 'switch-model', label: 'Switch', type: 'submit', tone: 'primary', size: 'xs', class: 'w-full' })}
+             ${ctx.fns.procs.ui.button({ action: 'switch-model', label: 'Switch', type: 'submit', tone: 'primary', size: 'xs', class: 'w-full', disabled: !hasEnabledAlternative })}
            </form>`
         : "";
 

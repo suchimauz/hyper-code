@@ -30,6 +30,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     let archivedTeam: any[] = [];
     let models: Record<string, string[]> = {};
     let accounts: any[] = [];
+    let disabledModels: string[] = [];
     let triggers: any[] = [];
     let extraSettings: string[] = [];
     if (section === "team") {
@@ -40,15 +41,19 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     } else if (section === "automation") {
         triggers = await ctx.fns.agent.triggers({ id: agentId, status: "all" });
         if (agent.scratchpad?.parked) {
-            [models, accounts] = await Promise.all([
+            const [availableModels, availableAccounts, policy] = await Promise.all([
                 ctx.fns.llm.listModels({}).catch(() => ({})),
                 ctx.fns.llm.listAccounts({}).catch(() => []),
+                ctx.fns.llm.modelPolicy({ action: "list" }),
             ]);
+            models = availableModels;
+            accounts = availableAccounts;
+            disabledModels = policy.disabledModels;
         }
     } else if (section === "settings") {
         // Collected here rather than inside the renderer, which is synchronous:
         // a plugin answering this point may read a setting out of Postgres.
         extraSettings = await ctx.fns.ui.agentSettingsBlocks({ agentId });
     }
-    return ctx.fns.ui.agentMetaSection({ agent, section: section as any, team, archivedTeam, models, accounts, triggers, extraSettings });
+    return ctx.fns.ui.agentMetaSection({ agent, section: section as any, team, archivedTeam, models, accounts, disabledModels, triggers, extraSettings });
 }

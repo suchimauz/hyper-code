@@ -15,6 +15,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; windows?: types.llm.UsageSnapshot["windows"] | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; sshInstance?: string; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>; thresholds?: { warnAt: number; criticalAt?: number; alertAt: number } }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
+    /** Exact locally disabled routes; kept visible with an enable action. @default [] */ disabledModels?: string[];
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
     /** MiniMax M Plan request settings shown next to the plan account. */
     minimax?: { serviceTier: string; maxTokens: number };
@@ -77,7 +78,9 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ], right: actions });
     };
 
-    const modelList = (models: string[]) => models.length ? `<ul class="llm-model-list mt-2 flex flex-wrap gap-1" aria-label="Available models">${models.map(model => `<li class="max-w-full break-all rounded bg-base-200 px-2 py-1 font-mono text-2xs">${esc(model)}</li>`).join("")}</ul>` : `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
+    const canonical = (model: string) => model.startsWith('hyper/') ? model : model.includes(':') ? model.replace(/^([a-z][\w-]*)\/default:/, '$1:') : 'lmstudio:' + model;
+    const disabledModels = new Set((opts.disabledModels ?? []).map(canonical));
+    const modelList = (models: string[]) => models.length ? `<ul class="llm-model-list mt-2 flex flex-wrap gap-1" aria-label="Available models">${models.map(model => `<li class="max-w-full">${ctx.fns.llms.modelControl({model,disabled:disabledModels.has(canonical(model))})}</li>`).join("")}</ul>` : `<p class="mt-2 text-2xs text-faint">No available catalogue models</p>`;
     // MiniMax M Plan exposes settings that change how requests are made:
     // the admission tier and the output budget (thinking tokens count
     // against it). They are shown next to the account so the person can see

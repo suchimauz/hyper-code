@@ -83,7 +83,16 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
     // credentials. Static catalogues describe capabilities, not availability.
     const configured = async (model: string) => {
         try { const endpoint = await ctx.fns.llm.resolveEndpoint({ model }); return endpoint.kind === "local" || !!endpoint.apiKey; }
-        catch { return false; }
+        catch (error) {
+            if ((error as { code?: string })?.code !== "MODEL_DISABLED_BY_USER") return false;
+            // Catalogue visibility is credential-based, not inference permission. Never
+            // bypass resolveEndpoint's guard or expose an unguarded inference endpoint.
+            const provider = model.slice(0, model.indexOf(":"));
+            if (provider === "kimi-coding") return !!ctx.env?.KIMI_CODING_API_KEY || !!ctx.fns.llm.accountCredentialExists?.({ provider: "kimi-coding" });
+            const keys: Record<string, string> = { kimi: "kimiApiKey", openai: "openaiApiKey", openrouter: "openrouterApiKey" };
+            const key = keys[provider];
+            return key ? !!await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key }) : false;
+        }
     };
     if (await configured("kimi:kimi-k3")) out.kimi = [
         "kimi:kimi-k3",
@@ -107,7 +116,11 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
     // Groq: query the account catalogue live when a key is configured. Fall back
     // to a small production list so model selection still works before login.
     try {
-        const endpoint = await ctx.fns.llm.resolveEndpoint({ model: "groq:openai/gpt-oss-120b" });
+        const endpoint = await ctx.fns.llm.resolveEndpoint({ model: "groq:openai/gpt-oss-120b" }).catch(async error => {
+            if ((error as { code?: string })?.code !== "MODEL_DISABLED_BY_USER") throw error;
+            // A catalogue GET is not inference: read only its own credential.
+            return { apiKey: await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key: "groqApiKey" }) };
+        });
         if (endpoint.apiKey) {
             const res = await fetch("https://api.groq.com/openai/v1/models", {
                 headers: { authorization: `Bearer ${endpoint.apiKey}` },
