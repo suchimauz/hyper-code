@@ -130,10 +130,15 @@ export default async function (
         const stale = { ...draftContext, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
         await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(stale), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] });
         await ctx.fns.session.syncAgentState({ agent: parent });
+        await ctx.fns.session.archive({ id: child.id }).catch(() => undefined);
         return { status: "stale", tokensBefore };
       }
       parent.sleepContext = next;
       await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_completed", payload: { revision, tokensBefore, tokensAfter, keptMessages: rootMessages.length - tailStart, summary } });
+      // The draft child has done its only job. Archive it here and in the catch
+      // below: otherwise every compaction — successful or failed — leaves a hidden
+      // agent row behind that later looks like unfinished delegated work.
+      await ctx.fns.session.archive({ id: child.id }).catch(() => undefined);
       return { status: "compacted", revision, tokensBefore, tokensAfter, keptMessages: rootMessages.length - tailStart, summary };
     } catch (error: any) {
       generation.status = "failed";
@@ -141,6 +146,7 @@ export default async function (
       await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(failed), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] }).catch(() => undefined);
       await ctx.fns.session.syncAgentState({ agent: parent });
       await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_failed", payload: { revision, error: String(error?.message ?? error) } }).catch(() => undefined);
+      await ctx.fns.session.archive({ id: child.id }).catch(() => undefined);
       throw error;
     } finally {
       // Durable rows survive projection failures; the worker recovery sweep retries.

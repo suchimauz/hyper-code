@@ -23,4 +23,29 @@ describe("agent.recoverOrphanedCompactions", () => {
         (ctx.state as any).compactionOwner = "current-process";
         expect((await ctx.fns.agent.recoverOrphanedCompactions({})).recovered).toEqual([]);
     });
+
+    // A draft child that never reached a terminal state used to survive forever
+    // as a hidden agent row, reading as unfinished delegated work in Team.
+    test("archives a compaction child the parent no longer holds as draft or active", async () => {
+        const ctx: any = await mkTestCtx();
+        const parent = await ctx.fns.agent.start({ model: "mock:test", title: "owner" });
+        const child = await ctx.fns.agent.start({ model: "mock:test", title: "owner · compact", parentId: parent.id, visibility: "hidden" });
+        // The generation moved on to a completed revision, so the child is spent.
+        const sleep = { mode: "full", activeRevision: 2, draftRevision: null, draftOwner: null, generations: [{ revision: 1, status: "completed", contextAgentId: child.id }, { revision: 2, status: "active" }] };
+        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context=?::jsonb WHERE id=?", params: [JSON.stringify(sleep), parent.id] });
+        (ctx.state as any).compactionOwner = "current-process";
+        expect((await ctx.fns.agent.recoverOrphanedCompactions({})).recovered).toContain(child.id);
+        const row: any = await ctx.fns.procs.db.select({ sql: "SELECT archived_at FROM agents WHERE id=?", params: [child.id] });
+        expect(row[0].archived_at).not.toBeNull();
+    });
+
+    test("keeps a compaction child the parent still holds as the active draft", async () => {
+        const ctx: any = await mkTestCtx();
+        const parent = await ctx.fns.agent.start({ model: "mock:test", title: "owner" });
+        const child = await ctx.fns.agent.start({ model: "mock:test", title: "owner · compact", parentId: parent.id, visibility: "hidden" });
+        const sleep = { mode: "full", activeRevision: null, draftRevision: 1, draftOwner: "current-process", generations: [{ revision: 1, status: "draft", contextAgentId: child.id }] };
+        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context=?::jsonb WHERE id=?", params: [JSON.stringify(sleep), parent.id] });
+        (ctx.state as any).compactionOwner = "current-process";
+        expect((await ctx.fns.agent.recoverOrphanedCompactions({})).recovered).not.toContain(child.id);
+    });
 });

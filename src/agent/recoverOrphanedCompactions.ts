@@ -26,5 +26,23 @@ export default async function (
       try { await ctx.fns.session.deliverInbound({ id: String(row.agent_id) }); }
       catch (error) { await ctx.fns.procs.log.warn({ event: 'inbound.recovery.failed', msg: String(error), agentId: String(row.agent_id) }); }
     }
-    return { recovered };
+    // A compaction draft child is a throwaway context window. Any that never
+    // reached a terminal state — a crash between spawn and archive, or an error
+    // that rethrew past it — stays as a hidden agent row and reads as unfinished
+    // delegated work forever. Archive those whose parent no longer holds their
+    // revision as an active or draft generation.
+    const orphans = await ctx.fns.procs.db.select({
+      sql: `SELECT c.id FROM agents c JOIN agents p ON p.id = c.parent_id
+            WHERE c.archived_at IS NULL AND c.title LIKE '%· compact'
+              AND NOT EXISTS (
+                SELECT 1 FROM jsonb_array_elements(COALESCE(p.sleep_context->'generations','[]'::jsonb)) g
+                WHERE g->>'contextAgentId' = c.id AND g->>'status' IN ('draft','active'))`,
+      params: [],
+    }) as any[];
+    const archived: string[] = [];
+    for (const row of orphans) {
+      const done: any = await ctx.fns.session.archive({ id: String(row.id) }).catch(() => null);
+      if (done?.ok !== false) archived.push(String(row.id));
+    }
+    return { recovered: [...recovered, ...archived] };
 }
