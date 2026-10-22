@@ -18,7 +18,7 @@ test('tool-only model usage persists and refreshes meter without assistant event
  const f=fixture();await f.record({prompt_tokens:70000,completion_tokens:1000});
  expect(f.events.map(e=>e.type)).toEqual(['context_usage']);expect(await renderEvent(f.ctx,null,{event:f.events[0],agentId:'a'})).toBe('');
  const region=live(f.ctx,null,{id:'chat-context-ring',url:'/chat/a/ring',topic:f.refreshes[0].topic,swap:'innerHTML'});expect(region).toContain('data-live-topic="agent:a"');expect(region).toContain('hx-trigger="hyper-live');expect(region).toContain('hx-get="/chat/a/ring"');
- expect(f.refreshes).toEqual([{topic:'agent:a',reason:'event'}]);expect(await f.render()).toContain('71%');
+ expect(f.refreshes).toEqual([{topic:'agent:a',reason:'event'}]);const r1=await f.render();expect(r1).toContain('71%');expect(r1).toContain('data-context-total');expect(r1).toContain('>71k/100k<');
  await f.record({prompt_tokens:79000,completion_tokens:1000});expect(await f.render()).toContain('80%');
 });
 test('successful compaction reduces meter until next request, failed compaction does not',async()=>{

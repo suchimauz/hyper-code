@@ -23,15 +23,25 @@ test('mobile context percentage stays exact beyond capacity and uses warning/err
         const html = await ring(used, 100000);
         expect(html).toContain('data-context-meter');
         expect(html).toContain(`aria-hidden="true">${percent}%</span>`);
+        expect(html).toContain(`data-context-total`);
+        expect(html).toContain('data-context-pct');
         expect(html).toContain(`--p:${fill};--c:var(--color-${colour})`);
         expect(html).toContain(`· ${percent}% — click to compact`);
     }
 });
 
+test('context meter formats the compact used/window total, with m for millions', async () => {
+    expect(await ring(253000, 1000000)).toContain('data-context-total');
+    expect(await ring(253000, 1000000)).toContain('>253k/1m<');
+    expect(await ring(71000, 100000)).toContain('71k/100k');
+    expect(await ring(1500000, 1000000)).toContain('1.5m/1m');
+    expect(await ring(950, 100000)).toContain('950/100k');
+});
+
 test('unknown context capacity shows tokens instead of a misleading percentage; unused is empty', async () => {
     const html = await ring(12345, 0);
     expect(html).toContain('12k');
-    expect(html).not.toContain('data-context-percent');
+    expect(html).not.toContain('data-context-pct');
     expect(await ring(0, 100000)).toBe('');
 });
 

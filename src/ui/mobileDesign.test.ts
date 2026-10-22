@@ -28,7 +28,7 @@ const context = {
 async function fixture(width: number, touchPoints: number, controlsHtml = '<button type="submit" data-composer-send>Send</button>') {
     const window = new Window({ width, height: 844, settings: { enableJavaScriptEvaluation: false } });
     Object.defineProperty(window.navigator, 'maxTouchPoints', { value: touchPoints });
-    const compose = await composer(context, null, { action: '/agent/demo', controlsHtml, toolsHtml: '<button data-chat-part="model">Model</button><button data-chat-part="effort">High</button>', metersHtml: '<button data-context-meter><span class="chat-ring"></span><span data-context-percent>95%</span></button>' });
+    const compose = await composer(context, null, { action: '/agent/demo', controlsHtml, toolsHtml: '<button data-chat-part="model">Model</button><button data-chat-part="effort">High</button>', metersHtml: '<button data-context-meter><span data-context-total>95k/100k</span><span class="chat-ring chat-ring-pct"><span data-context-pct>95%</span></span></button>' });
     const chatHeader = await header(context, null, { context: { agent: { id: 'ab', title: 'A long chat title', model: 'test:echo' } } as any });
     const nav = await rows(context, null, { items: [{ id: 'agent:ab', href: '/agent/ab', label: 'Chat title', model: 'test:echo', pin: 'agent:ab' }], pinned: new Set<string>() });
     const main = `<main id="main"><div id="project-tabs-host"><div class="project-mobile-bar"><a class="project-mobile-name"><span class="project-title">Hyper</span></a><details class="project-mobile-switcher"><summary>Чаты 3</summary><nav class="project-mobile-menu"><a class="project-mobile-chat">Current</a></nav></details></div><div class="project-tabs">Desktop project tabs</div></div><div data-page="agent"><section id="chat-panel">${chatHeader}<div id="messages" class="chat-dot-grid"><div class="assistant chat-glass"><div class="prose">Answer<div class="chat-table-block"><div class="chat-table-hint">Листайте вбок</div><div class="chat-table-scroll"><table><thead><tr><th>ID</th><th>Описание</th></tr></thead><tbody><tr><td>141811</td><td>Длинное описание задачи</td></tr></tbody></table></div></div></div></div><div class="chat-glass-primary"><span data-author="user" style="color:rgb(200,200,255)">Person</span>Question<span data-no-copy>10:30</span><span data-mention="user">@person</span></div></div>${compose}</section></div></main><div id="nav-overlay">${nav}</div>`;
@@ -65,7 +65,8 @@ test('mobile reading is 17px, quiet, and technical IDs are hidden only on phones
             expect(f.css('#project-tabs-host').display).not.toBe('none');
             expect(f.css('[data-chat-model-mark]').display).toBe('inline-flex');
             expect(f.css('[data-chat-avatar]').display).toBe('none');
-            expect(f.css('[data-context-percent]').display).toBe('inline');
+            expect(f.css('[data-context-pct]').display).not.toBe('none');
+            expect(f.css('[data-context-total]').display).not.toBe('none');
             expect(f.css('.chat-table-scroll').display).toBe('block');
             expect(f.css('.chat-table-scroll').overflowX).toBe('auto');
             expect(f.css('.chat-table-scroll > table').display).toBe('table');
@@ -116,7 +117,7 @@ test('desktop keeps compact type, technical IDs and existing textures', async ()
         expect(f.css('.project-mobile-bar').display).toBe('none');
         expect(f.css('[data-chat-model-mark]').display).toBe('none');
         expect(f.css('[data-chat-avatar]').display).not.toBe('none');
-        expect(f.css('[data-context-percent]').display).toBe('none');
+        expect(f.css('[data-context-pct]').display).not.toBe('none');
         expect(f.css('.chat-table-scroll').display).toBe('contents');
         expect(f.css('.chat-table-block').display).toBe('contents');
         expect(f.css('.chat-table-hint').display).toBe('none');

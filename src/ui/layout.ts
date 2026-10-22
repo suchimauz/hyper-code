@@ -291,6 +291,11 @@ export default async function (ctx: Context, session: Session | null, opts: {
 .chat-box.glass-input { max-height: none; min-height: 0; }
 .chat-box:focus-within { box-shadow: 0 0 0 2px rgb(59 130 246 / .55), 0 2px 10px rgb(0 0 0 / .055), 0 4px 80px 8px rgb(0 0 0 / .03); }
 .chat-ring { display: block; width: 18px; height: 18px; border-radius: 9999px; background: conic-gradient(var(--c) var(--p), color-mix(in oklab, var(--color-base-content) 14%, transparent) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); }
+/* The chat meter variant: bigger ring with the percentage inside it — the mask that
+   hollows .chat-ring would cut the number out, so the hole is a solid disc instead. */
+.chat-ring-pct { width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; position: relative; -webkit-mask: none; mask: none; }
+.chat-ring-pct::before { content: ""; position: absolute; inset: 2.5px; border-radius: 9999px; background: var(--color-base-100); }
+.chat-ring-pct > span { position: relative; font-size: .625rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
 .glass-input:hover { box-shadow: 0 0 0 1px rgb(0 0 0 / .05), 0 2px 9px rgb(0 0 0 / .05), 0 4px 80px 8px rgb(0 0 0 / .028); }
 .glass-input:focus {
   box-shadow: 0 0 0 3px rgb(59 130 246 / .72), 0 2px 10px rgb(0 0 0 / .055), 0 4px 80px 8px rgb(0 0 0 / .03);
@@ -326,7 +331,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
 /* The extra wrapper is layout-neutral on desktop and without the mobile controller. */
 .chat-composer [data-composer-settings] { display: contents; }
 .chat-composer [data-composer-settings-toggle] { display: none; }
-#chat-panel [data-chat-model-mark], [data-context-percent], .project-mobile-bar { display: none; }
+#chat-panel [data-chat-model-mark], .project-mobile-bar { display: none; }
 .chat-composer [data-chat-status] { order: 1; }
 .chat-composer [data-dictate] { order: 2; }
 .chat-composer [data-composer-submit] { order: 3; }
@@ -610,7 +615,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
   #chat-panel [data-chat-tools] { flex: 1 1 8rem; min-width: 0; flex-wrap: wrap; }
   #chat-panel [data-chat-meters] { flex-wrap: nowrap; margin-left: auto; }
   #chat-panel [data-chat-status] { margin-left: auto; }
-  #chat-panel [data-context-percent] { display: inline; font-size: .8125rem; font-variant-numeric: tabular-nums; line-height: 1; }
+  #chat-panel [data-context-total] { font-size: .8125rem; }
   #chat-panel [data-context-meter] { min-height: 2.75rem; padding-inline: .2rem; }
   #chat-panel [data-chat-tools] [data-chat-part="model"] { max-width: 100%; }
   #chat-panel [data-chat-tools] [data-chat-part="model"] > span { min-width: 0; }
