@@ -6,6 +6,20 @@
     window.__hyperPopupInstalled = true;
 
     let returnFocus = null;
+    let opened = false;
+    const touch = () => window.matchMedia('(pointer: coarse)').matches;
+    const editable = node => node?.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+    const finishClose = () => {
+        if (!opened) return;
+        opened = false;
+        const dialog = document.getElementById('app-popup');
+        if (dialog) delete dialog.dataset.popupKind;
+        const target = returnFocus?.isConnected ? returnFocus : document.getElementById('input');
+        returnFocus = null;
+        present(dialog, '');
+        if (touch() && editable(document.activeElement)) document.activeElement.blur();
+        if (target && (!touch() || !editable(target))) target.focus({ preventScroll: true });
+    };
 
     const present = (dialog, kind = '') => {
         const shell = dialog?.firstElementChild;
@@ -33,17 +47,19 @@
             if (!dialog?.contains(active) && active && active !== document.body) returnFocus = active;
             if (heading) heading.textContent = title;
             if (dialog && kind) dialog.dataset.popupKind = kind;
-            if (dialog && !dialog.open) dialog.showModal();
+            if (dialog && !dialog.open) {
+                // Native dialog.close() also restores focus. Blur the composer before
+                // showModal records it, so closing cannot summon a phone keyboard.
+                if (touch()) document.activeElement?.blur?.();
+                opened = true;
+                dialog.showModal();
+            }
             present(dialog, kind);
         },
         close() {
             const dialog = document.getElementById('app-popup');
             if (dialog?.open) dialog.close();
-            if (dialog) delete dialog.dataset.popupKind;
-            const focusTarget = returnFocus?.isConnected ? returnFocus : document.getElementById('input');
-            present(dialog, '');
-            returnFocus = null;
-            focusTarget?.focus();
+            finishClose();
         },
         content(html, title = '', kind = '') {
             const body = document.getElementById('app-popup-body');
@@ -90,11 +106,19 @@
     // Escape is cancellation for a secure prompt, not merely visual closure.
     document.getElementById('app-popup')?.addEventListener('cancel', event => {
         const dialog = event.currentTarget;
-        if (dialog?.dataset.popupKind !== 'secure-input') return;
+        if (dialog?.dataset.popupKind !== 'secure-input') {
+            event.preventDefault();
+            window.hyperPopup.close();
+            return;
+        }
         event.preventDefault();
         document.querySelector('#app-popup-body [data-secure-cancel]')?.click();
     });
 
+
+    document.getElementById('app-popup')?.addEventListener('close', () => {
+        if (!document.getElementById('app-popup')?.open) finishClose();
+    });
 
     document.getElementById('app-popup-close')?.addEventListener('click', () => {
         const dialog = document.getElementById('app-popup');
