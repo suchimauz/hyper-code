@@ -52,6 +52,9 @@ test('Z.ai usage leaves through the chosen SSH instance while the plan key stays
  expect(fetched[0].o.url).toBe('https://api.z.ai/api/monitor/usage/quota/limit');
  expect(fetched[0].o.init.headers.authorization).toBe('Bearer test-key');
  expect(r.primary!.used_percent).toBe(20);
+ // The remote bridge defaults to POST when the method is omitted, and the
+ // monitoring endpoint only answers GET — state it or quota fails remotely.
+ expect(fetched[0].o.init.method).toBe('GET');
  // No instance chosen keeps the direct local connection.
  ctx.fns.llm.codingInstance=async()=>({instance:null});
  await usage(ctx,null,{});

@@ -75,3 +75,11 @@ test("omits the other local connections section without changing the model catal
     expect(accounts).toHaveLength(1);
     expect(models.lmstudio).toEqual(["lmstudio:local-test-model"]);
 });
+
+test('OpenCode Console shows PAYG unavailable rather than subscription usage', () => {
+ const html=accountsCard(ctx,null,{accounts:[{provider:'opencode',account:'default',label:'OpenCode Console',model:'opencode:',source:'file',available:true,usedPercent:null,planType:'Pay as you go',resetsAt:null,parkedAgents:0}],models:{opencode:['opencode:gpt']}});
+ expect(html).toContain('data-provider="opencode"');
+ expect(html).toContain('Pay as you go');
+ expect(html).toContain('usage unavailable');
+ expect(html).not.toContain('quota-5h');
+});

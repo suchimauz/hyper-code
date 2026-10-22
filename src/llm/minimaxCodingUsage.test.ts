@@ -41,6 +41,22 @@ test('MiniMax quota makes no request without credentials', async () => {
   expect(requests).toHaveLength(0);
 });
 
+// The remote bridge defaults to POST when the caller omits the method, and the
+// token-plan endpoint only answers GET — quota must survive a chosen instance.
+test('MiniMax quota states GET so the SSH bridge is not rejected', async () => {
+  const { ctx, requests } = setup();
+  await usage(ctx, null, {});
+  expect(requests[0].init.method).toBe('GET');
+  const ssh: any = { fns: {
+    secrets: { resolveSetting: async () => 'test-key' },
+    llm: { codingInstance: async () => ({ instance: 'edge' }), connectFetch: async () => Response.json(payload) },
+    sshAccount: { fetch: async (o: any) => { requests.push({ via: 'ssh', o }); return Response.json(payload); } },
+  } };
+  await usage(ssh, null, {});
+  const bridged = requests.find((r: any) => r.via === 'ssh');
+  expect(bridged.o.init.method).toBe('GET');
+});
+
 test('MiniMax quota rejects failed or unrecognized responses without inventing windows', async () => {
   const http = setup(payload, 403);
   await expect(usage(http.ctx, null, {})).rejects.toThrow('HTTP 403');

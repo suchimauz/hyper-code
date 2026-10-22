@@ -18,7 +18,10 @@ export default async function (
     // The plan can leave through a chosen SSH instance; the same key rides the bridge.
     const { instance } = ctx.fns?.llm?.codingInstance ? await ctx.fns.llm.codingInstance({ provider: "zai-coding" }) : { instance: null };
     const url = "https://api.z.ai/api/monitor/usage/quota/limit";
-    const init = { headers: { authorization: "Bearer " + key, accept: "application/json" }, signal: AbortSignal.timeout(timeout), redirect: "error" as const };
+    // The remote bridge defaults to POST when the caller omits the method, and
+    // the monitoring endpoint only answers GET. State it explicitly so quota
+    // keeps working when the plan leaves through an SSH instance.
+    const init = { method: "GET", headers: { authorization: "Bearer " + key, accept: "application/json" }, signal: AbortSignal.timeout(timeout), redirect: "error" as const };
     const res = instance ? await ctx.fns.sshAccount.fetch({ ssh: { instance, provider: "zai-coding", account: "default" }, url, init })
         : await ctx.fns.llm.connectFetch({ url, init });
     if (!res.ok) throw new Error("Z.ai quota HTTP " + res.status);
