@@ -1,6 +1,6 @@
 /**
  * Render project navigation and restored chat tabs with shared Hyper buttons and theme tokens.
- * Includes a compact mobile project link and ordered open-chat chooser from the same personal tabs.
+ * Includes a compact mobile project link and ordered open-chat chooser with each chat's selected model logo from the same personal tabs.
  * Uses authorized summaries only; does not load transcripts or change persisted tab state.
  * @param opts.projects Visible projects with optional running and unread conversation counts.
  * @param opts.projectId Currently selected project identifier.
@@ -41,7 +41,8 @@ export default async function (ctx: Context, session: Session | null, opts: {
         const c=chats.get(id)!;
         const running=Boolean(c.runState && c.runState!=='idle');
         const status=(running?'<span class="project-mobile-running" role="img" aria-label="В работе" title="В работе">'+icon('spinner-gap')+'</span>':'')+(c.hasUnread?'<span class="project-mobile-unread project-unread-dot bg-success" role="img" aria-label="Непрочитанный ответ" title="Непрочитанный ответ"></span>':'');
-        return nav('/agent/'+encodeURIComponent(id),status+'<span class="project-title">'+esc(c.title||id)+'</span>','project-mobile-chat'+(id===opts.activeId?' selected':''),c.title||id,id===opts.activeId);
+        const modelMark='<span class="project-mobile-model inline-flex shrink-0" title="'+esc(c.model||'Model')+'">'+ctx.fns.chat.icon({model:c.model,size:'sm'})+'</span>';
+        return nav('/agent/'+encodeURIComponent(id),modelMark+status+'<span class="project-title">'+esc(c.title||id)+'</span>','project-mobile-chat'+(id===opts.activeId?' selected':''),c.title||id,id===opts.activeId);
     }).join(''):'<p class="project-mobile-empty text-muted">Нет открытых чатов</p>')+'</nav></details></div>':'';
     const tabs=opts.projectId?'<div class="project-tabs" data-project-id="'+esc(opts.projectId)+'" aria-label="Project chats"><div class="project-tab-list">'+openIds.map(id=>{
         const c=chats.get(id)!, selected=id===opts.activeId;

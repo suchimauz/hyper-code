@@ -3,8 +3,11 @@ import {Window} from 'happy-dom';
 import render from './renderChrome.ts';
 import button from '../procs/ui/button.ts';
 import popup from '../ui/popup.ts';
+import chatIcon from '../chat/icon';
+import modelLogo from '../ui/modelLogo';
 const ctx:any={fns:{procs:{ui:{escape:({text}:any)=>String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),attr:()=>''}},ui:{},chat:{icon:()=>''}}};
 ctx.fns.procs.ui.button=(o:any)=>button(ctx,null,o);ctx.fns.ui.popup=(o:any)=>popup(ctx,null,o);
+ctx.fns.chat.icon=(o:any)=>chatIcon(ctx,null,o);ctx.fns.ui.modelLogo=(o:any)=>modelLogo(ctx,null,o);
 const base={projects:[{id:'p',title:'<Project>',dir:'/work',host:''}],projectId:'p',activeId:'b',chats:[{id:'a',title:'<Chat>',runState:'idle'},{id:'b',title:'Second',runState:'idle'},{id:'closed',title:'Closed',runState:'idle'}],tabIds:['b','missing','a']};
 const source=await Bun.file(new URL('./$script_navigation.js',import.meta.url)).text();
 const tick=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
@@ -40,4 +43,18 @@ describe('compact project mobile navigation',()=>{
   chooser.open=true;(d.getElementById('outside') as any).click();expect(chooser.open).toBe(false);
   chooser.open=true;chooser.querySelector('a').dispatchEvent(new w.MouseEvent('click',{bubbles:true,button:0,cancelable:true}));expect(chooser.open).toBe(false);await tick();expect(visits).toEqual(['/agent/b']);await w.happyDOM.close();
  });
+});
+
+test('mobile chat list shows the selected model even when the chat has its own avatar',async()=>{
+ const model='opencode:deepseek-v4.1-flash';
+ const out=await render(ctx,null,{...base,chats:[{id:'a',title:'DeepSeek chat',model,icon:'<svg><path d="M0 0"/></svg>',runState:'running',hasUnread:true}],tabIds:['a']});
+ const w=new Window();try{
+  w.document.body.innerHTML=out.tabs;
+  const row=w.document.querySelector('.project-mobile-chat')!;
+  expect(row.querySelector('.project-mobile-model .chat-icon')).not.toBeNull();
+  expect(row.querySelector('.project-mobile-model')?.getAttribute('title')).toBe(model);
+  expect(row.querySelector('.project-mobile-model')?.innerHTML).not.toContain('data:image/svg+xml,');
+  expect(row.querySelector('.project-mobile-running')).not.toBeNull();expect(row.querySelector('.project-mobile-unread')).not.toBeNull();
+  expect(row.querySelector('.project-title')?.textContent).toBe('DeepSeek chat');
+ }finally{await w.happyDOM.close();}
 });
