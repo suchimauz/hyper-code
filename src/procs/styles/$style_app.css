@@ -596,6 +596,19 @@ summary::-webkit-details-marker { display: none; }
 .toggle:checked { background:var(--theme-primary); border-color:var(--theme-primary); }
 .toggle:checked::after { transform:translateX(1rem); }
 .toggle-sm { width:2rem; height:1.125rem; }
+/* Connections: compact Apple-style switch, independent of theme accent and generic input rules. */
+.llm-model-switch { position:relative; display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px; width:32px; height:20px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.llm-model-switch > input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; }
+.llm-model-switch-track { position:relative; display:block; width:28px; height:16px; border-radius:999px; background:#b8bdc5; box-shadow:inset 0 0 0 1px rgb(0 0 0 / .05); pointer-events:none; transition:background-color 180ms ease; }
+.llm-model-switch-track::after { content:""; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgb(0 0 0 / .2); transition:transform 180ms cubic-bezier(.2,.8,.2,1); }
+.llm-model-switch > input:checked + .llm-model-switch-track { background:#34c759; }
+.llm-model-switch > input:checked + .llm-model-switch-track::after { transform:translateX(12px); }
+.llm-model-switch > input:focus-visible + .llm-model-switch-track { outline:2px solid #007aff; outline-offset:3px; }
+.llm-model-switch:active .llm-model-switch-track { filter:brightness(.94); }
+.llm-model-switch > input:disabled { cursor:wait; }
+.llm-model-switch > input:disabled + .llm-model-switch-track { opacity:.65; }
+@media (pointer:coarse) { .llm-model-switch { flex-basis:44px; width:44px; height:44px; } }
+@media (prefers-reduced-motion:reduce) { .llm-model-switch-track,.llm-model-switch-track::after { transition:none; } }
 .card { border-radius:.75rem; background:var(--color-base-100); color:var(--color-base-content); }
 .card-border { border:1px solid var(--ui-border); }
 .card-body { display:flex; flex-direction:column; gap:.75rem; padding:1rem; }
