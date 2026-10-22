@@ -16,17 +16,17 @@ export default async function (
         /** Configured SSH instance name; required for status changes. */
         instance?: string;
         /** Official remote CLI provider; required for status changes. */
-        provider?: "codex" | "claude-code";
+        provider?: "codex" | "claude-code" | "kimi-coding";
         /** Isolated account slot containing ASCII letters, digits, underscores or hyphens; required for changes. */
         account?: string;
     },
-): Promise<Array<{ instance: string; provider: "codex" | "claude-code"; account: string; status: "pending" | "connected" | "failed"; updatedAt: number }>> {
+): Promise<Array<{ instance: string; provider: "codex" | "claude-code" | "kimi-coding"; account: string; status: "pending" | "connected" | "failed"; updatedAt: number }>> {
     await ctx.fns.sshAccount.requireOwner({});
     const valid = (s: string) => /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(s);
     if (!['list','begin','connect','fail'].includes(opts.action)) throw new Error('Invalid registry action');
     if (opts.instance && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(opts.instance)) throw new Error('Invalid instance name');
     if (opts.action !== 'list') {
-     if (!opts.instance || !opts.account || !valid(opts.account) || !['codex','claude-code'].includes(opts.provider ?? '')) throw new Error('Invalid remote account');
+     if (!opts.instance || !opts.account || !valid(opts.account) || !['codex','claude-code','kimi-coding'].includes(opts.provider ?? '')) throw new Error('Invalid remote account');
      const value = {instance:opts.instance,provider:opts.provider,account:opts.account,status:opts.action === 'begin' ? 'pending' : opts.action === 'connect' ? 'connected' : 'failed',updatedAt:Date.now()};
      await ctx.fns.settings.set({module:'sshAccount',scopeType:'global',key:[opts.instance,opts.provider,opts.account].join(':'),value});
     }

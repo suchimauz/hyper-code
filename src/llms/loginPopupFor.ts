@@ -10,16 +10,16 @@
  * @param opts.provider Provider login type.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
-    /** Provider to authenticate. */ provider: "claude-code" | "codex" | "xai";
+    /** Provider to authenticate. */ provider: "claude-code" | "codex" | "xai" | "kimi-coding";
     /** Existing account slot to reconnect. */ account?: string;
     /** Fixed configured SSH instance for a remote reconnect; omitted keeps reconnect local. */ instance?: string;
 }): Promise<string> {
     const provider = opts.provider;
-    if (provider !== "claude-code" && provider !== "codex" && provider !== "xai") throw new Error("unsupported provider");
+    if (provider !== "claude-code" && provider !== "codex" && provider !== "xai" && provider !== "kimi-coding") throw new Error("unsupported provider");
     if (opts.instance && provider === "xai") throw new Error("Grok does not support SSH account login");
     const instances = !opts.account && provider !== "xai" ? await ctx.fns.sshInstance.list({}) : [];
     return ctx.fns.ui.popupContent({
-        title: opts.account ? `Reconnect ${opts.account}` : provider === "claude-code" ? "Add Claude Code account" : provider === "xai" ? "Add Grok account" : "Add Codex account",
+        title: opts.account ? `Reconnect ${opts.account}` : provider === "claude-code" ? "Add Claude Code account" : provider === "xai" ? "Add Grok account" : provider === "kimi-coding" ? "Add Kimi Coding account" : "Add Codex account",
         kind: "login",
         html: ctx.fns.llms.loginPopup({ provider, flow: null, account: opts.account, instance: opts.instance, instances }),
     });

@@ -96,7 +96,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
         { id: "grok", title: "Grok", icon: "xai:grok", accounts: opts.accounts.filter(a => a.provider === "xai"), add: addButton(ctx, "xai", "Add Grok account") },
-        { id: "kimi", title: "Kimi Coding", icon: "kimi-coding:k3", accounts: opts.accounts.filter(a => a.provider === "kimi-coding"), add: ctx.fns.procs.ui.button({ action: "add-kimi", label: "+ Add account", tone: "default", size: "sm", disabled: true, title: "Kimi multi-login is not wired yet" }) },
+        { id: "kimi", title: "Kimi Coding", icon: "kimi-coding:k3", accounts: opts.accounts.filter(a => a.provider === "kimi-coding"), add: addButton(ctx, "kimi-coding", "Add Kimi account") },
         { id: "opencode", title: opts.accounts.some(a => a.provider === "opencode" && a.planType === "Go subscription") ? "OpenCode Go" : "OpenCode Console", icon: "opencode:", accounts: opts.accounts.filter(a => a.provider === "opencode"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
         { id: "zai-coding", title: "Z.ai", icon: "zai-coding:", accounts: opts.accounts.filter(a => a.provider === "zai-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
         { id: "minimax-coding", title: "MiniMax", icon: "minimax-coding:", accounts: opts.accounts.filter(a => a.provider === "minimax-coding"), add: '<a href="/settings/declared" class="text-xs text-muted">Configure API key</a>' },
@@ -176,7 +176,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     return ctx.fns.ui.live({ id: "llm-accounts", url: "/llms/accounts", topic: "llm-accounts", swap: "outerMorph", every: 10, attrs: 'class="block"', html });
 }
 
-function addButton(ctx: Context, provider: "claude-code" | "codex" | "xai", title: string): string {
+function addButton(ctx: Context, provider: "claude-code" | "codex" | "xai" | "kimi-coding", title: string): string {
     return ctx.fns.ui.popup({ method: "llms.loginPopupFor", params: { provider }, tone: "default", size: "sm", html: `<i class="ph ph-plus" aria-hidden="true"></i><span>${ctx.fns.procs.ui.escape({ text: title })}</span>` });
 }
 function storageLabel(source:string){return source==="node"?{text:"Hyper node",title:"Relayed through another Hyper instance; only your client token is stored here"}:source==="oauth"?{text:"Encrypted by Hyper",title:"OAuth credential encrypted and stored by Hyper"}:source==="keychain"?{text:"Keychain",title:"Credential stored by the official CLI in macOS Keychain"}:{text:"CLI storage",title:"Credential stored in an isolated official CLI directory"};}
