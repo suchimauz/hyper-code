@@ -12,6 +12,16 @@ describe("llm.listModels", () => {
         expect(groups["zai-coding"]).toEqual(["zai-coding:glm-5.3", "zai-coding:glm-5.3-flash"]);
     });
 
+    test("includes live MiniMax M Plan models under a separate provider", async () => {
+        const ctx = { env: { LMSTUDIO_URL: "http://127.0.0.1:9" }, fns: { settings: { get: async () => [] }, llm: {
+            gatewayHealth: async () => ({ models: [], status: "unknown" }),
+            resolveEndpoint: async () => ({ kind: "api", apiKey: null }),
+            minimaxCodingModels: async () => ["MiniMax-M3", "MiniMax-M3.1-Flash"],
+        } } } as unknown as Context;
+        const groups = await listModels(ctx, null);
+        expect(groups["minimax-coding"]).toEqual(["minimax-coding:MiniMax-M3", "minimax-coding:MiniMax-M3.1-Flash"]);
+    });
+
     test("omits static remote catalogues when their credentials are absent", async () => {
         const ctx = { env: { LMSTUDIO_URL: "http://127.0.0.1:9" }, fns: { settings: { get: async () => [] }, llm: {
             gatewayHealth: async () => ({ models: [], status: "unknown" }),

@@ -68,6 +68,12 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
         if (ids.length) out["zai-coding"] = ids.map(id => `zai-coding:${id}`);
     }
 
+    // Query only the M Plan catalogue; standard API billing is never used.
+    if (ctx.fns.llm.minimaxCodingModels) {
+        const ids = await ctx.fns.llm.minimaxCodingModels({});
+        if (ids.length) out["minimax-coding"] = ids.map(id => `minimax-coding:${id}`);
+    }
+
     // Remote curated defaults are exposed only when their endpoint has usable
     // credentials. Static catalogues describe capabilities, not availability.
     const configured = async (model: string) => {

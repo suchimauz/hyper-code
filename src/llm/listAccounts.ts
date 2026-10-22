@@ -139,6 +139,16 @@ export default async function (
         }
     }
 
+    if ((!filter || filter === "minimax-coding") && ctx.fns.settings?.get) {
+        const reference = await ctx.fns.settings.get({ module: "llm", scopeType: "global", key: "minimaxCodingApiKey" });
+        if (typeof reference === "string" && reference.trim()) {
+            const item = entry("minimax-coding", "default", "file", byKey, reconnectKeys);
+            item.label = "MiniMax M Plan";
+            item.planType = "M Plan";
+            out.push(item);
+        }
+    }
+
     if ((!filter || filter === "oneapi") && ctx.fns.llm.gatewayHealth) {
         const gatewayHealth = await ctx.fns.llm.gatewayHealth({});
         const item = entry("oneapi", "default", "file", new Map(), new Set());

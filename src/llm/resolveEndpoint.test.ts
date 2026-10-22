@@ -52,6 +52,18 @@ describe("ai.resolveEndpoint", () => {
         expect(keys).toEqual(["zaiCodingApiKey"]);
     });
 
+    test("MiniMax M Plan uses the Anthropic subscription endpoint and its own key setting", async () => {
+        const ctx = mkCtx();
+        const keys: string[] = [];
+        ctx.fns.secrets.resolveSetting = async (opts) => { keys.push(opts.key); return "m-plan-key"; };
+        const r = await resolve(ctx, null, { model: "minimax-coding:MiniMax-M3" });
+        expect(r.url).toBe("https://api.minimax.io/anthropic/v1/messages");
+        expect(r.api).toBe("anthropic");
+        expect(r.kind).toBe("subscription");
+        expect(r.apiKey).toBe("m-plan-key");
+        expect(keys).toEqual(["minimaxCodingApiKey"]);
+    });
+
     test("One API uses configured root, secret and OpenAI wire format", async () => {
         const ctx = mkCtx();
         ctx.fns.settings.getString = async () => "http://gateway.test/v1/";

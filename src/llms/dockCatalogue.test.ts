@@ -29,3 +29,12 @@ test('Z.ai has a branded connection section and an unknown-quota dock icon', asy
  const data=await usageData(c,null,{});expect(data.entries[0]).toMatchObject({provider:'zai-coding',usedPercent:null,quotaStatus:'unavailable'});
  const dock=dial(c,null,{entries:data.entries});expect(dock).toContain('quota unavailable');expect(dock).toContain('zai-coding:glm-5.3');expect(dock).not.toContain('stroke-dasharray');expect(dock).not.toContain('ph-cpu');
 });
+
+test('MiniMax M Plan has a branded connection section and an unknown-quota dock icon', async () => {
+ const a:any={provider:'minimax-coding',account:'default',label:'MiniMax M Plan',model:'minimax-coding:',source:'file',available:true,usedPercent:null,planType:'M Plan',resetsAt:null,parkedAgents:0};
+ const c:any={state:{llmUsageRefresh:{startedAt:Date.now()}},fns:{...ctx.fns,settings:{get:async(opts:any)=>opts.key==='minimaxCodingApiKey'?'secret://test/minimax':null},ui:{...ctx.fns.ui,modelLogo:(o:any)=>logo(c,null,o)},llm:{usageOverview:async()=>[],listAccounts:async()=>[a],listModels:async()=>({'minimax-coding':['minimax-coding:MiniMax-M3']})},node:{list:async()=>[]}}};
+ const html=card(c,null,{accounts:[a],models:{'minimax-coding':['minimax-coding:MiniMax-M3']}});
+ expect(html).toContain('data-provider="minimax-coding"');expect(html).toContain('MiniMax M Plan');expect(html).not.toContain('ph-cpu');
+ const data=await usageData(c,null,{});expect(data.entries[0]).toMatchObject({provider:'minimax-coding',usedPercent:null,quotaStatus:'unavailable'});
+ const dock=dial(c,null,{entries:data.entries});expect(dock).toContain('quota unavailable');expect(dock).toContain('minimax-coding:MiniMax-M3');expect(dock).not.toContain('stroke-dasharray');expect(dock).not.toContain('ph-cpu');
+});

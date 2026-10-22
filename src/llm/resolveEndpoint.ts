@@ -116,6 +116,15 @@ const PROVIDERS: Record<string, ProviderConfig> = {
         resolveBaseUrl: () => "https://api.z.ai/api/coding/paas/v4",
         resolveApiKey: declaredSecret('zaiCodingApiKey'),
     },
+    "minimax-coding": {
+        // MiniMax M Plan subscription — Anthropic-messages protocol, the route
+        // MiniMax recommends for coding tools. Keep subscription traffic
+        // separate from the standard, metered MiniMax API.
+        api: "anthropic",
+        kind: "subscription",
+        resolveBaseUrl: () => "https://api.minimax.io/anthropic",
+        resolveApiKey: declaredSecret('minimaxCodingApiKey'),
+    },
     lmstudio: {
         api: "openai",
         kind: "local",

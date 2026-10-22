@@ -35,6 +35,9 @@ export default function (ctx: Context, _session: Session | null, opts: {
     // Z.ai mark from https://z-cdn.chatglm.cn/z-ai/static/logo.svg (30×30).
     const zai = 'M15.47 7.1l-1.3 1.85c-.2.29-.54.47-.9.47h-7.1V7.09L15.47 7.1z M24.3 7.1L13.14 22.91H5.7L16.86 7.1z M14.53 22.91l1.31-1.86c.2-.29.54-.47.9-.47h7.09v2.33z';
     const isZai = key.startsWith('zai-coding:') || key.startsWith('zai-coding/');
+    // MiniMax mark from Simple Icons (CC0), normalized to 24×24.
+    const minimax = 'M11.43 3.92a.86.86 0 1 0-1.718 0v14.236a1.999 1.999 0 0 1-3.997 0V9.022a.86.86 0 1 0-1.718 0v3.87a1.999 1.999 0 0 1-3.997 0V11.49a.57.57 0 0 1 1.139 0v1.404a.86.86 0 0 0 1.719 0V9.022a1.999 1.999 0 0 1 3.997 0v9.134a.86.86 0 0 0 1.719 0V3.92a1.998 1.998 0 1 1 3.996 0v11.788a.57.57 0 1 1-1.139 0zm10.572 3.105a2 2 0 0 0-1.999 1.997v7.63a.86.86 0 0 1-1.718 0V3.923a1.999 1.999 0 0 0-3.997 0v16.16a.86.86 0 0 1-1.719 0V18.08a.57.57 0 1 0-1.138 0v2a1.998 1.998 0 0 0 3.996 0V3.92a.86.86 0 0 1 1.719 0v12.73a1.999 1.999 0 0 0 3.996 0V9.023a.86.86 0 1 1 1.72 0v6.686a.57.57 0 0 0 1.138 0V9.022a2 2 0 0 0-1.998-1.997';
+    const isMinimax = key.startsWith('minimax-coding:') || key.startsWith('minimax-coding/') || key.startsWith('minimax:') || key.startsWith('minimax/');
     const path = key.startsWith('codex:') || key.startsWith('codex/') || key.startsWith('openai:') || key.startsWith('openai/') || key.includes('gpt-')
             ? openai
             : key.startsWith('claude-code:') || key.startsWith('claude-code/') || key.startsWith('anthropic:') || key.startsWith('anthropic/') || key.startsWith('anthropic-oauth:') || key.startsWith('anthropic-oauth/') || key.includes('claude')
@@ -43,7 +46,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
                     ? grok
                     : key.startsWith('kimi:') || key.startsWith('kimi/') || key.startsWith('kimi-coding:') || key.startsWith('kimi-coding/') || key.startsWith('moonshot:') || key.includes('kimi')
                         ? kimi
-                        : isZai ? zai : null;
+                        : isZai ? zai
+                        : isMinimax ? minimax : null;
 
     const motion = opts.active ? ' animate-spin' : '';
     const markSize = opts.compact ? 'size-2.5' : 'size-3.5';
