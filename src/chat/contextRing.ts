@@ -32,7 +32,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const label = estimated ? 'Context estimate after compaction' : 'Context';
     const title = window > 0 ? `${label} ${k(used)} of ${k(window)} · ${percent}% — click to compact` : `${label} ${k(used)} tokens — click to compact`;
     const face = window > 0
-        ? `<span data-context-total class="font-mono text-3xs text-faint" aria-hidden="true">${k(used)}/${k(window)}</span><span class="chat-ring chat-ring-pct" style="--p:${(Math.min(1, share) * 100).toFixed(1)}%;--c:${colour}" aria-hidden="true"><span data-context-pct style="color:${colour}" aria-hidden="true">${percent}%</span></span>`
+        ? `<span data-context-total class="font-mono text-3xs text-faint" aria-hidden="true">${k(used)}/${k(window)}</span><span class="chat-ring chat-ring-pct" style="--p:${(Math.min(1, share) * 100).toFixed(1)}%;--c:${colour}" aria-hidden="true"><span data-context-pct style="color:${colour};font-size:${percent >= 100 ? 5.5 : 7.5}px" aria-hidden="true">${percent}%</span></span>`
         : `<span class="font-mono text-3xs">${k(used)}</span>`;
     return ctx.fns.ui.popup({
         method: "chat.compactPopup",
