@@ -42,8 +42,9 @@ export default async function (
     const headers: Record<string, string> = { authorization: `Bearer ${apiKey}`, "chatgpt-account-id": accountId, originator: "codex_cli_rs", version: await ctx.fns.llm.codexCliVersion({}), "OpenAI-Beta": "responses=experimental", accept: "text/event-stream", "content-type": "application/json", session_id: opts.sessionId, "x-codex-turn-metadata": turnMetadata };
     if (relay || ep.ssh) delete headers["chatgpt-account-id"];
     const init = { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal };
-    const res = ep.ssh
-        ? await ctx.fns.sshAccount.fetch({ ssh: ep.ssh, url: ep.url, init })
+    const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
+    const res = ssh
+        ? await ctx.fns.sshAccount.fetch({ ssh, url: ep.url, init })
         : await ctx.fns.llm.connectFetch({ url: ep.url, init });
     if (!res.ok) { const text = await res.text(); throw new Error(`codex compaction ${res.status}: ${text.slice(0, 500)}`); }
     if (!res.body) throw new Error("codex compaction returned no stream");

@@ -25,6 +25,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     /** New account name, e.g. "work" or "personal". */ account: string;
 }): Promise<{ provider: string; account: string; status: "pending"; verificationUri: string | null; userCode: string | null }> {
     const provider = opts.provider;
+    if (provider !== "codex" && provider !== "claude-code") throw new Error("Unsupported CLI login provider");
     const account = String(opts.account ?? "").trim();
     if (!/^[\w.-]{1,40}$/.test(account) || account === "default") throw new Error("account must be a short name other than default");
     const path = ctx.fns.llm.accountCredentialPath({ provider, account });

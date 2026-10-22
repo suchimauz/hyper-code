@@ -17,6 +17,7 @@
  * @param opts.model Target model as "provider[/account]:modelId".
  * @param opts.scope Apply to this agent only, or to every agent sharing its parked credential.
  * @param opts.now Current time in ms, for testing.
+ * @param opts.expectedModel Optional exact previously observed route; rejects stale per-agent parameter edits.
  */
 export default async function (
     ctx: Context,
@@ -30,11 +31,14 @@ export default async function (
         scope?: "agent" | "provider";
         /** Current timestamp in ms; defaults to Date.now(). */
         now?: number;
+        /** Require the agent route to equal this observed value before applying an agent-scoped edit. */
+        expectedModel?: string;
     },
 ): Promise<{ changed: string[]; model: string; from: string | null }> {
     const model = String(opts.model ?? "").trim();
     const now = opts.now ?? Date.now();
     if (!model) throw new Error("setModel: model is required");
+    if (opts.expectedModel !== undefined && opts.scope === "provider") throw new Error("setModel: expectedModel requires agent scope");
 
     // Fail here, loudly, instead of on the agent's next turn.
     const endpoint = await ctx.fns.llm.resolveEndpoint({ model });
@@ -48,6 +52,7 @@ export default async function (
     })) as any[])[0];
     if (!row) throw new Error(`setModel: agent not found: ${opts.id}`);
     const from = row.model ? String(row.model) : null;
+    if (opts.expectedModel !== undefined && from !== opts.expectedModel) throw new Error("setModel: model changed; reopen settings and retry");
 
     let targets = [String(row.id)];
     if (opts.scope === "provider") {
@@ -76,6 +81,7 @@ export default async function (
         const before = ((await ctx.fns.procs.db.select({ sql: "SELECT model, run_state FROM agents WHERE id = ? AND archived_at IS NULL", params: [id] })) as any[])[0];
         if (!before) throw new Error(`setModel: agent not found: ${id}`);
         const previous = before.model ? String(before.model) : null;
+        if (opts.expectedModel !== undefined && previous !== opts.expectedModel) throw new Error("setModel: model changed; reopen settings and retry");
         const live = (ctx.state as any).agent?.[id];
         if (previous === model && (!live || live.model === model)) continue;
         if (before.run_state === "running" || Number(live?.activeRunCount ?? 0) > 0) {

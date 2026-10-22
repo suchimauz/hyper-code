@@ -18,7 +18,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     provider: string;
     account: string;
     kind: "subscription" | "api" | "local";
-    api: "openai" | "anthropic" | "responses" | "cursor" | "mock";
+    api: "openai" | "anthropic" | "responses" | "mock";
     /** For hyper/<node> models: the provider the node uses upstream (e.g. claude-code). */
     upstream?: string;
     /** Node-scoped upstream quota identity; transport account remains the node name. */
@@ -27,10 +27,12 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     ssh?: { instance: string; provider: "codex" | "claude-code"; account: string };
 }> {
     const model = opts.model;
+    if (/^(?:ssh\/[^:]+:)?cursor(?:\/|:)/.test(model)) throw Object.assign(new Error("Provider unavailable"), { retryable: false, replaySafe: false });
     if (model.startsWith('ssh/')) {
         const remote = /^ssh\/([A-Za-z0-9][A-Za-z0-9_.-]{0,63}):(codex|claude-code)\/([A-Za-z0-9][A-Za-z0-9_-]{0,39}):([^:\s]+)$/.exec(model);
         if (!remote || [remote[1], remote[3]].some(x => x === '.' || x === '..')) throw new Error('invalid SSH subscription model route');
         const instance = remote[1]!; const provider = remote[2]! as 'codex'|'claude-code'; const account = remote[3]!; const modelId = remote[4]!;
+        if (!ctx.fns?.sshInstance?.list || !ctx.fns?.sshAccount?.registry) throw new Error('SSH transport is not ready');
         const [instances, accounts] = await Promise.all([ctx.fns.sshInstance.list({}), ctx.fns.sshAccount.registry({action:'list'})]);
         if (!instances.some(x=>x.name===instance&&x.pinnedHostKey)) throw new Error('SSH instance is missing or not trusted');
         if (!accounts.some(x=>x.instance===instance&&x.provider===provider&&x.account===account&&x.status==='connected')) throw new Error('SSH subscription account is not connected');
@@ -54,7 +56,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         if (matches.length > 1) throw new Error(`hyper/${account} model ${modelId} is ambiguous; select provider/account:model`);
         const entry = matches[0];
         if (!entry) throw new Error(`hyper/${account} does not offer model ${modelId}`);
-        if (String(entry.api) === "cursor") throw new Error(`hyper/${account}: Cursor transport is not supported; use a direct cursor account`);
+        if (!["openai", "anthropic", "responses", "mock"].includes(String(entry.api))) throw Object.assign(new Error(`hyper/${account}: provider unavailable`), { retryable: false, replaySafe: false });
         const path = entry.api === "openai" ? "chat" : entry.api;
         return { url: `${node.url}/${path}`, apiKey: await ctx.fns.node.token({ name: account }), modelId: entry.id, provider, account, kind: entry.kind, api: entry.api, upstream: entry.provider, quotaAccount: `${account}/${entry.provider}/${entry.account ?? "default"}` };
     }
@@ -77,7 +79,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 }
 
 type ProviderConfig = {
-    api: "openai" | "anthropic" | "responses" | "cursor" | "mock";
+    api: "openai" | "anthropic" | "responses" | "mock";
     // subscription = fixed quota per rolling window; a 429 means "wait until it
     // resets", money cannot fix it, so agents get parked. api = pay-per-token;
     // a 429 is short throttling and stays a normal retry. local = no limits.
@@ -179,17 +181,6 @@ const PROVIDERS: Record<string, ProviderConfig> = {
         kind: "subscription",
         resolveBaseUrl: () => "https://api.x.ai/v1",
         resolveApiKey: () => null,
-    },
-
-    cursor: {
-        // Cursor subscription through the official @cursor/sdk local runtime.
-        // Not an HTTP endpoint at all: the SDK speaks its own protocol from
-        // inside this process, so the URL is informational and streamCursor
-        // ignores it. See src/llm/streamCursor.ts.
-        api: "cursor",
-        kind: "subscription",
-        resolveBaseUrl: () => "https://api.cursor.com",
-        resolveApiKey: declaredSecret('cursorApiKey'),
     },
 
     openai: {

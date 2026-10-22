@@ -2,6 +2,7 @@
  * Persist a submitted chat turn with attachments and schedule its agent.
  *
  * Shared existing chat HTTP submission pipeline; callers must authenticate and resolve the durable agent before calling.
+ * A newly accepted human turn resumes a paused plan atomically with enqueueing. Duplicate retries do not resume it.
  * @param opts.req Text or multipart chat request.
  * @param opts.params Route values containing the existing agent id.
  */
@@ -81,6 +82,17 @@ export default async function (
                             return { idx: Number(existing.idx), duplicate: true };
                         }
                     }
+                    // Serialize human resumption with inbound delivery and scratchpad writes.
+                    // Only a NEW accepted human turn resumes a plan; retries return above.
+                    await ctx.fns.procs.db.select({ sql: 'SELECT id FROM agents WHERE id=? FOR UPDATE', params: [id] });
+                    await ctx.fns.session.mutateScratchpad({ id, mutate: (scratchpad: Record<string, any>, now: number) => {
+                        const plan = scratchpad.plan;
+                        if (!plan?.pausedAt) return;
+                        plan.pausedAt = null;
+                        plan.updatedAt = now;
+                        const active = Array.isArray(plan.tasks) ? plan.tasks.find((task: any) => task.status === 'active') : null;
+                        if (active && !active.activeSince) active.activeSince = now;
+                    } });
                     const safeText = await ctx.fns.session.scrubUnicode({ text });
                     const content: types.tools.Content[] = safeText ? [{ type: 'text', text: safeText }] : [];
                     content.push(...uploads.map(item => item.ref));

@@ -39,6 +39,10 @@ export default async function (
     resetCredits: types.llm.UsageSnapshot["resetCredits"];
     parkedAgents: number;
     needsReconnect: boolean;
+    /** Secret-free authorization status for an isolated SSH account; not inference availability. */
+    sshStatus?: "pending" | "connected" | "failed";
+    /** Last verified local CLI authorization status; does not imply model execution or a fresh network check. */
+    authStatus?: "pending" | "connected" | "failed";
     /** Gateway API catalogue health; does not imply generation success or quota. */
     gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>;
 }>> {
@@ -144,7 +148,7 @@ export default async function (
         item.model = `ssh/${row.instance}:${row.provider}/${row.account}:`;
         item.needsReconnect = item.needsReconnect || row.status !== "connected";
         item.available = row.status === "connected" && item.available;
-        out.push(item);
+        out.push({ ...item, sshStatus: row.status });
     }
 
     return out;

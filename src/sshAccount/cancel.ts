@@ -12,5 +12,5 @@ export default async function (
         id: string;
     },
 ): Promise<{ok:true}> {
-    await ctx.fns.sshAccount.requireOwner({});const f=ctx.state.sshAccount?.flows?.get(opts.id);if(f&&f.status==='pending'){f.status='cancelled';f.error='Authorization cancelled';f.process?.kill();await ctx.fns.sshAccount.registry({action:'fail',instance:f.instance,provider:f.provider,account:f.account});ctx.fns.procs.events.refresh({topic:'ssh-accounts'});}return {ok:true};
+    await ctx.fns.sshAccount.requireOwner({});const f=ctx.state.sshAccount?.flows?.get(opts.id);if(f&&f.status==='pending'){f.status='cancelled';f.error='Authorization cancelled';if(f.diagnostics){f.diagnostics.endedAt??=Date.now();const stage=f.diagnostics.stages.at(-1);if(stage)stage.endedAt??=f.diagnostics.endedAt;}f.process?.kill();await ctx.fns.sshAccount.registry({action:'fail',instance:f.instance,provider:f.provider,account:f.account});ctx.fns.procs.events.refresh({topic:'ssh-accounts'});}return {ok:true};
 }

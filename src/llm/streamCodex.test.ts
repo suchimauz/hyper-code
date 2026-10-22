@@ -7,6 +7,7 @@ import toCodexInput from "./toCodexInput";
 // a stubbed refreshCodex returning a fake JWT carrying a chatgpt_account_id
 // (so extractAccountId succeeds without real OAuth).
 function sseResponse(...chunks: string[]): Response {
+    chunks.push("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n");
     const enc = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
         start(c) { for (const s of chunks) c.enqueue(enc.encode(s)); c.close(); },
@@ -63,7 +64,7 @@ describe("streamCodex — offline (mocked fetch + shared parseSSE)", () => {
 
     test("sends the applied effort in the Responses reasoning object", async () => {
         let request: any;
-        globalThis.fetch = (async (_url:any, init:any) => { request = JSON.parse(init.body); return sseResponse('data: [DONE]\\n\\n'); }) as any;
+        globalThis.fetch = (async (_url:any, init:any) => { request = JSON.parse(init.body); return sseResponse('data: [DONE]\n\n'); }) as any;
         await stream(mkCtx(), null, { agent: { ...agent(), reasoningEffort: "high" } });
         expect(request.reasoning).toEqual({ effort: "high", summary: "auto" });
     });
@@ -77,5 +78,31 @@ describe("streamCodex — offline (mocked fetch + shared parseSSE)", () => {
         const res = await stream(mkCtx(), null, { agent: agent() });
         expect(res.text).toBe("out");
         expect(res.thinking).toBe("think");
+    });
+});
+
+
+describe('SSH replay safety', () => {
+    function sshCtx(body:string) {
+        const ctx:any=mkCtx();
+        const original=ctx.fns.llm.resolveEndpoint;
+        ctx.fns.llm.resolveEndpoint=()=>({...original(),apiKey:'remote',ssh:{instance:'mock',provider:'codex',account:'mock'}});
+        ctx.fns.sshAccount={fetch:async()=>new Response(body)};
+        return ctx;
+    }
+    test('truncated EOF and malformed stream are never successful or replayable',async()=>{
+        for(const body of ['', 'data: {bad json}\n\n']) {
+            await expect(stream(sshCtx(body),null,{agent:agent()})).rejects.toMatchObject({transportFailure:{phase:'ambiguous',retryable:false}});
+        }
+    });
+    test('valid terminal marker succeeds',async()=>{
+        const result=await stream(sshCtx("data: {\"type\":\"response.incomplete\",\"response\":{\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}}\n\n"),null,{agent:agent()});
+        expect(result.toolCalls).toEqual([]);
+    });
+    test('transport failure causes exactly one fetch, no inner retry',async()=>{
+        const ctx=sshCtx('');let calls=0;
+        ctx.fns.sshAccount.fetch=async()=>{calls++;throw Object.assign(Error('lost'),{transportFailure:{kind:'ssh_transport',phase:'before_dispatch',retryable:true}});};
+        await expect(stream(ctx,null,{agent:agent()})).rejects.toThrow('lost');
+        expect(calls).toBe(1);
     });
 });

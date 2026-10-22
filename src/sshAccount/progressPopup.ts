@@ -15,6 +15,17 @@ export default async function (ctx: Context, session: Session | null, opts: {
     const params = esc(JSON.stringify(opts));
     const tone = flow.status === 'failed' ? 'border-error/30 bg-error/10 text-error' : flow.status === 'connected' ? 'border-success/30 bg-success/10 text-success' : 'border-base-300 bg-base-100 text-base-content';
     let html = `<div class="space-y-4" data-refresh-topic="ssh-accounts"><div class="rounded-lg border ${tone} p-4 space-y-1"><p class="text-sm font-semibold">${esc(flow.account)} · ${esc(flow.status)}</p><p class="text-xs">${flow.provider === 'codex' ? 'Codex' : 'Claude Code'} · SSH ${esc(flow.instance)}</p>${flow.error ? `<p role="alert" class="text-xs leading-relaxed">${esc(flow.error)}</p>` : ''}</div>`;
+    if (flow.diagnostics) {
+        const d=flow.diagnostics;
+        const labels={'ssh-preflight':'SSH / preflight','cli-login':'CLI login waiting','credential-check':'Credential save / file check','login-status':'Login status check'};
+        const reasons={network:'Network error',tls:'TLS / certificate error',permission:'Permission denied',http:'HTTP error','missing-credentials':'Credential file missing or empty','cli-exit':'Process exited unsuccessfully',timeout:'Time limit reached',interrupted:'Authorization interrupted'};
+        const duration=(start:number,end:number|null)=>`${Math.max(0,Math.floor(((end??Date.now())-start)/1000))}s`;
+        html+=`<section aria-label="Safe login diagnostics" class="rounded-lg border border-base-300 p-4 text-xs space-y-2"><p>Started: ${esc(new Date(d.startedAt).toISOString())} · Duration: ${duration(d.startedAt,d.endedAt)}${d.endedAt!==null?` · Ended: ${esc(new Date(d.endedAt).toISOString())}`:''} · Process exit: ${d.exitCode??'not reported'}</p><ol>`;
+        for(const stage of d.stages) html+=`<li>${labels[stage.phase]} · ${esc(new Date(stage.startedAt).toISOString())} → ${stage.endedAt===null?'in progress':esc(new Date(stage.endedAt).toISOString())} · ${duration(stage.startedAt,stage.endedAt)} · exit ${stage.exitCode??'not reported'}</li>`;
+        html+='</ol>';
+        if(flow.status==='failed'&&d.reason)html+=`<p role="status">${reasons[d.reason]}${d.reason==='http'&&d.httpCode?` (${d.httpCode})`:''}. Classification is a hint, not a confirmed cause.</p>`;
+        html+='<p>Browser completion is not observable here until the CLI reports it. No provider logs are displayed. History is lost on server restart.</p></section>';
+    } else html+='<p class="text-xs text-subtle">Detailed diagnostics are unavailable for this earlier attempt.</p>';
     if (flow.status === 'pending') {
         html += '<p class="text-xs leading-relaxed text-subtle">Complete the provider sign-in below. Credentials are saved only in this account’s isolated HOME on the remote server.</p>';
         if (flow.verificationUri) html += `<div class="flex justify-center">${ui.button({ action: 'open-remote-authorization', label: 'Open authorization page', href: flow.verificationUri, tone: 'primary', attrs: { target: '_blank', rel: 'noopener noreferrer' } })}</div>`;

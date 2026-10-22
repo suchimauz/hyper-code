@@ -18,7 +18,9 @@ it('bounds startup and body deadlines even when cancellation stalls',async()=>{
 });
 it('fetches quota through framed fake SSH process without auth or network',async()=>{
  const c:any={fns:{sshInstance:{authorize:async()=>{},connection:async()=>({bin:'python3',args:['-c',`import sys,json
-r=json.load(sys.stdin)
+r=json.loads(sys.stdin.readline())
+print(json.dumps({'ready':True}),flush=True)
+assert sys.stdin.readline().strip()=='dispatch'
 assert r['url']=='https://chatgpt.com/backend-api/wham/usage'
 assert r['method']=='GET' and 'body' not in r
 assert 'authorization' not in r['headers']

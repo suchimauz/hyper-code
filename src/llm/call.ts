@@ -20,7 +20,7 @@ export default async function (
         model?: string;
         /** Sampling temperature where supported. */
         temperature?: number;
-        /** Maximum output tokens. */
+        /** Maximum output tokens where supported. */
         max_tokens?: number;
         /** Groq GPT-OSS reasoning budget; use low for short completions so reasoning does not consume the whole output limit. Ignored by other providers. */
         groqReasoningEffort?: "low" | "medium" | "high";
@@ -34,14 +34,20 @@ export default async function (
         sessionId?: string;
         /** Total request deadline across retries; aborts provider HTTP requests and response reads. Credential refresh is checked after it returns. Omit for no deadline. @minimum 1 @maximum 3600000 */
         timeoutMs?: number;
+        /** Caller cancellation signal; combined with timeoutMs when both are supplied. */
+        signal?: AbortSignal;
     },
 ): Promise<{ text: string; finishReason: string | null; usage: any; raw: any; model?: string; fallback?: { primary: string; attempted: string[]; attempts: Array<{ model: string; count: number }> } }> {
     if(opts.timeoutMs!==undefined&&(!Number.isInteger(opts.timeoutMs)||opts.timeoutMs<1||opts.timeoutMs>3600000))throw new Error('timeoutMs must be an integer in 1..3600000');
-    const signal=opts.timeoutMs===undefined?undefined:AbortSignal.timeout(opts.timeoutMs);
+    const deadline = opts.timeoutMs === undefined ? undefined : AbortSignal.timeout(opts.timeoutMs);
+    const signal = opts.signal && deadline ? AbortSignal.any([opts.signal, deadline]) : opts.signal ?? deadline;
     const user = String(opts.user ?? "").trim();
     if (!user) throw new Error("llm.call: user is required");
     const primary = String(opts.model ?? await ctx.fns.settings.modelDefault({})).trim();
     if (!primary) throw new Error("llm.call: model is required");
+    if (/^(?:ssh\/[^:]+:)?cursor(?:\/|:)/.test(primary)) {
+        throw Object.assign(new Error('Provider unavailable'), { retryable: false, replaySafe: false });
+    }
     const configuredFallbacks = opts.noFallback ? "" : await (ctx.fns.settings.getString?.({
         module: "llm", scopeType: "global", key: "fallbackModels",
         fallback: "codex:gpt-5.4-mini,kimi-coding:kimi-for-coding",
@@ -108,12 +114,14 @@ function alternateAnthropicModel(model: string): string | null {
 }
 
 function shouldRetrySameModel(error: unknown): boolean {
+    if ((error as { retryable?: boolean; replaySafe?: boolean })?.retryable === false || (error as { replaySafe?: boolean })?.replaySafe === false) return false;
     const message = String((error as any)?.message ?? error);
     if (/usage_limit_reached|usage limit (?:has been )?reached|quota_exceeded|credits_depleted|out of credits/i.test(message)) return false;
     return /\b429\b|rate.?limit|\b5\d\d\b|timeout|timed out|ETIMEDOUT|ECONNRESET|network|connection (?:reset|refused|closed)|overloaded|service unavailable/i.test(message);
 }
 
 function shouldFallback(error: unknown): boolean {
+    if ((error as { retryable?: boolean; replaySafe?: boolean })?.retryable === false || (error as { replaySafe?: boolean })?.replaySafe === false) return false;
     const message = String((error as any)?.message ?? error);
     if (/\b(?:400|401|403|404|409|413|422)\b/.test(message)) return false;
     if (/context_length_exceeded|request_too_large|prompt is too long|exceeds the context|invalid|unsupported|authentication|unauthorized/i.test(message)) return false;

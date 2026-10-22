@@ -6,6 +6,7 @@ import toAnthropicMessages from "./toAnthropicMessages";
 // Offline: drive streamAnthropic through the shared parseSSE with a mocked fetch.
 // Uses provider 'anthropic' so no OAuth refresh path is touched.
 function sseResponse(...chunks: string[]): Response {
+    chunks.push("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
     const enc = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
         start(c) { for (const s of chunks) c.enqueue(enc.encode(s)); c.close(); },
@@ -117,3 +118,29 @@ describe("streamAnthropic — offline (mocked fetch + shared parseSSE)", () => {
         expect(res.usage.cache_read_tokens).toBe(90);
         expect(res.usage.cache_write_tokens).toBe(5);
     });
+
+
+describe('SSH replay safety', () => {
+    function sshCtx(body:string) {
+        const ctx:any=mkCtx();
+        const original=ctx.fns.llm.resolveEndpoint;
+        ctx.fns.llm.resolveEndpoint=()=>({...original(),apiKey:'remote',ssh:{instance:'mock',provider:'claude-code',account:'mock'}});
+        ctx.fns.sshAccount={fetch:async()=>new Response(body)};
+        return ctx;
+    }
+    test('truncated EOF and malformed stream are never successful or replayable',async()=>{
+        for(const body of ['', 'data: {bad json}\n\n']) {
+            await expect(stream(sshCtx(body),null,{agent:agent()})).rejects.toMatchObject({transportFailure:{phase:'ambiguous',retryable:false}});
+        }
+    });
+    test('valid terminal marker succeeds',async()=>{
+        const result=await stream(sshCtx("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"),null,{agent:agent()});
+        expect(result.toolCalls).toEqual([]);
+    });
+    test('transport failure causes exactly one fetch, no inner retry',async()=>{
+        const ctx=sshCtx('');let calls=0;
+        ctx.fns.sshAccount.fetch=async()=>{calls++;throw Object.assign(Error('lost'),{transportFailure:{kind:'ssh_transport',phase:'before_dispatch',retryable:true}});};
+        await expect(stream(ctx,null,{agent:agent()})).rejects.toThrow('lost');
+        expect(calls).toBe(1);
+    });
+});

@@ -26,9 +26,17 @@ export default async function (ctx: Context, session: Session | null, opts: { re
             }
             if (!["GET", "HEAD", "OPTIONS"].includes(opts.req.method.toUpperCase())) {
                 const origin = opts.req.headers.get("origin");
-                const forwardedHost = opts.req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-                const expectedHost = forwardedHost || opts.req.headers.get("host") || url.host;
-                if (origin && new URL(origin).host !== expectedHost) return Response.json({ error: "cross_origin", message: "Cross-origin write rejected" }, { status: 403 });
+                const expectedOrigin = await ctx.fns.http.publicOrigin({ req: opts.req });
+                if (origin !== null) {
+                    // Opaque ("null") and malformed origins are untrusted, not server errors.
+                    // Require an HTTP(S) serialized origin, not an arbitrary URL with a matching host.
+                    let parsedOrigin: URL | null = null;
+                    try { parsedOrigin = new URL(origin); } catch { parsedOrigin = null; }
+                    if (!parsedOrigin || !["http:", "https:"].includes(parsedOrigin.protocol)
+                        || parsedOrigin.origin !== origin || parsedOrigin.origin !== expectedOrigin) {
+                        return Response.json({ error: "cross_origin", message: "Cross-origin write rejected" }, { status: 403 });
+                    }
+                }
             }
         }
     }

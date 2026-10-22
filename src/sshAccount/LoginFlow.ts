@@ -8,6 +8,15 @@ export type LoginFlow = {
     verificationUri: string | null;
     userCode: string | null;
     error: string | null;
+    /** Optional for flows started before diagnostics were installed. No provider output. */
+    diagnostics?: {
+        startedAt: number;
+        endedAt: number | null;
+        exitCode: number | null;
+        reason: 'network' | 'tls' | 'permission' | 'http' | 'missing-credentials' | 'cli-exit' | 'timeout' | 'interrupted' | null;
+        httpCode: number | null;
+        stages: { phase: 'ssh-preflight' | 'cli-login' | 'credential-check' | 'login-status'; startedAt: number; endedAt: number | null; exitCode: number | null }[];
+    };
     expiresAt: number;
     process: Bun.Subprocess<"pipe", "pipe", "pipe"> | null;
 };

@@ -40,6 +40,23 @@ describe('tools registry', () => {
         expect(boom.output).toContain('unknown option "script"');
     });
 
+    test('call preserves raw plugin JSON and existing tool envelopes', async () => {
+        const ctx = await setup();
+        const values = [{ id: 7, login: 'test' }, { time_entries: [{ hours: 2 }], total_count: 1 },
+            [{ id: 1 }], [], {}, null, false, 0];
+        for (const value of values) {
+            ctx.fns.tools.read = async () => value;
+            expect(await ctx.fns.tools.call({ name: 'read', args: { path: 'unused' } }))
+                .toEqual({ output: JSON.stringify(value), isError: false });
+        }
+        for (const value of [{ output: '', isError: false }, { output: 'failure', isError: true },
+            { output: 'answer', terminal: { type: 'html', html: '<p>answer</p>', text: 'answer' } }]) {
+            ctx.fns.tools.read = async () => value;
+            expect(await ctx.fns.tools.call({ name: 'read', args: { path: 'unused' } }))
+                .toEqual({ isError: false, ...value });
+        }
+    });
+
     test('unknown option and missing option are rejected before anything runs', async () => {
         const ctx = await setup();
         let touched = false;

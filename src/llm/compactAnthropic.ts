@@ -54,8 +54,9 @@ export default async function (
     const body: any = { model: ep.modelId, max_tokens: opts.maxTokens ?? 32000, messages, compaction };
     if (system.length) body.system = system;
     const init = { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal };
-    const res = ep.ssh
-        ? await ctx.fns.sshAccount.fetch({ ssh: ep.ssh, url: ep.url, init })
+    const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
+    const res = ssh
+        ? await ctx.fns.sshAccount.fetch({ ssh, url: ep.url, init })
         : await fetch(ep.url, init);
     if (!res.ok) throw new Error(`anthropic compaction ${res.status}: ${(await res.text()).slice(0, 500)}`);
     const raw: any = await res.json();

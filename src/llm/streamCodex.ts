@@ -68,13 +68,14 @@ export default async function (
         "session_id": agent.id,
     };
     const bodyJson = JSON.stringify(body);
+    const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
     const MAX_RETRIES = 3;
     let res: Response | null = null;
     let lastErr: any = null;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         if (opts.signal?.aborted) throw new Error("aborted");
         try {
-            res = ep.ssh ? await ctx.fns.sshAccount.fetch({ ssh: ep.ssh, url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } });
+            res = ssh ? await ctx.fns.sshAccount.fetch({ ssh, url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } });
             if (res.ok) {
                 await ctx.fns.llm.accountAuthHealth({ action: "clear", provider: ep.provider, account: ep.account });
                 break;
@@ -93,6 +94,7 @@ export default async function (
             if (attempt >= MAX_RETRIES || !info.retryable) throw lastErr;
         } catch (e: any) {
             lastErr = e;
+            if (ep.ssh) throw e; // SSH replay policy belongs to the worker, never nested retries.
             if (e?.message === "aborted") throw e;
             if (e?.failure && !e.failure.retryable) throw e;
             if (attempt >= MAX_RETRIES) throw e;
@@ -118,10 +120,12 @@ export default async function (
     // instead of after it.
     let rateLimits: any = null;
 
+    let terminal = false;
+    try {
     for await (const { data } of ctx.fns.llm.parseSSE({ body: res.body })) {
         if (!data || data === "[DONE]") continue;
         let ev: any;
-        try { ev = JSON.parse(data); } catch { continue; }
+        try { ev = JSON.parse(data); } catch (error) { if (ep.ssh) throw error; continue; }
         const t = ev.type;
         if (t === "response.output_text.delta" && typeof ev.delta === "string") {
             text += ev.delta;
@@ -144,6 +148,8 @@ export default async function (
             finishReason = mapStop(ev.response?.status);
             const stop = ev.response?.incomplete_details?.reason;
             if (stop === "max_output_tokens") finishReason = "length";
+            terminal = true;
+            break;
         } else if (t === "response.failed" || t === "error") {
             const msg =
                 ev.response?.error?.message ??
@@ -153,6 +159,16 @@ export default async function (
                 JSON.stringify(ev);
             throw new Error(`codex ${t}: ${msg}`);
         }
+    }
+
+    if (ep.ssh && !terminal) throw new Error("Codex stream ended without a terminal response");
+    } catch (error) {
+        if (ep.ssh && !opts.signal?.aborted) {
+            throw Object.assign(new Error("SSH inference interrupted; provider acceptance is uncertain. Resume manually.", { cause: error }), {
+                transportFailure: { kind: "ssh_transport", phase: "ambiguous", retryable: false },
+            });
+        }
+        throw error;
     }
 
     // Recording is a side effect of work already done: never its own request,

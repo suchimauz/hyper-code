@@ -29,6 +29,7 @@ export default async function* (
     const decoder = new TextDecoder();
     let buf = "";
     const reader = opts.body.getReader();
+    try {
     while (true) {
         let timer: any;
         const stall = new Promise<never>((_, reject) => {
@@ -55,5 +56,9 @@ export default async function* (
             }
             if (dataLines.length) yield { event, data: dataLines.join("\n") };
         }
+    }
+    } finally {
+        try { await reader.cancel(); } catch { /* Preserve the original stream failure. */ }
+        reader.releaseLock();
     }
 }

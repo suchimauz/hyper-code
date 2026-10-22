@@ -9,11 +9,18 @@
 // Never throws for a tool's own failure: a broken call is a message to the
 // model, not an exception for the run loop. An unknown name is reported the
 // same way, because in JSON mode the model picks the name itself.
-/** Validates and invokes a registered tool. */
+/** Validates and invokes a registered tool, preserving text, tool envelopes and JSON data results for the model. */
 export default async function (
     ctx: Context,
     session: Session | null,
-    opts: { /** Runtime, plugin, or tool name. */ name: string; /** Command-line arguments. */ args?: any; /** Agent associated with the operation. */ agent?: types.agent.Agent },
+    opts: {
+        /** Registered tool key, name or provider-facing wire name to execute. */
+        name: string;
+        /** Tool arguments validated against the registered JSON schema before execution. */
+        args?: any;
+        /** Owning agent whose workspace and cancellation scope apply to this call. */
+        agent?: types.agent.Agent;
+    },
 ): Promise<{ output: string; content?: types.tools.Content[]; isError: boolean; terminal?: { type: 'html'; html: string; text: string } }> {
     const name = String(opts.name ?? "").trim();
     const all = ctx.fns.tools.list({});
@@ -95,8 +102,10 @@ export default async function (
             ? telemetry.safeSpan({ name: "tool.execute", attrs, fn: invoke })
             : invoke());
         if (typeof r === "string") output = r;
-        else {
-            output = String(r?.output ?? "");
+        else if (r !== null && typeof r === "object" && !Array.isArray(r)
+            && (Object.hasOwn(r, "output") || Array.isArray(r.content)
+                || typeof r.isError === "boolean" || r.terminal?.type === "html")) {
+            output = String(r.output ?? "");
             if (Array.isArray(r?.content)) content = r.content;
             isError = r?.isError === true;
             if (r?.terminal?.type === 'html') terminal = {
@@ -104,6 +113,10 @@ export default async function (
                 html: String(r.terminal.html ?? ''),
                 text: String(r.terminal.text ?? ''),
             };
+        } else {
+            // Plugin procedures may return domain JSON rather than a tool envelope.
+            // Do not silently discard successful reads (users, time entries, etc.).
+            output = JSON.stringify(r) ?? "null";
         }
     } catch (e: any) {
         // A user abort is a RESULT, not a crash. Reporting elapsed time and

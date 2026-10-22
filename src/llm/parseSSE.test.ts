@@ -64,3 +64,14 @@ describe("llm.parseSSE", () => {
         ]);
     });
 });
+
+test('parser cancels and releases on idle stall and early return', async () => {
+    for (const stall of [true,false]) {
+        let cancelled=false;
+        const body=new ReadableStream<Uint8Array>({start(c){if(!stall)c.enqueue(new TextEncoder().encode('data: x\n\n'));},cancel(){cancelled=true;}});
+        const iterator=parseSSE({} as any,null,{body,idleTimeoutMs:5});
+        if(stall) await expect(iterator.next()).rejects.toThrow('stream stalled');
+        else {await iterator.next();await iterator.return(undefined);}
+        expect(cancelled).toBe(true);expect(body.locked).toBe(false);
+    }
+});

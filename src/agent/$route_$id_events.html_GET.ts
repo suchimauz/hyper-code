@@ -59,7 +59,8 @@ params: Record<string, string> }) {
         every: 30,
     });
 
-    return new Response(eventsHtml + '\n' + tail + usageOob, {
+    const transientOob = await ctx.fns.agent.renderTransientStream({ agentId: id, oob: true });
+    return new Response(eventsHtml + '\n' + tail + usageOob + transientOob, {
         headers: { 'content-type': 'text/html; charset=utf-8' },
     });
 }

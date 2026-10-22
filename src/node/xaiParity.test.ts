@@ -47,9 +47,3 @@ test("host refreshes xai OAuth for selected account and forwards session", async
     expect(account).toBe("named");
     expect(result?.headers).toEqual({ "content-type": "application/json", authorization: "Bearer fresh", accept: "text/event-stream", session_id: "root" });
 });
-
-test("catalog excludes direct and stale chained Cursor; stale resolution is explicit", async () => {
-    const ctx = { fns: { llm: { listModels: async () => ({ cursor: ["cursor:m"], xai: ["xai:g"] }), resolveEndpoint: async ({ model }: any) => ({ api: model.startsWith("cursor") ? "cursor" : "responses", kind: "subscription" }) }, node: { list: async () => [{ name: "chain", enabled: true, catalog: [{ id: "cursor/named:m", api: "cursor", provider: "cursor" }] }], get: async () => ({ enabled: true, catalog: [{ id: "cursor/named:m", api: "cursor" }] }), token: forbidden } } } as unknown as Context;
-    expect((await catalog(ctx, null, {})).map(x => x.id)).toEqual(["xai/default:g"]);
-    await expect(resolveEndpoint(ctx, null, { model: "hyper/host:cursor/named:m" })).rejects.toThrow("Cursor transport is not supported");
-});

@@ -43,6 +43,7 @@ export default async function (
             if (account.startsWith('ssh.')) {
                 const remote = (await ctx.fns.sshAccount.registry({action:'list'})).find(row => row.provider === provider && `ssh.${row.instance}.${row.account}` === account);
                 if (!remote || remote.status !== 'connected') throw new Error('SSH account is not connected');
+                if (remote.provider !== 'codex' && remote.provider !== 'claude-code') throw new Error('SSH usage is unsupported for this provider');
                 const response = await ctx.fns.sshAccount.fetchUsage({instance:remote.instance,provider:remote.provider,account:remote.account,timeoutMs});
                 if (provider === 'codex') await refreshCodex(ctx, account, timeoutMs, now, response);
                 else await refreshClaude(ctx, 'claude-code', account, timeoutMs, now, response);

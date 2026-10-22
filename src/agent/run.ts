@@ -182,22 +182,34 @@ export default async function (
         agent.scratchpad.mobileStream = mobileStream;
         const sampling = new AbortController();
         agent.samplingAbortController = sampling;
+        // Stream notifications address only the RAM fragment, not DB-backed regions.
+        let streamTimer: ReturnType<typeof setTimeout> | undefined;
+        const notifyStream = () => ctx.fns.procs.events.emit({ topic: `agent:${agent.id}:stream`, event: { type: "refresh" } });
+        const clearStream = () => {
+            clearTimeout(streamTimer);
+            streamTimer = undefined;
+            if (agent.scratchpad.mobileStream === mobileStream) delete agent.scratchpad.mobileStream;
+            notifyStream();
+        };
+        sampling.signal.addEventListener("abort", clearStream, { once: true });
         const onRunAbort = () => sampling.abort(ac.signal.reason ?? "run_aborted");
         ac.signal.addEventListener("abort", onRunAbort, { once: true });
         let streamed: any;
         try {
-            streamed = await ctx.fns.llm.stream({
-                agent,
-                signal: sampling.signal,
-                onEvent: (event: any) => {
-                    if (event?.type !== "text_delta" || typeof event.delta !== "string") return;
-                    mobileStream.text += event.delta;
-                    mobileStream.revision++;
-                },
-            });
+            const onEvent = (event: any) => {
+                if (sampling.signal.aborted || event?.type !== 'text_delta' || typeof event.delta !== 'string') return;
+                mobileStream.text += event.delta;
+                mobileStream.revision++;
+                if (streamTimer === undefined) streamTimer = setTimeout(() => {
+                    streamTimer = undefined;
+                    notifyStream();
+                }, 350);
+            };
+            streamed = await ctx.fns.llm.stream({ agent, signal: sampling.signal, onEvent });
         } catch (error: any) {
+            // Failed partial prose is never a durable assistant response.
+            clearStream();
             if (sampling.signal.aborted && sampling.signal.reason === "new_user_input" && !ac.signal.aborted) {
-                delete agent.scratchpad.mobileStream;
                 agent.samplingAbortController = null;
                 ac.signal.removeEventListener("abort", onRunAbort);
                 // Nothing from the interrupted partial response is persisted.
@@ -209,10 +221,11 @@ export default async function (
         } finally {
             if (agent.samplingAbortController === sampling) agent.samplingAbortController = null;
             ac.signal.removeEventListener("abort", onRunAbort);
+            sampling.signal.removeEventListener("abort", clearStream);
         }
+        clearStream();
         const { text, usage, finishReason, toolCalls = [] } = streamed;
         await ctx.fns.session.recordContextUsage({ id: agent.id, usage });
-        delete agent.scratchpad.mobileStream;
         const prose = String(text ?? '');
         delete agent.scratchpad.activeGoalFeedback;
 

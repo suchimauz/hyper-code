@@ -56,7 +56,6 @@ export default async function (
         oneapi: "Asoft LLM Gate",
         "kimi-coding": "Kimi Coding",
         kimi: "Kimi API",
-        cursor: "Cursor",
         groq: "Groq",
         hyper: "Hyper nodes",
         lmstudio: "LM Studio",
@@ -101,7 +100,10 @@ export default async function (
                 const target = account.models ? baseModel : withAccount(baseModel, entry.provider, account.account);
                 const selected = target === current;
                 const modelId = parseRoute(target).modelId;
-                const html = `<span class="min-w-0 flex-1"><span class="block truncate text-xs font-medium">${esc(modelId)}</span><span class="block truncate font-mono text-micro text-faint">${esc(target)}</span></span>${selected ? '<i class="ph ph-check-circle text-primary" aria-hidden="true"></i>' : '<i class="ph ph-arrow-right text-faint" aria-hidden="true"></i>'}`;
+                const label = modelId;
+                const visibleRoute = target;
+                const mark = ctx.fns.ui.modelLogo({ model: target, bare: true });
+                const html = `${mark}<span class="min-w-0 flex-1"><span class="block truncate text-xs font-medium">${esc(label)}</span><span class="block truncate font-mono text-micro text-faint">${esc(visibleRoute)}</span></span>${selected ? '<i class="ph ph-check-circle text-primary" aria-hidden="true"></i>' : '<i class="ph ph-arrow-right text-faint" aria-hidden="true"></i>'}`;
                 const button = ctx.fns.procs.ui.button({ action: "select-model", html, type: mode === "form" ? "button" : "submit", disabled: mode === "form" ? account.needsReconnect : selected || account.needsReconnect, title: account.needsReconnect ? "Reconnect this account in LLM connections before selecting it" : undefined, class: `flex w-full items-center gap-2 rounded-lg text-left ${selected ? "border-primary/30 bg-primary/10 text-primary" : "text-muted"}`, attrs: { "data-model-route": target, ...(selected ? { "aria-current": "true" } : {}), ...(mode === "form" ? { onclick: FORM_SELECT } : {}) } });
                 return mode === "form" ? button : `<form hx-post="/agent/${encodeURIComponent(id)}/model" hx-swap="none" class="contents"><input type="hidden" name="model" value="${esc(target)}"><input type="hidden" name="scope" value="agent">${button}</form>`;
             }).join("");
@@ -121,7 +123,7 @@ export default async function (
 type Account = { provider: string; account: string; available: boolean; needsReconnect: boolean; usedPercent: number | null; planType: string | null; label?: string; upstream?: string; models?: string[] };
 type Entry = { provider: string; models: string[]; accounts: Account[]; node?: string; sshInstance?: string };
 
-const UPSTREAM_LABELS: Record<string, string> = { "claude-code": "Claude Code", "anthropic-oauth": "Claude managed", anthropic: "Anthropic API", codex: "Codex", openai: "OpenAI API", openrouter: "OpenRouter", "kimi-coding": "Kimi Coding", kimi: "Kimi API", cursor: "Cursor", groq: "Groq", xai: "xAI" };
+const UPSTREAM_LABELS: Record<string, string> = { "claude-code": "Claude Code", "anthropic-oauth": "Claude managed", anthropic: "Anthropic API", codex: "Codex", openai: "OpenAI API", openrouter: "OpenRouter", "kimi-coding": "Kimi Coding", kimi: "Kimi API", groq: "Groq", xai: "xAI" };
 
 // One entry per Hyper node (docs/hyper-node.md): the node is shown like a
 // provider with a proxy mark, its "accounts" are the host's own providers

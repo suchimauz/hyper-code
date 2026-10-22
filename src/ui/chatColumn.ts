@@ -73,6 +73,7 @@ ${headerHtml}
 ${agent.sleepContext?.active === true
   ? `<div id="msg-tail" hx-get="/agent/${encodeURIComponent(id)}/events.html?offset=${maxIdx + 1}&compact=1" hx-trigger="load" hx-target="this" hx-swap="outerHTML"></div>`
   : `<div id="msg-tail" hx-get="/agent/${encodeURIComponent(id)}/events.html?offset=${maxIdx + 1}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"></div>`}
+${await ctx.fns.agent.renderTransientStream({ agentId: id })}
 ${ctx.fns.ui.live({
   id: 'active-tool-call',
   url: `/agent/${encodeURIComponent(id)}/active-tool`,

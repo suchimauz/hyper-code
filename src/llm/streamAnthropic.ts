@@ -107,7 +107,8 @@ export default async function (
         headers["anthropic-beta"] = [headers["anthropic-beta"], "compact-2026-09-04"].filter(Boolean).join(",");
     }
 
-    const transport = ep.ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh:ep.ssh!,...request}) : ctx.fns.llm.connectFetch;
+    const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
+    const transport = ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh,...request}) : ctx.fns.llm.connectFetch;
     const res = await transport({ url: ep.url, init: {
         method: "POST",
         headers,
@@ -136,10 +137,14 @@ export default async function (
     // JSON string across input_json_delta events, keyed by content-block index.
     const slots = new Map<number, { id: string; name: string; buf: string }>();
 
+    let terminal = false;
+    try {
     for await (const { event, data } of ctx.fns.llm.parseSSE({ body: res.body })) {
         let msg: any;
-        try { msg = JSON.parse(data); } catch { continue; }
-        const type = event ?? "message";
+        try { msg = JSON.parse(data); } catch (error) { if (ep.ssh) throw error; continue; }
+        const type = event ?? msg.type ?? "message";
+        if (type === "message_stop") { terminal = true; break; }
+        if (type === "error" && ep.ssh) throw new Error("Anthropic stream returned an error");
         if (type === "message_start") {
             const u = msg.message?.usage;
             if (u) {
@@ -169,6 +174,16 @@ export default async function (
             if (msg.delta?.stop_reason) finishReason = msg.delta.stop_reason;
             if (msg.usage?.output_tokens != null) usage.completion_tokens = msg.usage.output_tokens;
         }
+    }
+
+    if (ep.ssh && !terminal) throw new Error("Anthropic stream ended without message_stop");
+    } catch (error) {
+        if (ep.ssh && !opts.signal?.aborted) {
+            throw Object.assign(new Error("SSH inference interrupted; provider acceptance is uncertain. Resume manually.", { cause: error }), {
+                transportFailure: { kind: "ssh_transport", phase: "ambiguous", retryable: false },
+            });
+        }
+        throw error;
     }
 
     const toolCalls = [...slots.entries()]

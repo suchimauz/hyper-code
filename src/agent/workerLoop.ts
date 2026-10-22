@@ -164,6 +164,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
     const heartbeatTimer = setInterval(() => { void heartbeat().catch(() => undefined); }, RUN_HEARTBEAT_MS);
     let errorText: string | null = null;
     let failure: types.llm.FailureInfo | null = null;
+    let transportFailure: { kind: 'ssh_transport'; phase: 'before_dispatch' | 'ambiguous' | 'permanent'; retryable: boolean } | null = null;
     let aborted = false;
 
     // Steering: run() reports the user-message frontier its LAST model call
@@ -174,14 +175,17 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
         const result = await ctx.fns.agent.run({ agent, userText: '', userMessageAlreadyAppended: true });
         consumedIdx = Math.max(frontierIdx, Number((result as any)?.consumedUserIdx ?? -1));
     } catch (e: any) {
-        if (agent.currentJobId !== runToken) aborted = true;
-        else if (isAbortError(e)) {
+        if (agent.currentJobId !== runToken || agent.abortController?.signal.aborted) aborted = true;
+        else if (e?.name === 'AbortError' || (!e?.transportFailure && isAbortError(e))) {
             aborted = true;
         } else {
             // Stream implementations classify their own HTTP failures and carry
             // the verdict on the error. A spent subscription is a wait, not a
             // breakage: it gets parked below instead of an error badge.
-            failure = (e?.failure as types.llm.FailureInfo | undefined) ?? null;
+            transportFailure = e?.transportFailure?.kind === 'ssh_transport' ? e.transportFailure : null;
+            // Transport dispatch knowledge is authoritative, even if an upstream
+            // wrapper also attached an HTTP classification or a transient message.
+            failure = transportFailure ? null : (e?.failure as types.llm.FailureInfo | undefined) ?? null;
             errorText = failure?.message ?? e?.message ?? String(e);
             if (failure?.kind !== 'usage_limit') {
                 try { await ctx.fns.session.appendErrorEvent({ id: agentId, error: errorText ?? 'unknown error', ts: Date.now() }); } catch {}
@@ -191,6 +195,15 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
         clearInterval(heartbeatTimer);
         const ts = Date.now();
         const advanceCursor = !aborted && !errorText;
+        // Existing retry budget is process-local: a server restart resets it.
+        // The scheduled retry itself is durable and token-fenced below.
+        const retries: Record<string, number> = ((ctx.state as any).agentRunRetries ??= {});
+        const transient = transportFailure
+            ? transportFailure.phase === 'before_dispatch' && transportFailure.retryable === true
+            : failure ? failure.retryable
+            : !!errorText && /stalled|429|(?:^|\D)5\d\d(?:\D|$)|connection (?:was )?closed|ConnectionRefused|network|ETIMEDOUT|ECONNRESET|timed? ?out/i.test(errorText);
+        const retry = !aborted && !!errorText && failure?.kind !== 'usage_limit' && transient && (retries[agentId] ?? 0) < 1;
+        const retryAt = retry ? ts + (transportFailure ? 10_000 : Math.max(1_000, Number(failure?.retryAfterMs ?? 10_000))) : null;
 
         // ONE atomic finalize — the read-compute-write it replaces had a race:
         // a POST landing between "read afterIdx" and "UPDATE … next_run_at=NULL"
@@ -220,7 +233,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
                                  ELSE NULL END
                         -- abort/error: keep whatever schedule a concurrent POST set
                         -- (user-triggered retry); claim consumed the original one.
-                        ELSE next_run_at
+                        ELSE COALESCE(next_run_at, ?)
                     END,
                     last_error = ?,
                     stale_recovery_count = CASE WHEN ? = 1 THEN 0 ELSE stale_recovery_count END,
@@ -229,7 +242,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
                     updated_at = ?
               WHERE id = ? AND run_token = ?
               RETURNING next_run_at`,
-            params: [advanceCursor ? 1 : 0, consumedIdx, advanceCursor ? 1 : 0, consumedIdx, ts + 100, errorText, advanceCursor ? 1 : 0, ts, agentId, runToken],
+            params: [advanceCursor ? 1 : 0, consumedIdx, advanceCursor ? 1 : 0, consumedIdx, ts + 100, retryAt, errorText, advanceCursor ? 1 : 0, ts, agentId, runToken],
         });
 
         // Recovery or an explicit stop may already have revoked this token.
@@ -254,7 +267,13 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
         // round-trip per agent and cannot succeed before the quota resets. Such
         // a failure parks the whole credential group instead, with a durable
         // wake-up at the reset moment (see agent.parkOnUsageLimit).
-        const retries: Record<string, number> = ((ctx.state as any).agentRunRetries ??= {});
+        if (retry) {
+            retries[agentId] = (retries[agentId] ?? 0) + 1;
+            if (transportFailure) {
+                try { await ctx.fns.session.appendErrorEvent({ id: agentId, error: 'SSH connection failed before dispatch; one safe retry scheduled in 10 seconds.', ts }); }
+                catch { ctx.fns.procs.log.warn({ event: 'agent.ssh-retry.status-failed', agentId }); }
+            }
+        }
         if (failure?.kind === 'usage_limit') {
             delete retries[agentId];
             try {
@@ -264,16 +283,35 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
                 try { await ctx.fns.session.appendErrorEvent({ id: agentId, error: errorText ?? 'usage limit', ts: Date.now() }); } catch {}
             }
         } else {
-            const transient = failure
-                ? failure.retryable
-                : !!errorText && /stalled|429|(?:^|\D)5\d\d(?:\D|$)|connection (?:was )?closed|ConnectionRefused|network|ETIMEDOUT|ECONNRESET|timed? ?out/i.test(errorText);
             if (!errorText) delete retries[agentId];
-            else if (transient && (retries[agentId] ?? 0) < 1) {
-                retries[agentId] = (retries[agentId] ?? 0) + 1;
-                await ctx.fns.procs.db.run({
-                    sql: 'UPDATE agents SET next_run_at = COALESCE(next_run_at, ?) WHERE id = ?',
-                    params: [ts + Math.max(1_000, Number(failure?.retryAfterMs ?? 10_000)), agentId],
-                });
+        }
+
+        // A stable delivery key makes terminal child failure replay idempotent.
+        // This is best-effort, not a transactional outbox: delivery failure is
+        // logged, and a stop can race between the terminal SELECT and delivery.
+        // Never finish the task: its tool checkpoints and cursor remain intact.
+        if (transportFailure && errorText && !aborted && !retry && agent.parentId) {
+            const terminal = await ctx.fns.procs.db.select({
+                sql: `SELECT id FROM agents WHERE id = ? AND updated_at = ? AND run_state = 'idle'
+                    AND run_token IS NULL AND next_run_at IS NULL AND last_error = ?`,
+                params: [agentId, ts, errorText],
+            });
+            if (terminal.length && agent.currentJobId === runToken && !agent.abortController?.signal.aborted) {
+                const summary = transportFailure.phase === 'ambiguous'
+                    ? 'SSH transport failed after dispatch; remote inference outcome is unknown. Automatic replay is unsafe; manual continuation is required.'
+                    : transportFailure.phase === 'permanent'
+                    ? 'SSH transport rejected the request (configuration/authentication). Fix the connection and continue manually.'
+                    : transportFailure.retryable
+                    ? 'SSH connection failed before dispatch and the one safe retry is exhausted. Manual continuation is required.'
+                    : 'SSH connection failed before dispatch and was classified nonretryable. Manual continuation is required.';
+                try {
+                    await ctx.fns.session.deliverInbound({ id: agent.parentId, delivery: {
+                        key: `ssh-failure:${agentId}:${runToken}`,
+                        text: `<team-update member="${agentId}" event="failed">Agent ${agentId} failed: ${summary}</team-update>`,
+                        author: `agent:${agentId}`, messageType: 'team_update', wake: true,
+                        event: { type: 'team_update', event: 'failed', memberId: agentId, summary },
+                    } });
+                } catch { ctx.fns.procs.log.warn({ event: 'agent.ssh-failure.delivery-failed', agentId }); }
             }
         }
 

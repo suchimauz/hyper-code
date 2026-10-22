@@ -198,7 +198,7 @@ test('real HTMX swap:none and chrome processing keep dialog mounted until naviga
 test('mixed provider, proxy, API gateway and parked markers stay one-line with identity only in accessible details', async () => {
  const f = await fixture();
  try {
-  const providers = ['codex', 'openai', 'claude-code', 'anthropic-oauth', 'kimi-coding', 'cursor', 'xai', 'lmstudio', 'groq'];
+  const providers = ['codex', 'openai', 'claude-code', 'anthropic-oauth', 'kimi-coding', 'anthropic', 'xai', 'lmstudio', 'groq'];
   f.change({ entries: providers.map((provider, i) => entry(i, { provider, node: i % 2 ? 'proxy-node-long-name' : undefined, parkedAgents: i === 8 ? 2 : 0 })), gateway: {status: 'available', reason: 'models-ok', models: []} });
   f.click('[data-mobile-usage-open]'); await f.tick();
   const strip = f.d.querySelector('[data-mobile-usage-open]')!;
