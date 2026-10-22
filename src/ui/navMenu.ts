@@ -44,7 +44,37 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
   const narrowMenu = window.matchMedia('(max-width: 700px)');
   const coarseMenu = window.matchMedia('(max-width: 1023px) and (pointer: coarse)');
   const chatPositions = new WeakMap();
+  const expandedChats = new Set();
+  const foldChats = () => {
+    const mobile = narrowMenu.matches || coarseMenu.matches;
+    document.querySelectorAll('#nav-results [data-widget-type="chats"]').forEach(tile => {
+      const key = tile.getAttribute('data-nav-widget') || 'chats';
+      const agents = Array.from(tile.querySelectorAll('.nav-row[data-nav-id^="agent:"]')).map(row => row.parentElement);
+      const expanded = expandedChats.has(key);
+      agents.forEach((row, index) => {
+        const hide = mobile && !expanded && index >= 7;
+        row.hidden = hide;
+        // Row wrappers use display:flex, which otherwise overrides [hidden].
+        row.style.display = hide ? 'none' : '';
+      });
+      let button = tile.querySelector('[data-nav-more-chats]');
+      if (!mobile || agents.length <= 7) { button?.remove(); return; }
+      if (!button) {
+        button = document.createElement('button'); button.type = 'button';
+        button.setAttribute('data-nav-more-chats', '');
+        button.className = 'w-full rounded-lg px-3 py-2 text-left text-sm text-muted hover:bg-base-200';
+        button.addEventListener('click', () => {
+          if (expandedChats.has(key)) expandedChats.delete(key); else expandedChats.add(key);
+          foldChats();
+        });
+        tile.append(button);
+      }
+      button.setAttribute('aria-expanded', String(expanded));
+      button.textContent = expanded ? 'Свернуть' : 'Показать ещё · ' + (agents.length - 7);
+    });
+  };
   const orderWidgets = () => {
+    foldChats();
     const grid = document.querySelector('#nav-results [data-nav-mobile-chats-first]');
     if (!grid) return false;
     const chats = Array.from(grid.children).find(tile => tile.getAttribute('data-widget-type') === 'chats');
@@ -97,7 +127,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
   window.visualViewport?.addEventListener('resize', scheduleViewport, { passive: true });
   window.visualViewport?.addEventListener('scroll', scheduleViewport, { passive: true });
   window.addEventListener('resize', scheduleViewport, { passive: true });
-  const rows = () => Array.from(document.querySelectorAll('#nav-results .nav-row')).filter(row => !row.closest('details:not([open])'));
+  const rows = () => Array.from(document.querySelectorAll('#nav-results .nav-row')).filter(row => !row.closest('details:not([open]), [hidden]'));
   let currentProject = '';
   let selectionEpoch = 0;
   const currentPage = () => {
@@ -250,7 +280,7 @@ export default function (_ctx: Context, _session: Session | null, _opts?: {}): s
       return;
     }
     if (event.key === 'Enter') {
-      if (event.target.closest?.('#nav-close, #nav-theme-toggle, #nav-results form, [data-nav-mobile-usage]')) return;
+      if (event.target.closest?.('#nav-close, #nav-theme-toggle, #nav-results form, [data-nav-mobile-usage], [data-nav-more-chats]')) return;
       event.preventDefault(); openSelected(event.metaKey || event.ctrlKey);
     }
   }, true);

@@ -95,3 +95,22 @@ describe('mobile default Home widget order', () => {
         } finally { await f.window.happyDOM.close(); }
     });
 });
+
+test('mobile menu shows seven agent rows with reversible expansion; desktop and search keep all rows',async()=>{
+ const f=setup();
+ const agents=Array.from({length:10},(_,i)=>`<div class="group flex"><a class="nav-row" data-nav-id="agent:a${i}" href="/agent/a${i}">Chat ${i}</a></div>`).join('');
+ const html=`<section data-widget-type="chats" data-nav-widget="recent"><a class="nav-row" data-nav-default>New agent</a><section><h4>Recent</h4>${agents}</section></section>`;
+ const visible=()=>[...f.results.querySelectorAll('[data-nav-id^="agent:"]')].filter(row=>!row.closest('[hidden]'));
+ try{
+  f.refresh(html);expect(visible()).toHaveLength(7);
+  let more=f.results.querySelector('[data-nav-more-chats]') as any;
+  expect(more.textContent).toBe('Показать ещё · 3');expect(more.getAttribute('aria-expanded')).toBe('false');
+  more.click();expect(visible()).toHaveLength(10);expect(more.textContent).toBe('Свернуть');
+  f.refresh(html);expect(visible()).toHaveLength(10);
+  more=f.results.querySelector('[data-nav-more-chats]');more.click();expect(visible()).toHaveLength(7);
+  f.resize(1280);expect(visible()).toHaveLength(10);expect(f.results.querySelector('[data-nav-more-chats]')).toBeNull();
+  f.resize(390);expect(visible()).toHaveLength(7);
+  f.refresh(agents);expect(visible()).toHaveLength(10);expect(f.results.querySelector('[data-nav-more-chats]')).toBeNull();
+  f.refresh(html.replace(agents,agents.split('</div>').slice(0,4).join('</div>')));expect(f.results.querySelector('[data-nav-more-chats]')).toBeNull();
+ }finally{await f.window.happyDOM.close();}
+});
