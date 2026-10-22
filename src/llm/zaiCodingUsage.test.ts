@@ -42,3 +42,18 @@ test('Z.ai dual rings put weekly outside and 5h inside with explicit tooltip and
  html=dial(ctx,null,{entries:[{...entry,windows:{},usedPercent:null,quotaStatus:'unavailable'}],now});expect(html).not.toContain('stroke-dasharray');expect(html).toContain('quota unavailable — usage unknown');
  html=dial(ctx,null,{entries:[{...entry,windows:{primary:{usedPercent:100,resetsAt:now-1}}}],now});expect(html).not.toContain('stroke-dasharray');
 });
+
+test('Z.ai usage leaves through the chosen SSH instance while the plan key stays local',async()=>{
+ const fetched:any[]=[];
+ const ctx:any={fns:{secrets:{resolveSetting:async()=>'test-key'},llm:{codingInstance:async()=>({instance:'box'}),connectFetch:async(o:any)=>{fetched.push({via:'local',o});return Response.json(payload);}},sshAccount:{fetch:async(o:any)=>{fetched.push({via:'ssh',o});return Response.json(payload);}}}};
+ const r=await usage(ctx,null,{});
+ expect(fetched).toHaveLength(1);expect(fetched[0].via).toBe('ssh');
+ expect(fetched[0].o.ssh).toEqual({instance:'box',provider:'zai-coding',account:'default'});
+ expect(fetched[0].o.url).toBe('https://api.z.ai/api/monitor/usage/quota/limit');
+ expect(fetched[0].o.init.headers.authorization).toBe('Bearer test-key');
+ expect(r.primary!.used_percent).toBe(20);
+ // No instance chosen keeps the direct local connection.
+ ctx.fns.llm.codingInstance=async()=>({instance:null});
+ await usage(ctx,null,{});
+ expect(fetched[1].via).toBe('local');
+});

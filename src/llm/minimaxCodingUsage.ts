@@ -15,7 +15,12 @@ export default async function (
     const key = await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key: "minimaxCodingApiKey" });
     if (!key) throw new Error("MiniMax M Plan key is not configured");
     const timeout = Math.min(30000, Math.max(500, opts.timeoutMs ?? 5000));
-    const res = await ctx.fns.llm.connectFetch({ url: "https://www.minimax.io/v1/token_plan/remains", init: { headers: { authorization: "Bearer " + key, accept: "application/json" }, signal: AbortSignal.timeout(timeout), redirect: "error" } });
+    // The plan can leave through a chosen SSH instance; the same key rides the bridge.
+    const { instance } = ctx.fns?.llm?.codingInstance ? await ctx.fns.llm.codingInstance({ provider: "minimax-coding" }) : { instance: null };
+    const url = "https://www.minimax.io/v1/token_plan/remains";
+    const init = { headers: { authorization: "Bearer " + key, accept: "application/json" }, signal: AbortSignal.timeout(timeout), redirect: "error" as const };
+    const res = instance ? await ctx.fns.sshAccount.fetch({ ssh: { instance, provider: "minimax-coding", account: "default" }, url, init })
+        : await ctx.fns.llm.connectFetch({ url, init });
     if (!res.ok) throw new Error("MiniMax quota HTTP " + res.status);
     const body = await res.json() as { base_resp?: { status_code?: number; status_msg?: string }; model_remains?: Array<{ model_name?: string; end_time?: number; weekly_end_time?: number; current_interval_remaining_percent?: number; current_weekly_remaining_percent?: number }> };
     if (body.base_resp?.status_code !== 0 || !Array.isArray(body.model_remains)) throw new Error("Unrecognized MiniMax quota response: " + (body.base_resp?.status_msg ?? "no model_remains"));

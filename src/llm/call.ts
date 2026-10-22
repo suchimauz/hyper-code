@@ -98,7 +98,7 @@ async function callModel(ctx: Context, opts: any): Promise<{ text: string; finis
     const result = (endpoint.provider === "hyper" ? endpoint.upstream : endpoint.provider) === "xai" ? await xaiResponses(ctx, endpoint, { ...opts, user, system })
         : endpoint.api === "responses" ? await responses(ctx, endpoint, { ...opts, user, system })
             : endpoint.api === "anthropic" ? await anthropic(ctx, endpoint, { ...opts, user, system })
-                : await openAI(endpoint, { ...opts, user, system });
+                : await openAI(ctx, endpoint, { ...opts, user, system });
     return normalizeStructured(result, opts.response_format);
 }
 
@@ -197,7 +197,7 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
 }
 
-async function openAI(endpoint: any, opts: any) {
+async function openAI(ctx: Context, endpoint: any, opts: any) {
     const messages = [...(opts.system ? [{ role: "system", content: opts.system }] : []), { role: "user", content: opts.user }];
     const body: any = { model: endpoint.modelId, messages, stream: false };
     if (opts.temperature != null) body.temperature = opts.temperature;
@@ -205,8 +205,11 @@ async function openAI(endpoint: any, opts: any) {
     if (endpoint.provider === "groq" && /^openai\/gpt-oss-(20b|120b)$/.test(endpoint.modelId) && opts.groqReasoningEffort) body.reasoning_effort = opts.groqReasoningEffort;
     if (endpoint.provider === "openrouter" && opts.openrouterReasoningEffort) body.reasoning = { effort: opts.openrouterReasoningEffort, exclude: true };
     if (opts.response_format != null) body.response_format = opts.response_format;
-    let response = await fetch(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) });
-    response = await retryWithoutUnsupportedTemperature(response, body, () => fetch(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) }));
+    // A coding plan can leave through a chosen SSH instance; the plan key
+    // rides the bridge, so the authorization header stays as built here.
+    const transport = endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) });
+    response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) }));
     if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await response.json();
     const choice = raw?.choices?.[0] ?? {};

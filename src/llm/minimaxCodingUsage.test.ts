@@ -66,3 +66,14 @@ test('refreshUsage persists MiniMax windows and reuses the recent refresh', asyn
   expect(snapshot.rateLimits.secondary.used_percent).toBe(7);
   expect((await refresh(ctx, null, opts))[0]?.status).toBe('cached');
 });
+
+test('MiniMax usage leaves through the chosen SSH instance while the plan key stays local',async()=>{
+ const fetched:any[]=[];
+ const ctx:any={fns:{secrets:{resolveSetting:async()=>'test-key'},llm:{codingInstance:async()=>({instance:'edge'}),connectFetch:async(o:any)=>{fetched.push({via:'local',o});return Response.json(payload);}},sshAccount:{fetch:async(o:any)=>{fetched.push({via:'ssh',o});return Response.json(payload);}}}};
+ const r=await usage(ctx,null,{});
+ expect(fetched).toHaveLength(1);expect(fetched[0].via).toBe('ssh');
+ expect(fetched[0].o.ssh).toEqual({instance:'edge',provider:'minimax-coding',account:'default'});
+ expect(fetched[0].o.url).toBe('https://www.minimax.io/v1/token_plan/remains');
+ expect(fetched[0].o.init.headers.authorization).toBe('Bearer test-key');
+ expect(r.primary!.used_percent).toBe(20);
+});

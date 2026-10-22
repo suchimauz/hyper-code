@@ -26,7 +26,7 @@ export default async function (
         // One threshold pair for every surface: the rings, the account cards
         // and the mobile strip must colour the same account identically.
         const thresholds = { warnAt: 30, criticalAt: 60, alertAt: 75 };
-        if (local.length) Object.assign(thresholds, local[0].thresholds ?? {});
+        if (local.length) Object.assign(thresholds, local[0]?.thresholds ?? {});
         let entries: types.llms.UsageEntry[] = local.filter(entry => entry.provider !== "hyper").map(({ resetCredits: _resetCredits, ...entry }) => ({ ...entry, models: [] }));
         if (opts.includeConnected) {
             const inventory = (await ctx.fns.llm.listAccounts({})).filter(account => account.provider !== "hyper" && account.provider !== "oneapi");
@@ -75,9 +75,14 @@ export default async function (
         // Use the shared catalogue cache: it refreshes nodes with a five-minute TTL,
         // retains transient failures, and omits denied/disabled/empty catalogues.
         const models = await ctx.fns.llm.listModels({});
+        const planInstance = (provider: "zai-coding" | "minimax-coding") => ctx.fns?.llm?.codingInstance
+            ? ctx.fns.llm.codingInstance({ provider }).catch(() => ({ instance: null }))
+            : Promise.resolve({ instance: null });
+        const [zaiPlan, minimaxPlan] = await Promise.all([planInstance("zai-coding"), planInstance("minimax-coding")]);
         for (const entry of entries) {
             if (entry.provider === "zai-coding" || entry.provider === "minimax-coding") {
-                entry.label = entry.provider === "minimax-coding" ? "MiniMax" : "Z.ai";
+                const egress = entry.provider === "minimax-coding" ? minimaxPlan.instance : zaiPlan.instance;
+                entry.label = (entry.provider === "minimax-coding" ? "MiniMax" : "Z.ai") + (egress ? ` · ${egress}` : "");
                 if (entry.usedPercent == null) entry.quotaStatus = "unavailable";
                 else if (!entry.updatedAt || Date.now() - entry.updatedAt > 300_000) entry.quotaStatus = "stale";
             }

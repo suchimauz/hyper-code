@@ -94,3 +94,25 @@ test("default desktop mode never reads inventory or rewrites named routes", asyn
         expect(data.entries[0].needsReconnect).toBeUndefined();
     }
 });
+
+test("coding-plan labels show the chosen egress instance", async () => {
+    const ctx: any = { state: {}, fns: {
+        llm: {
+            refreshUsage: () => new Promise(() => {}),
+            usageOverview: async () => [
+                { provider: "zai-coding", account: "default", label: "Z.ai", model: "zai-coding:", usedPercent: 10, resetsAt: null, planType: "Coding Plan", resetCredits: null, parkedAgents: 0, tone: "neutral", updatedAt: Date.now() },
+                { provider: "minimax-coding", account: "default", label: "MiniMax", model: "minimax-coding:", usedPercent: null, resetsAt: null, planType: "M Plan", resetCredits: null, parkedAgents: 0, tone: "neutral", updatedAt: Date.now() },
+            ],
+            listModels: async () => ({}),
+            listAccounts: async () => [],
+            codingInstance: async (opts: any) => ({ instance: opts.provider === "zai-coding" ? "box" : null }),
+        },
+        node: { list: async () => [] },
+    } };
+    const data = await usageData(ctx, null, {});
+    const zai = data.entries.find((e: any) => e.provider === "zai-coding");
+    expect(zai!.label).toBe("Z.ai · box");
+    const mm = data.entries.find((e: any) => e.provider === "minimax-coding");
+    expect(mm!.label).toBe("MiniMax");
+    expect(mm!.quotaStatus).toBe("unavailable");
+});

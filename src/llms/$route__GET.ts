@@ -36,6 +36,13 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     const inventory = await ctx.fns.llm.listAccounts({}).catch(() => [] as any[]);
     await ctx.fns.llm.refreshUsage({ accounts: inventory.map((a: any) => ({ provider: a.provider, account: a.account })) }).catch(() => undefined);
     const accounts = await ctx.fns.llm.listAccounts({}).catch(() => inventory);
+    // Coding-plan egress: current per-provider instance plus trusted instance names.
+    const [zaiPlan, minimaxPlan, instanceRows] = await Promise.all([
+        ctx.fns.llm.codingInstance({ provider: "zai-coding" }).catch(() => ({ instance: null })),
+        ctx.fns.llm.codingInstance({ provider: "minimax-coding" }).catch(() => ({ instance: null })),
+        ctx.fns.sshInstance.list({}).catch(() => []),
+    ]);
+    const planInstances = { zai: zaiPlan.instance, minimax: minimaxPlan.instance, instances: (instanceRows as any[]).filter(i => i?.pinnedHostKey).map(i => String(i.name)) };
     const logins = ctx.fns.llm.accountLoginStatus?.({}) ?? [];
     const models = await ctx.fns.llm.listModels({});
     const nodes = await ctx.fns.node.list({});
@@ -83,7 +90,7 @@ ${addAccountForm}` : `
     const main = `<div class="llm-connections min-h-full bg-base-200">
 <header class="llm-connections-header border-b border-base-300 bg-base-100 px-6 py-5"><div class="mx-auto flex max-w-5xl items-start justify-between gap-4"><div><h1 class="text-xl font-semibold tracking-tight text-base-content">LLM connections</h1><p class="mt-1 text-sm text-subtle">Connect subscription accounts with +, or configure pay-per-token API providers.</p></div><div class="rounded-lg bg-base-200 px-3 py-2 text-right ring-1 ring-base-300"><div class="text-lg font-semibold text-base-content">${accounts.length}</div><div class="text-3xs uppercase tracking-wide text-faint">accounts</div></div></div></header>
 <div class="llm-connections-content mx-auto max-w-5xl space-y-7 px-6 py-6">
-${ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax })}
+${ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax, planInstances })}
 ${await ctx.fns.node.card({})}
 <section><div class="mb-3"><h2 class="text-xs font-semibold uppercase tracking-wider text-subtle">API providers</h2><p class="mt-1 text-xs text-faint">Pay-per-token keys are managed separately from subscription accounts.</p></div><div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">${staticCard({ icon: "ph-sparkle", name: "Anthropic API", description: "Claude models billed through an Anthropic API key.", on: status.anthropic.set, methods: [status.anthropic.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-circles-three-plus", name: "OpenAI", description: "OpenAI platform models and billing.", on: status.openai.set, methods: [status.openai.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-git-fork", name: "OpenRouter", description: "Multiple model vendors through one API.", on: status.openrouter.set, methods: [status.openrouter.set ? "Manage key in Settings" : "Add key in Settings"] })}</div></section>
 </div></div>`;

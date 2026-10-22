@@ -35,6 +35,8 @@ export default async function (
     available: boolean;
     usedPercent: number | null;
     resetsAt: number | null;
+    /** Both rolling quota windows when the provider reports them (5h/weekly coding plans); null otherwise. */
+    windows: types.llm.UsageSnapshot["windows"] | null;
     planType: string | null;
     resetCredits: types.llm.UsageSnapshot["resetCredits"];
     parkedAgents: number;
@@ -194,6 +196,9 @@ function entry(provider: string, account: string, source: "file" | "oauth" | "ke
         needsReconnect,
         usedPercent,
         resetsAt: known?.resetsAt ?? null,
+        // Both rolling windows (5h/weekly for the coding plans) so the account
+        // card can show each window, not only the worse one.
+        windows: known?.windows ?? null,
         planType: known?.planType ?? null,
         resetCredits: known?.resetCredits ?? null,
         parkedAgents: known?.parkedAgents ?? 0,

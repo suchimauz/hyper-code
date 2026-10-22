@@ -145,6 +145,22 @@ describe("ai.resolveEndpoint", () => {
         expect(r.apiKey).toBeNull();
     });
 
+    test("coding plans route through a chosen SSH instance without changing endpoint or key", async () => {
+        const ctx = mkCtx();
+        ctx.fns.secrets.resolveSetting = async () => "plan-key";
+        ctx.fns.llm = { codingInstance: async (o: any) => ({ instance: o.provider === "zai-coding" ? "box" : "edge" }) } as any;
+        ctx.fns.sshInstance = { list: async () => [{ name: "box", pinnedHostKey: "k" }, { name: "edge", pinnedHostKey: "k" }] } as any;
+        const zai = await resolve(ctx, null, { model: "zai-coding:glm-5.3" });
+        expect(zai.ssh).toEqual({ instance: "box", provider: "zai-coding", account: "default" });
+        expect(zai.url).toBe("https://api.z.ai/api/coding/paas/v4/chat/completions");
+        expect(zai.apiKey).toBe("plan-key");
+        const mm = await resolve(ctx, null, { model: "minimax-coding:MiniMax-M3" });
+        expect(mm.ssh).toEqual({ instance: "edge", provider: "minimax-coding", account: "default" });
+        // An instance that vanished from the registry must fail loudly, not silently go local.
+        ctx.fns.llm.codingInstance = async () => ({ instance: "ghost" });
+        await expect(resolve(ctx, null, { model: "zai-coding:glm-5.3" })).rejects.toThrow();
+    });
+
 
 
 });

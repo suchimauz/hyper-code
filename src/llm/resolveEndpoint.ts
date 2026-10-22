@@ -23,8 +23,9 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     upstream?: string;
     /** Node-scoped upstream quota identity; transport account remains the node name. */
     quotaAccount?: string;
-    /** Remote SSH execution route; credentials never leave this host. */
-    ssh?: { instance: string; provider: "codex" | "claude-code"; account: string };
+    /** Remote SSH execution route. For codex/claude-code credentials live on the
+     * remote host; for the coding plans the local plan key rides the bridge. */
+    ssh?: { instance: string; provider: "codex" | "claude-code" | "zai-coding" | "minimax-coding"; account: string };
 }> {
     const model = opts.model;
     if (/^(?:ssh\/[^:]+:)?cursor(?:\/|:)/.test(model)) throw Object.assign(new Error("Provider unavailable"), { retryable: false, replaySafe: false });
@@ -75,6 +76,18 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const url = p.api === "anthropic" ? `${baseUrl}/v1/messages`
         : p.api === "responses" ? `${baseUrl}/responses`
             : `${baseUrl}/chat/completions`;
+    // A coding plan can leave through a chosen SSH instance (egress routing):
+    // unlike ssh/ codex accounts, the plan API key stays the local secret and
+    // rides the bridge to the instance, which never stores it.
+    if (provider === "zai-coding" || provider === "minimax-coding") {
+        const { instance } = ctx.fns?.llm?.codingInstance ? await ctx.fns.llm.codingInstance({ provider }) : { instance: null };
+        if (instance) {
+            if (!ctx.fns?.sshInstance?.list) throw new Error('SSH transport is not ready');
+            const instances = await ctx.fns.sshInstance.list({});
+            if (!instances.some(x => x.name === instance && x.pinnedHostKey)) throw new Error(`SSH instance ${instance} is missing or not trusted`);
+            return { url, apiKey, modelId, provider, account, kind: p.kind, api: p.api, ssh: { instance, provider, account: 'default' } };
+        }
+    }
     return { url, apiKey, modelId, provider, account, kind: p.kind, api: p.api };
 }
 

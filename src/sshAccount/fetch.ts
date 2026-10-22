@@ -11,7 +11,7 @@ export default async function (
     session: Session | null,
     opts: {
         /** Pinned SSH instance and isolated subscription account identity. */
-        ssh: { instance:string; provider:"codex"|"claude-code"; account:string };
+        ssh: { instance:string; provider:"codex"|"claude-code"|"zai-coding"|"minimax-coding"; account:string };
         /** Allowlisted HTTPS inference, model catalogue or quota URL for the selected provider. */
         url: string;
         /** HTTP payload and cancellation signal; real authorization is injected remotely. */
@@ -19,9 +19,14 @@ export default async function (
     },
 ): Promise<Response> {
     await ctx.fns.sshInstance.authorize({});
-    if (!['codex','claude-code'].includes(opts.ssh.provider)) throw new Error('SSH provider supports authorization only, not inference');
+    // Coding plans bridge the caller's own plan key, so they need no remote
+    // account registry row; codex/claude-code load their credentials remotely.
+    const plan=opts.ssh.provider==='zai-coding'||opts.ssh.provider==='minimax-coding';
+    if (!plan&&!['codex','claude-code'].includes(opts.ssh.provider)) throw new Error('SSH provider supports authorization only, not inference');
+    if(!plan){
     const rows=await ctx.fns.sshAccount.registry({action:'list'});
     if(!rows.some(r=>r.instance===opts.ssh.instance&&r.provider===opts.ssh.provider&&r.account===opts.ssh.account&&r.status==='connected'))throw new Error('SSH subscription account is not connected');
+    }
     const c = await ctx.fns.sshInstance.connection({name:opts.ssh.instance});
     const script=await ctx.fns.sshAccount.inferenceScript({});
     const command="python3 -c '"+script.replaceAll("'","'\"'\"'")+"'";

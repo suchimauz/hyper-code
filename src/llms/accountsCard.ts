@@ -12,12 +12,14 @@
  * @param opts.now Current time in ms, for testing.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
-    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>; thresholds?: { warnAt: number; alertAt: number } }>;
+    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "ssh"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; windows?: types.llm.UsageSnapshot["windows"] | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean; gatewayHealth?: Awaited<ReturnType<typeof ctx.fns.llm.gatewayHealth>>; thresholds?: { warnAt: number; criticalAt?: number; alertAt: number } }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Shared available-model catalogue from llm.listModels; never credential keys. */ models?: Record<string, string[]>;
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
     /** MiniMax M Plan request settings shown next to the plan account. */
     minimax?: { serviceTier: string; maxTokens: number };
+    /** Coding-plan egress instances: current selection per provider plus trusted instance names. */
+    planInstances?: { zai: string | null; minimax: string | null; instances: string[] };
     /** Current timestamp in ms. */ now?: number;
 }): string {
     const now = opts.now ?? Date.now();
@@ -46,6 +48,17 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const resetCount = a.provider === "codex" && a.source !== "ssh" ? a.resetCredits?.availableCount : undefined;
         const resetDetails = a.provider === "codex" && a.resetCredits?.credits?.length ? `<details class="text-3xs text-subtle"><summary class="cursor-pointer">details</summary><div class="absolute z-20 mt-1 max-w-xs space-y-1 rounded-lg border border-ui-border bg-base-100 p-2 shadow-xl">${a.resetCredits.credits.map((credit: any) => `<div><div class="font-medium text-muted">${esc(credit.title || credit.resetType || "Codex reset")}</div>${credit.description ? `<div>${esc(credit.description)}</div>` : ""}${credit.expiresAt ? `<div>expires ${esc(new Date(typeof credit.expiresAt === "number" ? (credit.expiresAt < 10_000_000_000 ? credit.expiresAt * 1000 : credit.expiresAt) : credit.expiresAt).toLocaleString())}</div>` : ""}</div>`).join("")}</div></details>` : "";
         const reset = a.provider === "codex" && resetCount != null ? `<form method="POST" action="/llms/codex/reset" hx-post="/llms/codex/reset" hx-target="find .reset-result" hx-swap="innerHTML" class="flex items-center gap-1" onsubmit="return confirm('Use one of ${resetCount} Codex reset credits now?')"><input type="hidden" name="account" value="${esc(a.account)}"><span class="reset-result text-3xs text-subtle">${resetCount} reset${resetCount === 1 ? "" : "s"}</span>${resetDetails}${resetCount > 0 ? ctx.fns.procs.ui.button({ action: "reset-codex-limit", label: "Reset limit", type: "submit", size: "xs", tone: "warning" }) : ""}</form>` : "";
+        // The coding plans report two rolling windows; show each one with its
+        // own tone instead of only the worse of the two.
+        const windowCell = (label: string, w: { usedPercent?: number | null; resetsAt?: number | null }) => {
+            const pct = Math.round(w.usedPercent ?? 0);
+            const tone = pct >= alertAt ? "text-error" : pct >= criticalAt ? "text-critical" : pct >= warnAt ? "text-warning" : "text-success";
+            const resets = w.resetsAt ? ` · ${humanDelay(w.resetsAt - now)}` : "";
+            return { role: `quota-${label}`, text: `${label} ${pct}%${resets}`, class: `shrink-0 text-2xs font-mono ${tone}` };
+        };
+        const dual = (a.provider === "zai-coding" || a.provider === "minimax-coding") && (a.windows?.primary || a.windows?.secondary)
+            ? [a.windows?.primary ? windowCell("5h", a.windows.primary) : null, a.windows?.secondary ? windowCell("weekly", a.windows.secondary) : null].filter(Boolean) as Array<{ role: string; text: string; class: string }>
+            : null;
         const actions = `<span class="llm-account-actions flex flex-wrap items-center gap-1">${reset}${reconnect}${remove(a)}</span>`;
         return ctx.fns.procs.ui.row({ entity: "llm-account", id: `${a.provider}/${a.account}`, status: a.needsReconnect ? "error" : status, cells: [
             { role: "account", text: remote ? remote[2] : a.account === "default" ? "main" : a.account, class: "w-28 shrink-0 font-mono text-xs font-medium" },
@@ -53,7 +66,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
             ...(a.planType ? [{ role: "plan", text: planName(a.provider, a.planType), title: `Subscription plan: ${a.planType}`, class: "badge badge-sm shrink-0 capitalize text-muted" }] : []),
             { role: "prefix", text: prefix(a), title: prefix(a), class: "min-w-0 flex-1 truncate font-mono text-2xs text-faint" },
             { role: "storage", text: storage.text, title: storage.title, class: "hidden shrink-0 text-3xs text-faint lg:block" },
-            { role: "quota", text: quota, class: `shrink-0 text-2xs ${status === "limit" ? "text-error" : status === "critical" ? "text-critical" : status === "warning" ? "text-warning" : used == null ? "text-faint" : "text-success"}` },
+            ...(dual ? dual : [{ role: "quota", text: quota, class: `shrink-0 text-2xs ${status === "limit" ? "text-error" : status === "critical" ? "text-critical" : status === "warning" ? "text-warning" : used == null ? "text-faint" : "text-success"}` }]),
             ...(a.needsReconnect ? [{ role: "auth", text: "authentication required", class: "shrink-0 text-2xs font-medium text-error" }] : []),
             ...(a.parkedAgents ? [{ role: "parked", text: `${a.parkedAgents} parked`, class: "badge badge-sm shrink-0 text-warning" }] : []),
         ], right: actions });
@@ -70,7 +83,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
     };
     const localRow = (a: typeof opts.accounts[number]) => {
         const models = Object.values(opts.models ?? {}).flat().filter(model => model.startsWith(prefix(a)));
-        return `<div class="llm-account">${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div>${minimaxSettings(a)}</div>`;
+        const planInstance = a.provider !== "zai-coding" && a.provider !== "minimax-coding" || !opts.planInstances ? "" : ctx.fns.llms.planInstanceSettings({ provider: a.provider, instance: a.provider === "zai-coding" ? opts.planInstances.zai : opts.planInstances.minimax, instances: opts.planInstances.instances });
+        return `<div class="llm-account">${row(a)}<div class="px-3 pb-3" data-model-account="${esc(`${a.provider}/${a.account}`)}">${modelList(models)}</div>${minimaxSettings(a)}${planInstance}</div>`;
     };
     const providers = [
         { id: "codex", title: "Codex", icon: "codex:gpt", accounts: opts.accounts.filter(a => a.provider === "codex"), add: addButton(ctx, "codex", "Add Codex account") },

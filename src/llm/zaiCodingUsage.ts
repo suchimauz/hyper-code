@@ -15,7 +15,12 @@ export default async function (
     const key = await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key: "zaiCodingApiKey" });
     if (!key) throw new Error("Z.ai Coding Plan key is not configured");
     const timeout = Math.min(30000, Math.max(500, opts.timeoutMs ?? 5000));
-    const res = await ctx.fns.llm.connectFetch({ url: "https://api.z.ai/api/monitor/usage/quota/limit", init: { headers: { authorization: "Bearer " + key, accept: "application/json" }, signal: AbortSignal.timeout(timeout), redirect: "error" } });
+    // The plan can leave through a chosen SSH instance; the same key rides the bridge.
+    const { instance } = ctx.fns?.llm?.codingInstance ? await ctx.fns.llm.codingInstance({ provider: "zai-coding" }) : { instance: null };
+    const url = "https://api.z.ai/api/monitor/usage/quota/limit";
+    const init = { headers: { authorization: "Bearer " + key, accept: "application/json" }, signal: AbortSignal.timeout(timeout), redirect: "error" as const };
+    const res = instance ? await ctx.fns.sshAccount.fetch({ ssh: { instance, provider: "zai-coding", account: "default" }, url, init })
+        : await ctx.fns.llm.connectFetch({ url, init });
     if (!res.ok) throw new Error("Z.ai quota HTTP " + res.status);
     const body = await res.json() as { success?: boolean; code?: number; data?: { level?: string; limits?: Array<{ type?: string; unit?: number; number?: number; percentage?: number; nextResetTime?: number }> } };
     if (body.success !== true || body.code !== 200 || !Array.isArray(body.data?.limits)) throw new Error("Unrecognized Z.ai quota response");
