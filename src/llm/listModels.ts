@@ -220,10 +220,22 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
     if (ctx.fns.sshAccount?.registry) {
         const [remoteAccounts, instances] = await Promise.all([ctx.fns.sshAccount.registry({action:'list'}).catch(()=>[]),ctx.fns.sshInstance.list({}).catch(()=>[])]);
         const remoteCache:Record<string,string[]> = (ctx as any).state ? ((ctx as any).state.sshModelCatalog??={}) : {};
-        await Promise.all(remoteAccounts.filter(x=>(x.provider==='codex'||x.provider==='claude-code')&&x.status==='connected'&&instances.some(i=>i.name===x.instance&&i.pinnedHostKey)).map(async remote=>{
+        await Promise.all(remoteAccounts.filter(x=>(x.provider==='codex'||x.provider==='claude-code'||x.provider==='kimi-coding')&&x.status==='connected'&&instances.some(i=>i.name===x.instance&&i.pinnedHostKey)).map(async remote=>{
             const prefix=`ssh/${remote.instance}:${remote.provider}/${remote.account}`;
             const key=`ssh/${remote.instance}`;
             if(remote.provider==='claude-code') { (out[key]??=[]).push(...claudeModels.map(id=>`${prefix}:${id}`)); return; }
+            // Kimi publishes an account-specific catalogue on the coding host, so
+            // ask the host rather than guessing a static list the plan may not have.
+            if(remote.provider==='kimi-coding') {
+                let models=remoteCache[prefix]??[];
+                try {
+                    const response=await ctx.fns.sshAccount.fetch({ssh:{instance:remote.instance,provider:remote.provider,account:remote.account},url:'https://api.kimi.com/coding/v1/models',init:{method:'GET',headers:{accept:'application/json'},signal:AbortSignal.timeout(10000)}});
+                    if(response.ok){const data=await response.json() as {data?:Array<{id?:string}>};models=(data.data??[]).map(x=>x.id).filter((id): id is string => Boolean(id)).map(id=>`${prefix}:${id}`);remoteCache[prefix]=models;}
+                    else if(response.status!==408&&response.status!==429&&response.status<500){models=[];delete remoteCache[prefix];}
+                } catch { /* Keep the last successful catalogue through transient SSH outages. */ }
+                if(models.length)(out[key]??=[]).push(...models);
+                return;
+            }
             let models=remoteCache[prefix]??[];
             try {
                 const response=await ctx.fns.sshAccount.fetch({ssh:{instance:remote.instance,provider:remote.provider,account:remote.account},url:'https://chatgpt.com/backend-api/codex/models?client_version='+encodeURIComponent(await ctx.fns.llm.codexCliVersion({})),init:{method:'GET',signal:AbortSignal.timeout(10000)}});
