@@ -12,11 +12,11 @@ test('connections render gateway, account-grouped node and catalogue-only local 
  const html=card(ctx,null,{accounts:[account],models:{'hyper/mini':['hyper/mini:good'],'lmstudio':['lmstudio:local']},nodes:[{name:'mini',enabled:true,catalogAt:Date.now(),catalog:[{id:'good',provider:'codex',account:'alice'},{id:'hidden',provider:'codex',account:'bob'}]} as any]});
  expect(html).toContain('oneapi:gpt-test');expect(html).toContain('data-node-account="codex/alice"');expect(html).toContain('hyper/mini:good');expect(html).toContain('lmstudio:local');expect(html).not.toContain('hyper/mini:hidden');expect(html).toContain('generation not verified');
 });
-test('gateway dock is a neutral circle, status dot and escaped model tooltip without text block',async()=>{
+test('gateway dock is a neutral circle with a minimal hover card, no model list',async()=>{
  ctx.fns.llm={usageOverview:async()=>[],listModels:async()=>({}),gatewayHealth:async()=>({...account.gatewayHealth,models:['gpt<test>']})};ctx.fns.node={list:async()=>[]};ctx.fns.ui.usageDial=(o:any)=>dial(ctx,null,o);
  ctx.fns.llms={usageData:(opts:any)=>usageData(ctx,null,opts)};
  const html=await(await route(ctx,null,{})).text();
- expect(html).toContain('data-gateway="oneapi"');expect(html).toContain('size-7');expect(html).toContain('bg-success');expect(html).toContain('gpt&lt;test&gt;');expect(html).not.toContain('stroke-dasharray');expect(html).not.toContain('>Asoft LLM Gate');expect(html).toContain('generation not verified');
+ expect(html).toContain('data-gateway="oneapi"');expect(html).toContain('size-7');expect(html).toContain('bg-success');expect(html).toContain('quota-ring');expect(html).toContain('quota-tip-head">Asoft LLM Gate');expect(html).toContain('in catalogue');expect(html).not.toContain('gpt<test>');expect(html).not.toContain('Available models');expect(html).not.toContain('stroke-dasharray');
 });
 test('subscription rings keep quota in a minimal hover card without the model list',()=>{
  const html=dial(ctx,null,{entries:[{provider:'codex',account:'alice',label:'mini · alice',node:'mini',models:['hyper/mini:gpt'],usedPercent:17,resetsAt:null,planType:null,parkedAgents:0,tone:'neutral'}]});expect(html).toContain('17% used');expect(html).toContain('stroke-dasharray');expect(html).toContain('quota-tip');expect(html).toContain('Hyper node mini');expect(html).not.toContain('hyper/mini:gpt');expect(html).not.toContain('account alice');
