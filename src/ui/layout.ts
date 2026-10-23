@@ -343,6 +343,22 @@ export default async function (ctx: Context, session: Session | null, opts: {
 [data-chat-retry], [data-chat-cancel-retry] { min-height: 44px; padding: .4rem .65rem; text-decoration: underline; text-underline-offset: .2em; }
 [data-chat-retry]:disabled, [data-chat-cancel-retry]:disabled { opacity: .5; }
 [data-chat-submitting] :is([data-chat-retry], [data-chat-cancel-retry]) { pointer-events: none; }
+.chat-local-message { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
+[data-local-retry] { min-height: 44px; padding: .4rem .75rem; font-size: .8125rem; color: var(--color-error); text-decoration: underline; text-underline-offset: .2em; }
+[data-local-retry][hidden] { display: none; }
+[data-local-retry]:disabled { opacity: .5; }
+#chat-panel #messages .chat-local-message > .chat-glass-primary { position: relative; max-width: 80%; min-width: 0; padding-right: 2.6rem; border: 1px solid transparent; transition: background-color 180ms ease, border-color 180ms ease; }
+#chat-panel #messages .chat-local-message[data-state="pending"] > .chat-glass-primary { background: color-mix(in srgb, var(--color-base-content) 8%, var(--color-base-100)); color: var(--color-base-content); border-width: 1px; border-style: dashed; border-color: color-mix(in srgb, var(--color-base-content) 45%, transparent); box-shadow: none; }
+.chat-local-message[data-state="pending"] [data-local-text] { opacity: .68; }
+[data-local-progress] { position: absolute; right: .75rem; bottom: .75rem; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: chat-icon-spin .8s linear infinite; }
+.chat-local-message[data-state="pending"] [data-local-progress] { color: var(--color-primary); }
+[data-local-progress][hidden] { display: none; }
+.chat-local-message[data-state="failed"] [data-local-progress] { animation: none; border: 0; font-weight: 700; line-height: .7rem; }
+@media (prefers-reduced-motion: reduce) { #chat-panel #messages .chat-local-message > .chat-glass-primary { transition: none; } [data-local-progress] { animation: none; } }
+[data-chat-submitting] [data-composer-send] { opacity: .65; pointer-events: none; }
+[data-chat-submitting] [data-composer-send] > i { display: none; }
+[data-chat-submitting] [data-composer-send]::after { content: ''; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: chat-icon-spin .8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { [data-chat-submitting] [data-composer-send]::after { animation: none; } }
 
 /* LLM Connections: readable provider/account cards without changing desktop layout. */
 .llm-connections :is(section, article), .llm-accounts, .llm-node-account { min-width: 0; max-width: 100%; }

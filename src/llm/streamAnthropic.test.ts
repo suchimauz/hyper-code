@@ -159,3 +159,36 @@ test("Go Anthropic stream passes stable session, required output budget and reas
     expect(body.thinking).toEqual({ type: "adaptive" });
     expect(body.output_config).toEqual({ effort: "high" });
 });
+
+describe("Kimi response-channel opener", () => {
+    const opener = "<|open|>response";
+    async function run(chunks: string[], provider = "kimi-coding", ssh = false) {
+        const ctx: any = mkCtx();
+        ctx.fns.llm.resolveEndpoint = () => ({ provider, api: "anthropic", modelId: "k3-256k", url: "https://mock.invalid/messages", ...(ssh ? { ssh: { instance: "mock", provider, account: "test" } } : {}) });
+        ctx.fns.llm.refreshKimiCode = async () => null;
+        const response = () => sseResponse(...chunks.map(text => `event: content_block_delta\ndata: ${JSON.stringify({ delta: { type: "text_delta", text } })}\n\n`));
+        ctx.fns.llm.connectFetch = async () => response();
+        ctx.fns.sshAccount = { fetch: async () => response() };
+        const emitted: string[] = [];
+        const result = await stream(ctx, null, { agent: agent(), onEvent: (e: any) => { if (e.type === "text_delta") emitted.push(e.delta); } });
+        expect(emitted.join("")).toBe(result.text);
+        return result.text;
+    }
+    test("removes the reported opener for SSH Kimi before streaming or persistence", async () => {
+        expect(await run([opener + "Привет! Что делаем дальше?"], "kimi-coding", true)).toBe("Привет! Что делаем дальше?");
+    });
+    test("recognizes every SSE split of the opener", async () => {
+        for (let i = 1; i < opener.length; i++) {
+            expect(await run([opener.slice(0, i), opener.slice(i), "Привет!"])).toBe("Привет!");
+        }
+        expect(await run([...opener, "Hello"])).toBe("Hello");
+        expect(await run([opener])).toBe("");
+    });
+    test("preserves ordinary content, embedded markers, partials and non-Kimi providers", async () => {
+        for (const text of ["Привет!", "Example: " + opener, "<|open|>", "<|open|>respond", "<", ""]) {
+            expect(await run([text])).toBe(text);
+        }
+        expect(await run([opener + "Hello"], "anthropic")).toBe(opener + "Hello");
+        expect(await run([opener + opener + "Hello"])).toBe(opener + "Hello");
+    });
+});

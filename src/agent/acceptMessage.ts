@@ -61,7 +61,7 @@ export default async function (
             if (existing) {
                 const payload = typeof existing.payload === 'string' ? JSON.parse(existing.payload) : existing.payload;
                 if (!payload?.submissionFingerprint || payload.submissionFingerprint !== fingerprint) return Response.json({ error: 'Этот ключ уже использован или прежняя отправка не завершена. Проверьте историю чата.' }, { status: 409 });
-                if (req.headers.get('hx-request') === 'true') return new Response(null, { status: 204 });
+                if (req.headers.get('hx-request') === 'true') return new Response(null, { status: 204, headers: { 'x-chat-message-idx': String(existing.idx) } });
                 return Response.json({ ok: true, duplicate: true, messageIdx: Number(existing.idx) });
             }
         }
@@ -116,7 +116,7 @@ export default async function (
             }
         }
         if (userAppend.duplicate) {
-            if (req.headers.get('hx-request') === 'true') return new Response(null, { status: 204 });
+            if (req.headers.get('hx-request') === 'true') return new Response(null, { status: 204, headers: { 'x-chat-message-idx': String(userAppend.idx) } });
             return Response.json({ ok: true, duplicate: true, messageIdx: userAppend.idx });
         }
         // Durable acceptance committed. Notification failures cannot undo it.
@@ -180,7 +180,7 @@ export default async function (
             catch (error) { console.warn('Chat accepted; worker notification failed', id, error); }
         }
 
-        if (req.headers.get("hx-request") === "true") return new Response(null, { status: 204 });
+        if (req.headers.get('hx-request') === 'true') return new Response(null, { status: 204, headers: { 'x-chat-message-idx': String(userAppend.idx) } });
         if (String(req.headers.get("accept") ?? "").includes("text/html")) return new Response(null, { status: 303, headers: { location: `/agent/${encodeURIComponent(id)}` } });
         return Response.json({ ok: true, sendAt, messageIdx: userAppend.idx, attachments: uploads.map(item => item.meta) });
 }

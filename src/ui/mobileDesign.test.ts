@@ -293,3 +293,23 @@ test('tool popup keeps full-width Close below its scroll body on mobile only', a
         } finally { await f.window.happyDOM.close(); }
     }
 });
+
+test('pending message stays visibly distinct and reserves room for spinner on phone and desktop', async () => {
+    for (const width of [390, 1280]) {
+        const f = await fixture(width, width === 390 ? 5 : 0);
+        try {
+            f.window.document.querySelector('#messages')!.insertAdjacentHTML('beforeend', '<div class="chat-local-message" data-state="pending"><div class="chat-glass-primary"><span data-local-text>Pending</span><span data-local-progress role="img" aria-label="Отправляется"></span></div></div>');
+            const selector = '.chat-local-message > .chat-glass-primary';
+            expect(f.css(selector).borderStyle).toBe('dashed');
+            expect(f.css(selector).paddingRight).toBe('41.6px');
+            expect(Number(f.css('[data-local-text]').opacity)).toBe(.68);
+            expect(f.css('[data-local-progress]').width).toBe('16px');
+            const bubble = f.window.document.querySelector('.chat-local-message')!;
+            const confirmed = bubble.cloneNode(true) as HTMLElement;
+            confirmed.setAttribute('data-state', 'confirmed');
+            bubble.replaceWith(confirmed);
+            expect(f.css(selector).borderStyle).toBe('solid');
+            expect(Number(f.css('[data-local-text]').opacity)).not.toBe(.68);
+        } finally { await f.window.happyDOM.close(); }
+    }
+});

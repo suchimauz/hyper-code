@@ -132,3 +132,77 @@ test('a live status swap to running does not block a draft written while idle', 
         expect(f.submits).toBe(1);
     } finally { await f.w.happyDOM.close(); }
 });
+
+test('submit inserts a dimmable transcript bubble immediately, confirms by message index, and exposes retry on failure', async () => {
+    for (const success of [true, false]) {
+        const f = await fixture(true);
+        try {
+            f.input.value = '<script>literal</script>\nDraft';
+            f.form.dispatchEvent(new f.w.Event('submit', { bubbles: true, cancelable: true }));
+            const messages = f.w.document.querySelector('#messages')!;
+            const bubble = messages.querySelector('[data-local-message]')! as HTMLElement;
+            expect(bubble.dataset.state).toBe('pending');
+            expect(bubble.querySelector('[data-local-text]')!.textContent).toBe(f.input.value);
+            expect(bubble.querySelector('script')).toBeNull();
+            expect(f.form.querySelector('[data-chat-delivery]')).toBeNull();
+            expect(f.form.querySelector('[data-composer-send]')!.getAttribute('aria-busy')).toBe('true');
+            expect((bubble.querySelector('[data-local-retry]')! as HTMLButtonElement).hidden).toBe(true);
+            f.form.dispatchEvent(new f.w.CustomEvent('htmx:after:request', { bubbles: true, detail: { ctx: { sourceElement: f.form, response: { status: success ? 200 : 500 }, text: JSON.stringify({ messageIdx: 42 }) } } }));
+            expect(bubble.dataset.state).toBe(success ? 'confirmed' : 'failed');
+            expect((bubble.querySelector('[data-local-progress]')! as HTMLElement).hidden).toBe(success);
+            expect((bubble.querySelector('[data-local-retry]')! as HTMLButtonElement).hidden).toBe(success);
+            expect(f.input.value).toBe(success ? '' : '<script>literal</script>\nDraft');
+            expect(f.form.querySelector('[data-composer-send]')!.hasAttribute('aria-busy')).toBe(false);
+            if (success) {
+                messages.insertAdjacentHTML('beforeend', '<div id="m-42">Server message</div>');
+                messages.dispatchEvent(new f.w.CustomEvent('htmx:after:swap', { bubbles: true, detail: { ctx: { target: messages } } }));
+                expect(messages.querySelector('[data-local-message]')).toBeNull();
+                expect(messages.querySelector('#m-42')).not.toBeNull();
+            } else {
+                const id = f.form.elements.requestId.value;
+                // Simulate native submission without making a real HTTP request.
+                f.form.requestSubmit = () => f.form.dispatchEvent(new f.w.Event('submit', { bubbles: true, cancelable: true }));
+                f.input.value = 'New draft must not replace the retry snapshot';
+                (bubble.querySelector('[data-local-retry]')! as HTMLButtonElement).click();
+                expect(f.form.elements.requestId.value).toBe(id);
+                expect(bubble.dataset.state).toBe('pending');
+                expect(messages.querySelectorAll('[data-local-message]').length).toBe(1);
+                const body = new f.w.FormData();
+                f.form.dispatchEvent(new f.w.CustomEvent('htmx:config:request', { detail: { ctx: { sourceElement: f.form, request: { body } } } }));
+                expect(body.get('text')).toBe('<script>literal</script>\nDraft');
+                expect(body.get('requestId')).toBe(id);
+            }
+        } finally { await f.w.happyDOM.close(); }
+    }
+});
+
+test('live confirmation arriving before HTTP response reconciles without duplicate bubbles', async () => {
+    const f = await fixture(false);
+    try {
+        f.form.dispatchEvent(new f.w.Event('submit', { bubbles: true, cancelable: true }));
+        const messages = f.w.document.querySelector('#messages')!;
+        messages.insertAdjacentHTML('beforeend', '<div id="m-7">Draft</div>');
+        f.form.dispatchEvent(new f.w.CustomEvent('htmx:after:request', { detail: { ctx: { sourceElement: f.form, response: { status: 200 }, text: '{"messageIdx":7}' } } }));
+        expect(messages.querySelectorAll('[data-local-message]').length).toBe(0);
+        expect(messages.querySelectorAll('#m-7').length).toBe(1);
+    } finally { await f.w.happyDOM.close(); }
+});
+
+test('real HTMX 204 acknowledgements reconcile via header whether live bubble arrives first or later', async () => {
+    for (const liveFirst of [true, false]) {
+        const f = await fixture(true);
+        try {
+            f.form.dispatchEvent(new f.w.Event('submit', { bubbles: true, cancelable: true }));
+            const messages = f.w.document.querySelector('#messages')!;
+            const addLive = () => {
+                messages.insertAdjacentHTML('beforeend', '<div id="m-42">Draft</div>');
+                messages.dispatchEvent(new f.w.CustomEvent('htmx:after:swap', { bubbles: true, detail: { ctx: { target: messages } } }));
+            };
+            if (liveFirst) addLive();
+            f.form.dispatchEvent(new f.w.CustomEvent('htmx:after:request', { detail: { ctx: { sourceElement: f.form, response: { status: 204, headers: new f.w.Headers({ 'x-chat-message-idx': '42' }) }, text: '' } } }));
+            if (!liveFirst) addLive();
+            expect(messages.querySelectorAll('[data-local-message]')).toHaveLength(0);
+            expect(messages.querySelectorAll('#m-42')).toHaveLength(1);
+        } finally { await f.w.happyDOM.close(); }
+    }
+});

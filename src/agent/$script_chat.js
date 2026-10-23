@@ -12,6 +12,7 @@
     const pendingSends = new WeakMap();
     // File objects and failed snapshots stay in memory only, never sessionStorage.
     const deliveries = new Map();
+    const optimisticMessages = new Map();
     const draftFiles = new Map();
     const draftKey = form => 'hyper:chat-draft:v1:' + new URL(form.getAttribute('hx-post'), location.href).pathname;
     function readDraft(key) {
@@ -129,18 +130,25 @@
             const { signal } = this.abort;
             this.draftKey = draftKey(this.form);
             this.setFiles(draftFiles.get(this.draftKey) || []);
-            this.form.querySelector('[data-chat-retry]')?.addEventListener('click', () => {
+            const retrySend = () => {
                 const sent = deliveries.get(this.draftKey);
                 if (!sent || sent.inFlight || navigator.onLine === false) return;
                 this.retrying = true;
-                this.form.requestSubmit();
-                this.retrying = false;
+                try { this.form.requestSubmit(); } finally { this.retrying = false; }
+            };
+            this.form.querySelector('[data-chat-retry]')?.addEventListener('click', retrySend, { signal });
+            this.messages.addEventListener('click', event => {
+                const retry = event.target.closest('[data-local-retry]');
+                if (!retry || !this.messages.contains(retry)) return;
+                if (retry.closest('[data-local-message]')?.dataset.localMessage !== deliveries.get(this.draftKey)?.requestId) return;
+                retrySend();
             }, { signal });
             this.form.querySelector('[data-chat-cancel-retry]')?.addEventListener('click', () => {
                 const sent = deliveries.get(this.draftKey);
                 if (!sent || sent.inFlight) return;
                 if (sent.attempted && !window.confirm('Сообщение могло уже сохраниться. Не повторять его? Перед новой отправкой проверьте историю чата. Текущий черновик останется здесь.')) return;
                 deliveries.delete(this.draftKey);
+                optimisticMessages.delete(sent.requestId);
                 const key = this.form.elements.requestId;
                 if (key) key.value = '';
                 this.renderDelivery();
@@ -233,6 +241,7 @@
                 this.saveDraft();
                 const sent = previous || { key: this.draftKey, text: this.input.value, files: [...(this.fileInput?.files || [])], requestId: crypto.randomUUID() };
                 deliveries.set(this.draftKey, sent);
+                optimisticMessages.set(sent.requestId, sent);
                 if (navigator.onLine === false) { sent.error = 'Нет соединения. Отправка не началась.'; this.renderDelivery(); return reject(); }
                 sent.inFlight = true;
                 sent.attempted = true;
@@ -241,8 +250,9 @@
                 pendingSends.set(this.form, sent);
                 const requestId = this.form.elements.requestId;
                 if (requestId) requestId.value = sent.requestId;
-                this.renderDelivery();
                 this.shouldStick = true;
+                this.renderDelivery();
+                this.scrollBottom();
             }, { signal, capture: true });
             // Keep completion handling on this form even after navigation disposes
             // the controller; detached forms no longer bubble events to document.
@@ -625,6 +635,7 @@
             if (target === this.messages || this.messages.contains(target) || target?.id === 'msg-tail' || target?.id === 'msg-head') {
                 this.arrangeTools(this.messages);
             }
+            this.renderOptimisticMessages();
             this.collectNewMessages(!wasFollowing && target?.id !== 'msg-head');
             this.updateJumpButton();
             this.scheduleJumpUpdate();
@@ -812,10 +823,48 @@
             this.fileInput.files = dt.files;
         }
 
+        renderOptimisticMessages() {
+            for (const [id, sent] of optimisticMessages) {
+                if (sent.key !== this.draftKey) continue;
+                let bubble = [...this.messages.querySelectorAll('[data-local-message]')].find(node => node.dataset.localMessage === id);
+                if (Number.isInteger(sent.messageIdx) && this.messages.querySelector('#m-' + sent.messageIdx)) {
+                    bubble?.remove(); optimisticMessages.delete(id); continue;
+                }
+                if (!bubble) {
+                    bubble = document.createElement('div'); bubble.dataset.localMessage = id;
+                    bubble.className = 'chat-local-message';
+                    const body = document.createElement('div'); body.className = 'chat-glass-primary rounded-2xl rounded-br-md px-3.5 py-2 text-white whitespace-pre-wrap break-words';
+                    const text = document.createElement('span'); text.dataset.localText = '';
+                    const indicator = document.createElement('span'); indicator.dataset.localProgress = ''; indicator.setAttribute('role', 'img');
+                    const retry = document.createElement('button'); retry.type = 'button'; retry.dataset.localRetry = ''; retry.textContent = 'Повторить';
+                    body.append(text, indicator); bubble.append(body, retry);
+                    const tail = this.messages.querySelector('#msg-tail');
+                    if (tail) tail.before(bubble); else this.messages.append(bubble);
+                }
+                bubble.dataset.state = sent.inFlight ? 'pending' : sent.error ? 'failed' : 'confirmed';
+                bubble.querySelector('[data-local-text]').textContent = sent.text + (sent.files.length ? '\n📎 ' + sent.files.map(file => file.name).join(', ') : '');
+                const progress = bubble.querySelector('[data-local-progress]');
+                progress.hidden = !sent.inFlight && !sent.error;
+                progress.setAttribute('aria-label', sent.error ? 'Отправка не подтверждена' : 'Отправляется');
+                progress.textContent = sent.error ? '!' : '';
+                const retry = bubble.querySelector('[data-local-retry]');
+                retry.hidden = !sent.error;
+                retry.disabled = sent.inFlight || navigator.onLine === false;
+            }
+            for (const bubble of this.messages.querySelectorAll('[data-local-message]')) {
+                if (!optimisticMessages.has(bubble.dataset.localMessage)) bubble.remove();
+            }
+        }
+
         renderDelivery() {
             const sent = deliveries.get(this.draftKey);
             this.submitting = Boolean(sent?.inFlight);
             this.form.toggleAttribute('data-chat-submitting', this.submitting);
+            this.renderOptimisticMessages();
+            for (const button of this.form.querySelectorAll('[data-composer-send]')) {
+                if (this.submitting) { button.setAttribute('aria-busy', 'true'); button.setAttribute('aria-disabled', 'true'); }
+                else { button.removeAttribute('aria-busy'); button.removeAttribute('aria-disabled'); }
+            }
             this.form.toggleAttribute('data-chat-send-failed', Boolean(sent?.error));
             const offline = this.form.querySelector('[data-chat-network]');
             if (offline) offline.hidden = navigator.onLine !== false;
@@ -876,6 +925,18 @@
             return;
         }
         deliveries.delete(sent.key);
+        const confirm = result => {
+            if (Number.isInteger(result?.messageIdx)) sent.messageIdx = result.messageIdx;
+            if (current?.draftKey === sent.key) current.renderOptimisticMessages();
+        };
+        const payload = ctx.response;
+        const confirmedIdx = payload?.headers?.get?.('x-chat-message-idx') ?? payload?.raw?.headers?.get?.('x-chat-message-idx');
+        if (confirmedIdx != null && /^\d+$/.test(confirmedIdx)) confirm({ messageIdx: Number(confirmedIdx) });
+        if (typeof ctx.text === 'string' && ctx.text.trim()) {
+            try { confirm(JSON.parse(ctx.text)); } catch (error) { console.debug('Message confirmation unavailable', error); }
+        }
+        else if (payload?.clone) payload.clone().json().then(confirm).catch(error => console.debug('Message confirmation unavailable', error));
+        else if (payload?.responseText) { try { confirm(JSON.parse(payload.responseText)); } catch (error) { console.debug('Message confirmation unavailable', error); } }
         draftFiles.set(sent.key, (draftFiles.get(sent.key) || []).filter(file => !sent.files.includes(file)));
         if (readDraft(sent.key)?.text === sent.text) writeDraft(sent.key, null);
         const input = form.querySelector('#input');

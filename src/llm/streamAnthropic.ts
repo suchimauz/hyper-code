@@ -1,7 +1,8 @@
 // Stream from an Anthropic Messages API endpoint (anthropic.com, kimi.com/coding, etc).
-/** Performs the llm.streamAnthropic runtime operation. */
 /**
- * Stream from an Anthropic Messages API endpoint (anthropic.com, kimi.com/coding, etc).
+ * Stream Anthropic Messages responses into text, reasoning and native tool calls.
+ * Use for Anthropic-compatible providers, including SSH subscriptions. Removes
+ * Kimi's leaked leading response-channel opener before emitting text deltas.
  * @param opts.agent Agent associated with the operation.
  * @param opts.signal Abort signal for cancelling the request.
  * @param opts.onEvent Callback invoked for each normalized stream event.
@@ -169,6 +170,25 @@ export default async function (
     if (!res.body) throw new Error("empty response body");
 
     let text = "";
+    // Kimi occasionally exposes its internal response-channel opener as text.
+    // Hold only a possible leading opener, including across SSE chunks. Never
+    // strip embedded examples, partial/mismatched markers, or other providers.
+    const responseOpener = "<|open|>response";
+    let checkingOpener = ep.provider === "kimi-coding";
+    let pendingOpener = "";
+    const emitText = (delta: string) => {
+        if (!delta) return;
+        text += delta;
+        opts.onEvent?.({ type: "text_delta", delta });
+    };
+    const acceptText = (delta: string) => {
+        if (!checkingOpener) { emitText(delta); return; }
+        pendingOpener += delta;
+        if (responseOpener.startsWith(pendingOpener) && pendingOpener !== responseOpener) return;
+        checkingOpener = false;
+        emitText(pendingOpener.startsWith(responseOpener) ? pendingOpener.slice(responseOpener.length) : pendingOpener);
+        pendingOpener = "";
+    };
     let thinking = "";
     let finishReason: string | null = null;
     let usage: any = { prompt_tokens: 0, completion_tokens: 0 };
@@ -203,8 +223,7 @@ export default async function (
                 if (slot) slot.buf += d.partial_json;
             }
             if (d.type === "text_delta" && typeof d.text === "string") {
-                text += d.text;
-                opts.onEvent?.({ type: "text_delta", delta: d.text });
+                acceptText(d.text);
             } else if (d.type === "thinking_delta" && typeof d.thinking === "string") {
                 thinking += d.thinking;
                 opts.onEvent?.({ type: "thinking_delta", delta: d.thinking });
@@ -234,6 +253,8 @@ export default async function (
         throw error;
     }
 
+    // Preserve an unfinished opener if the provider ended before a full match.
+    emitText(pendingOpener);
     const toolCalls = [...slots.entries()]
         .sort((a, b) => a[0] - b[0])
         .map(([, s]) => ({ id: s.id, name: s.name, args: parseArgs(s.buf) }));

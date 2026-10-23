@@ -43,6 +43,7 @@ describe('POST /agent/:id', () => {
       headers: { 'content-type': 'application/x-www-form-urlencoded', 'hx-request': 'true' },
     });
     expect(res.status).toBe(204);
+    expect(res.headers.get('x-chat-message-idx')).toBe('0');
     expect((await userMessages(ctx, agent.id)).map((m: any) => m.content)).toEqual(['hello via htmx']);
   });
 

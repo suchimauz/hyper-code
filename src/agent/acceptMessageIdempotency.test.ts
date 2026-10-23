@@ -15,6 +15,9 @@ describe("chat submission idempotency", () => {
       ctx.fns.agent.acceptMessage({ req: request(), params: { id: agent.id } }),
     ]);
     expect(responses.map((response: Response) => response.status)).toEqual([204, 204]);
+    const indices = responses.map((response: Response) => response.headers.get('x-chat-message-idx'));
+    expect(indices[0]).not.toBeNull();
+    expect(indices[1]).toBe(indices[0]);
     const messages = await ctx.fns.session.getMessages({ id: agent.id });
     expect(messages.filter((message: any) => message.role === "user" && message.content === "send exactly once")).toHaveLength(1);
   });
