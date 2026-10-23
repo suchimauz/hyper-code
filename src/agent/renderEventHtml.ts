@@ -159,8 +159,8 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         const dotColor = ragReranked ? 'background:rgb(52 211 153)' : 'background:rgb(165 180 252)';
         const dots = ragNames.map(() => '<span class="h-1.5 w-1.5 rounded-full" style="' + dotColor + '" aria-hidden="true"></span>').join('');
         const scores = ragFunctions.filter((fn: any) => typeof fn !== 'string').map((fn: any) => `${fn.name}: RRF ${fn.score ?? 'n/a'} · BM25 ${fn.bm25 ?? 'n/a'} · cosine ${fn.similarity ?? 'n/a'} · rerank ${fn.jev ?? 'n/a'}`).join('\n');
-        const ragIcon = gateBadge + (ev.functionRag
-            ? badge(dots || '<span aria-hidden="true">0</span>', `Function RAG: retrieved ${retrieved}, kept ${ragNames.length}`,
+        const ragIcon = gateBadge + (ev.functionRag && ragNames.length
+            ? badge(dots, `Function RAG: retrieved ${retrieved}, kept ${ragNames.length}`,
                 `retrieved ${retrieved} · kept ${ragNames.length} · rerank ${ev.functionRag.rerankStatus ?? (ragReranked ? 'ok' : 'off')}\n${scores}\n${injected}`)
             : '');
         const attachmentHtml = Array.isArray(ev.attachments) && ev.attachments.length

@@ -47,5 +47,5 @@ for(const status of ['closed','open','off','error'])test(`tooltip shows ${status
     const ctx:any={fns:{}};
     const html=await render(ctx,null,{event:{type:'user',text:'test',functionRag:{gate:status,needsTool:.8,retrieved:2,rerankStatus:'ok',functions:[{...hit,jev:.91}]}}});
     expect(html).toContain(`gate ${status}`);expect(html).toContain('heuristic score 0.80');expect(html).toContain('retrieved 2 · kept 1');expect(html).toContain('RRF 0.03');expect(html).toContain('rerank 0.91');
-    const empty=await render(ctx,null,{event:{type:'user',text:'test',functionRag:{gate:status,retrieved:0,functions:[],rerankStatus:'skipped'}}});expect(empty).toContain('retrieved 0 · kept 0');expect(empty).toContain('rerank skipped');
+    const empty=await render(ctx,null,{event:{type:'user',text:'test',functionRag:{gate:status,retrieved:0,functions:[],rerankStatus:'skipped'}}});expect(empty).not.toContain('rerank skipped');expect(empty).not.toContain('kept 0');
 });
