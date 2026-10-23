@@ -40,7 +40,7 @@ export default function (
     const icon = opts.icon ? `<i class="ph ph-${esc(opts.icon)} text-base text-muted" aria-hidden="true"></i>` : '';
     const badge = opts.badge ? `<span class="shrink-0">${opts.badge}</span>` : '';
     const actions = opts.actions ? `<span class="ml-auto flex shrink-0 items-center gap-1">${opts.actions}</span>` : '';
-    const heading = `${icon}<span class="min-w-0 flex-1 truncate text-xs font-semibold text-base-content">${esc(opts.title)}</span>${badge}${actions}`;
+    const heading = `${icon}<span class="inspector-heading min-w-0 flex-1 truncate text-xs font-semibold text-base-content">${esc(opts.title)}</span>${badge}${actions}`;
     const content = opts.html.trim() || (opts.empty ? `<p class="text-xs leading-5 text-subtle">${esc(opts.empty)}</p>` : '');
     const body = `<div class="border-t border-ui-border bg-transparent px-3 py-3">${content}</div>`;
     const extra = opts.className ? ` ${opts.className}` : '';

@@ -20,5 +20,16 @@ export default async function (
     if (!prefs.eligible) return '';
     const csrf = await ctx.fns.auth.csrfToken({req:session.req});
     const esc = Bun.escapeHTML;
-    return '<form hx-post="/webPush/preferences" hx-target="this" hx-swap="outerHTML" class="mt-3 space-y-2"><h4 class="text-sm font-medium">Push Notifications</h4><input type="hidden" name="agentId" value="'+esc(opts.agentId)+'"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><label class="flex items-center gap-2 text-sm"><input type="checkbox" name="input" value="true"'+(prefs.input?' checked':'')+'>Action required (input)</label><label class="flex items-center gap-2 text-sm"><input type="checkbox" name="error" value="true"'+(prefs.error?' checked':'')+'>Work stopped by error</label><p class="text-xs opacity-70">Requires push notifications enabled on this device.</p><button type="submit" class="text-sm underline">Save notification preferences</button></form>';
+    // Shared toggles submit "1"; this endpoint deliberately accepts only "true".
+    const inputToggle = ctx.fns.ui.toggle({name:'input',enabled:prefs.input,label:'Action required',compact:true}).replace('value="1"', 'value="true"');
+    const errorToggle = ctx.fns.ui.toggle({name:'error',enabled:prefs.error,label:'Work stopped by error',compact:true}).replace('value="1"', 'value="true"');
+    const save = ctx.fns.procs.ui.button({action:'save-push-preferences',label:'Save',ariaLabel:'Save notification preferences',type:'submit',size:'xs',tone:'default'});
+    return `<form hx-post="/webPush/preferences" hx-target="this" hx-swap="outerHTML" class="mt-3 space-y-2">
+        <input type="hidden" name="agentId" value="${esc(opts.agentId)}"><input type="hidden" name="csrf" value="${esc(csrf)}">
+        <fieldset class="inspector-group inspector-surface-group">
+            <legend class="inspector-label">Push Notifications</legend>
+            ${inputToggle}${errorToggle}
+        </fieldset>
+        <div class="flex items-center justify-between gap-2"><span class="inspector-help">Requires device notifications.</span>${save}</div>
+    </form>`;
 }

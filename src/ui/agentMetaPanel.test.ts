@@ -49,11 +49,11 @@ test("agent meta panel is a static shell with per-section slots", () => {
 test("renders the display-only observed goals preview", () => {
     const ctx = mkCtx();
     const empty = render(ctx, null, { agent: { id: "eh", scratchpad: {} } as any });
-    expect(empty).toContain('<summary>Observed goals<span data-tone="neutral">off</span></summary>');
+    expect(empty).toContain('<summary>Goals<span data-tone="neutral">off</span></summary>');
     expect(empty).toContain('name="enabled"');
-    expect(empty).not.toContain('<details open><summary>Observed goals');
+    expect(empty).not.toContain('<details open><summary>Goals');
     const observed = render(ctx, null, { agent: { id: "eh", scratchpad: { goalTrackingEnabled: true, goalSidecar: { status: "ready", sourceMessageIdx: 4, sidecarId: "sc", goals: [{ id: "g1", statement: "Ship goal-aware agent", verification: "A new message updates the displayed goal without changing execution", status: "active", sourceMessageIdx: 4 }] } } } as any });
-    expect(observed).toContain('<details open><summary>Observed goals');
+    expect(observed).toContain('<details open><summary>Goals');
     expect(observed).toContain('Ship goal-aware agent');
     expect(observed).toContain('Check:');
     expect(observed).toContain('A new message updates the displayed goal without changing execution');
@@ -103,7 +103,7 @@ test("renders team members as semantic nested accordions", () => {
     });
     expect(html).toContain("Team");
     expect(html).toContain('data-tone="error"');
-    expect(html).toContain('class="ui-button ui-button--xs ui-button--ghost');
+    expect(html).toContain('class="ui-button ui-button--xs ui-button--default');
     expect(html).toContain('<progress value="0" max="1">');
 });
 
