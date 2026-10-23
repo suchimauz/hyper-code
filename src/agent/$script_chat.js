@@ -73,6 +73,10 @@
             }
             if (Math.abs(viewport.scale - 1) > 0.01 || viewport.height <= 0) return;
             const height = viewport.height + 'px';
+            this.keyboardBaseline = Math.max(this.keyboardBaseline || 0, window.innerHeight, viewport.height);
+            const editing = document.activeElement === this.input
+                && this.keyboardBaseline - viewport.height > Math.max(150, this.keyboardBaseline * .18);
+            this.panel.toggleAttribute('data-chat-editing', editing);
             const top = Math.max(0, viewport.offsetTop) + 'px';
             if (root.style.getPropertyValue('--chat-viewport-height') === height
                 && root.style.getPropertyValue('--chat-viewport-top') === top) return;
@@ -91,6 +95,7 @@
         }
 
         clearViewport() {
+            this.panel.removeAttribute('data-chat-editing');
             delete document.documentElement.dataset.chatViewport;
             document.documentElement.style.removeProperty('--chat-viewport-height');
             document.documentElement.style.removeProperty('--chat-viewport-top');
@@ -108,6 +113,13 @@
             window.visualViewport?.addEventListener('scroll', schedule, { passive: true, signal });
             window.addEventListener('resize', schedule, { passive: true, signal });
             window.addEventListener('pageshow', schedule, { signal });
+            this.input.addEventListener('focus', schedule, { signal });
+            this.input.addEventListener('blur', () => { this.panel.removeAttribute('data-chat-editing'); schedule(); }, { signal });
+            window.addEventListener('orientationchange', () => {
+                this.keyboardBaseline = 0;
+                this.panel.removeAttribute('data-chat-editing');
+                schedule();
+            }, { signal });
             this.syncViewport();
         }
 

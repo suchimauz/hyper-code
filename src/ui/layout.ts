@@ -677,6 +677,7 @@ ${opts.headExtra ?? ""}
 <script src="/ui/control.js" defer></script>
 <script src="/ui/hotkeys.js" defer></script>
 <script src="/ui/rpc.js?v=6" defer></script>
+<script src="/ui/pressFeedback.js" defer></script>
 <script src="/agent/chat.js" defer></script>
 <script src="/ui/dictation.js" defer></script>
 <script src="/ui/popup.js" defer></script>
@@ -762,6 +763,58 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
 .project-chat-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid #8883; }
 .project-chat-row a { flex:1; }
 @media(max-width:767px) { .project-tabs { padding-top:44px; } }
+/* Direct manipulation: immediate press, short interruptible release; no transcript-wide motion. */
+:where(#chat-panel, #project-tabs-host, #nav-overlay, #app-popup, [data-mobile-inspector-dialog], .mobile-usage-dialog, .home-dashboard) :is(button, a[href], summary, [role="button"], .tool), #mobile-nav-button {
+  -webkit-tap-highlight-color: transparent;
+  transition: scale 180ms cubic-bezier(.2,.8,.2,1), filter 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+[data-ui-pressed] {
+  scale: .96;
+  filter: brightness(.92);
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  transition-duration: 0ms !important;
+}
+:is(.nav-row, .project-mobile-chat, .project-mobile-name, .project-tab-link, .mobile-usage-strip, .home-dashboard a)[data-ui-pressed] { scale: .99; }
+/* The editor acknowledges touch before the native keyboard finishes opening. */
+#chat-panel .chat-composer .chat-box { transition: border-color 160ms ease, box-shadow 180ms ease, background-color 180ms ease; }
+#chat-panel .chat-composer .chat-box:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 40%, transparent);
+}
+#chat-panel .chat-composer .chat-box[data-ui-pressed] {
+  scale: none; filter: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  background-color: color-mix(in srgb, var(--color-primary) 6%, var(--color-base-200)) !important;
+}
+#chat-panel[data-chat-editing] .chat-composer .chat-box {
+  border-color: var(--color-primary);
+  background-color: color-mix(in srgb, var(--color-primary) 5%, var(--color-base-200)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 40%, transparent);
+  animation: composer-edit-ready 260ms cubic-bezier(.2,.8,.2,1);
+}
+@keyframes composer-edit-ready {
+  from { box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-primary) 16%, transparent); }
+  to { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 40%, transparent); }
+}
+#chat-panel .tool[data-ui-pressed], #mobile-nav-button[data-ui-pressed] { transform: none; }
+#mobile-nav-button[data-ui-pressed] {
+  scale: .9;
+  background-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-base-100));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+@media (hover: hover) and (pointer: fine) { #chat-panel .tool.tool-tucked:hover:not([data-ui-pressed]) { transform: translateY(-1px); } }
+@media (hover: none) { #chat-panel .tool.tool-tucked:hover { transform: none; } }
+:where(#chat-panel, #project-tabs-host, #nav-overlay, #app-popup, [data-mobile-inspector-dialog], .mobile-usage-dialog, .home-dashboard) :is(button, a[href], summary, [role="button"]):focus-visible, #mobile-nav-button:focus-visible {
+  outline: 2px solid var(--color-primary); outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(#chat-panel, #project-tabs-host, #nav-overlay, #app-popup, [data-mobile-inspector-dialog], .mobile-usage-dialog, .home-dashboard) :is(button, a[href], summary, [role="button"], .tool), #mobile-nav-button { transition: none; }
+  #chat-panel .chat-composer .chat-box { transition: none; }
+  #chat-panel[data-chat-editing] .chat-composer .chat-box { animation: none; }
+  [data-ui-pressed] { scale: none !important; transform: none !important; }
+  #chat-panel .tool.tool-tucked:hover, #mobile-nav-button:active { transform: none; }
+}
 </style>
 </head>
 <body class="bg-base-200 text-base-content text-sm h-screen${embedded ? " overflow-hidden" : ""}"${currentId ? ` data-agent-id="${esc(currentId)}"` : ""}${sidebar ? ' data-presentation="sidebar"' : ""}>

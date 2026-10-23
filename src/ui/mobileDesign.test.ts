@@ -247,3 +247,23 @@ test('busy composer shows send for content and always retains stop on phone, lan
         } finally { await f.window.happyDOM.close(); }
     }
 });
+
+test('chat and menu press feedback has visible state, restrained release and reduced-motion alternative', async () => {
+    const f = await fixture(390, 5);
+    try {
+        expect(f.html).toContain('/ui/pressFeedback.js');
+        const button = f.window.document.querySelector('[data-composer-send]')!;
+        button.setAttribute('data-ui-pressed', '');
+        // happy-dom does not expose the independent CSS scale property.
+        expect(f.styles).toContain('scale: .96;');
+        expect(f.window.getComputedStyle(button).filter).toBe('brightness(.92)');
+        const row = f.window.document.querySelector('.nav-row')!;
+        row.setAttribute('data-ui-pressed', '');
+        expect(f.styles).toContain('.home-dashboard a)[data-ui-pressed] { scale: .99; }');
+        expect(f.styles).toContain('scale 180ms cubic-bezier(.2,.8,.2,1)');
+        expect(f.styles).toContain('[data-ui-pressed] { scale: none !important; transform: none !important; }');
+        expect(f.styles).toContain('#chat-panel .chat-composer .chat-box[data-ui-pressed]');
+        expect(f.styles).toContain('transition: border-color 160ms ease, box-shadow 180ms ease');
+        expect(f.styles).toContain('transition-duration: 0ms !important');
+    } finally { await f.window.happyDOM.close(); }
+});

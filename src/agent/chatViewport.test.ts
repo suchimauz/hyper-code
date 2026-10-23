@@ -140,3 +140,16 @@ describe('mobile chat viewport', () => {
         } finally { await f.window.happyDOM.close(); }
     });
 });
+
+test('editing begins only with focused composer and keyboard-sized viewport shrink, ends on close or blur',async()=>{
+ const f=fixture();try{
+  const d=f.window.document,panel=d.querySelector('#chat-panel')!,input=d.querySelector('#input') as any;
+  input.focus();f.resize(800);expect(panel.hasAttribute('data-chat-editing')).toBe(false);
+  f.resize(480);expect(panel.hasAttribute('data-chat-editing')).toBe(true);
+  f.resize(470);expect(panel.hasAttribute('data-chat-editing')).toBe(true);
+  input.blur();expect(panel.hasAttribute('data-chat-editing')).toBe(false);
+  input.focus();f.resize(480);expect(panel.hasAttribute('data-chat-editing')).toBe(true);
+  f.resize(844);expect(panel.hasAttribute('data-chat-editing')).toBe(false);
+  input.blur();f.resize(480);expect(panel.hasAttribute('data-chat-editing')).toBe(false);
+ }finally{await f.window.happyDOM.close();}
+});
