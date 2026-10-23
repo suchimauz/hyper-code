@@ -18,7 +18,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     /** Agent whose section is rendered. */
     agentId: string;
     /** Section to render. */
-    section: "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
+    section: "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
 }): Promise<string> {
     const agentId = String(opts.agentId ?? "");
     const section = String(opts.section ?? "");
@@ -55,5 +55,6 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         // a plugin answering this point may read a setting out of Postgres.
         extraSettings = await ctx.fns.ui.agentSettingsBlocks({ agentId });
     }
-    return ctx.fns.ui.agentMetaSection({ agent, section: section as any, team, archivedTeam, models, accounts, disabledModels, triggers, extraSettings });
+    const globalCompactionPercent = section === "compaction" ? await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 }) : undefined;
+    return ctx.fns.ui.agentMetaSection({ globalCompactionPercent, agent, section: section as any, team, archivedTeam, models, accounts, disabledModels, triggers, extraSettings });
 }

@@ -39,12 +39,13 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Disabled exact model routes; omitted means no policy exclusions. */ disabledModels?: string[];
     /** Active durable wake, cron and condition triggers for this agent. */ triggers?: any[];
     /** Trusted HTML blocks answered by the `ui.agentSettings` point, appended to the settings section. */ extraSettings?: string[];
+    /** Current global automatic compaction percentage, resolved by the page route. */ globalCompactionPercent?: number;
     /** Render the inspector as its collapsed rail. */ collapsed?: boolean }): string {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
     const agent = opts.agent;
-    const slot = (section: "goal" | "knowledge" | "automation" | "settings" | "team" | "plan") =>
+    const slot = (section: "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan") =>
         `<div id="agent-meta-${section}-${esc(agent.id)}" data-meta-section="${section}">`
-        + ctx.fns.ui.agentMetaSection({ agent, section, team: opts.team, archivedTeam: opts.archivedTeam, models: opts.models, accounts: opts.accounts, disabledModels: opts.disabledModels, triggers: opts.triggers, extraSettings: opts.extraSettings })
+        + ctx.fns.ui.agentMetaSection({ agent, section, team: opts.team, archivedTeam: opts.archivedTeam, models: opts.models, accounts: opts.accounts, disabledModels: opts.disabledModels, triggers: opts.triggers, extraSettings: opts.extraSettings, globalCompactionPercent: opts.globalCompactionPercent })
         + `</div>`;
     const collapsed = opts.collapsed === true;
     return `<aside id="agent-meta-${esc(agent.id)}" data-agent-meta-panel class="glass-panel agent-meta-panel${collapsed ? ' agent-meta-collapsed' : ''} my-2 mr-2 ml-1 flex h-[calc(100%-1rem)] w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-ui-border text-base-content shadow-sm">
@@ -57,6 +58,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
       </header>
       <div data-agent-meta-content class="flex-1 overflow-y-auto bg-transparent">
         ${slot("settings")}
+        ${slot("compaction")}
         ${slot("automation")}
         ${slot("goal")}
         ${slot("knowledge")}

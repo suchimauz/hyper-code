@@ -26,7 +26,7 @@ async function fixture(width = 390) {
     return { w, doc, click, event };
 }
 
-test('inspector moves existing six live sections into modal and restores exact chat, draft and scroll', async () => {
+test('inspector moves existing seven live sections into modal and restores exact chat, draft and scroll', async () => {
     const f = await fixture();
     try {
         const panel = f.doc.querySelector('[data-agent-meta-panel]')!;
@@ -41,7 +41,7 @@ test('inspector moves existing six live sections into modal and restores exact c
         expect(dialog.open).toBe(true);
         expect(dialog.getAttribute('aria-labelledby')).toBe('mobile-inspector-title-a');
         expect(dialog.querySelector('[data-agent-meta-panel]')).toBe(panel);
-        expect(dialog.querySelectorAll('[data-meta-section]').length).toBe(6);
+        expect(dialog.querySelectorAll('[data-meta-section]').length).toBe(7);
         expect(f.doc.querySelectorAll('#agent-meta-settings-a').length).toBe(1);
         expect(f.doc.activeElement).toBe(dialog.querySelector('[data-mobile-inspector-close]'));
         const edit = dialog.querySelector('[data-section-edit]') as any;

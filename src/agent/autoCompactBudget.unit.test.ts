@@ -64,3 +64,20 @@ test('invalid dedicated usage cannot poison budget or revive legacy high usage',
  const measured=await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true});
  expect(measured.status).toBe('below_threshold');expect(Number.isFinite(measured.estimatedTokens)).toBe(true);expect(f.calls()).toBe(0);
 });
+
+test('per-agent override follows global changes after reset and drives real trigger',async()=>{
+ const f=fixture();let global=80;
+ f.ctx.fns.settings.getNumber=({key}:any)=>key==='autoCompactWindowPercent'?global:700000;
+ const opts={agent:f.agent,signal:f.signal,runToken:'owner'};
+ expect((await autoCompact(f.ctx,null,opts)).status).toBe('below_threshold');
+ global=65;expect((await autoCompact(f.ctx,null,opts)).status).toBe('compacted');
+ f.agent.autoCompactWindowPercent=85;global=30;
+ expect((await autoCompact(f.ctx,null,opts)).threshold).toBe(170000);expect(f.calls()).toBe(1);
+ f.agent.autoCompactWindowPercent=null;
+ expect((await autoCompact(f.ctx,null,opts)).threshold).toBe(60000);expect(f.calls()).toBe(2);
+ f.agent.model='other:model';f.agent.autoCompactWindowPercent=75;
+ expect((await autoCompact(f.ctx,null,opts)).threshold).toBe(150000);
+ f.ctx.fns.settings.getNumber=()=>100000;
+ expect((await autoCompact(f.ctx,null,opts)).threshold).toBe(100000);
+ expect((await autoCompact(f.ctx,null,{...opts,thresholdTokens:120000})).threshold).toBe(120000);
+});

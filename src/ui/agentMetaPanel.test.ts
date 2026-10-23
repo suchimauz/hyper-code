@@ -43,7 +43,7 @@ test("agent meta panel is a static shell with per-section slots", () => {
     // user reaches for far more often than a trigger list.
     const order = [...html.matchAll(/data-meta-section="([a-z]+)"/g)].map((match) => match[1]);
     expect(order[0]).toBe("settings");
-    expect(order[1]).toBe("automation");
+    expect(order).toEqual(['settings', 'compaction', 'automation', 'goal', 'knowledge', 'team', 'plan']);
 });
 
 test("renders the display-only observed goals preview", () => {
@@ -110,7 +110,7 @@ test("renders team members as semantic nested accordions", () => {
 test("automation unifies wake, schedule and watch controls, below agent settings", () => {
     const html = render(mkCtx(), null, { agent: { id: "eh", goal: null } as any, triggers: [{ id: "tr_1", kind: "at", prompt: "Continue", status: "active", nextAt: Date.now() + 1000 }] });
     expect(html).toContain('>Automation');
-    const slot = html.slice(html.indexOf('id="agent-meta-automation-eh"'));
+    const slot = html.slice(html.indexOf('id="agent-meta-compaction-eh"'));
     expect(slot).toContain("Wake-up");
     expect(slot).toContain("Schedule");
     expect(slot).toContain("Watch condition");
@@ -124,7 +124,7 @@ test("a plugin block answered by ui.agentSettings lands inside agent settings", 
         agent: { id: "eh", goal: null } as any,
         extraSettings: ['<form hx-post="/memory/settings"><input name="autoInject"></form>', '  ', ''],
     });
-    const settings = html.slice(html.indexOf('id="agent-meta-settings-eh"'), html.indexOf('id="agent-meta-automation-eh"'));
+    const settings = html.slice(html.indexOf('id="agent-meta-settings-eh"'), html.indexOf('id="agent-meta-compaction-eh"'));
     expect(settings).toContain('hx-post="/memory/settings"');
     expect(settings).toContain("Function RAG");
     // Blank answers are dropped rather than rendered as empty rows.

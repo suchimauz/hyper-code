@@ -63,7 +63,18 @@
         if (button.matches('[data-plan-move="down"]') && index >= 0 && index < rows.length - 1) tasks.insertBefore(rows[index + 1], row);
     });
 
-    const SECTIONS = ['goal', 'knowledge', 'automation', 'settings', 'team', 'plan'];
+    // Surface validation/network errors only for this Inspector form.
+    document.addEventListener('htmx:afterRequest', event => {
+        const form = event.detail?.elt?.closest?.('[data-compaction-form]');
+        if (!form) return;
+        const error = form.closest('[data-meta-section]')?.querySelector('[data-compaction-error]');
+        if (!error) return;
+        const failed = !event.detail.successful;
+        error.textContent = failed ? (event.detail.xhr?.responseText || 'Could not save compaction settings. Please try again.').slice(0, 500) : '';
+        error.hidden = !failed;
+    });
+
+    const SECTIONS = ['compaction', 'goal', 'knowledge', 'automation', 'settings', 'team', 'plan'];
     const pending = new Map(); // element -> timer
 
     // innerMorph keeps what the reader has in hand: open/closed sections

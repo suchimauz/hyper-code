@@ -27,6 +27,7 @@ id: string }): Promise<types.agent.Agent | null> {
         cursors: {},
         functionRagEnabled: row.function_rag_enabled === true || row.function_rag_enabled === 1 || row.function_rag_enabled === 't',
         jevRerankEnabled: row.jev_rerank_enabled === true || row.jev_rerank_enabled === 1 || row.jev_rerank_enabled === 't',
+        autoCompactWindowPercent: row.auto_compact_window_percent == null ? null : Number(row.auto_compact_window_percent),
         goal: row.goal == null ? null : (typeof row.goal === 'string' ? JSON.parse(row.goal) : row.goal),
         functionRagGateEnabled: row.function_rag_gate_enabled === true || row.function_rag_gate_enabled === 1 || row.function_rag_gate_enabled === 't',
         subscribers: new Set(),

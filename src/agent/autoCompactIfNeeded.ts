@@ -1,7 +1,7 @@
 /**
  * Compact oversized context after a successful turn or at an owned completed tool batch
  *
- * Estimate the effective context after a completed run and invoke the provider's `$compaction_<provider>` compactor (or `$compaction_default`) when it exceeds the threshold: the smaller of the global `autoCompactTokens` setting and `autoCompactWindowPercent` of the model's context window (Claude 200K, Codex 272K). The size is the larger of a chars/4 estimate and the latest provider-reported request plus completion tokens, including tool-only responses. Skip agents without a compactor, running, already compacted, or too-small agents; failures are recorded as events but do not fail the completed user turn.
+ * Estimate the effective context after a completed run and invoke the provider's `$compaction_<provider>` compactor (or `$compaction_default`) when it exceeds the threshold: the smaller of the global `autoCompactTokens` setting and the per-agent `autoCompactWindowPercent` override (or the dynamically inherited global percentage) of the model's context window (Claude 200K, Codex 272K). The size is the larger of a chars/4 estimate and the latest provider-reported request plus completion tokens, including tool-only responses. Skip agents without a compactor, running, already compacted, or too-small agents; failures are recorded as events but do not fail the completed user turn.
  * @param opts.agent Live agent to inspect after its run has finalized.
  * @param opts.thresholdTokens Token threshold overriding both settings. @minimum 10000
  * @param opts.runToken Worker ownership token at a completed tool batch.
@@ -53,7 +53,7 @@ export default async function (
     const fresh = !active || Number(last?.ts ?? 0) > Number(active.activatedAt ?? 0);
     const estimatedTokens = Math.max(estimate(effective), fresh ? reported : 0);
     const configured = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactTokens", fallback: 700000 });
-    const percent = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
+    const percent = agent.autoCompactWindowPercent ?? await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
     const window = (await ctx.fns.compaction.contextWindow({ model: agent.model }));
     const byWindow = window ? Math.floor(window * Math.min(95, Math.max(30, Number(percent ?? 65))) / 100) : Infinity;
     const threshold = Math.max(10000, Number(opts.thresholdTokens ?? Math.min(Number(configured ?? 700000), byWindow)));

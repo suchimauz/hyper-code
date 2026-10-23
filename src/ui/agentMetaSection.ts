@@ -27,7 +27,9 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Agent whose panel is rendered. */
     agent: types.agent.Agent;
     /** Section to render. */
-    section: "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
+    section: "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
+    /** Current global compaction percentage resolved by the page or RPC caller. */
+    globalCompactionPercent?: number;
     /** Active durable wake, cron and condition triggers for this agent. */
     triggers?: any[];
     /** Direct delegated children with their existing plans. */
@@ -49,6 +51,28 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const progressBar = ctx.fns.ui.progressBar ?? ((o: any) => `<progress value="${Number(o.value)}" max="${Math.max(1, Number(o.max))}"></progress>`);
     const inspectorSection = ctx.fns.ui.inspectorSection ?? ((o: any) => `<details ${o.open ? 'open' : ''}><summary>${esc(o.title)}</summary><div>${o.html}</div></details>`);
     const id = encodeURIComponent(agent.id);
+
+    if (opts.section === "compaction") {
+        const inherited = agent.autoCompactWindowPercent == null;
+        const globalPercent = Math.max(30, Math.min(95, opts.globalCompactionPercent ?? 65));
+        const effective = inherited ? globalPercent : agent.autoCompactWindowPercent!;
+        // A changed saved value gets a fresh input node; unrelated redraws retain dirty text.
+        const inputId = `compaction-percent-${agent.id}-${inherited ? 'global' : 'custom'}-${effective}`;
+        const hintId = `compaction-hint-${agent.id}`;
+        return inspectorSection({ title: "Compaction", icon: "arrows-in", badge: statusBadge({ label: `${effective}% · ${inherited ? 'global' : 'custom'}` }), html: `
+          <p class="mb-3 text-xs text-muted" role="status">${inherited ? `Following global setting: ${esc(globalPercent)}%.` : `Agent override: ${esc(effective)}%. Global setting: ${esc(globalPercent)}%.`}</p>
+          <form data-compaction-form hx-post="/agent/${id}/compaction" hx-swap="none" class="space-y-2">
+            <label for="${esc(inputId)}" class="block text-xs font-medium">Context window threshold (%)</label>
+            <input id="${esc(inputId)}" name="percent" type="number" min="30" max="95" step="any" required value="${esc(effective)}" aria-describedby="${esc(hintId)}" class="input input-bordered input-sm w-full" />
+            <p id="${esc(hintId)}" class="text-2xs text-faint">30–95%. Automatic compaction may happen earlier at the global token limit. If the model's context window is unknown, only that token limit applies.</p>
+            <button type="submit" class="btn btn-sm btn-outline">Save override</button>
+          </form>
+          <form data-compaction-form hx-post="/agent/${id}/compaction" hx-swap="none" class="mt-2">
+            <input type="hidden" name="action" value="inherit" />
+            <button type="submit" class="btn btn-sm btn-ghost" ${inherited ? 'disabled' : ''}>Reset to global (${esc(globalPercent)}%)</button>
+          </form>
+          <p data-compaction-error role="alert" class="mt-2 text-xs text-error" hidden></p>` });
+    }
 
     if (opts.section === "goal") {
         const enabled = agent.scratchpad?.goalTrackingEnabled === true;
