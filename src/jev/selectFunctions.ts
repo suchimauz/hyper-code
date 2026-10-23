@@ -43,14 +43,18 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     timeoutMs?: number;
     /** Model id override passed through to jev.decide. */
     model?: string;
+    /** Extra attempts on transient failures; use zero for a bounded pilot. @default 2 @minimum 0 @maximum 5 */
+    retries?: number;
 }): Promise<{
     functions: Array<{ name: string; score: number; rank: number; originalRank: number }>;
     needsTool: number;
     dropped: number;
     latencyMs: number;
+    /** Provider-reported token counts and nullable cost; null when no request was sent. */
+    usage: { inputTokens: number; outputTokens: number; cost: number | null } | null;
 }> {
     const items = (opts.candidates ?? []).filter((c) => c && typeof c.name === "string" && typeof c.text === "string");
-    if (items.length === 0) return { functions: [], needsTool: 0, dropped: 0, latencyMs: 0 };
+    if (items.length === 0) return { functions: [], needsTool: 0, dropped: 0, latencyMs: 0, usage: null };
 
     const limit = Math.min(50, Math.max(1, opts.limit ?? 5));
     const minScore = Math.min(1, Math.max(0, opts.minScore ?? 0.3));
@@ -81,9 +85,18 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         state: opts.query,
         questions,
         timeoutMs: opts.timeoutMs ?? 6000,
+        ...(opts.retries === undefined ? {} : { retries: opts.retries }),
         ...(opts.model ? { model: opts.model } : {}),
     });
 
+    // Incomplete or invalid provider answers are failures, not evidence that
+    // all tools are irrelevant. Throw so the caller keeps baseline retrieval.
+    for (const id of Object.keys(questions)) {
+        const answer = out.answers[id];
+        if (!answer || answer.type !== 'noul' || !Number.isFinite(answer.noul) || answer.noul < 0 || answer.noul > 1) {
+            throw new Error('Jev returned incomplete or invalid function relevance scores');
+        }
+    }
     const needsToolAnswer = out.answers.needs_tool;
     const needsTool = needsToolAnswer && needsToolAnswer.type === "noul" ? needsToolAnswer.noul : 1;
 
@@ -102,5 +115,5 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         .slice(0, limit)
         .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
 
-    return { functions: kept, needsTool, dropped: scored.length - kept.length, latencyMs: out.latencyMs };
+    return { functions: kept, needsTool, dropped: scored.length - kept.length, latencyMs: out.latencyMs, usage: out.usage };
 }

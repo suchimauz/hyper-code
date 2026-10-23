@@ -1,4 +1,9 @@
-/** Retrieves compact runtime-function candidates for the latest real user prompt. */
+/**
+ * Retrieve compact runtime-function recommendations for an opted-in agent's latest user prompt.
+ * Preserve plain retrieval when the optional Jev reranker fails. Recommendations do not authorize tool execution.
+ * @param opts.agent Agent whose retrieval, reranking and gate opt-in flags are inspected.
+ * @param opts.messages Transcript used to find the latest real user message; history is not rewritten.
+ */
 export default async function (
     ctx: Context,
     _session: Session | null,
@@ -68,7 +73,11 @@ export default async function (
         // thought. Mixing the two would reintroduce the noise reranking removes.
         .filter((hit: any) => jevScores
             ? jevScores.has(String(hit.name))
-            : (hit.evidence === "exact-name" || hit.evidence === "intersection" || hit.evidence === "bm25-only" || hit.evidence === "vector-only") && Number(hit.score) >= 0.015)
+            : (hit.evidence === "bm25"
+                // Raw BM25 is positive relevance, not an RRF score; this is
+                // the normal search path when embeddings are disabled.
+                ? Number(hit.score) > 0
+                : (hit.evidence === "exact-name" || hit.evidence === "intersection" || hit.evidence === "bm25-only" || hit.evidence === "vector-only") && Number(hit.score) >= 0.015))
         .sort((a: any, b: any) => jevScores
             ? (jevScores.get(String(b.name))! - jevScores.get(String(a.name))!) || (a.originalRank - b.originalRank)
             : 0)
