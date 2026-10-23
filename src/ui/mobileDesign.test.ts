@@ -267,3 +267,29 @@ test('chat and menu press feedback has visible state, restrained release and red
         expect(f.styles).toContain('transition-duration: 0ms !important');
     } finally { await f.window.happyDOM.close(); }
 });
+
+test('tool popup keeps full-width Close below its scroll body on mobile only', async () => {
+    for (const width of [390, 1280]) {
+        const f = await fixture(width, width < 1024 ? 5 : 0);
+        try {
+            const popup = f.window.document.createElement('dialog'); popup.id = 'app-popup'; popup.dataset.popupKind = 'tool';
+            popup.innerHTML = '<div><header><button id="app-popup-close">X</button></header><div id="app-popup-body">Tool result</div><footer data-tool-popup-footer><button data-tool-popup-close>Закрыть</button></footer></div>';
+            f.window.document.body.append(popup);
+            expect(f.css('[data-tool-popup-footer]').display).toBe(width === 390 ? 'block' : 'none');
+            if (width === 390) {
+                expect(f.css('#app-popup-close').display).toBe('none');
+                expect(f.css('#app-popup').position).toBe('fixed');
+                expect(f.css('#app-popup').height).toBe('auto');
+                expect(f.styles).toContain('border-radius: 1rem;');
+                expect(f.styles).toContain('translate: 0 -50%');
+                expect(f.styles).toContain('max-height: min(85dvh, calc(var(--chat-viewport-height, 100dvh) - 1rem))');
+                expect(f.css('#app-popup-body').overflow).toBe('auto');
+                expect(f.css('[data-tool-popup-close]').minHeight).toBe('48px');
+                const other = popup.cloneNode(true) as HTMLElement;
+                popup.remove(); other.dataset.popupKind = 'secure-input';
+                f.window.document.body.append(other);
+                expect(f.css('[data-tool-popup-footer]').display).toBe('none');
+            }
+        } finally { await f.window.happyDOM.close(); }
+    }
+});

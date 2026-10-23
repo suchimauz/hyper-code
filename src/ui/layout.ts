@@ -375,6 +375,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
 }
 
 .mobile-usage-strip { display: none; }
+[data-tool-popup-footer] { display: none; }
 .mobile-usage-dialog { margin: auto; padding: 0; width: min(42rem, calc(100vw - 2rem)); max-width: none; height: min(48rem, 90dvh); max-height: none; border: 1px solid var(--color-ui-border); border-radius: 1rem; overflow: hidden; color: var(--color-base-content); background: var(--color-base-100); }
 .mobile-usage-dialog[open] { display: flex; flex-direction: column; }
 .mobile-usage-dialog::backdrop { background: #0006; }
@@ -559,6 +560,14 @@ export default async function (ctx: Context, session: Session | null, opts: {
   .chat-composer textarea[name="text"] { max-height: min(40vh, calc(var(--chat-viewport-height, 100dvh) * .3)); }
   .chat-composer textarea[name="text"] { font-size: max(16px, 1.0625rem) !important; line-height: 1.5; }
   #app-popup { width: calc(100vw - 1rem) !important; max-height: calc(var(--chat-viewport-height, 100dvh) - 1rem) !important; }
+  #app-popup[data-popup-kind="tool"] { position: fixed; inset: auto .5rem; top: calc(var(--chat-viewport-top, 0px) + var(--chat-viewport-height, 100dvh) / 2); translate: 0 -50%; margin: 0 auto; width: calc(100vw - 1rem) !important; height: auto; max-height: min(85dvh, calc(var(--chat-viewport-height, 100dvh) - 1rem)) !important; border: 1px solid var(--color-ui-border); border-radius: 1rem; }
+  #app-popup[data-popup-kind="tool"] > div { height: auto; max-height: min(85dvh, calc(var(--chat-viewport-height, 100dvh) - 1rem)) !important; padding-top: 0; box-sizing: border-box; }
+  #app-popup[data-popup-kind="tool"] > div > div:first-child { min-height: 3.25rem; padding: 1rem 1.25rem .85rem; }
+  #app-popup[data-popup-kind="tool"]::backdrop { background: rgb(0 0 0 / .32); }
+  #app-popup[data-popup-kind="tool"] #app-popup-close { display: none; }
+  #app-popup[data-popup-kind="tool"] #app-popup-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 1rem max(1.25rem, env(safe-area-inset-right)) 1rem max(1.25rem, env(safe-area-inset-left)); background: var(--color-base-100); }
+  #app-popup[data-popup-kind="tool"] [data-tool-popup-footer] { display: block; flex-shrink: 0; padding: .65rem max(.75rem, env(safe-area-inset-right)) max(.65rem, env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-left)); border-top: 1px solid var(--color-ui-border); background: var(--color-base-100); }
+  #app-popup [data-tool-popup-close] { display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: center; border-radius: .85rem; background: var(--color-base-200); color: var(--color-base-content); font-size: 1rem; font-weight: 600; }
   /* Keep mobile notifications away from the navigation header. Show one at a time. */
   #toasts { top: auto !important; bottom: max(8rem, calc(env(safe-area-inset-bottom) + 8rem)) !important; right: .75rem !important; left: .75rem; align-items: stretch !important; flex-direction: column !important; }
   #toasts > :not(:last-child) { display: none; }
@@ -832,6 +841,7 @@ ${embedded ? "" : `<dialog id="app-popup" class="m-auto max-h-[85vh] w-[min(48re
   <div class="flex max-h-[85vh] flex-col">
     <div class="flex shrink-0 items-center gap-3 border-b border-ui-border px-5 py-3.5"><h2 id="app-popup-title" class="min-w-0 flex-1 truncate text-sm font-semibold text-muted">Details</h2>${ctx.fns.procs.ui.button({ action: "close-popup", html: '<i class="ph ph-x text-lg"></i>', appearance: "plain", title: "Close", ariaLabel: "Close", class: "flex size-8 items-center justify-center rounded-full text-faint hover:bg-base-200 hover:text-base-content", attrs: { id: "app-popup-close" } })}</div>
     <div id="app-popup-body" class="app-popup-body min-h-0 flex-1 overflow-auto bg-base-200/60 p-5 text-xs text-muted"></div>
+    <footer data-tool-popup-footer><button type="button" data-tool-popup-close aria-label="Закрыть окно инструмента">Закрыть</button></footer>
   </div>
 </dialog>
 ${hideNavigation ? "" : ctx.fns.ui.navMenu({})}`}

@@ -120,6 +120,7 @@
         if (!document.getElementById('app-popup')?.open) finishClose();
     });
 
+    document.querySelector('[data-tool-popup-close]')?.addEventListener('click', () => window.hyperPopup.close());
     document.getElementById('app-popup-close')?.addEventListener('click', () => {
         const dialog = document.getElementById('app-popup');
         if (dialog?.dataset.popupKind === 'secure-input') {

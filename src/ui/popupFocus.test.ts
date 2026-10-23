@@ -5,7 +5,7 @@ function fixture(touch=true){
  const w=new Window({url:'http://local/agent/a',width:touch?390:1280});
  const d=w.document;
  w.matchMedia=((query:string)=>({matches:touch&&query==='(pointer: coarse)'})) as any;
- d.body.innerHTML='<button id="tool">Tool details</button><textarea id="input">Unsent draft</textarea><dialog id="app-popup"><section><h2 id="app-popup-title"></h2><button id="app-popup-close">Close</button><div id="app-popup-body"></div></section></dialog>';
+ d.body.innerHTML='<button id="tool">Tool details</button><textarea id="input">Unsent draft</textarea><dialog id="app-popup"><section><h2 id="app-popup-title"></h2><button id="app-popup-close">Close</button><div id="app-popup-body"></div><footer data-tool-popup-footer><button data-tool-popup-close>Закрыть</button></footer></section></dialog>';
  const dialog=d.getElementById('app-popup') as any;
  let nativeReturn:any;
  // Model the native dialog focus restoration as well as our explicit restoration.
@@ -43,6 +43,14 @@ test('desktop retains composer restoration and direct native closure is cleaned 
   f.popup.open('Tool','tool');f.popup.close();expect(f.d.activeElement).toBe(input);
  }finally{await f.w.happyDOM.close();}
 });
+test('mobile bottom tool close uses shared dismissal without opening the keyboard',async()=>{
+ const f=fixture();try{
+  const input=f.d.getElementById('input')!;input.focus();f.popup.open('Tool','tool');
+  (f.d.querySelector('[data-tool-popup-close]') as any).click();
+  expect(f.dialog.open).toBe(false);expect(f.d.activeElement).not.toBe(input);
+ }finally{await f.w.happyDOM.close();}
+});
+
 test('secure prompt Escape still delegates cancellation rather than silently closing',async()=>{
  const f=fixture();try{
   let cancelled=0;f.popup.content('<button data-secure-cancel>Cancel</button>','Login','secure-input');
