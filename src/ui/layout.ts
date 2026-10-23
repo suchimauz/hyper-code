@@ -54,7 +54,8 @@ export default async function (ctx: Context, session: Session | null, opts: {
 <style>
 /* Compact lazy tool links. The tray is assembled client-side so consecutive
    calls occupy one visual row without wrapping each button in extra markup. */
-.tool-tray { display: flex; flex-wrap: wrap; gap: .25rem; align-items: center; }
+.tool-tray { --tool-chip-size: 1.333rem; position: relative; display: flex; flex-wrap: wrap; gap: .25rem; align-items: center; min-width: 0; max-width: 100%; overflow: hidden; padding-block: .25rem; }
+.tool-tray::-webkit-scrollbar { display: none; }
 .inplace-popup-panel[id^="chat-panel-"] { width: min(30rem, calc(100vw - 1.5rem)); max-height: min(36rem, calc(100vh - 5rem)); overflow-y: auto; padding: .6rem; }
 .chat-icon-ring { position: absolute; inset: -3px; border-radius: 9999px; pointer-events: none; background: conic-gradient(from 0deg, transparent 0 55%, var(--color-primary) 100%); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px)); animation: chat-icon-spin 1.1s linear infinite; }
 /* The header icon follows the live status region: ring on while it says running. */
@@ -65,13 +66,18 @@ export default async function (ctx: Context, session: Session | null, opts: {
 .chat-run-ring--live .chat-run-dots { transform-origin: 14px 14px; animation: chat-icon-spin 8s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .chat-run-ring--live .chat-run-dots { animation: none; } }
 .inplace-popup-panel[id^="chat-panel-"] .chat-row { justify-content: flex-start; min-height: 1.85rem; }
-.tool-tray-toggle { display: inline-flex; align-items: center; gap: .3rem; height: 1.5rem; padding: 0 .55rem; border: 1px solid var(--ui-border); border-radius: 9999px; background: rgb(from var(--color-base-100) r g b / .6); font-size: var(--text-2xs); color: var(--color-subtle); cursor: pointer; }
+.tool-tray-toggle { position: relative; z-index: 2; display: inline-flex; flex: none; align-items: center; justify-content: center; gap: .25rem; height: var(--tool-chip-size); padding: 0 .45rem; border: 1px solid var(--color-ui-border); border-radius: 9999px; background: var(--color-base-200); font-size: .6875rem; font-variant-numeric: tabular-nums; color: var(--color-muted); cursor: pointer; }
+.tool-tray-toggle > i { transition: rotate 240ms cubic-bezier(.2,.8,.2,1); }
+.tool-tray-toggle[aria-expanded="true"] > i { rotate: 180deg; }
 .tool-tray-toggle:hover { color: var(--color-base-content); border-color: var(--ui-border-strong); }
 /* Folded: failures and the latest call stay on the row. The latest one is
    marked by the script rather than matched with :last-child, because the live
    region for the running call also sits in this row and would otherwise take
    that position — silently hiding the very call the folded row exists to show. */
-.tool-tray--folded > .tool:not(.text-error):not(.tool-latest) { display: none; }
+#messages .tool-tray > .tool.tool-history { flex: none; box-sizing: border-box; width: var(--tool-chip-size); min-width: var(--tool-chip-size); max-width: var(--tool-chip-size); }
+#messages .tool-tray--folded > .tool.tool-history:not([data-tray-exit]) { display: none; }
+@media (max-width: 700px), (max-width: 1023px) and (pointer: coarse) { .tool-tray { --tool-chip-size: 2.25rem; } .tool-tray-toggle { min-height: 2.25rem; } }
+@media (prefers-reduced-motion: reduce) { #messages .tool-tray > .tool.tool-history, .tool-tray-toggle > i { transition: none; } }
 .tool.tool-tucked {
   width: 1.333rem; height: 1.333rem; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;

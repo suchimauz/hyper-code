@@ -272,6 +272,12 @@
                 this.fit();
                 requestAnimationFrame(() => { if (this.alive() && this.shouldStick) this.scrollBottom(); });
             }, { signal });
+            this.messages.addEventListener('click', event => {
+                const toggle = event.target.closest('.tool-tray-toggle');
+                if (!toggle || !this.messages.contains(toggle)) return;
+                event.preventDefault();
+                this.toggleTray(toggle.closest('.tool-tray'));
+            }, { signal });
             this.arrangeTools(this.messages);
             this.prepareTables();
             this.addInheritedNote();
@@ -651,7 +657,9 @@
             // The live chip is excluded: it is already a row member by way of
             // its region, and wrapping it would build a second row inside that
             // region instead of joining the one on screen.
-            root?.querySelectorAll('.tool[data-tool]:not(#active-tool-call .tool)').forEach(card => this.moveToTray(card));
+            root?.querySelectorAll('.tool[data-tool]:not([data-tray-exit])').forEach(card => {
+                if (!card.closest('#active-tool-call')) this.moveToTray(card);
+            });
             // Placed before the rows are summarized: folding reads the row's
             // membership, so the region has to be in its final position first.
             this.placeActiveTool(root);
@@ -685,32 +693,76 @@
             if (region !== tray.lastElementChild) tray.appendChild(region);
         }
 
-        // A long run of tool calls is one line — "12 tool calls ▸" — that opens
-        // in place. Failed and running calls stay visible while folded, so the
-        // row still says what went wrong or what is happening now.
+        // FLIP keeps wrapping rows spatially continuous in either direction.
+        toggleTray(tray) {
+            const nodes = [...tray.children];
+            const before = new Map(nodes.map(node => [node, node.getBoundingClientRect()]));
+            const oldHeight = tray.getBoundingClientRect().height;
+            tray._toolAnimations?.forEach(animation => animation.cancel());
+            tray._toolAnimations = [];
+            tray.querySelectorAll('[data-tray-exit]').forEach(node => node.remove());
+            tray.dataset.open = tray.dataset.open === '1' ? '0' : '1';
+            this.summarizeTray(tray);
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !tray.animate) return;
+            const bounds = tray.getBoundingClientRect();
+            const timing = { duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)' };
+            const animate = (node, frames, options = timing) => {
+                const animation = node.animate(frames, options);
+                tray._toolAnimations.push(animation);
+                return animation;
+            };
+            animate(tray, [{ height: oldHeight + 'px' }, { height: bounds.height + 'px' }]);
+            for (const node of nodes) {
+                if (!node.isConnected || node.hasAttribute('data-tray-exit')) continue;
+                const from = before.get(node), to = node.getBoundingClientRect();
+                if (!to.width) {
+                    if (!from.width) continue;
+                    const ghost = node.cloneNode(true);
+                    ghost.removeAttribute('id'); ghost.dataset.trayExit = ''; ghost.inert = true; ghost.setAttribute('aria-hidden', 'true');
+                    ghost.style.cssText = `position:absolute;pointer-events:none;left:${from.left - bounds.left}px;top:${from.top - bounds.top}px;width:${from.width}px;height:${from.height}px;`;
+                    tray.append(ghost);
+                    const animation = animate(ghost,[{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: 'translateX(-16px) scale(.8)' }], { ...timing, duration: 160 });
+                    animation.finished.then(() => ghost.remove(), () => ghost.remove());
+                    setTimeout(() => ghost.remove(), 200);
+                } else {
+                    const visible = from.width > 0;
+                    animate(node, [{ transform: `translate(${visible ? from.left - to.left : -16}px,${visible ? from.top - to.top : 0}px)`, opacity: visible ? 1 : 0 }, { transform: 'translate(0,0)', opacity: 1 }], timing);
+                }
+            }
+        }
+
+        // Failed and running calls remain visible while older calls are folded.
         summarizeTray(tray) {
-            const tools = [...tray.querySelectorAll(':scope > .tool[data-tool]')];
-            // Which call is the latest is a fact about this list, not about DOM
-            // order — the live region shares the row and would win :last-child.
-            tools.forEach((t, i) => t.classList.toggle('tool-latest', i === tools.length - 1));
+            const tools = [...tray.children].filter(node => node.matches('.tool[data-tool]:not([data-tray-exit])'));
+            // Keep the last three calls on screen; older calls slide in from the left.
+            tools.forEach((t, i) => {
+                t.classList.toggle('tool-latest', i >= tools.length - 3);
+                t.classList.toggle('tool-history', tools.length > 4 && i < tools.length - 3 && !t.classList.contains('text-error'));
+            });
             let toggle = tray.querySelector(':scope > .tool-tray-toggle');
-            if (tools.length <= 4) { toggle?.remove(); tray.classList.remove('tool-tray--folded'); return; }
+            if (tools.length <= 4) {
+                toggle?.remove(); tray.classList.remove('tool-tray--folded');
+                tools.forEach(tool => { tool.inert = false; tool.removeAttribute('aria-hidden'); });
+                return;
+            }
             if (!toggle) {
                 toggle = document.createElement('button');
                 toggle.type = 'button';
                 toggle.className = 'tool-tray-toggle';
                 toggle.dataset.action = 'toggle-tools';
-                toggle.addEventListener('click', () => {
-                    tray.dataset.open = tray.dataset.open === '1' ? '0' : '1';
-                    this.summarizeTray(tray);
-                }, { signal: this.abort.signal });
+
                 tray.prepend(toggle);
             } else if (toggle !== tray.firstElementChild) tray.prepend(toggle);
             const open = tray.dataset.open === '1';
             const failed = tools.filter(t => /\btext-error\b/.test(t.className)).length;
             tray.classList.toggle('tool-tray--folded', !open);
+            for (const tool of tools) {
+                tool.inert = !open && tool.classList.contains('tool-history');
+                if (tool.inert) tool.setAttribute('aria-hidden', 'true'); else tool.removeAttribute('aria-hidden');
+            }
             toggle.setAttribute('aria-expanded', String(open));
-            toggle.innerHTML = `<i class="ph ph-caret-${open ? 'down' : 'right'}" aria-hidden="true"></i><span>${tools.length} tool calls</span>${failed ? `<span class="text-error">· ${failed} failed</span>` : ''}`;
+            toggle.setAttribute('aria-label', `${open ? 'Свернуть' : 'Показать'} вызовы инструментов: ${tools.length}${failed ? `, ошибок: ${failed}` : ''}`);
+            toggle.innerHTML = `<i class="ph ph-caret-right" aria-hidden="true"></i><span>${tools.length}</span>${failed ? `<span class="text-error" aria-label="Ошибок: ${failed}">· ${failed}</span>` : ''}`;
         }
 
         moveToTray(card) {
