@@ -4,6 +4,9 @@
  * Enforce exact documented endpoints, reject redirects, and keep Go subscription
  * traffic separate from pay-as-you-go. Credentials travel only to opencode.ai,
  * locally or through a pinned SSH bridge. Never impersonates an official client.
+ * Retry response-header deadline failures up to three times after the initial
+ * request, preserving the session and payload. Never retry caller cancellation,
+ * HTTP failures, or errors after response streaming has started.
  * @param opts.url Exact allowed inference, catalogue, Go usage or read-only member-budget URL.
  * @param opts.init HTTP method, JSON payload and cancellation signal.
  * @param opts.sessionId Stable conversation identifier; forwarded as x-opencode-session. Omit for a standalone request.
@@ -49,7 +52,33 @@ export default async function (ctx: Context, session: Session | null, opts: {
     if (method === 'POST') headers.set('content-type','application/json');
     const raw = await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodeInstance'});
     const instance = raw?.trim();
-    const init = {...opts.init,method,headers,redirect:'error' as const,signal:opts.init.signal ?? AbortSignal.timeout(60000)};
-    if (instance && instance !== 'local') return ctx.fns.sshAccount.fetch({ssh:{instance,provider:'opencode',account:'default'},url:url.href,init:{method,headers:Object.fromEntries(headers.entries()),body:typeof init.body === 'string' ? init.body : undefined,signal:init.signal ?? undefined}});
-    return ctx.fns.llm.connectFetch({url:url.href,init});
+    // The deadline covers headers only; a whole-request timeout would kill a
+    // legitimate long generation. Each retry gets its own deadline/controller.
+    for (let retry = 0; ; retry++) {
+        opts.init.signal?.throwIfAborted();
+        const controller = new AbortController();
+        const signal = opts.init.signal ? AbortSignal.any([opts.init.signal, controller.signal]) : controller.signal;
+        const init = {...opts.init,method,headers,redirect:'error' as const,signal};
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            if (instance && instance !== 'local') {
+                return await Promise.race([
+                    ctx.fns.sshAccount.fetch({ssh:{instance,provider:'opencode',account:'default'},url:url.href,init:{method,headers:Object.fromEntries(headers.entries()),body:typeof init.body === 'string' ? init.body : undefined,signal}}),
+                    new Promise<never>((_, reject) => {
+                        timer = setTimeout(() => {
+                            const error = new Error('no response from provider in 120s');
+                            reject(error);
+                            controller.abort(error);
+                        }, 120_000);
+                    }),
+                ]);
+            }
+            return await ctx.fns.llm.connectFetch({url:url.href,init,ms:120_000});
+        } catch (error) {
+            if (opts.init.signal?.aborted || retry >= 3 || !(error instanceof Error)
+                || !/^no response from provider in [\d.]+s$/.test(error.message)) throw error;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
 }
