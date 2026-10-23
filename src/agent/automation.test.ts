@@ -7,7 +7,7 @@ describe("agent automation flags", () => {
         const agent = await ctx.fns.agent.start({ model: "mock:test" });
         agent.sleepContext = { mode: "compact", activeRevision: 1, draftRevision: null, generations: [{ revision: 1 }] };
         await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ?", params: [JSON.stringify(agent.sleepContext), agent.id] });
-        expect(await ctx.fns.agent.setAutomation({ id: agent.id, functionRagEnabled: false, jevRerankEnabled: false })).toEqual({ functionRagEnabled: false, functionRagGateEnabled: false, jevRerankEnabled: false });
+        expect(await ctx.fns.agent.setAutomation({ id: agent.id, functionRagEnabled: false, jevRerankEnabled: false })).toEqual({ functionRagEnabled: false, functionRagGateEnabled: false, jevRerankEnabled: false, jevContextEnabled: false, jevAgentRoutingEnabled: false, jevModelRoutingEnabled: false, jevEvidenceEnabled: false, jevFileRankingEnabled: false, jevResultReviewEnabled: false, jevRiskReviewEnabled: false });
         expect(agent.sleepContext.mode).toBe("compact");
         const loaded = await ctx.fns.session.load({ id: agent.id });
         expect(loaded.sleepContext).toEqual(agent.sleepContext);

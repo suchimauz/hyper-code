@@ -20,10 +20,11 @@ test('the gate and the reranker are independent switches under agent settings', 
         agent: { id: 'test', functionRagEnabled: true, functionRagGateEnabled: true, jevRerankEnabled: false } as any,
     });
     expect(html).toContain('functionRagGateEnabled');
-    expect(toggle.calls.map((x: any) => [x.name, x.enabled])).toEqual([
+    expect(toggle.calls.filter((x: any) => ['functionRagEnabled', 'functionRagGateEnabled', 'jevRerankEnabled', 'jevContextEnabled'].includes(x.name)).map((x: any) => [x.name, x.enabled])).toEqual([
         ['functionRagEnabled', true],
         ['functionRagGateEnabled', true],
         ['jevRerankEnabled', false],
+        ['jevContextEnabled', false],
     ]);
     // And they are not also drawn in Automation, which is where they were.
     const automation = render(ctx, null, { section: 'automation', agent: { id: 'test' } as any });

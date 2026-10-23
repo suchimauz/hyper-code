@@ -15,8 +15,8 @@ agent: types.agent.Agent }): Promise<void> {
     }
     await ctx.fns.procs.db.run({
         sql: `
-        INSERT INTO agents (auto_compact_window_percent, id, title, workspace_dir, workspace_host, model, reasoning_effort, system_prompt, tools, scratchpad, sleep_context, goal, function_rag_enabled, jev_rerank_enabled, function_rag_gate_enabled, status_line, status_line_every, status_line_mode, parent_id, visibility, fork_offset, created_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM agents WHERE id = ?), ?), ?)
+        INSERT INTO agents (auto_compact_window_percent, id, title, workspace_dir, workspace_host, model, reasoning_effort, system_prompt, tools, scratchpad, sleep_context, goal, function_rag_enabled, jev_rerank_enabled, function_rag_gate_enabled, jev_context_enabled, jev_agent_routing_enabled, jev_model_routing_enabled, jev_evidence_enabled, jev_file_ranking_enabled, jev_result_review_enabled, jev_risk_review_enabled, status_line, status_line_every, status_line_mode, parent_id, visibility, fork_offset, created_by, created_at, updated_at)
+        VALUES (?, ?, ?,  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM agents WHERE id = ?), ?), ?)
         ON CONFLICT(id) DO UPDATE SET
             auto_compact_window_percent = excluded.auto_compact_window_percent,
             model = excluded.model,
@@ -35,6 +35,13 @@ agent: types.agent.Agent }): Promise<void> {
             function_rag_enabled = excluded.function_rag_enabled,
             jev_rerank_enabled = excluded.jev_rerank_enabled,
             function_rag_gate_enabled = excluded.function_rag_gate_enabled,
+            jev_context_enabled = excluded.jev_context_enabled,
+            jev_agent_routing_enabled = excluded.jev_agent_routing_enabled,
+            jev_model_routing_enabled = excluded.jev_model_routing_enabled,
+            jev_evidence_enabled = excluded.jev_evidence_enabled,
+            jev_file_ranking_enabled = excluded.jev_file_ranking_enabled,
+            jev_result_review_enabled = excluded.jev_result_review_enabled,
+            jev_risk_review_enabled = excluded.jev_risk_review_enabled,
             status_line = excluded.status_line,
             status_line_every = excluded.status_line_every,
             status_line_mode = excluded.status_line_mode,
@@ -56,6 +63,13 @@ agent: types.agent.Agent }): Promise<void> {
             agent.functionRagEnabled === true,
             agent.jevRerankEnabled === true,
             agent.functionRagGateEnabled === true,
+            agent.jevContextEnabled === true,
+            agent.jevAgentRoutingEnabled === true,
+            agent.jevModelRoutingEnabled === true,
+            agent.jevEvidenceEnabled === true,
+            agent.jevFileRankingEnabled === true,
+            agent.jevResultReviewEnabled === true,
+            agent.jevRiskReviewEnabled === true,
             agent.statusLine ?? "",
             Math.max(1, Number(agent.statusLineEvery ?? 1)),
             agent.statusLineMode ?? "global",

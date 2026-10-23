@@ -49,7 +49,10 @@ export default async function (
     // that dies between the two writes leaves one behind. Repairing here — on
     // the way OUT, for whichever dialect — means such an agent answers again
     // instead of 400-ing forever on history it cannot edit.
-    const { messages: base, repaired } = ctx.fns.session.repairToolPairs({ messages: raw });
+    const { messages: repairedBase, repaired } = ctx.fns.session.repairToolPairs({ messages: raw });
+    // Opt-in, outgoing-only selection: stored transcript and tool pairs stay intact.
+    // Relevance failures must never prevent the main model from receiving history.
+    const base = await ctx.fns.agent.selectJevContext({ agent, messages: repairedBase }).catch(() => repairedBase);
     // The retrieved function catalogue USED to be spliced into the last user
     // message from here, and was never persisted: the transcript disagreed with
     // what the model saw, and a catalogue that changed between requests

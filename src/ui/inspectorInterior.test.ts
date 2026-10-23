@@ -16,14 +16,14 @@ test('all seven sections remain discoverable with empty data', () => {
  }
  expect(render('team')).toContain('No team yet'); expect(render('plan')).toContain('No plan yet'); expect(render('knowledge')).toContain('unavailable');
 });
-test('settings group preserves independent retrieval flags and informed sharing copy', () => {
+test('settings groups preserve all independent Jev flags and informed sharing copy', () => {
  const w=dom(render('settings')); const d=w.document;
- expect(d.querySelectorAll('fieldset').length).toBe(1);
+ expect(d.querySelectorAll('fieldset').length).toBe(3);
  expect(d.querySelectorAll('details details').length).toBe(1);
  expect(d.querySelectorAll('label .text-micro').length).toBe(0);
- expect(d.querySelectorAll('input[type=checkbox]').length).toBe(3);
- expect(d.querySelectorAll('input[type=hidden]').length).toBe(0);
- expect(d.body.textContent).toContain('external provider');
+ expect(d.querySelectorAll('input[type=checkbox]').length).toBe(10);
+ expect(d.querySelectorAll('input[type=hidden]').length).toBe(7);
+ expect(d.body.textContent).toContain('external provider'); expect(d.body.textContent).toContain('outside the allowed model destinations'); expect(d.body.textContent).toContain('no automatic actions');
  for(const input of d.querySelectorAll('input[type=checkbox]')) expect(input.closest('label')?.textContent?.trim()).toBeTruthy();
  w.happyDOM.abort();
 });

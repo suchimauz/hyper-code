@@ -1,0 +1,13 @@
+# Opt-in Jev model recommendation
+
+`agent.recommendModel({ task, allowedModels })` provides advice only. Enable **Jev model recommendation** in the caller's Settings first. The independent per-agent `jevModelRoutingEnabled` flag defaults to false; legacy forms preserve it. It does not enable executor routing, Function RAG, reranking, or context filtering.
+
+**Disclosure:** explicit task text and account-free model slugs go to the configured Jev provider, even when that provider is not among the allowed recommendation destinations. Never put credentials, account secrets or sensitive chat history in task text. No transcript, endpoint URL, credential, provider/account/host alias, or agent prompt is automatically attached. `allowedModels` authorizes only recommendation destinations, not a restriction on Jev's processing destination.
+
+Supply 1–20 provider-qualified model IDs, each at most 256 characters, and nonempty task text at most 4000 characters (oversize input is rejected, not truncated). The caller comes from the current session. Candidate intersection uses `llm.listModels`, exact model policy and `resolveEndpoint`; rejected candidates cannot be selected. Catalog discovery and endpoint credential refresh may perform network requests, but never candidate inference. Availability is a configuration snapshot, not a reachability guarantee. Duplicate model slugs across accounts abstain rather than exposing account aliases.
+
+Optional `requireTools`, `requireVision`, `minContextTokens` and `privacy` (`local-only` or `no-retention`) are fail-closed: mandatory requirements currently abstain because the generic catalog does not certify them. Context family estimates and model names do not verify capabilities. No invented price, performance, or benchmark claims are used.
+
+Jev gets opaque candidate keys, untrusted task/candidate data instructions, an abstention option, timeout 2800ms, no retries, and a 2900ms local race. This bounds the Jev stage, not catalog discovery wall time. Complete finite normalized distributions (sum tolerance 0.000001; coarsely rounded answers may safely abstain), known choices and confidence >=0.6 with a unique winning probability are required. Return includes `id` or null, `abstained`, machine-readable `reason`, confidence, distribution, reported usage when available, and total wall latency. There is no candidate inference, model switch, job start or automatic application. A subsequent explicit action must revalidate availability.
+
+Tests mock catalog, policy, endpoints and Jev; they make no paid calls and never enable live agents. Run `bun test src/agent/recommendModel.test.ts src/agent/jevModelRoutingSettings.unit.test.ts src/ui/jevModelRoutingSettings.test.ts`.

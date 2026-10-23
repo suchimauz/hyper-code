@@ -1,0 +1,15 @@
+# Advisory result review
+
+`agent.reviewResult({ task, criteria, evidence })` uses the **current caller's** `agents.jev_result_review_enabled` flag. Default/off makes no provider request. It never reads history, changes settings/models, closes tasks or marks work done. This function itself does not enable the flag.
+
+When enabled, explicit task text, criterion IDs/descriptions and evidence IDs/text are sent to the configured external Jev provider. Do not supply secrets. Text remains untrusted data in `state`, separate from fixed instructions; that separation reduces but does not eliminate prompt-injection risk.
+
+Limits: nonempty task ≤4000 characters; 1–10 criteria with unique IDs and nonempty descriptions ≤1200 characters; 0–12 evidence excerpts with unique IDs and nonempty text ≤1200 characters. IDs are 1–64 ASCII letters, digits, underscores or hyphens. Empty evidence yields insufficient without database or network access. Invalid input returns `invalid-input` with bounded best-effort insufficient rows, not a review.
+
+One batched Jev call contains one independent choice question per criterion. Its choices are insufficient or a met/not-met judgment referencing exactly one supplied excerpt by opaque index. Multiple-excerpt reasoning is intentionally unsupported: if no single excerpt decisively supports the judgment, instructions require insufficient. No generated quotes or evidence are returned. Unknown answer IDs, malformed distributions, missing answers or invalid choices invalidate the entire response. Weak/ambiguous judgments abstain individually. Evidence membership validation **does not establish truth, entailment, actual test execution or completion**. A plausible but wrong provider judgment remains possible; humans/callers must inspect evidence.
+
+The response includes `advisory: true`, overall `status`, criterion `results` with `met`/`not-met`/`insufficient` and `evidenceIds`, observed valid provider `usage` or null, and elapsed `wallMs`. Overall status distinguishes `disabled`, `no-evidence`, `invalid-input`, `no-current-agent`, `configuration-unavailable` (including unavailable DB schema), `invalid-response`, `provider-unavailable`, `timeout`, and `reviewed`. `reviewed` may contain insufficient judgments.
+
+A 2800ms wall timer includes caller/flag resolution and provider wait; the single provider request uses remaining budget and retries zero. If less than the provider's 500ms minimum remains, it abstains without requesting. The wall timer bounds caller waiting, not event-loop scheduling or cancellation of an underlying hung promise; the transport has its own timeout, and no second request is made. Late results never cause task/settings/session writes.
+
+Validation: `bun test ./src/agent/reviewResult.test.ts` uses mocks only (no live Jev traffic). Covers independent decisions, invalid/missing responses and evidence indices, missing evidence, identity/flag gating, input bounds, unchanged inputs, transfer whitelisting, schema/provider failure, and a hung provider deadline. Not a live-provider quality benchmark.

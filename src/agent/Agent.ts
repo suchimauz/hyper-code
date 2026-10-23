@@ -46,6 +46,20 @@ export type Agent = {
     /** Independently gate runtime-function retrieval before search; new agents default off. */
     functionRagGateEnabled?: boolean;
     jevRerankEnabled?: boolean;
+    /** Opt-in context filtering sends the latest request and old tool-result excerpts to Jev. Independent of Function RAG; defaults to false. */
+    jevContextEnabled?: boolean;
+    /** Opt-in advisory recommendations among explicitly allowed direct team children; sends task and titles to Jev. */
+    jevAgentRoutingEnabled?: boolean;
+    /** Opt-in advisory model recommendation; independent and off by default. */
+    jevModelRoutingEnabled?: boolean;
+    /** Allow explicit advisory calls to share task text and supplied evidence with the external configured Jev provider; no automatic actions. @default false */
+    jevEvidenceEnabled?: boolean;
+    /** Allow explicit advisory calls to share task text and file candidate metadata with the external configured Jev provider; no automatic actions. @default false */
+    jevFileRankingEnabled?: boolean;
+    /** Allow explicit advisory calls to share task text, proposed result and supplied evidence with the external configured Jev provider; no automatic actions. @default false */
+    jevResultReviewEnabled?: boolean;
+    /** Allow explicit advisory calls to share task text, proposed action and supplied metadata with the external configured Jev provider; no automatic actions. @default false */
+    jevRiskReviewEnabled?: boolean;
     goal?: Record<string, any> | null;
     drainPromise?: Promise<any> | null;
     wakeAt?: number | null;
