@@ -58,8 +58,8 @@ describe("markdown.render", () => {
     test("unknown language falls back to plain code", async () => {
         const ctx = mkCtx();
         const html = await render(ctx, null, { source: "```brainfuck\n+++.\n```" });
-        expect(html).toContain("<pre><code>");
-        expect(html).toContain("+++.");
+        expect(html).toContain('<pre data-code-language="brainfuck"><code>');
+        expect(html).toContain('+++.');
     });
 
     test("html entities inside code are decoded before highlighting", async () => {
@@ -103,7 +103,7 @@ describe("markdown.render", () => {
         const mermaid = mock(async () => { throw new Error("boom"); });
         const ctx = mkCtx(mermaid);
         const html = await render(ctx, null, { source: ["```mermaid", "flowchart LR", "A --> B", "```"].join("\n") });
-        expect(html).toContain("<pre><code>");
+        expect(html).toContain('<pre data-code-language="mermaid"><code>');
         expect(html).toContain("flowchart LR");
         expect(html).toContain("A --&gt; B");
     });

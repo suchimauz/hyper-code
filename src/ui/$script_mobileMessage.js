@@ -53,7 +53,7 @@
             clean.querySelectorAll('br').forEach(node => node.replaceWith('\n'));
             clean.querySelectorAll('p, div, pre, li, h1, h2, h3, h4, blockquote, tr').forEach(node => node.append('\n'));
             try {
-                await navigator.clipboard.writeText((clean.textContent || '').trim());
+                await window.hyperCopyText((clean.textContent || '').trim());
                 copyStatus.textContent = 'Скопировано';
             } catch {
                 copyStatus.textContent = 'Не удалось скопировать. Выделите текст вручную.';
@@ -101,43 +101,6 @@
             trigger.setAttribute('aria-haspopup', 'dialog');
             trigger.setAttribute('aria-label', 'Действия с сообщением');
             message.append(trigger);
-        }
-        for (const pre of messages.querySelectorAll('.assistant pre')) {
-            if (pre.dataset.mobileCode !== undefined) continue;
-            const code = pre.querySelector('code');
-            if (!code) continue;
-            pre.dataset.mobileCode = '';
-            pre.tabIndex = 0;
-            pre.setAttribute('aria-label', 'Код, горизонтальная прокрутка');
-            const tools = document.createElement('div');
-            tools.className = 'mobile-code-tools';
-            tools.dataset.noCopy = '';
-            const copy = button('Копировать', 'data-mobile-code-copy');
-            const status = document.createElement('span');
-            status.setAttribute('role', 'status');
-            status.setAttribute('aria-live', 'polite');
-            tools.append(copy, status);
-            copy.addEventListener('click', async () => {
-                try {
-                    await navigator.clipboard.writeText(code.textContent || '');
-                    status.textContent = 'Скопировано';
-                } catch {
-                    status.textContent = 'Не удалось скопировать. Выделите код вручную.';
-                }
-            });
-            if ((code.textContent || '').split('\n').length > 16) {
-                pre.dataset.mobileCollapsed = 'true';
-                const toggle = button('Развернуть код', 'data-mobile-code-toggle');
-                toggle.setAttribute('aria-expanded', 'false');
-                toggle.addEventListener('click', () => {
-                    const expanded = pre.dataset.mobileCollapsed === 'true';
-                    pre.dataset.mobileCollapsed = String(!expanded);
-                    toggle.setAttribute('aria-expanded', String(expanded));
-                    toggle.textContent = expanded ? 'Свернуть код' : 'Развернуть код';
-                });
-                tools.append(toggle);
-            }
-            pre.before(tools);
         }
     }
     function schedule() {

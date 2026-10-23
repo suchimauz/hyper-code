@@ -693,6 +693,7 @@ ${opts.headExtra ?? ""}
 <script src="/chat/header.js" defer></script>
 <script src="/ui/meta.js" defer></script>
 <script src="/ui/mobileInspector.js" defer></script>
+<script src="/ui/codeBlocks.js" defer></script>
 <script src="/ui/mobileMessage.js" defer></script>
 <script src="/ui/chatSearch.js" defer></script>
 <script src="/ui/quotaTip.js" defer></script>
@@ -772,6 +773,22 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
 .project-chat-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid #8883; }
 .project-chat-row a { flex:1; }
 @media(max-width:767px) { .project-tabs { padding-top:44px; } }
+/* Code has one shared surface on desktop and phone; lines never wrap implicitly. */
+#messages .chat-code-block { min-width: 0; max-width: 100%; margin: .8rem 0; overflow: hidden; border: 1px solid var(--color-ui-border); border-radius: .8rem; background: var(--color-base-100); }
+.chat-code-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: .3rem .5rem; border-bottom: 1px solid var(--color-ui-border); background: var(--color-base-200); font-size: .75rem; }
+.chat-code-language { flex: 1; min-width: 3rem; font-family: ui-monospace, monospace; color: var(--color-muted); }
+.chat-code-tools button, .chat-code-feedback button { min-height: 36px; padding: .35rem .65rem; border-radius: .5rem; color: var(--color-base-content); }
+.chat-code-tools button:hover, .chat-code-feedback button:hover { background: var(--color-base-300); }
+#messages .assistant .chat-code-block pre { margin: 0; padding: .85rem 1rem; min-width: 0; max-width: 100%; overflow: auto; overscroll-behavior-x: contain; white-space: pre; overflow-wrap: normal; word-break: normal; font-size: 13px; line-height: 1.6; border-radius: 0; }
+#messages .assistant .chat-code-block code { white-space: pre; overflow-wrap: normal; word-break: normal; font-size: inherit; line-height: inherit; }
+#messages .chat-code-block[data-code-collapsed="true"] pre { max-height: 24rem; }
+.chat-code-feedback { color: var(--color-muted); font-size: .75rem; }
+.chat-code-feedback:has(:not([hidden])) { padding-inline: .65rem; }
+@media (max-width: 700px), (max-width: 1023px) and (pointer: coarse) {
+  .chat-code-tools button, .chat-code-feedback button { min-height: 44px; }
+  #messages .chat-code-block[data-code-collapsed="true"] pre { max-height: 18rem; }
+}
+
 /* Direct manipulation: immediate press, short interruptible release; no transcript-wide motion. */
 :where(#chat-panel, #project-tabs-host, #nav-overlay, #app-popup, [data-mobile-inspector-dialog], .mobile-usage-dialog, .home-dashboard) :is(button, a[href], summary, [role="button"], .tool), #mobile-nav-button {
   -webkit-tap-highlight-color: transparent;

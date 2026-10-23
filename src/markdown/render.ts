@@ -110,6 +110,7 @@ function linkifyText(text: string): string {
 /**
  * Renders Markdown to highlighted HTML; fenced blocks whose language has a `$fence_<lang>` renderer (such as mermaid) become diagrams.
  * @param opts.source Markdown source.
+ * @param opts.fileBaseDir Resolve ordinary Markdown links as local files relative to this directory.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { source: string; /** Resolve ordinary Markdown links as local files relative to this directory. */ fileBaseDir?: string }): Promise<string> {
     let source = opts.source;
@@ -122,7 +123,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { s
     for (const m of html.matchAll(re)) {
         const [full, lang, raw] = m;
         const pretty = await ctx.fns.markdown.highlight({ code: decode(raw!), lang: lang! });
-        replacements.push({ full: full!, pretty });
+        replacements.push({ full: full!, pretty: pretty.replace('<pre', '<pre data-code-language="'+escapeHtml(decode(lang!))+'"') });
     }
     for (const { full, pretty } of replacements) html = html.replace(full, pretty);
     if (opts.fileBaseDir) html = rewriteFileLinks(html, opts.fileBaseDir);

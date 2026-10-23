@@ -15,6 +15,8 @@ async function setup(width = 390, coarse = false) {
         return result;
     };
     window.document.body.innerHTML = `<main id="messages"><div id="m-1"><div class="assistant"><pre><code>${Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n')}</code></pre></div><button data-action="delete-one" hx-confirm="delete this message?" hx-post="/original">Delete message</button><button data-action="delete-from" hx-confirm="delete this and everything after?">Delete from here</button></div></main>`;
+    window.eval(await Bun.file(new URL('./$script_codeBlocks.js', import.meta.url)).text());
+    Object.defineProperty(window, 'isSecureContext', { value: true });
     window.eval(source);
     window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
     await new Promise(resolve => setTimeout(resolve, 5));
@@ -44,18 +46,18 @@ test('code collapse and clipboard feedback do not change source', async () => {
     try {
         const pre = f.doc.querySelector('pre')!;
         const text = pre.textContent;
-        expect(pre.dataset.mobileCollapsed).toBe('true');
-        (f.doc.querySelector('[data-mobile-code-toggle]') as any).click();
-        expect(pre.dataset.mobileCollapsed).toBe('false');
+        expect(pre.closest('[data-chat-code-block]')?.getAttribute('data-code-collapsed')).toBe('true');
+        (f.doc.querySelector('[data-code-toggle]') as any).click();
+        expect(pre.closest('[data-chat-code-block]')?.getAttribute('data-code-collapsed')).toBe('false');
         let copied = '';
         Object.defineProperty(f.window.navigator, 'clipboard', { value: { writeText: async (s: string) => { copied = s; } } });
-        (f.doc.querySelector('[data-mobile-code-copy]') as any).click();
+        (f.doc.querySelector('[data-code-copy]') as any).click();
         await f.flush();
         expect(copied).toBe(text);
         expect(f.doc.querySelector('[role="status"]')?.textContent).toBe('Скопировано');
         expect(pre.textContent).toBe(text);
         Object.defineProperty(f.window.navigator.clipboard, 'writeText', { value: async () => { throw new Error('denied'); } });
-        (f.doc.querySelector('[data-mobile-code-copy]') as any).click();
+        (f.doc.querySelector('[data-code-copy]') as any).click();
         await f.flush();
         expect(f.doc.querySelector('[role="status"]')?.textContent).toContain('Не удалось');
     } finally { await f.window.happyDOM.close(); }
@@ -68,7 +70,7 @@ test('HTMX replacement closes sheet; repeated script does not duplicate enhancem
         f.doc.dispatchEvent(new f.window.Event('htmx:afterSwap'));
         await f.flush();
         expect(f.doc.querySelectorAll('[data-mobile-message-actions]').length).toBe(1);
-        expect(f.doc.querySelectorAll('.mobile-code-tools').length).toBe(1);
+        expect(f.doc.querySelectorAll('.chat-code-tools').length).toBe(1);
         (f.doc.querySelector('[data-mobile-message-actions]') as any).click();
         f.doc.querySelector('#messages')!.innerHTML = '';
         await f.flush();
@@ -76,12 +78,12 @@ test('HTMX replacement closes sheet; repeated script does not duplicate enhancem
     } finally { await f.window.happyDOM.close(); }
 });
 
-test('desktop markup remains untouched', async () => {
+test('desktop gets code controls without mobile message actions', async () => {
     const f = await setup(1280);
     try {
         expect(f.doc.querySelector('[data-mobile-message-actions]')).toBeNull();
-        expect(f.doc.querySelector('.mobile-code-tools')).toBeNull();
-        expect(f.doc.querySelector('pre')?.getAttribute('tabindex')).toBeNull();
+        expect(f.doc.querySelector('.chat-code-tools')).not.toBeNull();
+        expect(f.doc.querySelector('pre')?.getAttribute('tabindex')).toBe('0');
     } finally { await f.window.happyDOM.close(); }
 });
 
@@ -162,7 +164,7 @@ test('real user/assistant renderers copy readable text and native lifecycle size
         const messages = f.doc.getElementById('messages')!;
         messages.innerHTML = user + assistant + '<div id="m-5" class="tool">Tool event</div>';
         let sizedBeforeBubble = false;
-        f.doc.addEventListener('htmx:after:swap', () => { sizedBeforeBubble = f.doc.querySelector('pre')?.getAttribute('data-mobile-collapsed') === 'true'; }, { once: true });
+        f.doc.addEventListener('htmx:after:swap', () => { sizedBeforeBubble = f.doc.querySelector('[data-chat-code-block]')?.getAttribute('data-code-collapsed') === 'true'; }, { once: true });
         f.doc.dispatchEvent(new f.window.CustomEvent('htmx:after:swap', { detail: { ctx: { target: messages } } }));
         expect(sizedBeforeBubble).toBe(true);
         expect(f.doc.querySelectorAll('[data-mobile-message-actions]').length).toBe(2);
