@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 // Load native renderers into a tiny read-only fixture: no database boot or migrations.
 async function fixtureCtx(): Promise<any> {
-    const ctx: any = { fns: { procs: { db: {}, ui: {} }, dock: {}, chat: {}, ui: {} } };
+    const ctx: any = { fns: { agent:{teamActivity:async()=>({})}, procs: { db: {}, ui: {} }, dock: {}, chat: {}, ui: {} } };
     for (const [namespace, name, path] of [
         ['dock', 'runningAgents', './runningAgents.ts'],
         ['chat', 'icon', '../chat/icon.ts'],
@@ -25,12 +25,11 @@ describe('dock.runningAgents', () => {
         // Fixtures replace only the database read; no persisted chat is changed.
         ctx.fns.procs.db.select = async ({ sql }: { sql: string }) => {
             query = sql;
-            return Array.from({ length: 501 }, (_, i) => ({ id: `fixture-${i}`, title: '<Running & chat>', model: 'test', icon: null }));
+            return Array.from({ length: 501 }, (_, i) => ({ id: `fixture-${i}`, title: '<Running & chat>', run_state: 'running', model: 'test', icon: null }));
         };
         const html = await ctx.fns.dock.runningAgents({});
         expect(query).toContain("archived_at IS NULL AND visibility = 'nav'");
-        expect(query).toContain("NULLIF(TRIM(run_state), '') IS NOT NULL");
-        expect(query).toContain("run_state <> 'idle'");
+        expect(query).toContain('run_state FROM agents');
         expect(query.toLowerCase()).not.toContain('limit');
         expect(html).toContain('id="dock-running-agents"');
         expect(html).toContain('data-live-topic="agents"');
@@ -47,7 +46,7 @@ describe('dock.runningAgents', () => {
     test('start and stop are reflected by successive read-only region renders', async () => {
         const ctx: any = await fixtureCtx();
         let running = false;
-        ctx.fns.procs.db.select = async () => running ? [{ id: 'fixture', title: 'Fixture', icon: null, model: 'test' }] : [];
+        ctx.fns.procs.db.select = async () => running ? [{ id: 'fixture', title: 'Fixture', icon: null, run_state: 'running', model: 'test' }] : [];
         expect(await ctx.fns.dock.runningAgents({})).toContain('No running chats');
         running = true;
         const active = await ctx.fns.dock.runningAgents({});

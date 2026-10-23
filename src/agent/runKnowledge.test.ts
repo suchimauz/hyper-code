@@ -12,9 +12,9 @@ function harness(turns: any[], scratchpad: any = { knowledgeTrackingEnabled: tru
     const ctx: any = { fns: {
         session: { forAgent: () => ({}), appendUserMessage: ({ text }: any) => appendMessage({ message: { role: 'user', content: text } }), appendMessage,
             syncAgentState: async () => { agent.messages = rows.map(r => ({ ...r })); }, appendAssistantEvent: noop, appendErrorEvent: noop, appendToolCallEvent: noop,
-            updateMessageContent: async ({ idx, content }: any) => { rows[idx].content = content; } },
-        agent: { statusLineForTurn: async () => '', stashResult: async ({ output }: any) => ({ content: output }), sanitizeHtmlBody: ({ html }: any) => html },
-        procs: { db: { select: async () => [{ i: Math.max(-1, ...rows.filter(r => r.role === 'user').map(r => r.idx)) }] } },
+            updateMessageContent: async ({ idx, content }: any) => { rows[idx].content = content; }, recordContextUsage: noop },
+        agent: { autoCompactIfNeeded: async () => ({ status: 'not_needed' }), statusLineForTurn: async () => '', stashResult: async ({ output }: any) => ({ content: output }), sanitizeHtmlBody: ({ html }: any) => html },
+        procs: { events: { emit: () => {} }, db: { select: async () => [{ i: Math.max(-1, ...rows.filter(r => r.role === 'user').map(r => r.idx)) }] } },
         llm: { stream: async () => { const turn = turns.shift(); if (turn instanceof Error) throw turn; return turn ?? { text: 'done' }; } },
         markdown: { render: async ({ source }: any) => source },
         tools: { call: async ({ name }: any) => ({ output: 'tool persisted', ...(name === 'respondHtml' ? { terminal: { type: 'html', html: '<p>final</p>', text: 'final' } } : {}) }) },
@@ -69,7 +69,7 @@ describe('Knowledge completed-turn hook (isolated)', () => {
         const h = harness([new Error('provider failed')]); await expect(h.execute()).rejects.toThrow('provider failed'); expect(h.launches).toHaveLength(0);
         const empty = harness([{ text: '' }]); await empty.execute(); expect(empty.launches).toHaveLength(0);
         const aborted = harness([]); aborted.ctx.fns.llm.stream = async () => { aborted.agent.abortController.abort(); return { text: 'partial' }; };
-        await aborted.execute(); expect(aborted.launches).toHaveLength(0);
+        await expect(aborted.execute()).rejects.toMatchObject({ name: 'AbortError' }); expect(aborted.launches).toHaveLength(0);
     });
     test('extraction is not awaited and sync/async plugin failures do not fail the turn', async () => {
         for (const impl of [() => { throw new Error('sync'); }, async () => { throw new Error('async'); }, () => new Promise(() => {})]) {

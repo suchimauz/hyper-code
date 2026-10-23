@@ -67,7 +67,7 @@ async function recoverStaleRuns(ctx: Context, now: number): Promise<void> {
             SET run_state = 'idle', run_started_at = NULL,
                 run_heartbeat_at = NULL, run_token = NULL,
                 stale_recovery_count = stale_recovery_count + 1,
-                next_run_at = CASE WHEN stale_recovery_count < ?
+                next_run_at = CASE WHEN stopped_at IS NULL AND stale_recovery_count < ?
                     THEN ? + LEAST(120000, 5000 * CAST(power(2, stale_recovery_count) AS BIGINT))
                     ELSE NULL END,
                 last_error = CASE WHEN stale_recovery_count < ?
@@ -111,10 +111,11 @@ async function claimOne(ctx: Context, now: number): Promise<{ id: string; token:
                  AND next_run_at IS NOT NULL
                  AND next_run_at <= ?
                  AND archived_at IS NULL
+                 AND stopped_at IS NULL
                  AND sleep_context->>'draftRevision' IS NULL
                ORDER BY next_run_at ASC
                LIMIT 1
-          ) AND run_state = 'idle' AND sleep_context->>'draftRevision' IS NULL
+          ) AND run_state = 'idle' AND stopped_at IS NULL AND sleep_context->>'draftRevision' IS NULL
           RETURNING id`,
         params: [now, now, token, now, now],
     }) as any[];
@@ -144,8 +145,15 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
     })) as any[])[0];
     const frontierIdx = Number(frontier?.max_idx ?? -1);
 
+    // Stop may revoke the claim while loading the agent/frontier. Recheck just
+    // before starting; run() fences the remaining asynchronous startup window.
+    const owner = (await ctx.fns.procs.db.select({
+        sql: 'SELECT run_token, run_state, stopped_at FROM agents WHERE id = ?', params: [agentId],
+    }))[0];
+    if (!owner || owner.run_token !== runToken || owner.run_state !== 'running' || owner.stopped_at != null) return;
     agent.isStreaming = true;
     agent.currentJobId = runToken;
+    ctx.fns.events.emitAgentsChanged({ agentId, reason: 'run-started' });
     let heartbeatBusy = false;
     const heartbeat = async () => {
         if (heartbeatBusy) return;
@@ -220,6 +228,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
                     run_started_at = NULL,
                     last_processed_msg_idx = CASE WHEN ? = 1 THEN ? ELSE last_processed_msg_idx END,
                     next_run_at = CASE
+                        WHEN stopped_at IS NOT NULL THEN NULL
                         WHEN ? = 1 THEN
                             -- success: reschedule iff a user message exists past what
                             -- this run's LAST model call consumed (steering answered
@@ -245,6 +254,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
             params: [advanceCursor ? 1 : 0, consumedIdx, advanceCursor ? 1 : 0, consumedIdx, ts + 100, retryAt, errorText, advanceCursor ? 1 : 0, ts, agentId, runToken],
         });
 
+        ctx.fns.events.emitAgentsChanged({ agentId, reason: 'run-finalized' });
         // Recovery or an explicit stop may already have revoked this token.
         // In that case this owner is fenced: it must not schedule retries,
         // clear another run's state, or trigger post-run work.
@@ -448,10 +458,10 @@ async function workerPass(ctx: Context, inflight: Set<Promise<unknown>>): Promis
             // the soonest scheduled `next_run_at` is due.
             const next = ((await ctx.fns.procs.db.select({
                 sql: `SELECT LEAST(
-                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL), ?),
-                        COALESCE((SELECT MIN(wake_at) FROM agents WHERE wake_at IS NOT NULL AND archived_at IS NULL), ?),
-                        COALESCE((SELECT MIN(next_check_at) FROM agent_watches WHERE status = 'active'), ?),
-                        COALESCE((SELECT MIN(next_at) FROM agent_triggers WHERE status = 'active'), ?)
+                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
+                        COALESCE((SELECT MIN(wake_at) FROM agents WHERE wake_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
+                        COALESCE((SELECT MIN(next_check_at) FROM agent_watches w JOIN agents a ON a.id=w.agent_id WHERE w.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?),
+                        COALESCE((SELECT MIN(next_at) FROM agent_triggers t JOIN agents a ON a.id=t.agent_id WHERE t.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?)
                       ) AS next`,
                 params: ['idle', Date.now() + MAX_IDLE_MS, Date.now() + MAX_IDLE_MS, Date.now() + MAX_IDLE_MS, Date.now() + MAX_IDLE_MS],
             })) as any[])[0];
@@ -465,10 +475,10 @@ async function workerPass(ctx: Context, inflight: Set<Promise<unknown>>): Promis
             // MAX_IDLE_MS sleep that accidentally serialises agents.
             const next = ((await ctx.fns.procs.db.select({
                 sql: `SELECT LEAST(
-                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL), ?),
-                        COALESCE((SELECT MIN(wake_at) FROM agents WHERE wake_at IS NOT NULL AND archived_at IS NULL), ?),
-                        COALESCE((SELECT MIN(next_check_at) FROM agent_watches WHERE status = 'active'), ?),
-                        COALESCE((SELECT MIN(next_at) FROM agent_triggers WHERE status = 'active'), ?)
+                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
+                        COALESCE((SELECT MIN(wake_at) FROM agents WHERE wake_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
+                        COALESCE((SELECT MIN(next_check_at) FROM agent_watches w JOIN agents a ON a.id=w.agent_id WHERE w.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?),
+                        COALESCE((SELECT MIN(next_at) FROM agent_triggers t JOIN agents a ON a.id=t.agent_id WHERE t.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?)
                       ) AS next`,
                 params: ['idle', Date.now() + MAX_IDLE_MS, Date.now() + MAX_IDLE_MS, Date.now() + MAX_IDLE_MS, Date.now() + MAX_IDLE_MS],
             })) as any[])[0];

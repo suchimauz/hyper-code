@@ -9,20 +9,22 @@ export default async function (
     session: Session | null,
     opts: {
         /** Agent cards from nav.agents. */
-        agents: Array<{ id: string; title?: string | null; model?: string; icon?: string | null; runState?: string; hasUnread?: boolean; createdBy?: string | null }>;
+        agents: Array<{ id: string; title?: string | null; model?: string; icon?: string | null; runState?: string; teamRunningCount?: number; hasUnread?: boolean; createdBy?: string | null }>;
     },
 ): Promise<types.nav.Item[]> {
     const users = opts.agents.some(a => a.createdBy) ? await ctx.fns.auth.listUsers({}).catch(() => [] as types.auth.User[]) : [];
     const me = (session as any)?.user?.id as string | undefined;
     const multi = users.length > 1 && !!me;
     const names = new Map(users.map((u: any) => [String(u.id), String(u.name ?? u.id)]));
+    const teamActivity = await ctx.fns.agent.teamActivity({});
     return opts.agents.map(agent => ({
         id: `agent:${agent.id}`,
         label: String(agent.title || agent.id),
         href: `/agent/${encodeURIComponent(agent.id)}`,
         model: String(agent.model ?? "?"),
         ...(agent.icon ? { avatar: agent.icon } : {}),
-        active: !!agent.runState && agent.runState !== "idle",
+        active: (!!agent.runState && agent.runState !== "idle") || (teamActivity[agent.id]??agent.teamRunningCount??0)>0,
+        ...((teamActivity[agent.id]??agent.teamRunningCount??0)>0 ? {hint:String(teamActivity[agent.id]??agent.teamRunningCount)} : {}),
         unread: !!agent.hasUnread,
         ...(multi && agent.createdBy && agent.createdBy !== me ? { owner: names.get(agent.createdBy) ?? agent.createdBy } : {}),
         pin: `agent:${agent.id}`,

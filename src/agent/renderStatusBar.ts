@@ -1,6 +1,7 @@
 /** Render live agent status or composer controls. Busy and queued chats retain stop
  * alongside send so a nonempty draft can steer the agent without stopping its run.
  * Use part='stop' for the event-refreshed composer region; idle chats expose only send.
+ * Informational status also shows running descendants without enabling parent Stop controls.
  * @param opts.agentId Target agent identifier.
  * @param opts.initialUsage Initial token usage shown in the status bar.
  */
@@ -15,6 +16,7 @@ initialUsage?: any;
     const part = opts.part ?? 'status';
     let usage = initialUsage;
     const now = Date.now();
+    const teamRunningCount = part === 'status' ? Number((await ctx.fns.agent.teamActivity({}))[agentId] ?? 0) : 0;
     const row = ((await ctx.fns.procs.db.select({
         sql: 'SELECT run_state, run_started_at, next_run_at, last_processed_msg_idx, last_error, wake_at, scratchpad FROM agents WHERE id = ?',
         params: [agentId],
@@ -82,10 +84,14 @@ initialUsage?: any;
 
     const url = `/agent/${encodeURIComponent(agentId)}/statusbar`;
     const esc = (t: any) => ctx.fns.procs.ui.escape({ text: t });
-    const statusBadge = row?.last_error && row?.run_state !== 'running' && !parked
+    const ownStatusBadge = row?.last_error && row?.run_state !== 'running' && !parked
         ? `<span class="text-xs px-2 py-0.5 rounded border font-mono ${cls} max-w-[16rem] truncate inline-block align-bottom" title="${esc(String(row.last_error))} — send a message to retry">error: ${esc(String(row.last_error).slice(0, 48))}</span>`
         : row?.run_state === 'running' ? `<span class="inline-flex items-center ${cls}" title="${esc(title)}" data-agent-running>${label}</span>`
         : label ? `<span class="text-xs px-1.5 py-0.5 rounded ${borderCls} font-mono inline-flex items-center gap-1.5 ${cls}" title="${esc(title)}"${row?.run_state === 'running' ? ' data-agent-running' : ''}>${label}</span>` : '';
+    const teamBadge = teamRunningCount > 0
+        ? `<span class="inline-flex items-center gap-1 text-blue-500" data-team-running="${teamRunningCount}" role="status" aria-label="Работают сабагенты: ${teamRunningCount}" title="Работают сабагенты: ${teamRunningCount}"><i class="ph ph-users-three" aria-hidden="true"></i><svg class="chat-run-ring chat-run-ring--live" style="display:block;flex-shrink:0" width="24" height="24" viewBox="0 0 28 28" aria-hidden="true"><g class="chat-run-dots" data-spin-sync>${Array.from({ length: 8 }, (_, i) => { const a = i * Math.PI / 4; return `<circle cx="${(14 + 11 * Math.sin(a)).toFixed(2)}" cy="${(14 - 11 * Math.cos(a)).toFixed(2)}" r="1.25" fill="currentColor" opacity="${(0.2 + i * 0.1).toFixed(1)}"/>`; }).join('')}</g><text x="14" y="14" dy=".35em" text-anchor="middle" font-size="${teamRunningCount > 9 ? 9 : 11}" font-weight="600" fill="currentColor" font-family="ui-sans-serif,system-ui">${teamRunningCount}</text></svg></span>`
+        : '';
+    const statusBadge = ownStatusBadge + teamBadge;
     // Stop is rendered by this live fragment so it appears and disappears with
     // the run, but CSS anchors it inside the composer instead of the top bar.
     const busy = row?.run_state === 'running' || !!row?.next_run_at;
@@ -94,21 +100,14 @@ initialUsage?: any;
         ? `<span data-composer-running-controls>${ctx.fns.procs.ui.button({ action: 'stop', entity: 'agent', id: agentId, post: `/agent/${encodeURIComponent(agentId)}/stop`, swap: 'none', title: 'stop this run', ariaLabel: 'Stop generation', tone: 'danger', class: 'size-8 rounded-full shadow-md', html: '<span class="block size-2.5 rounded-[2px] bg-current" aria-hidden="true"></span>' })}${sendBtn}</span>`
         : sendBtn;
     if (part === 'stop') return controls;
-    // The SSE stream is the real trigger (it dispatches hyper-tick on every
-    // agent event); the timer is only a safety net. A busy agent still refreshes
-    // often enough to keep its elapsed counter honest, but an idle one costs one
-    // request every half minute instead of one per second — three widgets each
-    // polling once a second was what made a burst of clicks queue behind the
-    // browser's six sockets.
-    // A live region: the shared stream tells it when its agent moved, and the
-    // interval is only a watchdog. A running agent keeps a short one so the
-    // elapsed counter stays honest; an idle one costs a request every half
-    // minute instead of one per second.
+    // Refresh parent status even without its own events: descendants can start
+    // or finish independently. Phase-synced animation survives fragment swaps.
     return ctx.fns.ui.live({
         id: "status-bar",
         url,
         topic: `agent:${agentId}`,
-        every: busy ? 5 : 30,
+        // Descendant transitions may occur while the parent has no own events.
+        every: 5,
         attrs: 'class="flex items-center gap-2"',
         html: statusBadge,
     });

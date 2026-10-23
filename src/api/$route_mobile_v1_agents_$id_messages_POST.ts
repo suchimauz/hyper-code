@@ -34,20 +34,33 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     if (text) content.push({ type: "text", text });
     content.push(...uploads.map(upload => upload.ref));
     const ts = Date.now();
+    const sendAt = ts + Math.min(30_000, Math.max(0, debounceMs));
+    const { appended, eventIdx } = await ctx.fns.procs.db.transaction({ fn: async () => {
+    // Serialize acceptance, plan resumption and enqueueing against Stop.
+    await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [id] });
+    await ctx.fns.session.mutateScratchpad({ id, mutate: (scratchpad: Record<string, any>, now: number) => {
+        const plan = scratchpad.plan;
+        if (!plan?.pausedAt) return;
+        plan.pausedAt = null;
+        plan.updatedAt = now;
+        const active = Array.isArray(plan.tasks) ? plan.tasks.find((task: any) => task.status === 'active') : null;
+        if (active && !active.activeSince) active.activeSince = now;
+    } });
     const appended = await ctx.fns.session.appendMessage({ id, message: { role: "user", content: uploads.length ? content : text }, ts });
     if (uploads.length) await ctx.fns.attachments.commitUploads({ agentId: id, messageIdx: appended.idx, uploads });
     const event: any = { type: "user", text, attachments: uploads.map(upload => upload.meta), messageIdx: appended.idx, ts };
     event.actor = await ctx.fns.auth.actorId({ agentId: id }) ?? undefined;
     event.html = await ctx.fns.agent.renderEventHtml({ event, agentId: id });
     const eventIdx = await ctx.fns.session.appendEvent({ id, event, ts });
+    await ctx.fns.procs.db.run({ sql: "UPDATE agents SET stopped_at=NULL, last_error=NULL, next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=?", params: [sendAt, ts, id] });
+    return { appended, eventIdx };
+    } }) as { appended: { idx: number }; eventIdx: { idx: number } };
     await ctx.fns.session.syncAgentState({ agent });
 
 
     // Keep goal observation off the critical response path and separate from
     // the main agent's execution state.
     if (text && agent.scratchpad?.goalTrackingEnabled === true && ctx.fns.agent.updateGoalSidecar) void ctx.fns.agent.updateGoalSidecar({ agent, messageIdx: appended.idx, userMessage: text }).catch(() => undefined);
-    const sendAt = Date.now() + Math.min(30_000, Math.max(0, debounceMs));
-    await ctx.fns.procs.db.run({ sql: "UPDATE agents SET next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=?", params: [sendAt, Date.now(), id] });
     ctx.fns.agent.wakeWorker({});
     return Response.json({ version: 1, ok: true, messageIdx: appended.idx, eventIdx: eventIdx.idx, sendAt, attachments: uploads.map(upload => upload.meta) }, { status: 202 });
 }

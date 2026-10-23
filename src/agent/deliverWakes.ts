@@ -1,49 +1,50 @@
-/** Deliver wakes for the runtime.  * @param opts.now Timestamp used as the current time.
- * @param opts.limit Maximum records to process.
-*/
+/**
+ * Deliver due legacy wake-ups only while the target agent is not stopped.
+ * Hold the agent row lock through wake consumption, transcript append and scheduling,
+ * so Stop cannot race delivery. Stopped agents retain their pending wake-up.
+ * @param opts.now Current epoch milliseconds. @default Date.now()
+ * @param opts.limit Maximum due agents to inspect. @default 10 @minimum 1 @maximum 20
+ */
 export default async function (ctx: Context, _session: Session | null, opts?: {
-        /** Now used by the operation. */
-now?: number;
-        /** Maximum number of results to return. */
-limit?: number }): Promise<{ delivered: string[] }> {
+    /** Current epoch milliseconds. @default Date.now() */
+    now?: number;
+    /** Maximum due agents to inspect. @default 10 @minimum 1 @maximum 20 */
+    limit?: number;
+}): Promise<{ delivered: string[] }> {
     const now = Math.floor(opts?.now ?? Date.now());
     const limit = Math.max(1, Math.min(20, opts?.limit ?? 10));
-    const rows = (await ctx.fns.procs.db.select({
-        sql: `WITH due AS (
-                SELECT id, wake_reason FROM agents
-                 WHERE wake_at IS NOT NULL AND wake_at <= ? AND archived_at IS NULL
-                 ORDER BY wake_at ASC LIMIT ? FOR UPDATE SKIP LOCKED
-              ), cleared AS (
-                UPDATE agents a
-                   SET wake_at = NULL, wake_reason = NULL,
-                       next_run_at = COALESCE(a.next_run_at, ?), updated_at = ?
-                  FROM due WHERE a.id = due.id
-                RETURNING a.id, due.wake_reason
-              ) SELECT * FROM cleared`,
-        params: [now, limit, now, now],
-    })) as any[];
+    const rows = await ctx.fns.procs.db.select({
+        sql: `SELECT id FROM agents WHERE wake_at IS NOT NULL AND wake_at <= ?
+              AND archived_at IS NULL AND stopped_at IS NULL ORDER BY wake_at ASC LIMIT ?`,
+        params: [now, limit],
+    }) as { id: string }[];
     const delivered: string[] = [];
-    for (const row of rows) {
-        const id = String(row.id);
-        const reason = String(row.wake_reason ?? "Scheduled wake-up");
-        // A parked agent wakes because its quota came back — the mark must go
-        // before it runs, or the UI would keep claiming it is waiting. resume
-        // is off: the wake itself already scheduled the run.
-        try { await ctx.fns.agent.unpark({ id, reason: "wake", resume: false }); }
-        catch (error: any) { console.error(`unpark on wake failed for ${id}:`, error?.message ?? error); }
-        const message = await ctx.fns.session.appendMessage({ id, message: {
-            role: "user",
-            content: `Wake-up: ${reason}`,
-            message_type: "wake_up",
-            excluded_from_cursor: true,
+    for (const candidate of rows) {
+        const id = String(candidate.id);
+        const didDeliver = await ctx.fns.procs.db.transaction({ fn: async () => {
+            const row = (await ctx.fns.procs.db.select({
+                sql: `SELECT id, wake_reason FROM agents WHERE id = ? AND wake_at IS NOT NULL
+                      AND wake_at <= ? AND archived_at IS NULL AND stopped_at IS NULL FOR UPDATE`,
+                params: [id, now],
+            }) as { id: string; wake_reason: string | null }[])[0];
+            if (!row) return false;
+            const reason = String(row.wake_reason ?? "Scheduled wake-up");
+            await ctx.fns.procs.db.run({
+                sql: `UPDATE agents SET wake_at = NULL, wake_reason = NULL,
+                      next_run_at = COALESCE(next_run_at, ?), updated_at = ? WHERE id = ?`,
+                params: [now, now, id],
+            });
+            // Preserve quota-parking behavior, but only under the stopped-agent guard.
+            await ctx.fns.agent.unpark({ id, reason: "wake", resume: false });
+            const message = await ctx.fns.session.appendMessage({ id, message: {
+                role: "user", content: `Wake-up: ${reason}`, message_type: "wake_up", excluded_from_cursor: true,
+            } });
+            await ctx.fns.session.appendEvent({ id, event: { type: "wake_up", reason, messageIdx: message.idx } });
+            return true;
         } });
-        await ctx.fns.session.appendEvent({ id, event: { type: "wake_up", reason, messageIdx: message.idx } });
-        const agent = (ctx.state as any).agent?.[id];
-        if (agent) {
-            agent.wakeAt = null;
-            agent.wakeReason = null;
-            await ctx.fns.session.syncAgentState({ agent });
-        }
+        if (!didDeliver) continue;
+        const agent = ctx.state.agent?.[id];
+        if (agent) await ctx.fns.session.syncAgentState({ agent });
         ctx.fns.events.refreshAgentMeta({ agentId: id, section: "wake", reason: "wake-delivered" });
         delivered.push(id);
     }

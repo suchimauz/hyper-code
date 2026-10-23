@@ -1,16 +1,38 @@
-import { describe, expect, test } from "bun:test";
-import { mkTestCtx } from "../_testCtx.entry";
+import { expect, test } from "bun:test";
+import injectScheduledPrompt from "./injectScheduledPrompt";
 
-describe("agent.injectScheduledPrompt", () => {
-    test("appends a real user message and schedules the agent", async () => {
-        const ctx: any = await mkTestCtx();
-        const agent = await ctx.fns.agent.start({ model: "mock:test" });
-        const result = await ctx.fns.agent.injectScheduledPrompt({ agentId: agent.id, text: "Review progress", scheduleId: "daily" });
-        expect(result.scheduled).toBe(true);
-        const messages = await ctx.fns.session.getMessages({ id: agent.id });
-        expect(messages.at(-1)).toMatchObject({ role: "user", content: "Review progress" });
-        expect(messages.at(-1).excluded_from_cursor).not.toBe(true);
-        const row = (await ctx.fns.procs.db.select({ sql: "SELECT next_run_at FROM agents WHERE id=?", params: [agent.id] }))[0] as any;
-        expect(Number(row.next_run_at)).toBeGreaterThan(0);
+function harness(stoppedAt: number | null) {
+    let locked = false;
+    const effects: string[] = [];
+    const ctx: any = { state: { agent: {} }, fns: {
+        procs: { db: {
+            transaction: async ({ fn }: any) => { locked = true; try { return await fn(); } finally { locked = false; } },
+            select: async ({ sql }: any) => {
+                expect(locked).toBe(true);
+                expect(sql).toContain("FOR UPDATE");
+                return [{ id: "agent", stopped_at: stoppedAt }];
+            },
+            run: async ({ sql }: any) => { expect(locked).toBe(true); expect(sql).not.toContain("stopped_at="); effects.push("schedule"); },
+        } },
+        session: { appendUserMessage: async ({ text }: any) => { expect(locked).toBe(true); expect(text).toBe("tick"); effects.push("append"); return { idx: 2 }; } },
+        events: { refreshAgentMeta: () => effects.push("refresh") },
+        agent: { wakeWorker: () => effects.push("wake") },
+    } };
+    return { ctx, effects };
+}
+
+test("scheduled prompt rechecks durable Stop under row lock without transcript writes", async () => {
+    const h = harness(0);
+    expect(await injectScheduledPrompt(h.ctx, null, { agentId: "agent", text: "tick" })).toEqual({
+        agentId: "agent", messageIdx: null, scheduled: false, reason: "stopped",
     });
+    expect(h.effects).toEqual([]);
+});
+
+test("scheduled prompt appends and schedules atomically for a non-stopped agent", async () => {
+    const h = harness(null);
+    expect(await injectScheduledPrompt(h.ctx, null, { agentId: "agent", text: "tick" })).toEqual({
+        agentId: "agent", messageIdx: 2, scheduled: true,
+    });
+    expect(h.effects).toEqual(["append", "schedule", "refresh", "wake"]);
 });

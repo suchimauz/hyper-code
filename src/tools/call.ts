@@ -73,12 +73,20 @@ export default async function (
     });
     callCtx = Object.create(callCtx);
     callCtx.toolRun = run;
+    const parentSignal: AbortSignal | undefined = (ctx as any).runSignal ?? opts.agent?.abortController?.signal;
+    const cancelWithRun = () => {
+        run.aborted = true;
+        run.controller.abort(parentSignal?.reason ?? 'run_stopped');
+    };
+    parentSignal?.addEventListener('abort', cancelWithRun, { once: true });
+    if (parentSignal?.aborted) cancelWithRun();
 
     // Declaration and implementation are separate files, so the fn is resolved
     // through ctx.fns by its dotted name — which also means a hot-reloaded
     // implementation is picked up without touching the declaration.
     const fn = String(tool.fn).split(".").reduce((node: any, seg: string) => node?.[seg], callCtx.fns);
     if (typeof fn !== "function") {
+        parentSignal?.removeEventListener('abort', cancelWithRun);
         ctx.fns.tools.endRun({ id: run.id });
         return { output: `Error: tool "${tool.wireName}" declares fn "${tool.fn}", but nothing is registered under that name`, isError: true };
     }
@@ -89,15 +97,22 @@ export default async function (
     let isError = false;
     const attrs: Record<string, any> = { "tool.name": tool.wireName, "agent.id": opts.agent?.id };
 
+    let rejectAbort: (() => void) | undefined;
     try {
         const telemetry: any = (callCtx.fns.procs as any).telemetry;
-        const invoke = () => Promise.race([
-            fn(args),
-            new Promise((_resolve, reject) => {
-                if (run.controller.signal.aborted) return reject(new Error("aborted by user"));
-                run.controller.signal.addEventListener("abort", () => reject(new Error("aborted by user")), { once: true });
-            }),
-        ]);
+        const invoke = () => {
+            run.controller.signal.throwIfAborted();
+            const cancelled = new Promise<never>((_resolve, reject) => {
+                rejectAbort = () => reject(new Error('aborted by user'));
+                run.controller.signal.addEventListener('abort', rejectAbort, { once: true });
+            });
+            // Invoke only after the precheck and listener registration. This is
+            // cooperative cancellation; arbitrary in-process eval is not killed.
+            return Promise.race([Promise.resolve().then(() => {
+                run.controller.signal.throwIfAborted();
+                return fn(args);
+            }), cancelled]);
+        };
         const r: any = await (typeof telemetry?.safeSpan === "function"
             ? telemetry.safeSpan({ name: "tool.execute", attrs, fn: invoke })
             : invoke());
@@ -132,6 +147,8 @@ export default async function (
         }
         isError = true;
     } finally {
+        parentSignal?.removeEventListener('abort', cancelWithRun);
+        if (rejectAbort) run.controller.signal.removeEventListener('abort', rejectAbort);
         // Unconditional: an indicator that outlives its work is the same lie
         // as no indicator at all, just more convincing.
         ctx.fns.tools.endRun({ id: run.id });

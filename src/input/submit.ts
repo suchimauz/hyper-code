@@ -8,6 +8,9 @@
  * Used by the POST /input/<id> route; callable directly to answer or withdraw an input
  * programmatically. Returns the new state and, on a validation failure, the message to show
  * under the still-open form. A second answer to the same input is a no-op.
+ * Human answers and cancellations resume durable and plan pauses atomically with
+ * transcript delivery and scheduling; an `agent:<id>` withdrawal preserves pauses.
+ * Trusted callers must supply actor accurately; missing actor retains human-answer behavior.
  * @param opts.id Input identifier.
  * @param opts.values Submitted form fields; a repeated name is an array.
  * @param opts.cancel Cancel instead of submitting.
@@ -78,11 +81,26 @@ async function deliver(ctx: Context, input: types.input.Row, state: string, summ
     const now = Date.now();
     const message: any = { role: "user", content, message_type: "input" };
     if (actor) message.author = actor;
-    await ctx.fns.session.appendMessage({ id: input.agentId, message, ts: now });
-    await ctx.fns.procs.db.run({
-        sql: "UPDATE agents SET next_run_at = GREATEST(COALESCE(next_run_at, 0), ?), updated_at = ? WHERE id = ? AND archived_at IS NULL",
-        params: [now, now, input.agentId],
-    });
+    await ctx.fns.procs.db.transaction({ fn: async () => {
+        await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [input.agentId] });
+        // Agent withdrawal is not a human instruction to resume work.
+        const human = !actor?.startsWith("agent:");
+        if (human) await ctx.fns.session.mutateScratchpad({ id: input.agentId, mutate: (scratchpad: Record<string, any>, ts: number) => {
+            const plan = scratchpad.plan;
+            if (!plan?.pausedAt) return;
+            plan.pausedAt = null;
+            plan.updatedAt = ts;
+            const active = Array.isArray(plan.tasks) ? plan.tasks.find((task: any) => task.status === 'active') : null;
+            if (active && !active.activeSince) active.activeSince = ts;
+        } });
+        await ctx.fns.session.appendMessage({ id: input.agentId, message, ts: now });
+        await ctx.fns.procs.db.run({
+            sql: human
+                ? "UPDATE agents SET stopped_at=NULL, last_error=NULL, next_run_at = GREATEST(COALESCE(next_run_at, 0), ?), updated_at = ? WHERE id = ? AND archived_at IS NULL"
+                : "UPDATE agents SET next_run_at = GREATEST(COALESCE(next_run_at, 0), ?), updated_at = ? WHERE id = ? AND archived_at IS NULL AND stopped_at IS NULL",
+            params: [now, now, input.agentId],
+        });
+    } });
     const live = (ctx.state as any).agent?.[input.agentId];
     if (live) await ctx.fns.session.syncAgentState({ agent: live });
     ctx.fns.procs.events.refresh({ topic: `agent:${input.agentId}`, reason: "input" });

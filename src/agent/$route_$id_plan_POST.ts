@@ -18,7 +18,18 @@ params: Record<string, string> }) {
             const instructions = form.getAll("task_instructions").map(String);
             if (ids.length !== titles.length || ids.length !== instructions.length) throw new Error("Invalid plan rows");
             const tasks = ids.map((taskId, index) => ({ id: taskId, title: titles[index]!, instructions: instructions[index] }));
+            await ctx.fns.procs.db.transaction({ fn: async () => {
+            await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [id] });
             const result = await ctx.fns.session.updatePlan({ agent, title: String(form.get("title") ?? ""), tasks });
+            await ctx.fns.session.mutateScratchpad({ id, mutate: (scratchpad: Record<string, any>, now: number) => {
+                const plan = scratchpad.plan;
+                if (!plan?.pausedAt) return;
+                plan.pausedAt = null;
+                plan.updatedAt = now;
+                const active = Array.isArray(plan.tasks) ? plan.tasks.find((task: any) => task.status === 'active') : null;
+                if (active && !active.activeSince) active.activeSince = now;
+            } });
+            await ctx.fns.procs.db.run({ sql: "UPDATE agents SET stopped_at=NULL, last_error=NULL WHERE id=?", params: [id] });
             const active = result.plan?.tasks?.find((task: any) => task.status === "active");
             if (active) {
                 // Saving a plan is an instruction to work, not only metadata.
@@ -41,14 +52,15 @@ params: Record<string, string> }) {
                     instructions: active.instructions ?? "",
                     messageIdx: message.idx,
                 } });
-                await ctx.fns.session.syncAgentState({ agent });
                 const now = Date.now();
                 await ctx.fns.procs.db.run({
                     sql: "UPDATE agents SET next_run_at = COALESCE(next_run_at, ?), updated_at = ? WHERE id = ?",
                     params: [now, now, agent.id],
                 });
-                ctx.fns.agent.wakeWorker({});
             }
+            } });
+            await ctx.fns.session.syncAgentState({ agent });
+            ctx.fns.agent.wakeWorker({});
         } else {
             await ctx.fns.session.removePlan({ agent, archive: action !== "delete" });
         }

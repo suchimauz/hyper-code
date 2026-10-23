@@ -19,6 +19,7 @@ export default async function (
     const viewer = await ctx.fns.auth.viewerId({});
     // Match session.list: single-user instances retain the native legacy read watermarks.
     const legacyKv = (await ctx.fns.auth.listUsers({})).length <= 1;
+    const teamActivity = await ctx.fns.agent.teamActivity({});
     const rows = await ctx.fns.procs.db.select({sql:`SELECT a.workspace_dir AS dir, COALESCE(a.workspace_host,'') AS host,
       MAX(a.created_at) AS latest_created_at,
       SUM(CASE WHEN a.archived_at IS NULL AND a.run_state <> '' AND a.run_state <> 'idle' THEN 1 ELSE 0 END) AS running_count,
@@ -39,6 +40,17 @@ export default async function (
      if (archivedAt !== undefined && Number(row.latest_created_at) > archivedAt) project.archived=false;
      project.runningCount=(project.runningCount??0)+Number(row.running_count);
      project.unreadCount=(project.unreadCount??0)+Number(row.unread_count);
+    }
+    // Add idle roots with working descendants exactly once; own-running roots are already counted above.
+    const activeTeamIds=Object.keys(teamActivity).filter(id=>(teamActivity[id]??0)>0);
+    if(activeTeamIds.length){
+     const teamRoots=await ctx.fns.procs.db.select({sql:`SELECT id,workspace_dir AS dir,COALESCE(workspace_host,'') AS host FROM agents WHERE id IN (${activeTeamIds.map(()=>'?').join(',')}) AND visibility='nav' AND archived_at IS NULL AND (run_state IS NULL OR run_state IN ('','idle')) AND workspace_dir IS NOT NULL`,params:activeTeamIds});
+     for(const row of teamRoots){
+      if(!row.dir.startsWith('/')) continue;
+      const identity=await ctx.fns.projects.identity({dir:row.dir,host:row.host});
+      const project=result.get(identity.id);
+      if(project) project.runningCount=(project.runningCount??0)+1;
+     }
     }
     return [...result.values()].sort((a,b)=>a.title.localeCompare(b.title)||a.id.localeCompare(b.id));
 }

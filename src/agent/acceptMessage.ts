@@ -104,7 +104,7 @@ export default async function (
                     event.html = await ctx.fns.agent.renderEventHtml({ event, agentId: id });
                     const payload = await ctx.fns.session.scrubUnicode({ text: JSON.stringify(event) });
                     await ctx.fns.procs.db.run({ sql: `INSERT INTO events (agent_id, idx, type, payload, ts, actor) SELECT ?, COALESCE(MAX(idx), -1)+1, 'user', ?, ?, ? FROM events WHERE agent_id=?`, params: [id, payload, ts, actor, id] });
-                    await ctx.fns.procs.db.run({ sql: `UPDATE agents SET next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=?`, params: [sendAt, ts, id] });
+                    await ctx.fns.procs.db.run({ sql: `UPDATE agents SET stopped_at=NULL, last_error=NULL, next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=?`, params: [sendAt, ts, id] });
                     return { idx };
                 } }) as { idx: number; duplicate?: boolean };
                 break;

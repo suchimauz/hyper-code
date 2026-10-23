@@ -12,6 +12,8 @@
  * Use for direct turns or worker-claimed input. Successful prose and terminal HTML
  * responses asynchronously launch optional Knowledge extraction through the final
  * durable assistant index; failed, aborted and observer turns do not launch it.
+ * Refuses durably stopped agents, fences awaited work against Stop/replacement,
+ * and passes an immutable runSignal to cooperative tools. Cannot preempt arbitrary JS.
  * @param opts.agent Live agent whose transcript and turn state are updated.
  * @param opts.userText User input to append unless already persisted by ingestion.
  * @param opts.userMessageAlreadyAppended Skip appending input for worker-claimed messages. @default false
@@ -32,11 +34,32 @@ export default async function (
     const agentCtx: any = Object.create(ctx);
     agentCtx.session = ctx.fns.session.forAgent({ agent });
     ctx = agentCtx;
+    // Capture ownership before the first await; mutable currentJobId may belong
+    // to a replacement by the time startup or a tool finishes.
+    const runToken = agent.currentJobId ?? undefined;
     const ac = new AbortController();
+    const assertRunActive = async () => {
+        ac.signal.throwIfAborted();
+        if (agent.abortController !== ac || (runToken && agent.currentJobId !== runToken)) {
+            throw new DOMException('Run ownership lost', 'AbortError');
+        }
+        const rows = await ctx.fns.procs.db.select({
+            sql: 'SELECT stopped_at, run_state, run_token FROM agents WHERE id = ?', params: [agent.id],
+        }) as Array<{ stopped_at: number | null; run_state: string; run_token: string | null }>;
+        ac.signal.throwIfAborted();
+        if (agent.abortController !== ac || (runToken && agent.currentJobId !== runToken)
+            || rows[0]?.stopped_at != null
+            || (runToken && (rows[0]?.run_state !== 'running' || rows[0]?.run_token !== runToken))) {
+            throw new DOMException('Run stopped or ownership lost', 'AbortError');
+        }
+    };
+    // Downstream tools inherit the immutable run signal, not a replacement's controller.
+    agentCtx.runSignal = ac.signal;
     let discardTransient: (() => void) | undefined;
     agent.abortController = ac;
     agent.activeRunCount = (agent.activeRunCount ?? 0) + 1;
     try {
+    await assertRunActive();
     // One successful-turn hook shared by direct and worker runs. The cutoff is
     // the final durable assistant row, never the triggering user frontier or a
     // later MAX(idx) that could capture a concurrently arriving user message.
@@ -52,7 +75,9 @@ export default async function (
 
     if (!opts.userMessageAlreadyAppended) {
         await ctx.fns.session.appendUserMessage({ id: agent.id, text: userText });
+        await assertRunActive();
         await ctx.fns.session.syncAgentState({ agent });
+        await assertRunActive();
     }
 
     agent.scratchpad ??= {};
@@ -65,10 +90,13 @@ export default async function (
             const active = Array.isArray(plan.tasks) ? plan.tasks.find((task: any) => task.status === 'active') : null;
             if (active && !active.activeSince) active.activeSince = now;
         } });
+        await assertRunActive();
         agent.scratchpad = updated.scratchpad;
         ctx.fns.events.refreshAgentMeta({ agentId: agent.id, section: 'plan', reason: 'plan-resumed' });
     }
-    agent.scratchpad.activeStatusLine = await ctx.fns.agent.statusLineForTurn({ agent });
+    const activeStatusLine = await ctx.fns.agent.statusLineForTurn({ agent });
+    await assertRunActive();
+    agent.scratchpad.activeStatusLine = activeStatusLine;
     // The status line is persisted as a small cursor-excluded user row right
     // behind the message that started this run: the transcript then shows
     // exactly what the model saw, forks inherit it, and the provider prompt
@@ -84,7 +112,9 @@ export default async function (
                 excluded_from_cursor: true,
                 message_type: 'status_line',
             } });
+            await assertRunActive();
             await ctx.fns.session.syncAgentState({ agent });
+            await assertRunActive();
         }
     }
     // Volatile model-visible context (bound tab, retrieved functions, plugin
@@ -96,19 +126,15 @@ export default async function (
         ctx.fns.procs.log?.warn?.({ event: "agent.world-state.failed", msg: String(error?.message ?? error), agentId: agent.id });
         return null;
     });
+    await assertRunActive();
     let consumedUserIdx = -1;
     const MAX_TURNS = 300;
     let turns = 0;
     // One unsuccessful compaction per run: a failing summarizer must not become
     // another expensive loop. Successful compactions may recur as context grows.
     let compactionBlocked = false;
-    const runToken = agent.currentJobId ?? undefined;
     const compactAtBoundary = async () => {
-        ac.signal.throwIfAborted();
-        if (runToken) {
-            const owner = ((await ctx.fns.procs.db.select({ sql: 'SELECT run_state, run_token FROM agents WHERE id = ?', params: [agent.id] })) as any[])[0];
-            if (agent.currentJobId !== runToken || owner?.run_state !== 'running' || owner?.run_token !== runToken) throw new DOMException('Run ownership lost', 'AbortError');
-        }
+        await assertRunActive();
         let compacted;
         try {
             compacted = await ctx.fns.agent.autoCompactIfNeeded({ agent, runToken, signal: ac.signal, checkOnly: compactionBlocked });
@@ -116,26 +142,26 @@ export default async function (
             compactionBlocked = true;
             ctx.fns.procs.log?.warn?.({ event: 'agent.mid-turn-compaction.failed', msg: String(error), agentId: agent.id });
         }
+        await assertRunActive();
         if (compacted && ['failed', 'stale', 'not_needed', 'no_compactor', 'busy'].includes(compacted.status)) compactionBlocked = true;
         ac.signal.throwIfAborted();
         // No retryable provider error: finish this run with a durable explanation,
         // preserving the cursor and every completed tool effect exactly once.
         if (compactionBlocked || compacted?.status === 'compacted' || compacted?.status === 'already_compact') {
             const budget = await ctx.fns.agent.autoCompactIfNeeded({ agent, runToken, signal: ac.signal, checkOnly: true });
+            await assertRunActive();
             if (budget.contextWindow && budget.estimatedTokens >= budget.contextWindow * 0.9) {
                 const text = 'Paused before another model request: context is near the model limit and compaction could not reduce it. Compact the context or start a new chat before continuing.';
                 await ctx.fns.session.appendMessage({ id: agent.id, message: { role: 'assistant', content: text } });
+                await assertRunActive();
                 await ctx.fns.session.appendErrorEvent({ id: agent.id, error: text });
+                await assertRunActive();
                 if (runToken) await ctx.fns.agent.stopContextGuard({ agent, runToken });
                 else await ctx.fns.agent.stop({ agent, clearQueue: true });
                 return true;
             }
         }
-        ac.signal.throwIfAborted();
-        if (runToken) {
-            const owner = ((await ctx.fns.procs.db.select({ sql: 'SELECT run_state, run_token FROM agents WHERE id = ?', params: [agent.id] })) as any[])[0];
-            if (agent.currentJobId !== runToken || owner?.run_state !== 'running' || owner?.run_token !== runToken) throw new DOMException('Run ownership lost', 'AbortError');
-        }
+        await assertRunActive();
         return false;
     };
 
@@ -145,15 +171,18 @@ export default async function (
     const planAttempts: Record<string, number> = {};
     let totalPlanInjections = 0;
     while (true) {
-        ac.signal.throwIfAborted();
+        await assertRunActive();
         if (++turns > MAX_TURNS) {
             await ctx.fns.session.appendErrorEvent({ id: agent.id, error: `run hit the ${MAX_TURNS}-turn cap — closing; send a message to continue` });
+            await assertRunActive();
             await ctx.fns.session.appendMessage({ id: agent.id, message: {
                 role: 'user',
                 content: `This run exceeded ${MAX_TURNS} tool cycles and was closed. Summarize where you are; the user can send a message to continue.`,
                 excluded_from_cursor: true,
             } });
+            await assertRunActive();
             await ctx.fns.session.syncAgentState({ agent });
+            await assertRunActive();
         delete agent.scratchpad.activeStatusLine;
 
             return { text: '', usage: null, consumedUserIdx };
@@ -166,8 +195,10 @@ export default async function (
             sql: "SELECT COALESCE(MAX(idx), -1) AS i FROM messages WHERE agent_id = ? AND role = 'user' AND excluded_from_cursor = 0",
             params: [agent.id],
         })) as any[])[0];
+        await assertRunActive();
         consumedUserIdx = Math.max(consumedUserIdx, Number(seen?.i ?? -1));
         await ctx.fns.session.syncAgentState({ agent });
+        await assertRunActive();
         // Initial preflight is safe only when all persisted calls have results.
         if (turns === 1) {
             const answered = new Set(agent.messages.filter((m: any) => m.role === 'tool').map((m: any) => m.tool_call_id));
@@ -179,9 +210,11 @@ export default async function (
         // every token would hammer Postgres; the final assistant event remains
         // the durable source of truth. A monotonically increasing revision lets
         // pollers replace one transient bubble without creating duplicates.
+        await assertRunActive();
         const mobileStream = { text: "", revision: 0, startedAt: Date.now(), phase: 'streaming' };
         delete agent.scratchpad.streamHandoff;
         agent.scratchpad.mobileStream = mobileStream;
+        await assertRunActive();
         const sampling = new AbortController();
         agent.samplingAbortController = sampling;
         // Stream notifications address only the RAM fragment, not DB-backed regions.
@@ -190,7 +223,9 @@ export default async function (
         const clearStream = (handoff = false) => {
             clearTimeout(streamTimer);
             streamTimer = undefined;
-            if (agent.scratchpad.mobileStream === mobileStream) delete agent.scratchpad.mobileStream;
+            // A late stream/finally must not erase a replacement run's state.
+            if (agent.abortController !== ac || agent.scratchpad.mobileStream !== mobileStream) return;
+            delete agent.scratchpad.mobileStream;
             if (handoff) agent.scratchpad.streamHandoff = true;
             else { delete agent.scratchpad.streamHandoff; notifyStream(); }
         };
@@ -202,12 +237,12 @@ export default async function (
         let streamed: any;
         try {
             const onEvent = (event: any) => {
-                if (sampling.signal.aborted || event?.type !== 'text_delta' || typeof event.delta !== 'string') return;
+                if (ac.signal.aborted || agent.abortController !== ac || sampling.signal.aborted || event?.type !== 'text_delta' || typeof event.delta !== 'string') return;
                 mobileStream.text += event.delta;
                 mobileStream.revision++;
                 if (streamTimer === undefined) streamTimer = setTimeout(() => {
                     streamTimer = undefined;
-                    notifyStream();
+                    if (!ac.signal.aborted && agent.abortController === ac) notifyStream();
                 }, 350);
             };
             streamed = await ctx.fns.llm.stream({ agent, signal: sampling.signal, onEvent });
@@ -215,7 +250,7 @@ export default async function (
             // Failed partial prose is never a durable assistant response.
             clearStream();
             if (sampling.signal.aborted && sampling.signal.reason === "new_user_input" && !ac.signal.aborted) {
-                agent.samplingAbortController = null;
+                if (agent.samplingAbortController === sampling) agent.samplingAbortController = null;
                 ac.signal.removeEventListener("abort", onRunAbort);
                 // Nothing from the interrupted partial response is persisted.
                 // The next loop refreshes the durable transcript and includes
@@ -228,12 +263,14 @@ export default async function (
             ac.signal.removeEventListener("abort", onRunAbort);
             sampling.signal.removeEventListener("abort", abortStream);
         }
+        await assertRunActive();
         // Keep visible text until the durable tail replaces it in one swap.
         clearTimeout(streamTimer);
         streamTimer = undefined;
         mobileStream.phase = 'finalizing';
         const { text, usage, finishReason, toolCalls = [] } = streamed;
         await ctx.fns.session.recordContextUsage({ id: agent.id, usage });
+        await assertRunActive();
         const prose = String(text ?? '');
         delete agent.scratchpad.activeGoalFeedback;
 
@@ -244,6 +281,7 @@ export default async function (
         if (finishReason === 'length' && toolCalls.some((c: any) => c?.args?.__unparsed !== undefined)) {
             clearStream();
             await ctx.fns.session.appendErrorEvent({ id: agent.id, error: 'reply truncated at token limit — tool calls not executed' });
+            await assertRunActive();
             await ctx.fns.session.appendMessage({ id: agent.id, message: {
                 role: 'user',
                 content: 'Your reply hit the token limit and was cut off mid-call, so NOTHING was executed. '
@@ -251,7 +289,9 @@ export default async function (
                     + 'or produce big content with eval instead of passing it as an argument.',
                 excluded_from_cursor: true,
             } });
+            await assertRunActive();
             await ctx.fns.session.syncAgentState({ agent });
+            await assertRunActive();
             continue;
         }
 
@@ -267,10 +307,13 @@ export default async function (
             content: prose,
             tool_calls: toolCalls.length ? toolCalls : undefined,
         } });
+        await assertRunActive();
         await ctx.fns.session.syncAgentState({ agent });
+        await assertRunActive();
 
         if (prose.trim()) {
             const html = await ctx.fns.markdown.render({ source: prose, fileBaseDir: agent.workspaceDir || process.cwd() });
+            await assertRunActive();
             const activeStatus = String(agent.scratchpad?.activeStatusLine ?? "");
             const instructionIndicators = {
                 statusLine: activeStatus.split("\n").find((line: string) => line.startsWith("User status line: "))?.slice("User status line: ".length) || null,
@@ -281,7 +324,9 @@ export default async function (
             await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
                 text: prose, html, usage, messageIdx: append.idx, instructionIndicators,
             } });
+            await assertRunActive();
             await ctx.fns.session.syncAgentState({ agent });
+            await assertRunActive();
         }
         clearStream(!!prose.trim());
         discardTransient = undefined;
@@ -290,6 +335,7 @@ export default async function (
         if (toolCalls.length === 0) {
             if (goal?.enabled && goal?.statement) {
                 const check = await ctx.fns.agent.checkGoal({ agent, candidateAnswer: prose });
+                await assertRunActive();
                 const feedback = `${check.reason}\n${check.nextStep ?? ""}`.trim();
                 const maxIterations = Math.max(1, Math.min(10, Number(goal.maxIterations ?? 3)));
                 const withinBudget = goalIterations < maxIterations;
@@ -307,6 +353,7 @@ export default async function (
                     evidence: check.evidence,
                 } : check;
                 await ctx.fns.agent.recordGoalCheck({ agent, check: effectiveCheck });
+                await assertRunActive();
 
                 const displayIteration = canContinue ? goalIterations + 1 : Math.min(goalIterations, maxIterations);
                 const label = effectiveCheck.status === "achieved"
@@ -320,6 +367,7 @@ export default async function (
                     message_type: "goal_feedback",
                     excluded_from_cursor: true,
                 } });
+                await assertRunActive();
                 await ctx.fns.session.appendEvent({ id: agent.id, event: {
                     type: "goal_check",
                     status: effectiveCheck.status,
@@ -329,7 +377,9 @@ export default async function (
                     maxIterations,
                     messageIdx: feedbackRow.idx,
                 } });
+                await assertRunActive();
                 await ctx.fns.session.syncAgentState({ agent });
+                await assertRunActive();
 
                 if (canContinue) {
                     goalIterations++;
@@ -357,7 +407,9 @@ export default async function (
                     message_type: "plan_feedback",
                     excluded_from_cursor: true,
                 } });
+                await assertRunActive();
                 await ctx.fns.session.syncAgentState({ agent });
+                await assertRunActive();
                 continue;
             }
 
@@ -375,15 +427,18 @@ export default async function (
         // never speak again because its own history is malformed.
         const pending: Record<string, number> = {};
         for (const call of toolCalls) {
+            await assertRunActive();
             const row = await ctx.fns.session.appendMessage({ id: agent.id, message: {
                 role: 'tool',
                 content: `(${call.name} is running — interrupted before it reported back)`,
                 tool_call_id: call.id,
                 excluded_from_cursor: true,
             } });
+            await assertRunActive();
             pending[call.id] = row.idx;
         }
         await ctx.fns.session.syncAgentState({ agent });
+        await assertRunActive();
 
         // Calls in one reply are independent by construction — no protocol lets
         // a later call read an earlier one's result — so a failure does not
@@ -392,8 +447,11 @@ export default async function (
         // filled, preserving the provider's native tool-call transcript.
         let terminal: { type: 'html'; html: string; text: string } | undefined;
         for (const call of toolCalls) {
+            await assertRunActive();
             const r = await ctx.fns.tools.call({ name: call.name, args: call.args, agent });
+            await assertRunActive();
             const { content: output, result_ref } = await ctx.fns.agent.stashResult({ agent, output: r.output, kind: call.name });
+            await assertRunActive();
 
             // Events store data, never rendered markup. renderEventHtml builds
             // the current view on every read, so renderer improvements apply to
@@ -403,24 +461,28 @@ export default async function (
                 isError: r.isError,
                 messageIdx: append.idx,
             } });
-
+            await assertRunActive();
             await ctx.fns.session.updateMessageContent({
                 id: agent.id,
                 idx: pending[call.id]!,
                 content: r.content?.length ? [{ type: 'text', text: output }, ...r.content] : output,
                 result_ref,
             });
+            await assertRunActive();
             if (!r.isError && r.terminal?.type === 'html') terminal = r.terminal;
         }
         await ctx.fns.session.syncAgentState({ agent });
+        await assertRunActive();
 
         if (terminal) {
+            await assertRunActive();
             const text = terminal.text.trim() || 'HTML response';
             const html = ctx.fns.agent.sanitizeHtmlBody({ html: terminal.html });
             const final = await ctx.fns.session.appendMessage({ id: agent.id, message: {
                 role: 'assistant',
                 content: text,
             } });
+            await assertRunActive();
             const activeStatus = String(agent.scratchpad?.activeStatusLine ?? '');
             const instructionIndicators = {
                 statusLine: activeStatus.split('\n').find((line: string) => line.startsWith('User status line: '))?.slice('User status line: '.length) || null,
@@ -428,7 +490,9 @@ export default async function (
             await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
                 text, html, usage, messageIdx: final.idx, instructionIndicators,
             } });
+            await assertRunActive();
             await ctx.fns.session.syncAgentState({ agent });
+            await assertRunActive();
             delete agent.scratchpad.activeStatusLine;
             observeCompletedTurn(final.idx);
             return { text, html, usage, consumedUserIdx, terminal: true };

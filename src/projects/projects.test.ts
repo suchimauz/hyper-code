@@ -5,7 +5,7 @@ import {Database} from 'bun:sqlite';
 async function mkTestCtx() {
  const db=new Database(':memory:');
  db.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY,host TEXT,dir TEXT,title TEXT,created_at INTEGER,UNIQUE(host,dir));CREATE TABLE project_members(principal TEXT,project_id TEXT,title TEXT,archived_at INTEGER,PRIMARY KEY(principal,project_id));CREATE TABLE project_tabs(principal TEXT,project_id TEXT,tab_ids TEXT DEFAULT '[]',active_id TEXT,revision INTEGER DEFAULT 0,PRIMARY KEY(principal,project_id));CREATE TABLE agents(id TEXT,title TEXT,model TEXT,icon TEXT,run_state TEXT,workspace_dir TEXT,workspace_host TEXT,archived_at INTEGER,created_at INTEGER,visibility TEXT,last_notifiable_at INTEGER);CREATE TABLE user_agent_state(user_id TEXT,agent_id TEXT,seen_at INTEGER,PRIMARY KEY(user_id,agent_id));CREATE TABLE kv(key TEXT PRIMARY KEY,value TEXT);CREATE TABLE messages(agent_id TEXT,idx INTEGER,ts INTEGER);`);
- const registry:any={auth:{viewerId:async()=>null,listUsers:async()=>[]},projects:{},workspace:{},agent:{},settings:{modelDefault:async()=> 'mock:echo'},procs:{db:{
+ const registry:any={auth:{viewerId:async()=>null,listUsers:async()=>[]},projects:{},workspace:{},agent:{teamActivity:async()=>({})},settings:{modelDefault:async()=> 'mock:echo'},procs:{db:{
  select:async(_c:any,_s:any,o:any)=>db.query(o.sql.replaceAll('::jsonb','')).all(...o.params).map((r:any)=>r.tab_ids?{...r,tab_ids:JSON.parse(r.tab_ids)}:r),
  run:async(_c:any,_s:any,o:any)=>db.query(o.sql.replaceAll('::jsonb','')).run(...o.params),
  },events:{emit:()=>{}}}};
