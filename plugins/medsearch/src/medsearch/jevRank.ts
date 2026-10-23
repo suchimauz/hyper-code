@@ -18,6 +18,7 @@ export default async function (
         /** Maximum lexically preselected candidates scored by Jev in one request. @default 40 @minimum 5 @maximum 80 */ preselect?: number;
         /** Minimum Jev relevance probability retained. @default 0 */ minScore?: number;
         /** Jev request timeout in milliseconds. @default 8000 @minimum 500 @maximum 30000 */ timeoutMs?: number;
+        /** Extra attempts for transient failures; zero bounds a pilot to one request. @default 2 @minimum 0 @maximum 5 */ retries?: number;
     },
 ): Promise<types.medsearch.Paper[]> {
     const limit = Math.max(1, Math.min(opts.limit, 100));
@@ -50,7 +51,15 @@ export default async function (
             state: opts.query,
             questions,
             timeoutMs: Math.max(500, Math.min(opts.timeoutMs ?? 8000, 30000)),
+            ...(opts.retries === undefined ? {} : { retries: opts.retries }),
         });
+        // Missing scores are a provider failure, not evidence of irrelevance.
+        for (let index = 0; index < lexical.length; index++) {
+            const answer = out.answers[`p${index}`];
+            if (!answer || answer.type !== 'noul' || !Number.isFinite(answer.noul) || answer.noul < 0 || answer.noul > 1) {
+                throw new Error('Invalid Jev paper relevance scores');
+            }
+        }
         const minScore = Math.max(0, Math.min(opts.minScore ?? 0, 1));
         return lexical.map((paper, index) => {
             const answer = out.answers[`p${index}`];
