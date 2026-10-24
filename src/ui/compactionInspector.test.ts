@@ -38,8 +38,8 @@ test('numeric equivalence, validation and unchanged Enter guard', () => {
     expect(f.apply.disabled).toBe(true);
     expect(f.event('htmx:before:request').defaultPrevented).toBe(true);
     f.type('65.0'); expect(f.apply.parentElement.hidden).toBe(true);
-    for (const v of ['', '29', '96']) { f.type(v); expect(f.apply.disabled).toBe(true); }
-    for (const v of ['30', '95', '70.5']) { f.type(v); expect(f.apply.disabled).toBe(false); }
+    for (const v of ['', '14.9', '96']) { f.type(v); expect(f.apply.disabled).toBe(true); }
+    for (const v of ['15', '15.5', '29', '30', '95', '70.5']) { f.type(v); expect(f.apply.disabled).toBe(false); }
     f.w.happyDOM.abort();
 });
 test('busy requests defer live morph; successful Apply updates baseline without erasing newer edits', async () => {

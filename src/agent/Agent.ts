@@ -1,7 +1,7 @@
 export type Agent = {
     id: string;
     model: string;
-    /** Optional automatic compaction context-window percentage (30–95); null/undefined inherits the current global setting. */
+    /** Optional automatic compaction context-window percentage (15–95); null/undefined inherits the current global setting. */
     autoCompactWindowPercent?: number | null;
     title: string;
     /** Chat avatar: sanitized SVG markup set by chat.setIcon; null/undefined shows the model logo. */

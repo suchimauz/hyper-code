@@ -81,3 +81,16 @@ test('per-agent override follows global changes after reset and drives real trig
  expect((await autoCompact(f.ctx,null,opts)).threshold).toBe(100000);
  expect((await autoCompact(f.ctx,null,{...opts,thresholdTokens:120000})).threshold).toBe(120000);
 });
+
+test('window threshold supports 15 percent and fractional lower overrides without changing the default',async()=>{
+ for(const percent of [15,15.5,29]) {
+  const f=fixture();f.agent.autoCompactWindowPercent=percent;
+  const result=await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true});
+  expect(result.threshold).toBe(Math.floor(200000*percent/100));
+  f.agent.autoCompactWindowPercent=null;
+  f.ctx.fns.settings.getNumber=({key}:any)=>key==='autoCompactWindowPercent'?percent:700000;
+  expect((await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true})).threshold).toBe(Math.floor(200000*percent/100));
+ }
+ const f=fixture();f.agent.autoCompactWindowPercent=14.9;
+ expect((await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true})).threshold).toBe(30000);
+});

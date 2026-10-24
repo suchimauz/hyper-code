@@ -90,7 +90,7 @@
         if (!form) return;
         const input = form.elements.percent;
         const changed = input.value.trim() === '' || Number(input.value) !== Number(form.dataset.compactionSaved);
-        const valid = input.value.trim() !== '' && Number.isFinite(Number(input.value)) && Number(input.value) >= 30 && Number(input.value) <= 95;
+        const valid = input.value.trim() !== '' && Number.isFinite(Number(input.value)) && Number(input.value) >= 15 && Number(input.value) <= 95;
         const busy = compactionRequests.has(slot);
         const apply = form.querySelector('[data-compaction-apply]');
         apply.hidden = !changed;

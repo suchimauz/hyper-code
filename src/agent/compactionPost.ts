@@ -18,7 +18,7 @@ export default async function (
     const form = await opts.req.formData();
     const raw = form.get('percent');
     const reset = form.get('action') === 'inherit';
-    if (!reset && (typeof raw !== 'string' || !raw.trim())) return new Response('Enter a percentage from 30 to 95.', {status: 400});
+    if (!reset && (typeof raw !== 'string' || !raw.trim())) return new Response('Enter a percentage from 15 to 95.', {status: 400});
     try {
      await ctx.fns.agent.setCompaction({id: opts.id, percent: reset ? null : Number(raw)});
     } catch (error) { return new Response(error instanceof Error ? error.message : 'Invalid compaction settings', {status: 400}); }

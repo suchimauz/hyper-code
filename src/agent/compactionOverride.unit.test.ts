@@ -18,18 +18,18 @@ function fixture() {
 }
 test('setter validates finite bounds, updates only target, and reset persists null',async()=>{
  const f=fixture();
- for(const percent of [NaN,Infinity,-Infinity,29,96,'65',undefined]) await expect(setCompaction(f.ctx,null,{id:'fixture',percent} as any)).rejects.toThrow();
+ for(const percent of [NaN,Infinity,-Infinity,14.9,96,'65',undefined]) await expect(setCompaction(f.ctx,null,{id:'fixture',percent} as any)).rejects.toThrow();
  expect(f.updates).toHaveLength(0);
- for(const percent of [30,65.5,95,null]) {await setCompaction(f.ctx,null,{id:'fixture',percent});expect(f.live.autoCompactWindowPercent).toBe(percent);expect(f.updates.at(-1).params[0]).toBe(percent);expect(f.updates.at(-1).params[2]).toBe('fixture');expect(f.events.at(-1).section).toBe('compaction');}
+ for(const percent of [15,15.5,29,30,65.5,95,null]) {await setCompaction(f.ctx,null,{id:'fixture',percent});expect(f.live.autoCompactWindowPercent).toBe(percent);expect(f.updates.at(-1).params[0]).toBe(percent);expect(f.updates.at(-1).params[2]).toBe('fixture');expect(f.events.at(-1).section).toBe('compaction');}
 });
 test('POST rejects absent blank nonfinite and file values; reset needs no valid number',async()=>{
  const f=fixture();
- for(const raw of [null,'',' ','NaN','Infinity','29','96',new Blob(['65'])]) {const form=new FormData();if(raw!==null)form.set('percent',raw);expect((await post(f.ctx,null,{id:'fixture',req:new Request('http://local',{method:'POST',body:form})})).status).toBe(400);}
- for(const form of [new URLSearchParams({percent:'71.5'}),new URLSearchParams({action:'inherit',percent:'invalid'})]) expect((await post(f.ctx,null,{id:'fixture',req:new Request('http://local',{method:'POST',body:form})})).status).toBe(204);
+ for(const raw of [null,'',' ','NaN','Infinity','14.9','96',new Blob(['65'])]) {const form=new FormData();if(raw!==null)form.set('percent',raw);expect((await post(f.ctx,null,{id:'fixture',req:new Request('http://local',{method:'POST',body:form})})).status).toBe(400);}
+ for(const form of [...['15','15.5','29','71.5'].map(percent=>new URLSearchParams({percent})),new URLSearchParams({action:'inherit',percent:'invalid'})]) expect((await post(f.ctx,null,{id:'fixture',req:new Request('http://local',{method:'POST',body:form})})).status).toBe(204);
  expect(f.live.autoCompactWindowPercent).toBeNull();
 });
 test('save and load preserve explicit override and null inheritance',async()=>{
- for(const percent of [null,72.5]) {
+ for(const percent of [null,15,15.5,29,72.5]) {
  const f=fixture();f.live.autoCompactWindowPercent=percent;await save(f.ctx,null,{agent:f.live});
  const q=f.updates.find(x=>x.sql.includes('INSERT INTO agents'));expect(q.params[0]).toBe(percent);expect(q.sql).toContain('auto_compact_window_percent = excluded.auto_compact_window_percent');expect((q.sql.match(/\?/g)||[]).length).toBe(q.params.length);
  f.ctx.fns.procs.db.select=async()=>[{id:'fixture',auto_compact_window_percent:percent,tools:'[]',scratchpad:'{}'}];
@@ -39,7 +39,7 @@ test('save and load preserve explicit override and null inheritance',async()=>{
 });
 test('renderer labels dynamic inherited and explicit values and separate reset form',async()=>{
  const f=fixture();
- for(const globalCompactionPercent of [65,80]) {const html=section(f.ctx,null,{agent:f.live,section:'compaction',globalCompactionPercent});expect(html).toContain(`Following global setting: ${globalCompactionPercent}%`);expect(html).toContain('role="alert"');expect(html).toContain('min="30" max="95"');expect(html).toContain('global token limit');}
+ for(const globalCompactionPercent of [15,15.5,29,65,80]) {const html=section(f.ctx,null,{agent:f.live,section:'compaction',globalCompactionPercent});expect(html).toContain(`Following global setting: ${globalCompactionPercent}%`);expect(html).toContain('role="alert"');expect(html).toContain('min="15" max="95"');expect(html).toContain('global token limit');}
  f.live.autoCompactWindowPercent=75;
  const html=section(f.ctx,null,{agent:f.live,section:'compaction',globalCompactionPercent:80});expect(html).toContain('Agent override: 75%. Global setting: 80%.');expect(html).toContain('Follow global setting (80%)');expect(html).toContain('>Reset</button>');expect(html.match(/<form/g)).toHaveLength(2);
  f.ctx.fns.ui.agentMetaSection=(o:any)=>section(f.ctx,null,o);

@@ -54,7 +54,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
 
     if (opts.section === "compaction") {
         const inherited = agent.autoCompactWindowPercent == null;
-        const globalPercent = Math.max(30, Math.min(95, opts.globalCompactionPercent ?? 65));
+        const globalPercent = Math.max(15, Math.min(95, opts.globalCompactionPercent ?? 65));
         const effective = inherited ? globalPercent : agent.autoCompactWindowPercent!;
         // Stable identity preserves an in-progress draft across live redraws.
         const inputId = `compaction-percent-${agent.id}`;
@@ -63,8 +63,8 @@ export default function (ctx: Context, _session: Session | null, opts: {
           <p class="inspector-help" role="status">${inherited ? `Following global setting: ${esc(globalPercent)}%.` : `Agent override: ${esc(effective)}%. Global setting: ${esc(globalPercent)}%.`}</p>
           <div class="inspector-compaction-row inspector-surface-row"><form data-compaction-form data-compaction-saved="${esc(effective)}" hx-post="/agent/${id}/compaction" hx-swap="none" class="inspector-compaction-edit">
             <label for="${esc(inputId)}" class="block text-xs font-normal">Threshold (%)</label>
-            <input id="${esc(inputId)}" name="percent" type="number" min="30" max="95" step="any" required value="${esc(effective)}" aria-describedby="${esc(hintId)}" class="input input-bordered input-sm w-full text-xs" />
-            <details class="inspector-compaction-hint inspector-disclosure" data-inspector-disclosure="compaction-limits"><summary>Limits</summary><p id="${esc(hintId)}" class="inspector-help">30–95%. Automatic compaction may happen earlier at the global token limit. If the model's context window is unknown, only that token limit applies.</p></details>
+            <input id="${esc(inputId)}" name="percent" type="number" min="15" max="95" step="any" required value="${esc(effective)}" aria-describedby="${esc(hintId)}" class="input input-bordered input-sm w-full text-xs" />
+            <details class="inspector-compaction-hint inspector-disclosure" data-inspector-disclosure="compaction-limits"><summary>Limits</summary><p id="${esc(hintId)}" class="inspector-help">15–95%. Automatic compaction may happen earlier at the global token limit. If the model's context window is unknown, only that token limit applies.</p></details>
             <span data-compaction-apply hidden>${ctx.fns.procs.ui.button({ label: 'Apply', type: 'submit', size: 'xs', tone: 'default', action: 'apply-compaction', disabled: true })}</span>
           </form>
           ${!inherited && effective !== globalPercent ? `<form data-compaction-form data-compaction-reset="${esc(globalPercent)}" hx-post="/agent/${id}/compaction" hx-swap="none" class="inspector-compaction-reset">

@@ -55,7 +55,7 @@ export default async function (
     const configured = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactTokens", fallback: 700000 });
     const percent = agent.autoCompactWindowPercent ?? await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
     const window = (await ctx.fns.compaction.contextWindow({ model: agent.model }));
-    const byWindow = window ? Math.floor(window * Math.min(95, Math.max(30, Number(percent ?? 65))) / 100) : Infinity;
+    const byWindow = window ? Math.floor(window * Math.min(95, Math.max(15, Number(percent ?? 65))) / 100) : Infinity;
     const threshold = Math.max(10000, Number(opts.thresholdTokens ?? Math.min(Number(configured ?? 700000), byWindow)));
     if (!hasCompactor) return { status: 'no_compactor', estimatedTokens, threshold, contextWindow: window ?? undefined };
     if (opts.checkOnly) return { status: estimatedTokens < threshold ? 'below_threshold' : 'over_threshold', estimatedTokens, threshold, contextWindow: window ?? undefined };
