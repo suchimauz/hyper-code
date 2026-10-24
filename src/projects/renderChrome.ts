@@ -1,6 +1,6 @@
 /**
  * Render project navigation and restored chat tabs with shared Hyper buttons and theme tokens.
- * Includes a compact mobile project link and ordered open-chat chooser with each chat's selected model logo from the same personal tabs.
+ * Includes a compact mobile project link and ordered open-chat chooser with each chat's custom icon or model fallback from the same personal tabs.
  * Uses authorized summaries only; mobile counters include other project chats even outside personal open tabs, excluding the selected chat. Does not load transcripts or change persisted tab state.
  * @param opts.projects Visible projects with optional running and unread conversation counts.
  * @param opts.projectId Currently selected project identifier.
@@ -50,7 +50,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
         const c=chats.get(id)!;
         const running=isActive(c);
         const status=c.hasUnread?'<span class="project-mobile-unread project-unread-dot bg-success" role="img" aria-label="Непрочитанный ответ" title="Непрочитанный ответ"></span>':'';
-        const modelMark='<span class="project-mobile-model inline-flex shrink-0" title="'+esc(c.model||'Model')+'">'+ctx.fns.chat.icon({model:c.model,active:running,size:'sm'})+'</span>';
+        const modelMark='<span class="project-mobile-model inline-flex shrink-0" title="'+esc(c.model||'Model')+'">'+ctx.fns.chat.icon({icon:c.icon,model:c.model,active:running,size:'sm'})+'</span>';
         return nav('/agent/'+encodeURIComponent(id),modelMark+teamBadge(c)+status+'<span class="project-title">'+esc(c.title||id)+'</span>','project-mobile-chat'+(id===opts.activeId?' selected':''),activityTitle(c),id===opts.activeId);
     }).join(''):'<p class="project-mobile-empty text-muted">Нет открытых чатов</p>')+'</nav></details></div>':'';
     const tabs=opts.projectId?'<div class="project-tabs" data-project-id="'+esc(opts.projectId)+'" aria-label="Project chats"><div class="project-tab-list">'+openIds.map(id=>{

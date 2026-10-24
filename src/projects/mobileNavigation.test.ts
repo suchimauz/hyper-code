@@ -45,7 +45,7 @@ describe('compact project mobile navigation',()=>{
  });
 });
 
-test('mobile chat list shows the selected model even when the chat has its own avatar',async()=>{
+test('mobile chat list preserves its custom avatar and selected model tooltip',async()=>{
  const model='opencode:deepseek-v4.1-flash';
  const out=await render(ctx,null,{...base,chats:[{id:'a',title:'DeepSeek chat',model,icon:'<svg><path d="M0 0"/></svg>',runState:'running',hasUnread:true}],tabIds:['a']});
  const w=new Window();try{
@@ -53,7 +53,9 @@ test('mobile chat list shows the selected model even when the chat has its own a
   const row=w.document.querySelector('.project-mobile-chat')!;
   expect(row.querySelector('.project-mobile-model .chat-icon')).not.toBeNull();
   expect(row.querySelector('.project-mobile-model')?.getAttribute('title')).toBe(model);
-  expect(row.querySelector('.project-mobile-model')?.innerHTML).not.toContain('data:image/svg+xml,');
+  expect(decodeURIComponent(row.querySelector('.project-mobile-model img')!.getAttribute('src')!.split(',')[1])).toBe('<svg><path d="M0 0"/></svg>');
+  expect(row.querySelectorAll('.project-mobile-model .chat-icon')).toHaveLength(1);
+  expect(w.document.querySelector('.project-tab img')?.getAttribute('src')).toBe(row.querySelector('.project-mobile-model img')?.getAttribute('src'));
   expect(row.querySelector('.project-mobile-model .chat-icon-ring')).not.toBeNull();expect(row.querySelector('.project-mobile-running')).toBeNull();expect(row.querySelector('.project-mobile-unread')).not.toBeNull();
   expect(row.querySelector('.project-title')?.textContent).toBe('DeepSeek chat');
  }finally{await w.happyDOM.close();}

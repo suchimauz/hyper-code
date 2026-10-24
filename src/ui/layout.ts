@@ -674,10 +674,8 @@ export default async function (ctx: Context, session: Session | null, opts: {
   /* A normal flex header cannot float over messages or consume safe-area twice. */
   #chat-panel > header.glass-bar { position: relative; inset: auto; left: auto; right: auto; width: 100% !important; max-width: none !important; margin: 0 !important; height: auto; min-height: 3.5rem; flex-shrink: 0; padding-left: 3.5rem !important; padding-right: .5rem !important; border: 0; border-bottom: 1px solid var(--color-ui-border); border-radius: 0; background-color: var(--color-base-100) !important; background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
   #chat-panel > header [data-chat-part="icon"] { display: inline-flex !important; }
-  #chat-panel > header [data-chat-avatar] { display: none; }
-  #chat-panel > header [data-chat-model-mark] { display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); }
-  #chat-panel [data-chat-model-mark] > span { color: inherit; }
-  #chat-panel [data-chat-model-mark] svg { width: 1.125rem; height: 1.125rem; }
+  /* Keep the chat's assigned avatar (or its single model fallback) on phones too. */
+  #chat-panel > header [data-chat-avatar] { display: inline-flex; }
   #main:has(> #project-tabs-host .project-mobile-bar) #chat-panel > header.glass-bar { min-height: 2.75rem; padding-left: .5rem !important; }
   body:has(#main > #project-tabs-host .project-mobile-bar):has(#main > [data-page="agent"]) #mobile-nav-button { top: env(safe-area-inset-top); }
   #chat-panel > header > div:has([data-chat-part="name"]) { flex: 1; }
