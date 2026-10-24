@@ -40,7 +40,7 @@ export default async function (
     if(req.method==='GET'&&req.headers.get('hx-request')==='true'&&u.searchParams.has('q'))return new Response(await chatResults(u.searchParams.get('q')||''),{headers:{...headers,'content-type':'text/html; charset=utf-8'}});
     if(req.method==='GET'){
      const model=await ctx.fns.settings.modelDefault({});
-     const composer=await ctx.fns.ui.chatComposer({action:u.pathname+'?presentation=sidebar'});
+     const composer=await ctx.fns.ui.chatComposer({action:u.pathname+'?presentation=sidebar',model});
      const picker='<div class="border-b border-ui-border py-2"><input type="search" name="q" placeholder="Search chats…" autocomplete="off" hx-get="'+Bun.escapeHTML(u.pathname+'?presentation=sidebar')+'" hx-trigger="input changed delay:200ms, search" hx-target="#chat-results" hx-swap="innerHTML" class="mx-3 mb-1 w-[calc(100%-1.5rem)] rounded border border-ui-border bg-base-100 px-3 py-2"><div id="chat-results">'+await chatResults('')+'</div></div>';
      const main='<div data-page="agent" class="flex min-h-0 min-w-0 flex-1 bg-base-200"><section id="chat-panel" class="flex min-w-0 flex-1 flex-col"><header class="p-3 border-b border-ui-border"><h1>'+Bun.escapeHTML(b.title)+'</h1><div class="text-xs text-subtle">'+Bun.escapeHTML(model)+'</div></header>'+picker+'<div id="messages" class="dot-grid-surface chat-dot-grid flex-1 overflow-y-auto px-3 py-3 space-y-2"></div>'+composer+'</section></div>';
      return new Response(await ctx.fns.ui.layout({title:b.title,main}),{headers:{...headers,'content-type':'text/html; charset=utf-8'}});

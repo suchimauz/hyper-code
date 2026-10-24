@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import layout from './layout';
 import composer from './chatComposer';
+import modelLogo from './modelLogo';
 import rows from '../nav/rows';
 import header from '../chat/header';
 import chatIcon from '../chat/icon';
@@ -19,7 +20,7 @@ const context = {
             button: () => '',
         } },
         ui: {
-            modelLogo: () => '<svg data-test-model-logo></svg>',
+            modelLogo: (opts: Parameters<typeof modelLogo>[2]) => modelLogo(context, null, opts),
             faviconUrl: async () => '/favicon.ico', navMenu: () => '',
             popup: ({ html, attrs }: { html: string; attrs: string }) => `<button ${attrs}>${html}</button>`,
             inplacePopup: async () => '<button aria-label="Chat panel">More</button>',
@@ -32,7 +33,7 @@ const context = {
 async function fixture(width: number, touchPoints: number, controlsHtml = '<button type="submit" data-composer-send>Send</button>', icon?: string) {
     const window = new Window({ width, height: 844, settings: { enableJavaScriptEvaluation: false } });
     Object.defineProperty(window.navigator, 'maxTouchPoints', { value: touchPoints });
-    const compose = await composer(context, null, { action: '/agent/demo', controlsHtml, toolsHtml: '<button data-chat-part="model">Model</button><button data-chat-part="effort">High</button>', metersHtml: '<button data-context-meter><span data-context-total>95k/100k</span><span class="chat-ring"></span></button>' });
+    const compose = await composer(context, null, { action: '/agent/demo', model: 'anthropic:claude-sonnet-4', controlsHtml, toolsHtml: '<button data-chat-part="model">Model</button><button data-chat-part="effort">High</button>', metersHtml: '<button data-context-meter><span data-context-total>95k/100k</span><span class="chat-ring"></span></button>' });
     const chatHeader = await header(context, null, { context: { agent: { id: 'ab', title: 'A long chat title', model: 'test:echo', icon } } as any });
     const nav = await rows(context, null, { items: [{ id: 'agent:ab', href: '/agent/ab', label: 'Chat title', model: 'test:echo', avatar: icon, pin: 'agent:ab' }], pinned: new Set<string>() });
     const main = `<main id="main"><div id="project-tabs-host"><div class="project-mobile-bar"><a class="project-mobile-name"><span class="project-title">Hyper</span></a><details class="project-mobile-switcher"><summary>Чаты 3</summary><nav class="project-mobile-menu"><a class="project-mobile-chat">Current</a></nav></details></div><div class="project-tabs">Desktop project tabs</div></div><div data-page="agent"><section id="chat-panel">${chatHeader}<div id="messages" class="chat-dot-grid"><div class="assistant chat-glass"><div class="prose">Answer<div class="chat-table-block"><div class="chat-table-hint">Листайте вбок</div><div class="chat-table-scroll"><table><thead><tr><th>ID</th><th>Описание</th></tr></thead><tbody><tr><td>141811</td><td>Длинное описание задачи</td></tr></tbody></table></div></div></div></div><div class="chat-glass-primary"><span data-author="user" style="color:rgb(200,200,255)">Person</span>Question<span data-no-copy>10:30</span><span data-mention="user">@person</span></div></div>${compose}</section></div></main><div id="nav-overlay">${nav}</div>`;
@@ -331,10 +332,10 @@ for (const width of [320, 390, 430, 1280]) {
                 for (const selector of selectors) {
                     const root = f.window.document.querySelector(selector)!;
                     expect(root).not.toBeNull();
-                    const face = root.querySelector(icon ? 'img' : '[data-test-model-logo]')!;
+                    const face = root.querySelector(icon ? 'img' : '[aria-label="Model: test:echo"]')!;
                     expect(face).not.toBeNull();
                     if (icon) expect(decodeURIComponent(face.getAttribute('src')!.split(',')[1])).toBe(customIcon);
-                    expect(root.querySelectorAll('[data-test-model-logo]')).toHaveLength(icon ? 0 : 1);
+                    expect(root.querySelectorAll('[aria-label="Model: test:echo"]')).toHaveLength(icon ? 0 : 1);
                     for (let node: any = face; node && node !== f.window.document.body; node = node.parentElement) {
                         const style = f.window.getComputedStyle(node);
                         expect(style.display).not.toBe('none');
@@ -346,3 +347,28 @@ for (const width of [320, 390, 430, 1280]) {
         });
     }
 }
+
+for (const width of [320, 390, 430, 1280]) {
+    test(`composer settings uses current model, not custom chat avatar at ${width}px`, async () => {
+        const f = await fixture(width, width < 768 ? 5 : 0, undefined, customIcon);
+        try {
+            const toggle = f.window.document.querySelector('[data-composer-settings-toggle]')!;
+            expect(toggle.innerHTML).toBe(modelLogo(context, null, { model: 'anthropic:claude-sonnet-4', bare: true }));
+            expect(toggle.innerHTML).not.toContain('M0 0h20v20z');
+            expect(toggle.innerHTML).not.toContain('ph-sliders-horizontal');
+            expect(toggle.getAttribute('aria-controls')).toBe('composer-settings');
+            expect(toggle.getAttribute('aria-expanded')).toBe('false');
+            expect(f.css('[data-composer-settings-toggle]').display).toBe(width < 768 ? 'inline-flex' : 'none');
+        } finally { await f.window.happyDOM.close(); }
+    });
+}
+
+test('composer rerender follows a changed model and preserves the draft fallback', async () => {
+    const render = (model?: string) => composer(context, null, { action: '/agent/demo', model, toolsHtml: '<button>Model</button>' });
+    const anthropic = await render('anthropic:claude-sonnet-4');
+    const openai = await render('openai:gpt-4.1');
+    expect(anthropic).toContain(modelLogo(context, null, { model: 'anthropic:claude-sonnet-4', bare: true }));
+    expect(openai).toContain(modelLogo(context, null, { model: 'openai:gpt-4.1', bare: true }));
+    expect(openai).not.toContain('anthropic:claude-sonnet-4');
+    expect(await render()).toContain('ph-sliders-horizontal');
+});

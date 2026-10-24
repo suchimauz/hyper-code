@@ -6,6 +6,7 @@
  * Desktop keeps all controls inline in their original order. A controller-managed mobile return-to-latest
  * button floats above the composer without resizing the transcript or focusing the keyboard.
  * @param opts.action Same-origin submission path.
+ * @param opts.model Current model identifier for the mobile settings icon; omitted keeps the generic settings icon.
  * @param opts.controlsHtml Trusted existing agent stop/send controls; omitted uses a send button.
  * @param opts.statusHtml Trusted status-line popup markup; omitted for drafts.
  * @param opts.toolsHtml Trusted controls on the left of the toolbar under the text (model chip, plugin tools).
@@ -18,6 +19,8 @@ export default async function (
     opts: {
         /** Same-origin submission path. */
         action: string;
+        /** Current model identifier, never the chat avatar. Omitted keeps the generic settings icon. */
+        model?: string;
         /** Trusted existing agent stop/send controls; omitted uses a send button. */
         controlsHtml?: string;
         /** Trusted status-line popup markup; omitted for drafts. */
@@ -60,7 +63,7 @@ export default async function (
           class="block max-h-[40vh] min-h-10 w-full resize-none overflow-y-auto bg-transparent [field-sizing:content] border-0 px-2.5 py-2 font-sans text-sm leading-[22px] text-base-content placeholder:text-faint focus:outline-none"></textarea>
         <div data-composer-toolbar class="flex min-w-0 items-center gap-1">
           <button type="button" data-attach-button class="flex size-8 shrink-0 items-center justify-center rounded-full text-faint hover:bg-base-200 hover:text-primary" title="Attach files" aria-label="Attach files"><i class="ph ph-plus"></i></button>
-          ${opts.toolsHtml || opts.statusHtml ? '<button type="button" data-composer-settings-toggle class="hidden size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-base-200" aria-label="Параметры ответа" title="Модель, усилие и инструкции" aria-expanded="false" aria-controls="composer-settings"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i></button>' : ''}
+          ${opts.toolsHtml || opts.statusHtml ? `<button type="button" data-composer-settings-toggle class="hidden size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-base-200" aria-label="Параметры ответа" title="Модель, усилие и инструкции" aria-expanded="false" aria-controls="composer-settings">${opts.model ? ctx.fns.ui.modelLogo({ model: opts.model, bare: true }) : '<i class="ph ph-sliders-horizontal" aria-hidden="true"></i>'}</button>` : ''}
           <div id="composer-settings" data-composer-settings class="contents">
             <div data-chat-tools class="flex min-w-0 items-center gap-0.5">${opts.toolsHtml ?? ""}</div>
             <div data-chat-status class="flex shrink-0 items-center gap-0.5">${opts.statusHtml ?? ""}</div>

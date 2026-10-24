@@ -96,6 +96,7 @@ ${ctx.fns.ui.live({
 </div>
 ${await ctx.fns.ui.chatComposer({
   action: `/agent/${encodeURIComponent(id)}?debounceSeconds=0.1`,
+  model: agent.model,
   controlsHtml: stopControlRegion,
   // The prompt inject takes a line above the text only when it differs from the instance default;
   // otherwise it is a quiet icon among the meters.
