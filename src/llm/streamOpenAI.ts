@@ -1,6 +1,8 @@
 /** Stream OpenAI-compatible chat completions, accepting SSE or a gateway JSON completion and preserving reported model metadata. */
 /**
  * Stream an agent request through an OpenAI-compatible endpoint.
+ * OneAPI Qwen requests explicitly allow 8192 output tokens to avoid the observed
+ * 2048-token gateway default truncating tool arguments; other routes are unchanged.
  * @param opts.agent Agent associated with the operation.
  * @param opts.signal Abort signal for cancelling the request.
  * @param opts.onEvent Callback invoked for each normalized stream event.
@@ -49,6 +51,11 @@ export default async function (
         stream: true,
         stream_options: { include_usage: true },
     };
+    // This route otherwise defaults to 2048 output tokens, including reasoning.
+    // Keep the override provider/model-scoped: other APIs have different limits.
+    if ((ep.upstream ?? ep.provider) === "oneapi" && /^qwen/i.test(ep.modelId)) {
+        body.max_tokens = 8192;
+    }
     if ((ep.upstream ?? ep.provider) === "zai-coding" && /^glm-5\.3(?:-flashx?)?$/.test(ep.modelId)) {
         const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort ?? "auto" });
         body.thinking = { type: "enabled" };

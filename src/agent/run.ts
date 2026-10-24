@@ -1,7 +1,6 @@
 // The agent turn loop. Tools are invoked as the provider's NATIVE function
-// calls; there is no text protocol to parse, so there is no parse error to
-// repair — the provider validated the envelope and ctx.fns.tools.validate
-// validated the arguments before anything ran.
+// calls. Malformed argument JSON rejects the entire response before any tool
+// runs; valid argument objects then pass through ctx.fns.tools.validate.
 //
 // One loop, one registry: every call goes through ctx.fns.tools.call over the
 // $tool_ declarations, exactly like a call made by hand from the REPL.
@@ -165,6 +164,8 @@ export default async function (
         return false;
     };
 
+    const MAX_MALFORMED_RESPONSES = 3;
+    let consecutiveMalformedResponses = 0;
     let goalIterations = 0;
     let lastGoalFeedback = "";
     const goalDeadline = Date.now() + 5 * 60_000;
@@ -274,19 +275,37 @@ export default async function (
         const prose = String(text ?? '');
         delete agent.scratchpad.activeGoalFeedback;
 
-        // A reply cut off at the token limit can end mid-arguments: the JSON
-        // never closed, so the call arrives as {__unparsed}. Executing that is
-        // meaningless and the schema would complain about the wrong thing —
-        // NOTHING runs, and the model is told what actually happened.
-        if (finishReason === 'length' && toolCalls.some((c: any) => c?.args?.__unparsed !== undefined)) {
+        // Invalid JSON can arrive with any finish reason (including gateway
+        // truncation without "length"). Reject the WHOLE batch before persisting
+        // calls or executing tools, and bound retries locally to this run.
+        if (toolCalls.some((c: any) => c?.args?.__unparsed !== undefined)) {
             clearStream();
-            await ctx.fns.session.appendErrorEvent({ id: agent.id, error: 'reply truncated at token limit — tool calls not executed' });
+            consecutiveMalformedResponses++;
+            const knownLength = finishReason === 'length';
+            if (consecutiveMalformedResponses >= MAX_MALFORMED_RESPONSES) {
+                const error = `Stopped this turn after ${MAX_MALFORMED_RESPONSES} consecutive replies with malformed tool arguments. `
+                    + 'No tools from those replies were executed. Retry with smaller tool payloads; '
+                    + 'if this persists, check the model gateway or switch models.';
+                await ctx.fns.session.appendErrorEvent({ id: agent.id, error });
+                await assertRunActive();
+                await ctx.fns.session.appendMessage({ id: agent.id, message: { role: 'assistant', content: error } });
+                await assertRunActive();
+                await ctx.fns.session.syncAgentState({ agent });
+                await assertRunActive();
+                delete agent.scratchpad.activeStatusLine;
+                return { text: error, usage, consumedUserIdx };
+            }
+            await ctx.fns.session.appendErrorEvent({ id: agent.id, error: knownLength
+                ? 'reply truncated at token limit — tool calls not executed'
+                : 'reply contained malformed tool arguments — tool calls not executed' });
             await assertRunActive();
             await ctx.fns.session.appendMessage({ id: agent.id, message: {
                 role: 'user',
-                content: 'Your reply hit the token limit and was cut off mid-call, so NOTHING was executed. '
-                    + 'Re-issue the call with a smaller payload: split a large write into several calls, '
-                    + 'or produce big content with eval instead of passing it as an argument.',
+                content: (knownLength
+                    ? 'Your reply hit the token limit and was cut off mid-call, so NOTHING was executed. '
+                    : 'Your reply contained malformed tool argument JSON, so NOTHING in the batch was executed. The cause is unknown. ')
+                    + 'Re-issue the call with valid JSON and a smaller payload. '
+                    + 'Use small targeted edits rather than rewriting a large file; do not repeat the same oversized call.',
                 excluded_from_cursor: true,
             } });
             await assertRunActive();
@@ -294,6 +313,8 @@ export default async function (
             await assertRunActive();
             continue;
         }
+
+        consecutiveMalformedResponses = 0;
 
         // The assistant turn is ONE row, carrying both what it said and what it
         // called — that pairing is what the next request replays.

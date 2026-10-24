@@ -164,6 +164,78 @@ describe('transcript surgery keeps JSON pairs intact', () => {
         expect(msgs.some((m: any) => String(m.content).includes('cut off mid-call'))).toBe(true);
     });
 
+    test('non-length malformed arguments reject the whole mixed batch without claiming truncation', async () => {
+        const ctx: any = await mkTestCtx();
+        const agent = await mkAgent(ctx, []);
+        let ran = 0;
+        let sampled = 0;
+        ctx.fns.tools.call = async () => { ran++; return 'unexpected'; };
+        ctx.fns.llm.stream = async () => sampled++ === 0
+            ? { text: 'partial', usage: null, finishReason: 'tool_calls', toolCalls: [
+                { id: 'valid', name: 'read', args: { path: 'a.ts' } },
+                { id: 'invalid', name: 'read', args: { __unparsed: '{' } },
+            ] }
+            : { text: 'recovered', usage: null, finishReason: 'stop', toolCalls: [] };
+        await ctx.fns.agent.run({ agent, userText: 'go' });
+        const msgs = await ctx.fns.session.getMessages({ id: agent.id, includeExcluded: true });
+        expect(ran).toBe(0);
+        expect(sampled).toBe(2);
+        expect(msgs.some((m: any) => m.tool_calls?.length || m.role === 'tool')).toBe(false);
+        const feedback = msgs.find((m: any) => String(m.content).includes('malformed tool argument JSON'));
+        expect(feedback).toMatchObject({ role: 'user', excluded_from_cursor: true });
+        expect(feedback.content).not.toContain('token limit');
+        expect(msgs.some((m: any) => m.content === 'partial')).toBe(false);
+        expect(msgs.at(-1).content).toBe('recovered');
+    });
+
+    test('three consecutive malformed responses end only this turn with actionable feedback', async () => {
+        const ctx: any = await mkTestCtx();
+        const agent = await mkAgent(ctx, []);
+        const other = await mkAgent(ctx, []);
+        let sampled = 0;
+        let ran = 0;
+        let stopped = 0;
+        ctx.fns.agent.stop = async () => { stopped++; };
+        ctx.fns.tools.call = async () => { ran++; return 'unexpected'; };
+        ctx.fns.llm.stream = async () => {
+            sampled++;
+            return { text: '', usage: null, finishReason: sampled === 2 ? 'length' : 'stop',
+                toolCalls: [{ id: `bad${sampled}`, name: 'read', args: { __unparsed: '{' } }] };
+        };
+        const result = await ctx.fns.agent.run({ agent, userText: 'go' });
+        expect(sampled).toBe(3);
+        expect(ran).toBe(0);
+        expect(stopped).toBe(0);
+        expect(result.text).toContain('3 consecutive');
+        expect(result.text).toContain('check the model gateway');
+        const msgs = await ctx.fns.session.getMessages({ id: agent.id, includeExcluded: true });
+        expect(msgs.some((m: any) => m.tool_calls?.length || m.role === 'tool')).toBe(false);
+        expect(msgs.at(-1)).toMatchObject({ role: 'assistant', content: result.text });
+        expect(await ctx.fns.session.getMessages({ id: other.id })).toEqual([]);
+    });
+
+    test('a valid response resets the consecutive malformed response budget', async () => {
+        const ctx: any = await mkTestCtx();
+        const agent = await mkAgent(ctx, []);
+        let sampled = 0;
+        let ran = 0;
+        ctx.fns.files.read = async () => { ran++; return 'read'; };
+        ctx.fns.llm.stream = async () => {
+            sampled++;
+            if (sampled === 6) return { text: 'done', usage: null, finishReason: 'stop', toolCalls: [] };
+            return { text: '', usage: null, finishReason: 'tool_calls', toolCalls: [
+                { id: `call${sampled}`, name: 'read', args: sampled === 3 ? { path: 'a.ts' } : { __unparsed: '{' } },
+            ] };
+        };
+        const result = await ctx.fns.agent.run({ agent, userText: 'go' });
+        expect(sampled).toBe(6);
+        expect(ran).toBe(1);
+        expect(result.text).toBe('done');
+        const msgs = await ctx.fns.session.getMessages({ id: agent.id, includeExcluded: true });
+        expect(msgs.filter((m: any) => m.tool_calls?.length)).toHaveLength(1);
+        expect(msgs.filter((m: any) => m.role === 'tool')).toHaveLength(1);
+    });
+
     test('respondHtml stores the tool result, sanitizes HTML, publishes one final answer, and skips another LLM turn', async () => {
         const ctx: any = await mkTestCtx();
         const agent = await mkAgent(ctx, [

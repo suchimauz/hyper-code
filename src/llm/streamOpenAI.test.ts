@@ -135,3 +135,40 @@ test("Go OpenAI stream passes agent session and the resolved endpoint", async ()
     expect(request.url).toBe("https://go.invalid/chat");
     expect(JSON.parse(request.init.body).reasoning_effort).toBe("high");
 });
+
+test("only OneAPI Qwen receives an explicit tool-output budget", async () => {
+    for (const endpoint of [
+        { provider: "oneapi", modelId: "qwen3.8-flash-next", expected: 8192 },
+        { provider: "ssh", upstream: "oneapi", modelId: "qwen3.8-flash-next", expected: 8192 },
+        { provider: "oneapi", modelId: "other-model", expected: undefined },
+        { provider: "openrouter", modelId: "qwen3.8-flash-next", expected: undefined },
+    ]) {
+        let body: any;
+        const ctx: any = { fns: {
+            agent: { buildLlmRequest: async () => ({ system: "", messages: [] }), wireTools: () => [] },
+            llm: {
+                resolveEndpoint: async () => ({ ...endpoint, url: "https://mock.invalid", apiKey: null }),
+                toOpenAIMessages: () => [],
+                connectFetch: async (o: any) => { body = JSON.parse(o.init.body); return Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }); },
+            },
+        } };
+        await stream(ctx, null, { agent: { model: "test" } as any });
+        expect(body.max_tokens).toBe(endpoint.expected);
+    }
+});
+
+test("preserves truncated SSE arguments and finish reason without executing a tool", async () => {
+    const ctx: any = { fns: {
+        agent: { buildLlmRequest: async () => ({ system: "", messages: [] }), wireTools: () => [] },
+        llm: {
+            resolveEndpoint: async () => ({ provider: "oneapi", modelId: "qwen3.8-flash-next", url: "https://mock.invalid" }),
+            toOpenAIMessages: () => [],
+            parseSSE: (o: any) => parseSSE(ctx, null, o),
+            connectFetch: async () => new Response('data: ' + JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: "cut", function: { name: "write", arguments: '{"path":' } }] }, finish_reason: "length" }], usage: { completion_tokens: 2048 } }) + '\n\ndata: [DONE]\n\n'),
+        },
+    } };
+    const r = await stream(ctx, null, { agent: { model: "test" } as any });
+    expect(r.finishReason).toBe("length");
+    expect(r.toolCalls).toEqual([{ id: "cut", name: "write", args: { __unparsed: '{"path":' } }]);
+    expect(r.usage.completion_tokens).toBe(2048);
+});
