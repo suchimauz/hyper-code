@@ -1,5 +1,56 @@
 import { describe, expect, test } from "bun:test";
 import call from "./call";
+import resolveReasoningEffort from "./resolveReasoningEffort";
+
+for (const effort of [undefined, "high", "off", "xhigh", "auto"] as const) {
+    test(`SSH Codex reasoning ${effort ?? "omitted"} reaches the wire safely`, async () => {
+        const model = "ssh/sol:codex:gpt-6.1";
+        const requests: any[] = [], capabilityModels: string[] = [];
+        const ctx: any = { fns: { llm: {
+            resolveEndpoint: async () => ({ api: "responses", provider: "codex", modelId: "gpt-6.1", url: "https://codex.invalid/responses", apiKey: "fake", ssh: "sol" }),
+            resolveReasoningEffort: async (opts: any) => resolveReasoningEffort(ctx, null, opts),
+            reasoningCapabilities: async ({ model }: any) => {
+                capabilityModels.push(model);
+                return { supported: ["off", "low", "medium", "high"], defaultEffort: "medium", mode: "effort" };
+            },
+        }, sshAccount: { fetch: async (request: any) => {
+            requests.push(request);
+            return new Response('data: {"type":"response.completed","response":{"status":"completed","output_text":"ok"}}\n\ndata: [DONE]\n\n');
+        } } } };
+        const result = await call(ctx, null, { model, user: "hello", reasoningEffort: effort, max_tokens: 321, temperature: 0, noFallback: true });
+        expect(result.text).toBe("ok");
+        expect(result.model).toBe(model);
+        expect(requests).toHaveLength(1);
+        expect(requests[0].ssh).toBe("sol");
+        const body = JSON.parse(requests[0].init.body);
+        expect(body.reasoning).toEqual(effort === undefined ? undefined : { effort: effort === "off" ? "none" : effort === "auto" ? "medium" : "high", summary: "auto" });
+        expect(capabilityModels).toEqual(effort === undefined ? [] : [model]);
+        expect(body.max_output_tokens).toBeUndefined();
+        expect(body.temperature).toBeUndefined();
+        expect(body.tools).toBeUndefined();
+    });
+}
+
+for (const effort of [undefined, "high"] as const) {
+    test(`OpenCode Responses reasoning ${effort ?? "omitted"} stays catalog-owned`, async () => {
+        let request: any, reasoningOpts: any;
+        const ctx: any = { fns: { llm: {
+            resolveEndpoint: async () => ({ api: "responses", provider: "opencode", modelId: "go-model", url: "https://go.invalid", apiKey: "fake" }),
+            resolveReasoningEffort: async () => { throw new Error("must not use Codex resolver"); },
+            opencodeReasoningBody: async (opts: any) => { reasoningOpts = opts; return { reasoning: { effort: "low" } }; },
+            opencodeFetch: async ({ init }: any) => {
+                request = JSON.parse(init.body);
+                return new Response('data: {"type":"response.completed","response":{"status":"completed","output_text":"ok"}}\n\ndata: [DONE]\n\n');
+            },
+        } } };
+        await call(ctx, null, { model: "opencode:go-model", user: "hello", reasoningEffort: effort, max_tokens: 321, temperature: 0 });
+        expect(reasoningOpts).toEqual({ model: "opencode:go-model", modelId: "go-model", api: "responses", effort });
+        expect(request.reasoning).toEqual({ effort: "low" });
+        expect(request.max_output_tokens).toBe(321);
+        expect(request.temperature).toBe(0);
+    });
+}
+
 
 describe("llm.call", () => {
     test("uses the configured default model when model is omitted", async () => {

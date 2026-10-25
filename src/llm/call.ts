@@ -25,7 +25,7 @@ export default async function (
         max_tokens?: number;
         /** Groq GPT-OSS reasoning budget; use low for short completions so reasoning does not consume the whole output limit. Ignored by other providers. */
         groqReasoningEffort?: "low" | "medium" | "high";
-        /** OpenCode reasoning preference; emits only cached catalog-supported wire settings. @default auto */
+        /** Reasoning preference for Responses/Codex and OpenCode, resolved against model capabilities. Omit to preserve provider defaults; OpenCode uses cached catalog-supported settings. */
         reasoningEffort?: types.llm.ReasoningEffort;
         /** OpenRouter reasoning effort for models that require thinking; only sent to OpenRouter. */
         openrouterReasoningEffort?: "minimal" | "low" | "medium" | "high";
@@ -185,6 +185,10 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
         text: { verbosity: "low" },
     };
     if (endpoint.provider === "opencode") Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: opts.model, modelId: endpoint.modelId, api: "responses", effort: opts.reasoningEffort }));
+    else if (opts.reasoningEffort != null) {
+        const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: opts.model, effort: opts.reasoningEffort });
+        body.reasoning = { effort: reasoning.applied === "off" ? "none" : reasoning.applied, summary: "auto" };
+    }
     const format = responsesFormat(opts.response_format);
     if (format) body.text.format = format;
     if (endpoint.provider === "opencode") {
