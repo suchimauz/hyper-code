@@ -105,6 +105,22 @@ export default async function (
       const summaryMessage: any = result.message;
       const tokensAfter = estimate([summaryMessage, ...rootMessages.slice(tailStart)]);
       generation.compactor = compactor.provider;
+      if (parent.jevCompactionEnabled === true) {
+        generation.preservationReview = await ctx.fns.agent.reviewCompaction({
+          agent: parent,
+          messages: effective.slice(0, Math.max(0, effective.length - (rootMessages.length - tailStart))),
+          retained: rootMessages.slice(tailStart),
+          summary,
+          messageType: summaryMessage.message_type,
+          signal: opts.signal,
+        });
+        // Review is advisory on transport failure, but never bypasses run ownership.
+        opts.signal?.throwIfAborted();
+        if (!ownsRun()) throw new Error("compaction run ownership lost");
+        if (generation.preservationReview.verdict === "loss_detected") {
+          throw new Error("Compaction preservation check detected an omission in limited text excerpts; previous active context kept. No repair loop.");
+        }
+      }
       await ctx.fns.session.appendMessage({ id: child.id, message: summaryMessage });
       const currentCount = (await ctx.fns.session.getMessages({ id: parent.id })).length;
       const currentRow = ((await ctx.fns.procs.db.select({ sql: "SELECT updated_at, run_state, run_token, sleep_context, last_error FROM agents WHERE id = ?", params: [parent.id] })) as any[])[0];

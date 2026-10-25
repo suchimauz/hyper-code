@@ -9,6 +9,46 @@ async function seeded(ctx: any) {
 }
 
 describe("agent.compactContext", () => {
+  test("preservation loss keeps prior active context and fails the draft without retry", async () => {
+    const ctx = await mkTestCtx();
+    const agent = await seeded(ctx);
+    ctx.state.registry.llm.call = () => ({text:'summary',finishReason:'stop',usage:{},raw:{}});
+    await ctx.fns.agent.compactContext({agent});
+    const previous = agent.sleepContext.activeRevision;
+    for (let i=0;i<8;i++) await ctx.fns.session.appendMessage({id:agent.id,message:{role:i%2?'assistant':'user',content:'new '+ 'z'.repeat(16000)}});
+    await ctx.fns.session.syncAgentState({agent});
+    agent.jevCompactionEnabled = true;
+    let calls=0;
+    ctx.state.registry.agent.reviewCompaction = () => {calls++;return {verdict:'loss_detected',scope:'limited',reason:'limited_excerpt_check',sourceChars:10,summaryChars:7};};
+    await expect(ctx.fns.agent.compactContext({agent})).rejects.toThrow('previous active context kept');
+    expect(calls).toBe(1);
+    expect(agent.sleepContext.activeRevision).toBe(previous);
+    expect(agent.sleepContext.draftRevision).toBeNull();
+    expect(agent.sleepContext.generations.at(-1).status).toBe('failed');
+    expect(agent.sleepContext.generations.at(-1).preservationReview.verdict).toBe('loss_detected');
+  });
+  test("review unavailability fails open but concurrent root change still prevents activation", async () => {
+    const ctx = await mkTestCtx();
+    const agent = await seeded(ctx);
+    agent.jevCompactionEnabled = true;
+    ctx.state.registry.llm.call = () => ({text:'summary',finishReason:'stop',usage:{},raw:{}});
+    ctx.state.registry.agent.reviewCompaction = async () => {
+      await ctx.fns.session.appendMessage({id:agent.id,message:{role:'user',content:'concurrent review input'}});
+      return {verdict:'unavailable',scope:'limited',reason:'review_failed_or_timed_out',sourceChars:10,summaryChars:7};
+    };
+    expect((await ctx.fns.agent.compactContext({agent})).status).toBe('stale');
+    expect(agent.sleepContext.activeRevision).toBeNull();
+  });
+  test("disabled skips review; enabled unavailable review still activates", async () => {
+    for (const enabled of [false,true]) {
+      const ctx=await mkTestCtx(); const agent=await seeded(ctx); agent.jevCompactionEnabled=enabled;
+      let calls=0;
+      ctx.state.registry.agent.reviewCompaction=()=>{calls++;return {verdict:'unavailable',scope:'limited',reason:'review_failed_or_timed_out',sourceChars:0,summaryChars:0};};
+      ctx.state.registry.llm.call=()=>({text:'summary',finishReason:'stop',usage:{},raw:{}});
+      expect((await ctx.fns.agent.compactContext({agent})).status).toBe('compacted');
+      expect(calls).toBe(enabled?1:0);
+    }
+  });
   test("activates summary plus verbatim tail without changing root", async () => {
     const ctx = await mkTestCtx();
     const agent = await seeded(ctx);

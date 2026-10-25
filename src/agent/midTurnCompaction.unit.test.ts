@@ -33,12 +33,36 @@ test('reservation fingerprints changes before acquiring draft lock',async()=>{co
 test('successful and failed compaction both attempt durable drain after release',async()=>{for(const fail of [false,true]){const f=fixture();let drains=0;f.ctx.fns.session.deliverInbound=async()=>{drains++;expect(f.row.sleep_context.draftRevision).toBeNull();};if(fail)f.setSummary(async()=>{throw new Error('provider failure');});if(fail)await expect(f.call()).rejects.toThrow('provider failure');else expect((await f.call()).status).toBe('compacted');expect(drains).toBe(1);}});
 test('idle compaction does not activate after explicit manual stop',async()=>{const f=fixture();f.agent.activeRunCount=0;f.row.run_state='idle';f.row.run_token=null;f.setSummary(async()=>{f.row.last_error='stopped by user';return {summary:'summary',message:{role:'user',content:'summary'}};});expect((await compact(f.ctx,null,{agent:f.agent})).status).toBe('stale');});
 
+test('Jev loss rejection preserves active context and records aggregate review', async () => {
+ const f=fixture(); f.agent.jevCompactionEnabled=true; const before=structuredClone(f.root);
+ f.ctx.fns.agent.reviewCompaction=async()=>({verdict:'loss_detected',scope:'limited',reason:'limited_excerpt_check',sourceChars:100,summaryChars:7});
+ await expect(f.call()).rejects.toThrow('preservation check detected');
+ expect(f.root).toEqual(before); expect(f.row.sleep_context.activeRevision).toBeNull(); expect(f.row.sleep_context.draftRevision).toBeNull();
+ expect(f.row.sleep_context.generations.at(-1).preservationReview.verdict).toBe('loss_detected');
+});
+for(const verdict of ['preserved','unavailable','skipped']) test(`Jev ${verdict} keeps ordinary activation guards`,async()=>{
+ const f=fixture(); f.agent.jevCompactionEnabled=true;
+ f.ctx.fns.agent.reviewCompaction=async()=>({verdict,scope:'limited',reason:'test',sourceChars:0,summaryChars:7});
+ expect((await f.call()).status).toBe('compacted');
+ expect(f.row.sleep_context.generations.at(-1).preservationReview.verdict).toBe(verdict);
+});
+test('cancellation during Jev review cannot activate a summary',async()=>{
+ const f=fixture(); f.agent.jevCompactionEnabled=true;
+ f.ctx.fns.agent.reviewCompaction=async()=>{f.ac.abort();return {verdict:'unavailable',scope:'limited',reason:'cancelled'};};
+ await expect(f.call()).rejects.toThrow(); expect(f.row.sleep_context.activeRevision).toBeNull();
+});
+test('transcript changes during Jev review still invalidate activation',async()=>{
+ const f=fixture(); f.agent.jevCompactionEnabled=true;
+ f.ctx.fns.agent.reviewCompaction=async()=>{f.root[0]!.content='edited during review';return {verdict:'preserved',scope:'limited',reason:'test'};};
+ expect((await f.call()).status).toBe('stale'); expect(f.row.sleep_context.activeRevision).toBeNull();
+});
+
 function runFixture(over=false) {
  const messages:any[]=[];const usageSnapshots:any[]=[];let visibleReplies=0;let attempts=0,effects=0,streams=0,stops=0;
  const agent:any={id:'r',model:'test',messages,scratchpad:{}};
  const append=async({message}:any)=>{messages.push(message);return {idx:messages.length-1};};
  const ctx:any={fns:{
- procs:{db:{select:async()=>[{i:0}]},log:{warn:()=>{}}},
+ procs:{db:{select:async()=>[{i:0}]},log:{warn:()=>{}},events:{emit:()=>{}}},
  session:{recordContextUsage:async({usage}:any)=>{usageSnapshots.push(usage);},forAgent:()=>null,appendUserMessage:async({text}:any)=>append({message:{role:'user',content:text}}),appendMessage:append,syncAgentState:async()=>{},appendAssistantEvent:async()=>{visibleReplies++;},appendErrorEvent:async()=>{},appendToolCallEvent:async()=>{},updateMessageContent:async({idx,content}:any)=>{messages[idx].content=content;}},
  agent:{statusLineForTurn:async()=>'',stashResult:async({output}:any)=>({content:output}),autoCompactIfNeeded:async({checkOnly}:any)=>{if(!checkOnly)attempts++;expect(messages.filter(m=>m.role==='tool').every(m=>m.content==='done')).toBe(true);return {status:checkOnly?'over_threshold':'failed',estimatedTokens:over?195000:10000,contextWindow:200000};},stop:async()=>{stops++;agent.abortController.abort();}},
  markdown:{render:async({source}:any)=>source},tools:{call:async()=>{effects++;return {output:'done'};}},llm:{stream:async()=>{streams++;const usage={prompt_tokens:streams*1000,completion_tokens:100};return streams<=3?{text:'',usage,toolCalls:[{id:'c'+streams,name:'effect',args:{}}]}:{text:'finished',usage,toolCalls:[]};}}
