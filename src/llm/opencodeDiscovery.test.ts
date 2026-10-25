@@ -2,6 +2,7 @@ import {afterEach,describe,expect,test} from 'bun:test';
 import catalog from './opencodeCatalog';
 import models from './opencodeModels';
 import routes from './opencodeDocumentedRoutes';
+import opencodeFetch from './opencodeFetch';
 const originalFetch=globalThis.fetch;
 afterEach(()=>{globalThis.fetch=originalFetch;});
 function markdown(plan='go') {
@@ -12,7 +13,7 @@ function fixture() {
  const meta={models:{'chat-free':{tool_call:true,provider:{npm:'@ai-sdk/anthropic',api:'https://evil.test'},reasoning_options:[{type:'effort',values:['low','high','max']}],limit:{context:123,output:45}},gpt:{tool_call:true},claude:{tool_call:true},gemini:{tool_call:true}}};
  const calls:any[]=[];const auth={key:'test-key' as string|null,plan:'go'};
  globalThis.fetch=(async (url:any,init:any)=>{calls.push({url,init});return url==='https://models.dev/api.json'?Response.json({'opencode-go':meta,opencode:meta}):new Response(markdown(auth.plan));}) as any;
- const ctx={state:{},fns:{settings:{getString:async()=>auth.plan},secrets:{resolveSetting:async()=>auth.key},procs:{log:{warn:async()=>{}}},llm:{opencodeDocumentedRoutes:(opts:any)=>routes(ctx as any,null,opts),opencodeFetch:async(opts:any)=>{calls.push(opts);return Response.json({data:['chat-free','big-pickle','gpt','claude','gemini','missing','evil','unknown'].map(id=>({id}))});}}}} as any;
+ const ctx={state:{},fns:{settings:{getString:async({key}:any)=>key==='opencodeInstance'?'local':auth.plan},secrets:{resolveSetting:async()=>auth.key},procs:{log:{warn:async()=>{}}},llm:{opencodeDocumentedRoutes:(opts:any)=>routes(ctx as any,null,opts),opencodeFetch:async(opts:any)=>{if(opts.url.includes('/v2/docs/'))return opencodeFetch(ctx,null,opts);calls.push(opts);return Response.json({data:['chat-free','big-pickle','gpt','claude','gemini','missing','evil','unknown'].map(id=>({id}))});}}}} as any;
  ctx.fns.llm.opencodeCatalog=(opts:any)=>catalog(ctx,null,opts);
  return {ctx,calls,auth};
 }

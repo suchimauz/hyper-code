@@ -7,18 +7,31 @@
  * Retry response-header deadline failures up to three times after the initial
  * request, preserving the session and payload. Never retry caller cancellation,
  * HTTP failures, or errors after response streaming has started.
- * @param opts.url Exact allowed inference, catalogue, Go usage or read-only member-budget URL.
+ * @param opts.url Exact allowed inference, catalogue, public Console documentation, Go usage or read-only member-budget URL.
  * @param opts.init HTTP method, JSON payload and cancellation signal.
  * @param opts.sessionId Stable conversation identifier; forwarded as x-opencode-session. Omit for a standalone request.
  */
 export default async function (ctx: Context, session: Session | null, opts: {
-    /** Exact allowed inference, catalogue, Go usage or read-only member-budget URL. */
+    /** Exact allowed inference, catalogue, public Console documentation, Go usage or read-only member-budget URL. */
     url: string;
     /** HTTP method, JSON payload and cancellation signal. */
     init: RequestInit;
     /** Stable conversation identifier; omit for a standalone request. */
     sessionId?: string;
 }): Promise<Response> {
+    // Public documentation uses the selected network route, never account credentials.
+    // Match the literal URL before parsing so normalization cannot widen this allowlist.
+    if (['https://opencode.ai/v2/docs/console/go','https://opencode.ai/v2/docs/console/models'].includes(opts.url)) {
+        if ((opts.init.method ?? 'GET') !== 'GET' || opts.init.body != null) throw new Error('OpenCode documentation requires GET without body');
+        const instance = (await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodeInstance'}))?.trim();
+        const headers = {Accept:'text/markdown'};
+        if (instance && instance !== 'local') {
+            const response = await ctx.fns.sshAccount.fetch({ssh:{instance,provider:'opencode',account:'default'},url:opts.url,init:{method:'GET',headers,signal:opts.init.signal ?? undefined}});
+            if (response.status >= 300 && response.status < 400) throw new Error('OpenCode documentation redirects are forbidden');
+            return response;
+        }
+        return await fetch(opts.url,{method:'GET',headers,redirect:'error',signal:opts.init.signal});
+    }
     const url = new URL(opts.url);
     const method = (opts.init.method ?? 'GET').toUpperCase();
     const plan = await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodePlan'}) === 'go' ? 'go' : 'payg';

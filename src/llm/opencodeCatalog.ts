@@ -30,7 +30,7 @@ export default async function (
     const pending = (async (): Promise<Catalog> => {
         const prefix = plan === 'go' ? 'https://opencode.ai/inference/go' : 'https://opencode.ai/inference';
         const [docsResponse, idsResponse, metadata] = await Promise.all([
-            fetch('https://opencode.ai/v2/docs/console/'+(plan === 'go' ? 'go' : 'models'),{headers:{Accept:'text/markdown'},redirect:'error',signal:AbortSignal.timeout(20000)}),
+            ctx.fns.llm.opencodeFetch({url:'https://opencode.ai/v2/docs/console/'+(plan === 'go' ? 'go' : 'models'),init:{method:'GET',signal:AbortSignal.timeout(20000)}}),
             key ? ctx.fns.llm.opencodeFetch({url:prefix+'/v1/models',init:{method:'GET',redirect:'error',signal:AbortSignal.timeout(20000)}}) : Promise.resolve(null),
             (async () => {
                 try {
