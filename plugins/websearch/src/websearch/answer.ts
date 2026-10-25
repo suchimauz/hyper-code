@@ -28,7 +28,8 @@ const normalize = (value: string): string => value.toLowerCase().replace(/[^\p{L
  * Use when an agent needs a grounded answer rather than a list of links: this searches the public web, reads the top
  * results as readable Markdown, asks one LLM for a short answer plus per-claim quotes, and then checks each quote
  * against the page text it was attributed to, marking it `verified`. Prefer websearch.search for link discovery only,
- * and websearch.fetch when the URL is already known.
+ * and websearch.fetch when the URL is already known. Reading source pages still requires the user's browser,
+ * even when search uses the browser-free OpenSERP backend.
  *
  * @param opts.question Natural-language question to answer from the public web.
  * @param opts.pages Number of top search results read as evidence. @default 3 @minimum 1 @maximum 8
@@ -46,7 +47,7 @@ export default async function (
         /** Number of top search results read as evidence. @default 3 @minimum 1 @maximum 8 */
         pages?: number;
         /** Search backend passed to websearch.search; when omitted, the `websearch.defaultEngine` setting applies. */
-        engine?: 'brave' | 'google-browser';
+        engine?: 'brave' | 'google-browser' | 'openserp';
         /** Provider-qualified model override; when omitted, uses `websearch.fetchModel`, then the global default model. */
         model?: string;
         /** Maximum readable Markdown characters kept per page. @default 12000 @minimum 1000 @maximum 50000 */

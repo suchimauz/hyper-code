@@ -6,6 +6,7 @@
     "configuration": {
       "settings": [
         "websearch.defaultEngine",
+        "websearch.openserpEndpoint",
         "websearch.fetchModel"
       ]
     },
@@ -13,6 +14,6 @@
     "label": "Web Search",
     "icon": "ph-magnifying-glass",
     "optional": true,
-    "description": "Search the public web through the Brave API or Google in the user’s browser."
+    "description": "Search the public web through the Brave API, Google in the user’s browser, or an optional operator-run OpenSERP service."
   }
 }
