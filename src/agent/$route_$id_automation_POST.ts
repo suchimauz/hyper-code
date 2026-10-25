@@ -15,6 +15,8 @@ params: Record<string, string> }) {
             functionRagEnabled: form.get('functionRagEnabled') === '1',
             jevRerankEnabled: form.get('jevRerankEnabled') === '1',
             functionRagGateEnabled: form.get('functionRagGateEnabled') === '1',
+            jevCompactionEnabled: form.has('jevCompactionPresent') || form.has('jevCompactionEnabled')
+                ? form.get('jevCompactionEnabled') === '1' : undefined,
             jevContextEnabled: form.has('jevContextPresent') || form.has('jevContextEnabled')
                 ? form.get('jevContextEnabled') === '1' : undefined,
             jevAgentRoutingEnabled: form.has('jevAgentRoutingPresent') || form.has('jevAgentRoutingEnabled')

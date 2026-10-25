@@ -22,8 +22,10 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     jevResultReviewEnabled?: boolean;
     /** Allow explicit advisory calls to share task text, proposed action and supplied metadata with the external configured Jev provider; no automatic actions. @default false */
     jevRiskReviewEnabled?: boolean;
-}): Promise<{ functionRagEnabled: boolean; functionRagGateEnabled: boolean; jevRerankEnabled: boolean; jevContextEnabled: boolean; jevAgentRoutingEnabled: boolean; jevModelRoutingEnabled: boolean; jevEvidenceEnabled: boolean; jevFileRankingEnabled: boolean; jevResultReviewEnabled: boolean; jevRiskReviewEnabled: boolean }> {
-    const row = (await ctx.fns.procs.db.select({ sql: 'SELECT function_rag_enabled, function_rag_gate_enabled, jev_rerank_enabled, jev_context_enabled, jev_agent_routing_enabled, jev_model_routing_enabled, jev_evidence_enabled, jev_file_ranking_enabled, jev_result_review_enabled, jev_risk_review_enabled FROM agents WHERE id = ? AND archived_at IS NULL', params: [opts.id] }))[0];
+    /** Opt in to automatic bounded summary-preservation checks during compaction, sending source excerpts and the summary to the external configured Jev provider. Independent advisory check, not a security guarantee. @default false */
+    jevCompactionEnabled?: boolean;
+}): Promise<{ functionRagEnabled: boolean; functionRagGateEnabled: boolean; jevRerankEnabled: boolean; jevContextEnabled: boolean; jevAgentRoutingEnabled: boolean; jevModelRoutingEnabled: boolean; jevEvidenceEnabled: boolean; jevFileRankingEnabled: boolean; jevResultReviewEnabled: boolean; jevRiskReviewEnabled: boolean; jevCompactionEnabled: boolean }> {
+    const row = (await ctx.fns.procs.db.select({ sql: 'SELECT function_rag_enabled, function_rag_gate_enabled, jev_rerank_enabled, jev_context_enabled, jev_agent_routing_enabled, jev_model_routing_enabled, jev_evidence_enabled, jev_file_ranking_enabled, jev_result_review_enabled, jev_risk_review_enabled, jev_compaction_enabled FROM agents WHERE id = ? AND archived_at IS NULL', params: [opts.id] }))[0];
     if (!row) throw new Error(`agent not found: ${opts.id}`);
     const enabled = (value: unknown) => value === true || value === 1 || value === 't';
     const flags = {
@@ -37,8 +39,9 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         jevFileRankingEnabled: opts.jevFileRankingEnabled ?? enabled(row.jev_file_ranking_enabled),
         jevResultReviewEnabled: opts.jevResultReviewEnabled ?? enabled(row.jev_result_review_enabled),
         jevRiskReviewEnabled: opts.jevRiskReviewEnabled ?? enabled(row.jev_risk_review_enabled),
+        jevCompactionEnabled: opts.jevCompactionEnabled ?? enabled(row.jev_compaction_enabled),
     };
-    await ctx.fns.procs.db.run({ sql: 'UPDATE agents SET function_rag_enabled = ?, function_rag_gate_enabled = ?, jev_rerank_enabled = ?, jev_context_enabled = ?, jev_agent_routing_enabled = ?, jev_model_routing_enabled = ?, jev_evidence_enabled = ?, jev_file_ranking_enabled = ?, jev_result_review_enabled = ?, jev_risk_review_enabled = ?, updated_at = ? WHERE id = ?', params: [flags.functionRagEnabled, flags.functionRagGateEnabled, flags.jevRerankEnabled, flags.jevContextEnabled, flags.jevAgentRoutingEnabled, flags.jevModelRoutingEnabled, flags.jevEvidenceEnabled, flags.jevFileRankingEnabled, flags.jevResultReviewEnabled, flags.jevRiskReviewEnabled, Date.now(), opts.id] });
+    await ctx.fns.procs.db.run({ sql: 'UPDATE agents SET function_rag_enabled = ?, function_rag_gate_enabled = ?, jev_rerank_enabled = ?, jev_context_enabled = ?, jev_agent_routing_enabled = ?, jev_model_routing_enabled = ?, jev_evidence_enabled = ?, jev_file_ranking_enabled = ?, jev_result_review_enabled = ?, jev_risk_review_enabled = ?, jev_compaction_enabled = ?, updated_at = ? WHERE id = ?', params: [flags.functionRagEnabled, flags.functionRagGateEnabled, flags.jevRerankEnabled, flags.jevContextEnabled, flags.jevAgentRoutingEnabled, flags.jevModelRoutingEnabled, flags.jevEvidenceEnabled, flags.jevFileRankingEnabled, flags.jevResultReviewEnabled, flags.jevRiskReviewEnabled, flags.jevCompactionEnabled, Date.now(), opts.id] });
     const live = ctx.state.agent?.[opts.id];
     if (live) Object.assign(live, flags);
     ctx.fns.events.refreshAgentMeta({ agentId: opts.id, section: 'automation', reason: 'automation' });

@@ -35,6 +35,7 @@ id: string }): Promise<types.agent.Agent | null> {
         jevFileRankingEnabled: row.jev_file_ranking_enabled === true || row.jev_file_ranking_enabled === 1 || row.jev_file_ranking_enabled === 't',
         jevResultReviewEnabled: row.jev_result_review_enabled === true || row.jev_result_review_enabled === 1 || row.jev_result_review_enabled === 't',
         jevRiskReviewEnabled: row.jev_risk_review_enabled === true || row.jev_risk_review_enabled === 1 || row.jev_risk_review_enabled === 't',
+        jevCompactionEnabled: row.jev_compaction_enabled === true || row.jev_compaction_enabled === 1 || row.jev_compaction_enabled === 't',
         goal: row.goal == null ? null : (typeof row.goal === 'string' ? JSON.parse(row.goal) : row.goal),
         functionRagGateEnabled: row.function_rag_gate_enabled === true || row.function_rag_gate_enabled === 1 || row.function_rag_gate_enabled === 't',
         subscribers: new Set(),

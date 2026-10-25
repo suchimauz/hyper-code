@@ -60,6 +60,8 @@ export type Agent = {
     jevResultReviewEnabled?: boolean;
     /** Allow explicit advisory calls to share task text, proposed action and supplied metadata with the external configured Jev provider; no automatic actions. @default false */
     jevRiskReviewEnabled?: boolean;
+    /** Opt in to automatic bounded summary-preservation checks during compaction, sending source excerpts and the summary to the external configured Jev provider. Independent advisory check, not a security guarantee. @default false */
+    jevCompactionEnabled?: boolean;
     goal?: Record<string, any> | null;
     drainPromise?: Promise<any> | null;
     wakeAt?: number | null;

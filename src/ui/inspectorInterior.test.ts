@@ -21,8 +21,8 @@ test('settings groups preserve all independent Jev flags and informed sharing co
  expect(d.querySelectorAll('fieldset').length).toBe(3);
  expect(d.querySelectorAll('details details').length).toBe(1);
  expect(d.querySelectorAll('label .text-micro').length).toBe(0);
- expect(d.querySelectorAll('input[type=checkbox]').length).toBe(10);
- expect(d.querySelectorAll('input[type=hidden]').length).toBe(7);
+ expect(d.querySelectorAll('input[type=checkbox]').length).toBe(11);
+ expect(d.querySelectorAll('input[type=hidden]').length).toBe(8);
  expect(d.body.textContent).toContain('external provider'); expect(d.body.textContent).toContain('outside the allowed model destinations'); expect(d.body.textContent).toContain('no automatic actions');
  for(const input of d.querySelectorAll('input[type=checkbox]')) expect(input.closest('label')?.textContent?.trim()).toBeTruthy();
  w.happyDOM.abort();
