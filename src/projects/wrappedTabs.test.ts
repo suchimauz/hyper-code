@@ -56,8 +56,11 @@ describe('wrapped desktop project tabs', () => {
             expect(desktop.querySelectorAll('details.project-tab-menu summary')).toHaveLength(count);
             expect(desktop.querySelectorAll('[data-project-action="archive"]')).toHaveLength(count);
             expect(desktop.querySelector('.project-tab-tools [hx-popup="ui.newAgentPopup"]')).not.toBeNull();
-            expect(desktop.querySelector('a[title="All project chats"]')).not.toBeNull();
-            expect([...w.document.querySelectorAll('.project-mobile-menu a')].map(a => a.getAttribute('href'))).toEqual(links.map(a => a.getAttribute('href')));
+            expect(desktop.querySelector('button[data-project-panel="manage"]')).not.toBeNull();
+            const chooser=(w.document.querySelector('template[data-project-template="chats"]') as any).content;
+            const manage=(w.document.querySelector('template[data-project-template="manage"]') as any).content;
+            expect(manage.querySelector('a[href="/projects/view?projectId=p&list=1"]')).not.toBeNull();
+            expect([...chooser.querySelectorAll('.project-mobile-menu a')].map(a => a.getAttribute('href'))).toEqual(links.map(a => a.getAttribute('href')));
         } finally { await w.happyDOM.close(); }
     });
 });

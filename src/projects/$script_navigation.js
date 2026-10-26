@@ -11,6 +11,94 @@
     return match && decodeURIComponent(match[1]) === id ? id : '';
   };
   const project = () => new URLSearchParams(location.search).get('projectId') || document.querySelector('#main [data-project-id]')?.dataset.projectId || '';
+  let panel = null, panelKind = '', panelOpener = null;
+  let pendingReturn;
+  const here = () => location.pathname + location.search + location.hash;
+  const projectPage = url => /^\/projects\/(view|archive)$/.test(new URL(url, location.href).pathname);
+  const localUrl = value => typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') && new URL(value, location.href).origin === location.origin;
+  // Keep the entry point on this browser history entry, not in a global "last chat".
+  // Internal archive/list visits carry it forward, including a full page reload.
+  const returnState = () => {
+    const saved = history.state?.projectReturn;
+    return saved?.page === here() && localUrl(saved.source?.url) ? saved.source : null;
+  };
+  const snapshot = () => ({
+    url: here(),
+    scroll: ['main','messages'].map(id => ({id, top: document.getElementById(id)?.scrollTop || 0})),
+    focus: panel ? panelKind : '',
+    parent: returnState(),
+    search: document.querySelector('[data-page-search]')?.value || '',
+    filter: document.querySelector('[data-page-filter][aria-pressed="true"]')?.dataset.pageFilter || 'all',
+  });
+  const syncBack = () => {
+    if (pendingReturn !== undefined) {
+      history.replaceState({...history.state, projectReturn: pendingReturn && projectPage(here()) ? {page:here(),source:pendingReturn} : null}, '', location.href);
+    }
+    const back = document.querySelector('[data-project-page-back]'), source = returnState();
+    if (back) back.setAttribute('href',source?.url || back.dataset.projectBackFallback || back.getAttribute('href'));
+  };
+  const restoreView = saved => {
+    if (!saved || here() !== saved.url) return;
+    const search = document.querySelector('[data-page-search]');
+    if (search) {
+      search.value = saved.search || ''; search.dispatchEvent(new Event('input',{bubbles:true}));
+      [...document.querySelectorAll('[data-page-filter]')].find(el => el.dataset.pageFilter === saved.filter)?.click();
+    }
+    for (const entry of saved.scroll || []) {
+      const el = document.getElementById(entry.id);
+      if (el) { el.scrollTop = entry.top; el.dispatchEvent(new Event('scroll')); }
+    }
+    [...document.querySelectorAll('[data-project-panel]')].find(el => el.dataset.projectPanel === saved.focus && el.getClientRects().length)?.focus({preventScroll:true});
+  };
+  const panelSource = kind => document.querySelector('#project-tabs-host template[data-project-template="'+kind+'"]');
+  const panelFocusKey = element => element?.getAttribute('href') || (element?.dataset.projectAction ? element.dataset.projectAction+':'+(element.dataset.chatId||element.dataset.projectId||'') : element?.getAttribute('hx-popup')) || '';
+  const restorePanelFocus = () => {
+    const next = panelOpener?.isConnected ? panelOpener : [...document.querySelectorAll('[data-project-panel="'+panelKind+'"]')].find(el => el.getClientRects().length);
+    next?.focus({preventScroll:true});
+  };
+  const closePanel = (focus=true) => {
+    if (!panel) return;
+    const old = panel; panel = null;
+    document.querySelectorAll('[data-project-panel]').forEach(el=>el.setAttribute('aria-expanded','false'));
+    if (old.open) old.close();
+    if (focus) restorePanelFocus();
+    // Popup RPC listeners still need the clicked trigger during this event.
+    queueMicrotask(()=>old.remove());
+  };
+  const updatePanel = () => {
+    if (!panel) return;
+    const source = panelSource(panelKind);
+    if (!source) { closePanel(); return; }
+    const focused = panel.contains(document.activeElement), key = panelFocusKey(document.activeElement), scroll = panel.scrollTop;
+    panel.replaceChildren(source.content.cloneNode(true));
+    window.htmx?.process(panel);
+    panel.scrollTop = scroll;
+    if (focused) ([...panel.querySelectorAll('a,button')].find(el=>key && panelFocusKey(el)===key) || [...panel.querySelectorAll('[data-project-panel-close]')].find(el=>el.getClientRects().length) || panel.querySelector('.project-panel-close'))?.focus({preventScroll:true});
+  };
+  const openPanel = button => {
+    const kind = button.dataset.projectPanel, source = panelSource(kind);
+    if (!source) return;
+    closePanel(false); panelKind = kind; panelOpener = button;
+    panel = document.createElement('dialog');
+    panel.className = 'project-panel-dialog'; panel.dataset.projectDialog = kind;
+    panel.dataset.projectId = project();
+    panel.setAttribute('aria-labelledby','project-panel-title');
+    panel.replaceChildren(source.content.cloneNode(true));
+    panel.addEventListener('cancel',event=>{event.preventDefault();closePanel();});
+    panel.addEventListener('click',event=>{
+      if (event.target!==panel) return;
+      const r=panel.getBoundingClientRect();
+      if (event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom) closePanel();
+    });
+    document.body.append(panel); window.htmx?.process(panel);
+    if (typeof panel.showModal === 'function') panel.showModal(); else panel.setAttribute('open','');
+    button.setAttribute('aria-expanded','true');
+    const r=button.getBoundingClientRect();
+    panel.style.setProperty('--project-panel-top',Math.max(8,r.bottom+6)+'px');
+    panel.style.setProperty('--project-panel-right',Math.max(8,innerWidth-r.right)+'px');
+    panel.querySelector('.project-panel-back')?.focus({preventScroll:true});
+    if (!panel.querySelector('.project-panel-back')?.getClientRects().length) panel.querySelector('.project-panel-close')?.focus({preventScroll:true});
+  };
   const error = message => {
     let box = document.getElementById('project-error');
     if (!box) { box = document.createElement('div'); box.id = 'project-error'; box.setAttribute('role', 'alert'); document.getElementById('main')?.prepend(box); }
@@ -37,16 +125,20 @@
     dialog.showModal();
     dialog.querySelector('[data-confirm-cancel]').focus();
   });
-  const go = url => {
+  const go = (url, returning = null) => {
     // Serialize visits too: two different links otherwise have independent HTMX
     // requests, and the older response can replace the newer page.
+    const source = projectPage(url) ? (panel ? snapshot() : returnState() || (url === here() ? null : snapshot())) : null;
+    closePanel(false);
     const visit = visits.then(async () => {
       await selections;
       navigating = true; ++request;
+      pendingReturn = returning ? returning.parent || null : source;
       try {
         if (!window.htmx) { location.assign(url); return; }
         await window.htmx.ajax('GET', url, {target:'#main', push:'true'});
-      } finally { navigating = false; navigated(); }
+      } finally { navigating = false; navigated(); pendingReturn = undefined; }
+      if (returning) { restoreView(returning); requestAnimationFrame(() => restoreView(returning)); }
     });
     visits = visit.catch(e => error(e.message));
     return visit;
@@ -82,21 +174,10 @@
       let tabs = document.getElementById('project-tabs-host');
       if (!tabs) { tabs = document.createElement('div'); tabs.id='project-tabs-host'; document.getElementById('main')?.prepend(tabs); }
       const tabScroll = tabs.querySelector('.project-tab-list')?.scrollLeft || 0;
-      const chooser = tabs.querySelector('.project-mobile-switcher');
-      const chooserOpen = Boolean(chooser?.open);
-      const chooserScroll = chooser?.querySelector('nav')?.scrollTop || 0;
-      const focused = chooser?.contains(document.activeElement) ? document.activeElement : null;
-      const focusHref = focused?.getAttribute('href');
       tabs.innerHTML = data.tabs;
-      const nextChooser = tabs.querySelector('.project-mobile-switcher');
-      if (nextChooser) {
-        nextChooser.open = chooserOpen;
-        const menu = nextChooser.querySelector('nav');
-        if (menu) menu.scrollTop = chooserScroll;
-        if (focused) {
-          const nextFocus = focusHref ? [...nextChooser.querySelectorAll('a[href]')].find(a => a.getAttribute('href') === focusHref) : null;
-          (nextFocus || nextChooser.querySelector('summary'))?.focus({preventScroll:true});
-        }
+      if (panel) {
+        document.querySelectorAll('[data-project-panel="'+panelKind+'"]').forEach(el=>el.setAttribute('aria-expanded','true'));
+        updatePanel();
       }
       const tabList = tabs.querySelector('.project-tab-list');
       if (tabList) {
@@ -116,21 +197,27 @@
   }
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    const chooser = document.querySelector('.project-mobile-switcher[open]');
-    if (!chooser) return;
-    chooser.open = false;
-    chooser.querySelector('summary')?.focus();
-    e.preventDefault();
+    if (!panel) return;
+    closePanel(); e.preventDefault();
   });
   document.addEventListener('click', e => {
-    const chooser = document.querySelector('.project-mobile-switcher[open]');
-    if (chooser && (!chooser.contains(e.target) || e.target.closest('a[href]'))) chooser.open = false;
+    const trigger=e.target.closest('[data-project-panel]');
+    if (trigger) { e.preventDefault(); openPanel(trigger); return; }
+    if (e.target.closest('[data-project-panel-close]')) { e.preventDefault();closePanel();return; }
+    if (panel?.contains(e.target) && e.target.closest('[hx-popup]')) closePanel(false);
     const link = e.target.closest('a[href]');
     if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || link.target || link.hasAttribute('download')) return;
     const url = new URL(link.href, location.href);
-    if (url.origin !== location.origin || !link.closest('#project-sidebar, #project-tabs-host') || !/^\/(agent\/[^/]+|projects\/view)$/.test(url.pathname)) return;
+    if (url.origin !== location.origin) return;
+    if (link.matches('[data-project-page-back]')) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      const saved = returnState(); void go(saved?.url || url.pathname + url.search, saved); return;
+    }
+    if (!link.closest('#project-sidebar, #project-tabs-host, [data-project-dialog], [data-project-page]') && !projectPage(url.href)) return;
+    if (!/^\/(agent\/[^/]+|projects\/(view|archive))$/.test(url.pathname)) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    void go(url.pathname + url.search); // go attaches a rejection handler to the shared visit queue
+    if (link.closest('#nav-overlay')) window.__navClose?.();
+    void go(url.pathname + url.search + url.hash); // go attaches a rejection handler to the shared visit queue
   }, true);
   document.addEventListener('click', async e => {
     const b = e.target.closest('[data-project-action]');
@@ -139,25 +226,30 @@
     if (b.disabled) return;
     b.disabled = true;
     try {
-      if ((action === 'archive-project' || action === 'restore-project') && !await confirmProject(action, b)) return;
+      if (action === 'archive-project' || action === 'restore-project') {
+        closePanel(false);
+        if (!await confirmProject(action, b)) { restorePanelFocus(); return; }
+      }
       if (action === 'archive-project' || action === 'restore-project') {
         await post('/projects/action', {action, projectId:b.dataset.projectId});
-        if (action === 'restore-project' || location.pathname === '/projects/view') await go(location.pathname+location.search);
+        if (location.pathname.startsWith('/projects/')) await go(location.pathname+location.search);
         else await refresh();
       } else if (action === 'archive' || action === 'restore') {
         const archiving = action !== 'restore';
         await post('/agent/'+encodeURIComponent(b.dataset.chatId)+'/'+(archiving?'archive':'unarchive'), {});
         if (archiving && current() === b.dataset.chatId) { await go('/projects/view?projectId='+encodeURIComponent(project())); return; }
-        if (action === 'restore') { await go(location.pathname+location.search); return; }
+        if (action === 'restore' || location.pathname === '/projects/view') { await go(location.pathname+location.search); return; }
         await refresh();
       } else {
         const data = await post('/projects/action', {action, projectId:project(), agentId:b.dataset.chatId});
         const destination = action === 'close' ? (current() === b.dataset.chatId ? data.fallbackUrl : null) : data.url;
-        if (destination) await go(destination); else await refresh();
+        if (destination) await go(destination);
+        else if (action === 'close' && location.pathname === '/projects/view') await go(location.pathname+location.search);
+        else await refresh();
       }
-    } catch (e) { error(e.message); } finally { b.disabled = false; }
+    } catch (e) { error(e.message); } finally { b.disabled = false; if (!b.isConnected && !panel) restorePanelFocus(); }
   });
-  const navigated = () => { refresh(true); };
+  const navigated = () => { closePanel(false); syncBack(); refresh(true); };
   document.addEventListener('projects:navigated', navigated);
   document.addEventListener('htmx:before:request', e => {
     if (['main','frame'].includes(e.detail?.ctx?.target?.id)) { navigating = true; ++request; }
@@ -174,5 +266,6 @@
   // History restoration is asynchronous; only its actual main swap may select.
   window.addEventListener('popstate', () => { ++request; navigating = true; lastSelected = ''; });
   window.hyperLive?.subscribe({name:'project-navigation', types:['agents.changed','projects.changed'], onEvent:() => { clearTimeout(timer); timer=setTimeout(() => refresh(),200); }, resync:() => refresh()});
+  syncBack();
   refresh(true);
 })();

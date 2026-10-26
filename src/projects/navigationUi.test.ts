@@ -11,7 +11,8 @@ import rows from '../nav/rows.ts';
 import popup from '../ui/popup.ts';
 import icon from '../chat/icon.ts';
 import modelLogo from '../ui/modelLogo.ts';
-const fixture=()=>{const calls:string[]=[];const p={id:'p',title:'project',dir:'/same',host:'remote',virtual:false};const ctx:any={fns:{agent:{teamActivity:async()=>({})},auth:{verifyCsrf:async()=>true},procs:{ui:{escape:({text}:any)=>Bun.escapeHTML(text)}},projects:{list:async()=>[p],resolve:async()=>p,get:async()=>p,chats:async({archived}:any)=>[{id:archived?'archived':'a',title:'chat',runState:'idle'}],tabs:async()=>({tabIds:[],activeId:null}),renderChrome:async(o:any)=>{calls.push(JSON.stringify(o));return {sidebar:'sidebar',tabs:'tabs'}},navigation:async()=>({sidebar:'sidebar',tabs:'tabs'}),closeTab:async()=>({tabIds:[],activeId:null})}}};ctx.fns.procs.ui.button=(o:any)=>button(ctx,null,o);ctx.fns.procs.ui.attr=(o:any)=>attr(ctx,null,o);ctx.fns.auth.pinnedIds=async()=>new Set();ctx.fns.nav={chatItems:(o:any)=>chatItems(ctx,null,o),rows:(o:any)=>rows(ctx,null,o)};ctx.fns.ui={popup:(o:any)=>popup(ctx,null,o),modelLogo:(o:any)=>modelLogo(ctx,null,o)};ctx.fns.chat={icon:(o:any)=>icon(ctx,null,o)};return {ctx,calls};};
+import renderPage from './renderPage.ts';
+const fixture=()=>{const calls:string[]=[];const p={id:'p',title:'project',dir:'/same',host:'remote',virtual:false};const ctx:any={fns:{agent:{teamActivity:async()=>({})},auth:{verifyCsrf:async()=>true},procs:{ui:{escape:({text}:any)=>Bun.escapeHTML(text)}},projects:{list:async()=>[p],resolve:async()=>p,get:async()=>p,chats:async({archived}:any)=>[{id:archived?'archived':'a',title:'chat',runState:'idle'}],tabs:async()=>({tabIds:[],activeId:null}),renderChrome:async(o:any)=>{calls.push(JSON.stringify(o));return {sidebar:'sidebar',tabs:'tabs'}},navigation:async()=>({sidebar:'sidebar',tabs:'tabs'}),closeTab:async()=>({tabIds:[],activeId:null})}}};ctx.fns.procs.ui.button=(o:any)=>button(ctx,null,o);ctx.fns.procs.ui.attr=(o:any)=>attr(ctx,null,o);ctx.fns.auth.pinnedIds=async()=>new Set();ctx.fns.nav={chatItems:(o:any)=>chatItems(ctx,null,o),rows:(o:any)=>rows(ctx,null,o)};ctx.fns.ui={popup:(o:any)=>popup(ctx,null,o),modelLogo:(o:any)=>modelLogo(ctx,null,o)};ctx.fns.chat={icon:(o:any)=>icon(ctx,null,o)};ctx.fns.projects.renderPage=(o:any)=>renderPage(ctx,null,o);return {ctx,calls};};
 describe('project UI boundaries',()=>{
  test('project archive actions are separate from chat archive and archive page offers restore',async()=>{
   const {ctx}=fixture();const calls:any[]=[];ctx.fns.projects.setArchived=async(o:any)=>calls.push(o);
@@ -27,9 +28,9 @@ describe('project UI boundaries',()=>{
  test('archive is scoped and offers restore, not delete or generation',async()=>{const {ctx}=fixture();const result=await view(ctx,null,{req:new Request('http://local/projects/view?projectId=p&archive=1')});if(result instanceof Response)throw new Error('Archive must render index');expect(result.main).toContain('data-project-action="restore"');expect(result.main).toContain('data-chat-id="archived"');expect(result.main).not.toContain('delete');});
  test('active and archived lists preserve custom agent icons through native rows',async()=>{
   const svg='<svg xmlns="http://www.w3.org/2000/svg"><path d="M1 1"/></svg>';
-  for(const archived of [false,true]){const {ctx}=fixture();let requested=false;ctx.fns.projects.chats=async(o:any)=>{requested=o.archived;return [{id:'custom',title:'Custom',model:'openai:gpt-4o',icon:svg,runState:'idle'}]};
+  for(const archived of [false,true]){const {ctx}=fixture();const requested:boolean[]=[];ctx.fns.projects.chats=async(o:any)=>{requested.push(!!o.archived);return [{id:'custom',title:'Custom',model:'openai:gpt-4o',icon:svg,runState:'idle'}]};
    const result=await view(ctx,null,{req:new Request('http://local/projects/view?projectId=p&'+(archived?'archive=1':'list=1'))});
-   if(result instanceof Response)throw Error('Expected list');expect(requested).toBe(archived);expect(result.main).toContain('data:image/svg+xml,'+encodeURIComponent(svg));expect(result.main).not.toContain('<svg xmlns=');
+   if(result instanceof Response)throw Error('Expected list');expect(requested).toContain(archived);expect(result.main).toContain('data:image/svg+xml,'+encodeURIComponent(svg));expect(result.main).not.toContain('<svg xmlns=');
   }
  });
 });

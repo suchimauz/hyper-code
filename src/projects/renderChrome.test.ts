@@ -1,4 +1,5 @@
 import {describe,test,expect} from 'bun:test';
+import {Window} from 'happy-dom';
 import render from './renderChrome.ts';
 import button from '../procs/ui/button.ts';
 import popup from '../ui/popup.ts';
@@ -20,7 +21,7 @@ describe('project navigation markup',()=>{
  });
  test('empty projects remain selectable and new chats are independent',async()=>{
   const out=await render(ctx,null,{...base,chats:[],tabIds:[]});
-  expect(out.sidebar).toContain('/projects/view?projectId=p'); expect(out.tabs).toContain('New independent chat');
+  expect(out.sidebar).toContain('/projects/view?projectId=p'); expect(out.tabs).toContain('Новый независимый чат');
   expect(out.tabs).not.toContain('/fork');
   expect(out.tabs).toContain('hx-popup="ui.newAgentPopup"');
   expect(out.tabs).toContain('hx-popup-params="{&quot;projectId&quot;:&quot;p&quot;}"');
@@ -46,7 +47,7 @@ describe('project navigation markup',()=>{
  });
  test('archived selected project offers restore instead of archive',async()=>{
   const out=await render(ctx,null,{...base,projects:base.projects.map(p=>({...p,archived:true}))});
-  expect(out.tabs).toContain('data-project-action="restore-project"');expect(out.tabs).toContain('Разархивировать проект');expect(out.tabs).not.toContain('data-project-action="archive-project"');expect(out.tabs).toContain('data-project-id="p"');
+  expect(out.tabs).toContain('data-project-action="restore-project"');expect(out.tabs).toContain('Восстановить проект');expect(out.tabs).not.toContain('data-project-action="archive-project"');expect(out.tabs).toContain('data-project-id="p"');
  });
  test('no selected project yields no stray tabs',async()=>{
   const out=await render(ctx,null,{...base,projectId:undefined}); expect(out.tabs).toBe('');
@@ -69,4 +70,38 @@ test('project logos use inert image URLs in expanded and mobile navigation with 
  expect(out.sidebar).toContain('class="project-logo"');expect(out.sidebar).toContain(Buffer.from(svg).toString('base64'));
  expect(out.sidebar).not.toContain(svg);expect(out.sidebar).toContain('project-unread-badge');
  expect(out.tabs).toContain('class="project-logo"');expect(out.tabs).toContain('hx-popup="projects.iconPopup"');
+});
+
+test('management remains inert until opened and exposes escaped authorized project details and scoped popups',async()=>{
+ const w=new Window();try{
+  w.document.body.innerHTML=(await render(ctx,null,{...base,projects:[{id:'p',title:'<img src=x onerror=alert(1)>',dir:'/work/<private>',host:'ssh<&host',runningCount:4,unreadCount:2}]})).tabs;
+  const d=w.document,menu=(d.querySelector('template[data-project-template="manage"]') as any).content;
+  expect(d.querySelectorAll('template')).toHaveLength(2);
+  expect(d.querySelector('.project-panel-dialog')).toBeNull();expect(d.querySelector('[data-project-action="archive-project"]')).toBeNull();
+  expect(menu.querySelector('h2')?.textContent).toBe('<img src=x onerror=alert(1)>');expect(menu.querySelector('img')).toBeNull();
+  expect(menu.querySelector('.project-panel-workspace')?.textContent).toContain('/work/<private>');expect(menu.querySelector('.project-panel-workspace')?.textContent).toContain('ssh<&host');
+  expect(menu.querySelector('a[href="/projects/view?projectId=p&list=1"] small')?.textContent).toBe('1');
+  expect(menu.querySelector('a[href="/projects/view?projectId=p&archive=1"]')).not.toBeNull();
+  for(const name of ['ui.newAgentPopup','projects.iconPopup']) expect(JSON.parse(menu.querySelector('[hx-popup="'+name+'"]')!.getAttribute('hx-popup-params')!)).toEqual({projectId:'p'});
+  expect(menu.querySelector('[data-project-action="archive-project"]')?.getAttribute('data-project-title')).toBe('<img src=x onerror=alert(1)>');
+  for(const selector of ['.project-mobile-toggle','.project-mobile-manage','.project-manage-trigger']){
+   const trigger=d.querySelector(selector)!;expect(trigger.tagName).toBe('BUTTON');expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');expect(trigger.getAttribute('aria-expanded')).toBe('false');expect(trigger.getAttribute('data-project-panel')).toBe(selector==='.project-mobile-toggle'?'chats':'manage');
+  }
+ }finally{await w.happyDOM.close();}
+});
+
+test('archive permissions and running guards never disable closing a personal tab',async()=>{
+ const w=new Window();try{
+  w.document.body.innerHTML=(await render(ctx,null,{...base,chats:[
+   {id:'denied',title:'Denied',runState:'idle',canArchive:false,archiveBlockedReason:'scheduled'},
+   {id:'running',title:'Running',runState:'running',canArchive:true},
+   {id:'allowed',title:'Allowed',runState:'idle',canArchive:true},
+  ],tabIds:['denied','running','allowed']})).tabs;
+  for(const id of ['denied','running','allowed']){
+   const archive=w.document.querySelector('[data-project-action="archive"][data-chat-id="'+id+'"]') as any;
+   expect(archive.disabled).toBe(id!=='allowed');
+   expect((w.document.querySelector('[data-project-action="close"][data-chat-id="'+id+'"]') as any).disabled).toBe(false);
+  }
+  expect(w.document.querySelector('[data-project-action="archive"][data-chat-id="denied"]')?.getAttribute('title')).toBe('Нельзя архивировать работающий или запланированный чат');
+ }finally{await w.happyDOM.close();}
 });

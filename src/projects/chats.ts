@@ -20,7 +20,7 @@ export default async function (
     const viewer=await ctx.fns.auth.viewerId({});
     // Same watermark precedence as session.list, including legacy single-user instances.
     const legacyKv=(await ctx.fns.auth.listUsers({})).length<=1;
-    const rows=await ctx.fns.procs.db.select({sql:`SELECT a.id,a.title,a.model,a.icon,a.run_state,a.workspace_dir,a.workspace_host,a.archived_at,
+    const rows=await ctx.fns.procs.db.select({sql:`SELECT a.id,a.title,a.model,a.icon,a.run_state,a.next_run_at,a.wake_at,a.workspace_dir,a.workspace_host,a.archived_at,
       (a.last_notifiable_at IS NOT NULL AND a.last_notifiable_at > COALESCE(s.seen_at,
         (SELECT CAST(k.value AS BIGINT) FROM kv k WHERE k.key='seen-at:' || a.id AND ?=1),
         (SELECT MAX(m.ts) FROM messages m WHERE m.agent_id=a.id AND m.idx <= COALESCE((SELECT CAST(k.value AS INTEGER) FROM kv k WHERE k.key='seen:' || a.id),-1)), -1)) AS has_unread
@@ -31,7 +31,9 @@ export default async function (
     for(const row of rows){
      if(!row.workspace_dir.startsWith('/')) continue;
      const identity=await ctx.fns.projects.identity({dir:row.workspace_dir,host:row.workspace_host??''});
-     if(identity.id===project.id) result.push({id:row.id,title:row.title||row.id,model:row.model,icon:row.icon??null,archived:row.archived_at!==null,runState:row.run_state,teamRunningCount:teamActivity[row.id]??0,hasUnread:row.has_unread===true||row.has_unread==='t'||row.has_unread===1,workspaceDir:identity.dir,workspaceHost:identity.host});
+     // Advisory snapshot of session.archive guards; the atomic write remains authoritative.
+     const archiveBlockedReason = row.run_state !== 'idle' || Number(ctx.state?.agent?.[row.id]?.activeRunCount ?? 0) > 0 ? 'busy' : row.wake_at != null ? 'scheduled' : row.next_run_at != null ? 'queued' : undefined;
+     if(identity.id===project.id) result.push({canArchive:!archiveBlockedReason,archiveBlockedReason,id:row.id,title:row.title||row.id,model:row.model,icon:row.icon??null,archived:row.archived_at!==null,runState:row.run_state,teamRunningCount:teamActivity[row.id]??0,hasUnread:row.has_unread===true||row.has_unread==='t'||row.has_unread===1,workspaceDir:identity.dir,workspaceHost:identity.host});
     }
     return result;
 }

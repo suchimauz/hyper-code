@@ -25,22 +25,23 @@ describe('mobile chat status indicators',()=>{
  });
  test('independently renders authorized running and unread states in personal order',async()=>{
   const w=new Window();w.document.body.innerHTML=(await render(ctx,null,base)).tabs;
-  const links=[...w.document.querySelectorAll('.project-mobile-chat')];
+  const chooser=(w.document.querySelector('template[data-project-template="chats"]') as any).content;
+  const links=[...chooser.querySelectorAll('.project-mobile-chat')];
   expect(links.map(a=>a.getAttribute('href'))).toEqual(['/agent/both','/agent/quiet','/agent/unread','/agent/working']);
   expect(links.map(a=>!!a.querySelector('.project-mobile-model .chat-icon-ring'))).toEqual([true,false,false,true]);
-  expect(w.document.querySelectorAll('.project-mobile-model .chat-icon-ring')).toHaveLength(2);
+  expect(chooser.querySelectorAll('.project-mobile-model .chat-icon-ring')).toHaveLength(2);
   expect(links.map(a=>!!a.querySelector('.project-mobile-unread'))).toEqual([true,false,true,false]);
   expect(links[0].getAttribute('aria-current')).toBe('page');expect(links[0].classList.contains('selected')).toBe(true);
-  for(const el of w.document.querySelectorAll('.project-mobile-unread')){
+  for(const el of chooser.querySelectorAll('.project-mobile-unread')){
    expect(el.getAttribute('role')).toBe('img');expect(el.getAttribute('aria-label')).toBe('Непрочитанный ответ');
   }
   expect(w.document.querySelector('[data-project-other-running]')).toBeNull();
   expect(w.document.querySelector('[data-project-other-unread]')?.getAttribute('data-project-other-unread')).toBe('2');
-  const dot=w.document.querySelector('.project-mobile-toggle')?.firstElementChild;
+  const dot=w.document.querySelector('.project-mobile-toggle')?.querySelector('[data-project-other-unread]');
   expect(dot?.hasAttribute('data-project-other-unread')).toBe(true);
   expect(dot?.classList.contains('project-unread-dot')).toBe(true);
   expect(dot?.textContent).toBe('');
-  expect(dot?.nextElementSibling?.classList.contains('ph-chats')).toBe(true);
+  expect(w.document.querySelector('.project-mobile-toggle .ph-chats')).not.toBeNull();
   expect(w.document.querySelector('.project-mobile-toggle')?.getAttribute('aria-label')).not.toContain('работают');
   expect(w.document.querySelector('.project-tabs .project-mobile-running')).toBeNull();
   expect(w.document.querySelector('.project-tabs .project-mobile-unread')).toBeNull();
@@ -55,9 +56,9 @@ describe('mobile chat status indicators',()=>{
   let live:any;let response=initial;
   (w as any).hyperLive={subscribe:(o:any)=>live=o};(w as any).fetch=async()=>({ok:true,json:async()=>response});(w as any).htmx={process:()=>{}};
   w.eval(source);await tick();
-  const chooser=d.querySelector('.project-mobile-switcher') as any;chooser.open=true;(chooser.querySelector('a[href="/agent/working"]') as any).focus();
+  (d.querySelector('.project-mobile-toggle') as any).click();const chooser=d.querySelector('.project-panel-dialog') as any;(chooser.querySelector('a[href="/agent/working"]') as any).focus();
   response=updated;await live.resync();await tick();
-  expect((d.querySelector('.project-mobile-switcher') as any).open).toBe(true);expect(d.activeElement?.getAttribute('href')).toBe('/agent/working');
+  expect((d.querySelector('.project-panel-dialog') as any).open).toBe(true);expect(d.activeElement?.getAttribute('href')).toBe('/agent/working');
   expect(d.querySelector('.project-mobile-chat[aria-current="page"]')?.getAttribute('href')).toBe('/agent/both');
   expect(d.querySelector('[data-project-other-running]')).toBeNull();
   expect(d.querySelector('[data-project-other-unread]')?.getAttribute('data-project-other-unread')).toBe('1');

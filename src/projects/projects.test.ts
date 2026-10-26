@@ -4,7 +4,7 @@ import {Database} from 'bun:sqlite';
 // Isolated SQL fixture: exercises real project procedures, no live agents or model calls.
 async function mkTestCtx() {
  const db=new Database(':memory:');
- db.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY,host TEXT,dir TEXT,title TEXT,created_at INTEGER,UNIQUE(host,dir));CREATE TABLE project_members(principal TEXT,project_id TEXT,title TEXT,archived_at INTEGER,icon TEXT,PRIMARY KEY(principal,project_id));CREATE TABLE project_tabs(principal TEXT,project_id TEXT,tab_ids TEXT DEFAULT '[]',active_id TEXT,revision INTEGER DEFAULT 0,PRIMARY KEY(principal,project_id));CREATE TABLE agents(id TEXT,title TEXT,model TEXT,icon TEXT,run_state TEXT,workspace_dir TEXT,workspace_host TEXT,archived_at INTEGER,created_at INTEGER,visibility TEXT,last_notifiable_at INTEGER);CREATE TABLE user_agent_state(user_id TEXT,agent_id TEXT,seen_at INTEGER,PRIMARY KEY(user_id,agent_id));CREATE TABLE kv(key TEXT PRIMARY KEY,value TEXT);CREATE TABLE messages(agent_id TEXT,idx INTEGER,ts INTEGER);`);
+ db.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY,host TEXT,dir TEXT,title TEXT,created_at INTEGER,UNIQUE(host,dir));CREATE TABLE project_members(principal TEXT,project_id TEXT,title TEXT,archived_at INTEGER,icon TEXT,PRIMARY KEY(principal,project_id));CREATE TABLE project_tabs(principal TEXT,project_id TEXT,tab_ids TEXT DEFAULT '[]',active_id TEXT,revision INTEGER DEFAULT 0,PRIMARY KEY(principal,project_id));CREATE TABLE agents(id TEXT,title TEXT,model TEXT,icon TEXT,run_state TEXT,next_run_at INTEGER,wake_at INTEGER,workspace_dir TEXT,workspace_host TEXT,archived_at INTEGER,created_at INTEGER,visibility TEXT,last_notifiable_at INTEGER);CREATE TABLE user_agent_state(user_id TEXT,agent_id TEXT,seen_at INTEGER,PRIMARY KEY(user_id,agent_id));CREATE TABLE kv(key TEXT PRIMARY KEY,value TEXT);CREATE TABLE messages(agent_id TEXT,idx INTEGER,ts INTEGER);`);
  const registry:any={auth:{viewerId:async()=>null,listUsers:async()=>[]},projects:{},workspace:{},agent:{teamActivity:async()=>({})},settings:{modelDefault:async()=> 'mock:echo'},procs:{db:{
  select:async(_c:any,_s:any,o:any)=>db.query(o.sql.replaceAll('::jsonb','')).all(...o.params).map((r:any)=>r.tab_ids?{...r,tab_ids:JSON.parse(r.tab_ids)}:r),
  run:async(_c:any,_s:any,o:any)=>db.query(o.sql.replaceAll('::jsonb','')).run(...o.params),
@@ -12,7 +12,7 @@ async function mkTestCtx() {
  const ctx:any={state:{registry}};
  const proxy=(r:any):any=>new Proxy({}, {get:(_t,k:string)=> typeof r[k]==='function' ? (o:any)=>r[k](ctx,null,o) : proxy(r[k])});
  ctx.fns=proxy(registry);
- for(const name of ['identity','list','get','create','materialize','setArchived','chats','tabs','updateTabs','open','closeTab','reorder','createChat','resolve'])registry.projects[name]=(await import('./'+name+'.ts')).default;
+ for(const name of ['identity','list','get','create','materialize','setArchived','chats','tabs','updateTabs','open','closeTab','reorder','createChat','resolve','renderPage'])registry.projects[name]=(await import('./'+name+'.ts')).default;
  return ctx;
 }
 
