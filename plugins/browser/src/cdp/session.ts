@@ -4,6 +4,7 @@
 /**
  * Creates or reconnects a named Chrome page session, preserving its original target.
  * A disconnected or missing previously selected target never creates a replacement tab.
+ * Plugin-created tabs expire after ten idle minutes; attached user targets are never owned.
  */
 export default async function (
     ctx: Context,
@@ -15,12 +16,18 @@ export default async function (
   targetId?: string } = {},
 ): Promise<any> {
     const scope = await ctx.fns.cdp.scope({ session: opts.name, targetId: opts.targetId });
+    await ctx.fns.cdp.ensureIdleReaper({});
     opts = { ...opts, name: scope.session, targetId: scope.targetId };
     const name = String(opts.name || "main");
     const state = ((ctx.state as any).cdp ??= { sessions: new Map() });
     const sessions: Map<string, any> = (state.sessions ??= new Map());
     const existing = sessions.get(name);
-    if (existing?.closed) throw new Error(`CDP target ${existing.targetId} was closed`);
+    if (existing?.closed) throw new Error(`CDP target ${existing.targetId} was closed; use browser.sessionForget before starting a new task`);
+    if (existing?.closing || [...sessions.values()].some(h => h.closing && h.targetId === opts.targetId)) {
+        throw new Error("CDP target is being closed after inactivity");
+    }
+    // Renew before reconnect yields, so the reaper cannot close an active target.
+    if (existing) existing.lastUsed = Date.now();
     if (existing?.targetId && opts.targetId && existing.targetId !== opts.targetId) {
         throw new Error(`CDP session ${name} is already bound to target ${existing.targetId}`);
     }
@@ -52,6 +59,7 @@ export default async function (
         return await state.recovering;
     };
     let targetId = existing?.targetId || opts.targetId;
+    const owned = existing?.owned === true || !targetId;
     if (!targetId) {
         let version = await probe();
         if (!version?.ok && await restartChrome()) version = await probe();
@@ -74,7 +82,7 @@ export default async function (
     }
 
     // Retain target identity even if the first connection attempt fails.
-    if (!existing) sessions.set(name, { name, targetId, ws: null, pending: new Map() });
+    if (!existing) sessions.set(name, { name, targetId, owned, lastUsed: Date.now(), ws: null, pending: new Map() });
     const wsUrl = `${browserUrl.replace(/^http/, "ws")}/devtools/page/${targetId}`;
     try {
         return await connect(wsUrl, targetId);
@@ -89,7 +97,7 @@ export default async function (
     function connect(wsUrl: string, targetId: string): Promise<any> {
     return new Promise<any>((resolve, reject) => {
         const ws = new WebSocket(wsUrl);
-        const handle: any = { name, targetId, ws, msgId: 0, pending: new Map(), lastUsed: Date.now() };
+        const handle: any = { name, targetId, owned, ws, msgId: 0, pending: new Map(), lastUsed: Date.now() };
         const timer = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("CDP page websocket timed out")); }, 5000);
         ws.onopen = () => {
             clearTimeout(timer);

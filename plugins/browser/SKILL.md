@@ -149,6 +149,8 @@ Actions auto-wait for attachment, visibility and actionability. Target ambiguity
 
 Named sessions default to `main`. High-level Google workflows use task-specific sessions, and multi-page research uses independently named page sessions. Task-created tabs should normally be closed with the tab/session cleanup functions. High-level workflows clean up temporary sessions unless callers intentionally request `keepOpen`.
 
+Plugin-created tabs are automatically closed after ten minutes without CDP activity (checked every thirty seconds). Pending commands and open Hyper live viewers protect the target; activity through any named alias also counts. Attached existing/user tabs and tabs whose ownership is unknown are never auto-closed. `keepOpen` prevents immediate workflow cleanup, not idle expiry. Chrome itself stays running. Expired names retain a closed-target marker: use `browser.sessionForget({ session })` before intentionally starting a fresh task with that name. The timer and ownership registry are process-local; after a server restart, old tabs are not guessed to be owned.
+
 Prefer the high-level Google search, AI and research workflows for those tasks rather than scraping Google manually. AI-generated answers can be wrong; compare factual claims with source pages. Consent pages, login challenges and CAPTCHA are reported as errors rather than silently returning empty results.
 
 All CDP capabilities remain public. Use `browser.evaluate`, `cdp.send` or `cdp.session` when the focused browser operations do not expose a required Chrome capability. This plugin connects to an existing debuggable Chrome; it does not launch the browser.

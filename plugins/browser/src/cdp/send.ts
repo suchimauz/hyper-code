@@ -2,7 +2,8 @@
 /**
  * Sends a CDP command exactly once through a named page session.
  * Reconnects before sending if needed; never retries a command after an error or timeout,
- * since a mutation may already have executed.
+ * since a mutation may already have executed. In-flight commands protect the tab
+ * from idle cleanup; the ten-minute idle window restarts when a command settles.
  */
 export default async function (
     ctx: Context,
@@ -41,5 +42,10 @@ export default async function (
         });
     };
 
-    return await call();
+    if (handle.closed || handle.closing) throw new Error("CDP target is closed or being closed");
+    try {
+        return await call();
+    } finally {
+        handle.lastUsed = Date.now();
+    }
 }
