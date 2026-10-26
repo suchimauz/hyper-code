@@ -160,6 +160,54 @@
     });
     applyTheme();
 
+    // The compact rail never hides quotas: move the same live region to a wider
+    // bottom shelf. Also use that shelf when quota rows would crowd out navigation.
+    let collapsed = false;
+    try { collapsed = localStorage.getItem('hyper:sidebar-collapsed') === 'true'; }
+    catch (_) { /* Storage may be unavailable; keep the expanded default. */ }
+    let layoutFrame = 0;
+    function placeLimits() {
+        layoutFrame = 0;
+        const nav = dock(), frame = document.getElementById('frame');
+        const home = document.getElementById('dock-limits-home');
+        const shelf = document.getElementById('dock-limits-shelf');
+        const limits = document.getElementById('dock-limits');
+        if (!nav || !frame || !home || !shelf) return;
+        const desktop = window.matchMedia('(min-width:701px)').matches;
+        nav.classList.toggle('dock-collapsed', collapsed && desktop);
+        frame.classList.toggle('dock-compact', collapsed && desktop);
+        const toggle = nav.querySelector('[data-action="toggle-sidebar"]');
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', String(!collapsed));
+            toggle.setAttribute('aria-label', collapsed ? 'Развернуть панель' : 'Свернуть панель');
+            toggle.title = collapsed ? 'Развернуть панель' : 'Свернуть панель';
+        }
+        const bands = [...(limits?.querySelectorAll('.quota-matrix-band') || [])];
+        const quotaHeight = bands.reduce((height, band) => height + band.getBoundingClientRect().height + 7, 50);
+        const footer = nav.querySelector('.dock-footer');
+        const utilityHeight = (footer?.getBoundingClientRect().height || 0) - (home.getBoundingClientRect().height || 0);
+        const detached = desktop && Boolean(limits) && (collapsed || quotaHeight > Math.max(160, nav.clientHeight - utilityHeight - 330));
+        frame.classList.toggle('limits-detached', detached);
+        const target = detached ? shelf : home;
+        if (limits && limits.parentElement !== target) target.append(limits);
+    }
+    const scheduleLimits = () => { if (!layoutFrame) layoutFrame = requestAnimationFrame(placeLimits); };
+    document.addEventListener('click', e => {
+        if (!e.target.closest?.('[data-action="toggle-sidebar"]')) return;
+        collapsed = !collapsed;
+        try { localStorage.setItem('hyper:sidebar-collapsed', String(collapsed)); }
+        catch (_) { /* Layout remains usable without persistence. */ }
+        placeLimits();
+    });
+    window.addEventListener('resize', scheduleLimits);
+    window.addEventListener('storage', e => {
+        if (e.key !== 'hyper:sidebar-collapsed') return;
+        collapsed = e.newValue === 'true';
+        scheduleLimits();
+    });
+    const limitsObserver = new MutationObserver(scheduleLimits);
+    limitsObserver.observe(document.body, { childList: true, subtree: true });
+
     // ── refresh after a pin changes (HX-Trigger dock-refresh, or the dock.changed event) ──
     let refreshing = false;
     async function refresh() {
@@ -175,6 +223,7 @@
             const next = tpl.content.querySelector('#dock');
             if (!next) return;
             next.querySelectorAll('script').forEach(s => s.remove());
+            document.querySelector('#dock-limits-shelf #dock-limits')?.remove();
             current.replaceWith(next);
             window.htmx?.process?.(next);
             setup();
@@ -191,7 +240,7 @@
         document.body.dispatchEvent(new CustomEvent('nav-refresh'));
     }
 
-    const setup = () => { arm(); paintTheme(); };
+    const setup = () => { arm(); paintTheme(); placeLimits(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup); else setup();
-    document.addEventListener('htmx:after:swap', arm);
+    document.addEventListener('htmx:after:swap', () => { arm(); scheduleLimits(); });
 })();

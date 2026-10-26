@@ -888,36 +888,6 @@ ${opts.headExtra ?? ""}
 <script src="/ui/tool-timer.js" defer></script>
 ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
 <style>
-/* Full-height shell navigation, using Hyper theme tokens and shared buttons. */
-#dock { width:232px; height:100%; margin:0; padding:0 10px 10px; align-items:stretch; border-radius:0; background-color:color-mix(in srgb,var(--color-base-100) 97%,white); box-shadow:inset 0 1px 0 rgb(255 255 255 / .22); }
-.project-shell-header { display:flex; align-items:center; justify-content:space-between; height:48px; flex-shrink:0; padding:0 12px; margin:0 -10px 6px; border-bottom:1px solid var(--ui-border-strong); }
-.project-header-controls { display:flex; align-items:center; gap:6px; }
-.project-header-controls>.dock-fixed { width:auto; }
-.project-header-controls #hyper-update-badge { margin-top:0; }
-#dock-running-agents { flex:0 0 auto; min-width:0; width:100%; margin:6px 0; }
-.dock-running-list { display:flex; flex-wrap:wrap; align-items:center; align-content:flex-start; gap:6px; min-width:0; max-height:158px; overflow-x:hidden; overflow-y:auto; padding:6px; scrollbar-width:thin; }
-.dock-running-list>a { display:flex; align-items:center; justify-content:center; flex:0 0 32px; width:32px; height:32px; padding:0; border-radius:6px; }
-.dock-running-list>a:hover { background:var(--color-base-300); }
-.project-sidebar { display:flex; flex:1; min-height:0; flex-direction:column; }
-.project-heading { display:flex; align-items:center; justify-content:space-between; padding:8px 6px; font-size:12px; font-weight:500; }
-.project-list { overflow:auto; min-height:0; }
-.project-row { display:flex; align-items:center; gap:9px; min-height:36px; padding:7px 9px; border-radius:6px; margin:2px 0; font-size:13px; text-decoration:none; }
-.project-title { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.project-row .project-title { flex:1; }
-.project-row>i { flex-shrink:0; font-size:16px; }
-.project-row:hover,.project-all-chats:hover,.project-icon-button:hover,.project-menu-item:hover { background:var(--color-base-300); }
-.project-row.selected { background:var(--color-base-300); color:var(--color-base-content); }
-.project-row:focus-visible,.project-icon-button:focus-visible,.project-tab-link:focus-visible { outline:2px solid var(--color-primary); outline-offset:-2px; }
-.project-indicators { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.project-running { display:inline-flex; font-size:15px; }
-.project-unread { min-width:17px; height:17px; padding:0 4px; border-radius:9px; font-size:10px; line-height:17px; text-align:center; }
-.project-unread-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-#dock-bottom>.dock-item { width:auto; }
-#dock-bottom { flex-direction:row; flex-wrap:wrap; justify-content:flex-start; padding:8px 4px 0; border-top:1px solid var(--color-ui-border); }
-#dock #quota-rings,#dock #llm-usage { width:100%; }
-#dock #llm-usage { display:flex; align-items:flex-start; gap:4px; flex-wrap:wrap; }
-#dock #llm-usage>[role="group"] { flex-direction:row; flex-wrap:wrap; justify-content:flex-start; gap:5px; border-top:0; padding-top:0; }
-#dock #llm-usage>div:not([role="group"]) { padding-top:0; }
 /* Quota ring hover card: the name, the limits and the reset moment — nothing else.
    It lives in the top layer (Popover API): the dock's backdrop-filter creates a
    stacking context, so no z-index inside the dock can lift anything above the
@@ -1040,6 +1010,7 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
   <section id="page-view" class="flex min-w-0 flex-1 flex-col bg-base-100">
     <main id="main" hx-history-elt class="min-h-0 min-w-0 flex flex-1 flex-col overflow-y-auto">${opts.main}</main>
   </section>
+  ${hideNavigation ? '' : '<aside id="dock-limits-shelf" aria-label="Лимиты моделей"></aside>'}
 </div>
 ${embedded ? "" : `<dialog id="app-popup" class="m-auto max-h-[85vh] w-[min(48rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-ui-border bg-base-100 p-0 text-base-content shadow-2xl backdrop:bg-black/40 backdrop:backdrop-blur-[1px]">
   <div class="flex max-h-[85vh] flex-col">

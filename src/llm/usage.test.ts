@@ -279,11 +279,10 @@ describe("ui.usageDial", () => {
         expect(dial(escCtx, null, { entries: [], now: NOW })).toBe("");
     });
 
-    test("the ring fill is proportional to the spent quota", () => {
+    test("generic quota remains explicitly unclassified", () => {
         const html = dial(escCtx, null, { entries: [entry({ usedPercent: 50 })], now: NOW });
-        // Half of the r=12 circumference (75.4). The ring IS the number — there
-        // is no digit to read in a 40px-wide bar.
-        expect(html).toContain('stroke-dasharray="37.7 75.4"');
+        // Generic quota has no measured period and cannot become a 5h bar.
+        expect(html).toContain("50% used · период неизвестен");
         expect(html).not.toMatch(/>\s*50\s*</);
     });
 
@@ -294,30 +293,30 @@ describe("ui.usageDial", () => {
 
     test("crossing the thresholds changes the colour", () => {
         expect(dial(escCtx, null, { entries: [entry({ usedPercent: 20, tone: "neutral" })], now: NOW })).toContain("text-faint");
-        expect(dial(escCtx, null, { entries: [entry({ usedPercent: 70, tone: "warning" })], now: NOW })).toContain("text-warning");
+        expect(dial(escCtx, null, { entries: [entry({ usedPercent: 40, tone: "warning" })], now: NOW })).toContain("text-warning");
         expect(dial(escCtx, null, { entries: [entry({ usedPercent: 92, tone: "error" })], now: NOW })).toContain("text-error");
     });
 
-    test("a parked credential shows the pause mark and says how many wait", () => {
+    test("a parked credential shows an error and says how many wait", () => {
         const html = dial(escCtx, null, { entries: [entry({ usedPercent: 100, tone: "error", parkedAgents: 14 })], now: NOW });
-        expect(html).toContain("ph-pause");
+        expect(html).toContain("Ошибка квоты");
         expect(html).toContain("14 agent(s) parked");
     });
 
     test("the tooltip interprets the number instead of just stating it", () => {
         const calm = dial(escCtx, null, { entries: [entry({ usedPercent: 20, tone: "neutral" })], now: NOW });
-        expect(calm).toContain("80% remaining");
-        expect(calm).toContain("sufficient capacity");
-        expect(calm).toContain("resets in 2h 0m");
+        expect(calm).toContain("20% used");
+        expect(calm).toContain("период неизвестен");
+        expect(calm).toContain("5h no data");
 
         const hot = dial(escCtx, null, { entries: [entry({ usedPercent: 78, tone: "error" })], now: NOW });
-        expect(hot).toContain("22% remaining");
-        expect(hot).toContain("consider switching models");
+        expect(hot).toContain("78% used");
+        expect(hot).toContain("Ошибка квоты");
     });
 
     test("no data draws an empty ring instead of a fake zero", () => {
         const html = dial(escCtx, null, { entries: [entry({ usedPercent: null, tone: "neutral" })], now: NOW });
         expect(html).not.toContain("stroke-dasharray");
-        expect(html).toContain("no data yet");
+        expect(html).toContain("Нет данных");
     });
 });

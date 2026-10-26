@@ -1,5 +1,5 @@
 /**
- * Renders the signed-in person's avatar button for the quick bar, with a small menu:
+ * Render the signed-in person's avatar, name and actual role with the account menu:
  * name and email, "People" for owners, and sign out.
  *
  * Returns "" when nobody is signed in (open local instance without users), so a single-user Hyper
@@ -21,8 +21,8 @@ export default async function (ctx: Context, session: Session | null, _opts: {})
     const item = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted hover:bg-base-200 hover:text-base-content";
     return `<div class="mb-1">` + await ctx.fns.ui.inplacePopup({
         id: "me-menu",
-        triggerHtml: face,
-        triggerAttrs: `class="flex size-7 items-center justify-center rounded-full" title="${esc(user.name)}" aria-label="Account: ${esc(user.name)}"`,
+        triggerHtml: face + `<span class="account-copy"><span class="account-name">${esc(user.name)}</span><span class="account-role">${user.role === 'owner' ? 'Owner' : 'Member'}</span></span>`,
+        triggerAttrs: `class="account-trigger flex items-center gap-2" title="${esc(user.name)}" aria-label="Account: ${esc(user.name)}"`,
         panelAttrs: `aria-label="Account" data-placement="side"`,
         contentHtml: `<div class="flex flex-col">
     <div class="mb-1 border-b border-ui-border px-2 pb-1.5 pt-0.5"><div class="truncate text-xs font-semibold">${esc(user.name)}</div><div class="truncate text-3xs text-faint">${esc(user.email ?? user.id)}${user.role === "owner" ? " · owner" : ""}</div></div>

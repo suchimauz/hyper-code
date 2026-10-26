@@ -1,9 +1,8 @@
 /**
- * Renders the unread @mentions badge of the left navigation rail.
+ * Render the viewer's unread mention counter and popup in the left navigation rail.
  *
- * An @ button with the viewer's unread count that opens a popup listing those mentions (who, which chat,
- * a line of text) with links straight to the message. Hidden when there is nothing unread. Refreshed by
- * GET /mentions/badge when a `mentions.changed` event arrives.
+ * Use for a live, accessible count linking to mention messages. Hidden when there is nothing unread;
+ * refreshed by GET /mentions/badge when a `mentions.changed` event arrives.
  */
 export default async function (
     ctx: Context,
@@ -21,7 +20,7 @@ export default async function (
     const label = `${count} unread mention${count === 1 ? "" : "s"}`;
     return `<div id="mentions-badge"${meAttr} class="mt-1">` + await ctx.fns.ui.inplacePopup({
         id: "mentions-popup",
-        triggerHtml: `<span class="flex h-7 min-w-7 items-center justify-center gap-0.5 rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-content"><span aria-hidden="true">@</span>${count}</span>`,
+        triggerHtml: `<span class="ui-unread-badge flex h-7 min-w-7 items-center justify-center gap-0.5 rounded-full px-1.5 text-xs font-semibold tabular-nums"><span aria-hidden="true">@</span>${count}</span>`,
         triggerAttrs: `class="flex items-center justify-center" title="${label}" aria-label="${label}"`,
         panelAttrs: `aria-label="Mentions" data-placement="side"`,
         contentHtml: `<div class="w-80 max-w-[80vw]"><div class="mb-1 border-b border-ui-border px-2 pb-1.5 text-xs font-semibold">Mentions</div><div class="max-h-[60vh] overflow-y-auto">${rows}</div></div>`,

@@ -7,7 +7,7 @@ import menu from '../nav/chatItems.ts';
 
 function fixture(){
  const count={root:2,own:1};
- const ctx:any={fns:{agent:{teamActivity:async()=>count},auth:{viewerId:async()=>null,listUsers:async()=>[]},projects:{get:async()=>({id:'p'}),principal:async()=>'local',identity:async()=>({id:'p',dir:'/work',host:''})},procs:{db:{select:async()=>[]},ui:{escape:({text}:any)=>text,button:(o:any)=>JSON.stringify(o)}},chat:{icon:(o:any)=>JSON.stringify(o)},ui:{live:(o:any)=>o.html,popup:()=>''}}};
+ const ctx:any={fns:{agent:{teamActivity:async()=>count},auth:{viewerId:async()=>null,listUsers:async()=>[]},projects:{list:async()=>[{id:'p',title:'Project',dir:'/work',host:''}],get:async()=>({id:'p'}),principal:async()=>'local',identity:async()=>({id:'p',dir:'/work',host:''})},procs:{db:{select:async()=>[]},ui:{escape:({text}:any)=>text,button:(o:any)=>JSON.stringify(o)}},chat:{icon:(o:any)=>JSON.stringify(o)},ui:{live:(o:any)=>o.html,popup:()=>''}}};
  return {ctx,count};
 }
 test('chat summary carries descendant count without changing own idle state',async()=>{
@@ -25,7 +25,7 @@ test('project counts idle team roots once, not each worker or already running ro
 });
 test('idle ancestors appear active in dock and menu without altering state',async()=>{
  const {ctx}=fixture();ctx.fns.procs.db.select=async()=>[{id:'root',title:'Parent',run_state:'idle'},{id:'idle',title:'Idle',run_state:'idle'}];
- const out=await dock(ctx,null,{});expect(out).toContain('Working subagents: 2');expect(out).toContain('/agent/root');expect(out).not.toContain('/agent/idle');
+ const out=await dock(ctx,null,{});expect(out).toContain('Ожидает · Подагенты: 2');expect(out).toContain('/agent/root');expect(out).not.toContain('/agent/idle');
  const cards=[{id:'root',runState:'idle'},{id:'idle',runState:'idle'},{id:'own',runState:'running'}];
  const items=await menu(ctx,null,{agents:cards});expect(items.map(x=>x.active)).toEqual([true,false,true]);expect(cards[0]?.runState).toBe('idle');expect(items[0]?.detail).toBeUndefined();
 });

@@ -12,7 +12,7 @@ function node(patch = {}) {
 async function render(nodes: any[], locals: any[] = [local], groups?: Record<string, string[]>, gateway?: any) {
     let calls = 0;
     const ctx: any = { state: { llmUsageRefresh: { startedAt: Date.now() } }, fns: {
-        llm: { ...(gateway ? { gatewayHealth: async () => gateway } : {}), usageOverview: async () => locals, listModels: async (opts: any) => { expect(opts).toEqual({}); calls++; return groups ?? Object.fromEntries(nodes.map(n => [`hyper/${n.name}`, n.catalog.map((m: any) => `hyper/${n.name}:${m.id}`)])); } },
+        llm: { listAccounts: async () => locals, ...(gateway ? { gatewayHealth: async () => gateway } : {}), usageOverview: async () => locals, listModels: async (opts: any) => { expect(opts).toEqual({}); calls++; return groups ?? Object.fromEntries(nodes.map(n => [`hyper/${n.name}`, n.catalog.map((m: any) => `hyper/${n.name}:${m.id}`)])); } },
         node: { list: async () => nodes },
         procs: { ui: { escape: ({ text }: any) => String(text).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!) ) } },
         ui: { live: ({ html }: any) => html, usageDial: (opts: any) => dial(ctx, null, opts), modelLogo: () => "<span></span>" },
@@ -28,7 +28,7 @@ describe("account quota dock", () => {
         const html = await render([node()], [local], undefined, { status: "available", reason: "models-ok" });
         expect(html).toContain('data-gateway="oneapi"');
         expect(html).toContain("Asoft LLM Gate · available");
-        expect(html).toContain("generation not verified; quota unavailable");
+        expect(html).toContain("quota not measured");
         expect(count(html)).toBe(4);
         expect(html).toContain("17% used");
     });

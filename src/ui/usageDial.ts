@@ -1,16 +1,11 @@
-// The quota indicator: one ring per subscription credential, filled by how much
-// of the window is spent. A ring is readable at a glance in a way a number is
-// not — the point is noticing 87% before the work stops, not reading it after.
-/** Renders compact quota groups by local machine, Hyper node or SSH instance, with equal-height provider rings. */
 /**
- * Render a compact ring per subscription credential showing spent quota.
- *
- * Colour follows configured thresholds (50% warning / 75% alert by default), and
- * a full ring with a pause icon once agents are parked on it. Returns an empty
- * string when nothing has been recorded yet.
- *
- * @param opts.entries Snapshot rows from llm.usageOverview.
- * @param opts.now Current time in ms, for testing.
+ * Render a provider/account quota matrix grouped by local machine, Hyper node or SSH.
+ * Shows measured five-hour, weekly and monthly periods together; missing or expired
+ * measurements remain explicitly unknown. Generic quota is shown with an explicit unknown-period label.
+ * Keeps provider reset timestamps in the tooltip, localized by the browser.
+ * Returns empty markup when there are no connections. Uses shared severity thresholds.
+ * @param opts.entries Connection snapshots from llms.usageData.
+ * @param opts.now Current epoch milliseconds for expiry checks; defaults to Date.now().
  */
 export default function (
     ctx: Context,
@@ -26,7 +21,7 @@ export default function (
             model?: string;
             /** Available catalogue model IDs for this provider/account; the full list lives on /llms, not in the hover card. */
             models?: string[];
-            /** Measured 5h, weekly and optional monthly quota windows, rendered as concentric rings. */
+            /** Measured 5h, weekly and optional monthly quota windows, rendered as simultaneous matrix rows. */
             windows?: types.llm.UsageSnapshot["windows"];
             /** Hyper node name for remote credentials; omitted for local credentials. */
             node?: string;
@@ -40,6 +35,8 @@ export default function (
             /** Shared quota colour thresholds from usageOverview. */
             thresholds?: { warnAt: number; criticalAt: number; alertAt: number };
         }>;
+        /** Optional OpenAI-compatible gateway health; never interpreted as subscription quota. */
+        gateway?: { status: string; reason?: string; models?: string[]; checkedAt?: number | null } | null;
         /** Current timestamp in ms; defaults to Date.now(). */
         now?: number;
         /**
@@ -51,7 +48,8 @@ export default function (
     },
 ): string {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
-    const entries = opts.entries ?? [];
+    const entries = [...(opts.entries ?? [])];
+    if (opts.gateway) entries.push({provider: "oneapi", account: "default", label: "Asoft LLM Gate", usedPercent: null, resetsAt: null, planType: null, parkedAgents: 0, tone: "neutral"});
     if (!entries.length) return "";
     const now = opts.now ?? Date.now();
     // Four steps, so the ring heats up instead of staying green until the
@@ -61,98 +59,89 @@ export default function (
     const groups = new Map<string, { label: string; entries: typeof entries }>();
     for (const entry of entries) {
         const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];
-        const key = entry.node ? `hyper/${entry.node}` : ssh ? `ssh/${ssh}` : 'local';
-        const label = entry.node ? `Hyper · ${entry.node}` : ssh ? `SSH · ${ssh}` : 'Local';
+        const key = entry.provider === 'oneapi' ? 'gateway' : entry.node ? `hyper/${entry.node}` : ssh ? `ssh/${ssh}` : 'local';
+        const label = entry.provider === 'oneapi' ? 'Gate' : entry.node ? `Hyper · ${entry.node}` : ssh ? `SSH · ${ssh}` : 'Local';
         if (!groups.has(key)) groups.set(key, { label, entries: [] });
         groups.get(key)!.entries.push(entry);
     }
     const ring = (entry: typeof entries[number]) => {
-        if (entry.provider === "opencode" && entry.planType !== "Go subscription") {
-            const text = entry.memberBudgetText ?? "Monthly member budget unavailable";
-            return `<a href="/llms" data-member-budget="opencode" class="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-2xs hover:bg-base-300" aria-label="${esc(`${entry.label} · ${text}`)}"><span aria-hidden="true">${ctx.fns.ui.modelLogo({ model: "opencode:", bare: true, compact: true })}</span><span>${esc(text)}</span></a>`;
-        }
         const ssh = /^ssh\/([^:]+):/.exec(entry.model ?? '')?.[1] ?? /^ssh\.(.+)\.[^.]+$/.exec(entry.account)?.[1];
-        const percent = entry.usedPercent == null ? 0 : Math.max(0, Math.min(100, entry.usedPercent));
-        const known = entry.quotaStatus !== "unavailable" && entry.usedPercent != null && Number.isFinite(entry.usedPercent);
-        const parked = entry.parkedAgents > 0;
-        const thresholds = entry.thresholds ?? opts.thresholds ?? { warnAt: 30, criticalAt: 60, alertAt: 75 };
+        const gateway = entry.provider === "oneapi" ? opts.gateway : null;
         const unavailable = entry.quotaStatus === "unavailable";
-        const muted = unavailable || entry.quotaStatus === "stale";
-        const colour = parked ? "text-error" : muted ? "text-faint" : toneClass(known ? percent : null, thresholds);
-        // A stroke-dasharray on a circle of r=12 (circumference ≈ 75.4) needs no
-        // JS and no layout: the fill IS the number.
-        const circumference = 75.4;
-        const filled = known ? (percent / 100) * circumference : 0;
-        // Two rings when the provider reports two rolling windows: the weekly
-        // one outside, the short one inside. Driven by the measured windows,
-        // not by a list of providers — otherwise a plan that reports a weekly
-        // window would still show one ring.
-        const freshWindow = (window?: types.llm.UsageWindow) => window && Number.isFinite(window.usedPercent) && (!window.resetsAt || window.resetsAt > now) ? window : undefined;
-        const short = unavailable ? undefined : freshWindow(entry.windows?.primary);
-        const weekly = unavailable ? undefined : freshWindow(entry.windows?.secondary);
-        const monthly = unavailable ? undefined : freshWindow(entry.windows?.tertiary);
-        const triple = Boolean(entry.windows?.tertiary);
-        const kimiWindows = entry.provider === 'kimi-coding' ? [
-            entry.windows?.tertiary ? {label:'Monthly',key:'monthly',window:monthly} : null,
-            entry.windows?.secondary ? {label:'Weekly',key:'weekly',window:weekly} : null,
-            entry.windows?.primary ? {label:'5h',key:'5h',window:short} : null,
-        ].filter((w): w is {label:string;key:string;window:types.llm.UsageWindow|undefined} => w !== null) : null;
-        const dual = Boolean(kimiWindows?.length) || triple || Boolean(entry.windows?.secondary) || entry.provider === "zai-coding" || entry.provider === "minimax-coding";
-        const quotaCircle = (radius: number, window: types.llm.UsageWindow | undefined, label: string) => {
-            const length = 2 * Math.PI * radius;
-            const percent = window ? Math.max(0, Math.min(100, window.usedPercent)) : null;
-            // The same severity rule as every other usage surface.
-            const tone = parked ? "text-error" : muted ? "text-faint" : toneClass(percent, thresholds);
-            return `<g data-quota-window="${label}" class="${tone}"><circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.18"></circle>${percent == null ? "" : `<circle cx="14" cy="14" r="${radius}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="${(length*percent/100).toFixed(2)} ${length.toFixed(2)}"></circle>`}</g>`;
+        const stale = entry.quotaStatus === "stale";
+        const parked = entry.parkedAgents > 0;
+        const budget = entry.provider === "opencode" && entry.planType !== "Go subscription";
+        const thresholds = entry.thresholds ?? opts.thresholds ?? { warnAt: 30, criticalAt: 60, alertAt: 75 };
+        // Most providers normalize named periods to semantic slots. Codex slots
+        // are ordered by the upstream response, not by duration: primary may be
+        // weekly. Never infer five hours (or a week) from an unlabelled Codex slot.
+        const windows = Object.entries(entry.windows ?? {}).filter((entry): entry is [string, types.llm.UsageWindow] => entry[1] != null);
+        const measured = (slot: string, minutes: number) => {
+            if (unavailable || budget) return undefined;
+            return windows.find(([key, w]) => {
+                const duration = w.windowMinutes;
+                const matches = duration == null ? entry.provider !== "codex" && key === slot : minutes === 43200
+                    ? duration >= 40320 && duration <= 44640 : duration === minutes;
+                return matches && Number.isFinite(w.usedPercent) && (!w.resetsAt || w.resetsAt > now);
+            })?.[1];
         };
-        const dualSvg = dual ? `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">${kimiWindows ? kimiWindows.map((w,i)=>quotaCircle(12-i*3,w.window,w.key)).join('') : `${triple ? quotaCircle(12,monthly,"monthly") : ""}${quotaCircle(triple ? 9 : 12,weekly,"weekly")}${quotaCircle(triple ? 6 : 9,short,"5h")}`}</svg>` : "";
-
-        // The hover card keeps only what the eye came for — the name, the
-        // limits and the reset moment. The model catalogue lives one click
-        // away on /llms; a tooltip is not the place for a wall of model IDs.
-        // Reset moments are rendered in the Russian short format, without
-        // seconds: "21 окт., 15:30".
-        const ruStamp = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-        const resetStamp = (ms: number | null | undefined) => (ms && Number.isFinite(ms) ? ruStamp.format(new Date(ms)) : null);
-        const tipRow = (name: string, usedPercent: number | null, resetsAt: number | null) => {
-            const tone = parked ? "text-error" : muted ? "text-faint" : toneClass(usedPercent, thresholds);
-            const stamp = resetStamp(resetsAt);
-            const used = usedPercent == null ? "no data" : `${Math.round(usedPercent)}% used${entry.quotaStatus === "stale" ? " (last known)" : ""}`;
-            return {
-                tone,
-                text: stamp ? `${name} ${used} · resets ${stamp}` : `${name} ${used}`,
-                html: `<span class="quota-tip-row ${tone}"><i class="quota-tip-dot" aria-hidden="true"></i><span class="quota-tip-name">${esc(name)}</span><span>${esc(used)}</span>${stamp ? `<span class="quota-tip-reset">resets ${esc(stamp)}</span>` : ""}</span>`,
-            };
-        };
-        const rows = unavailable
-            ? [{ tone: "text-faint", text: "quota unavailable — usage unknown", html: `<span class="quota-tip-row text-faint"><i class="quota-tip-dot" aria-hidden="true"></i><span>quota unavailable — usage unknown</span></span>` }]
-            : kimiWindows?.length
-                ? [...kimiWindows].reverse().map(w=>tipRow(w.label,w.window?.usedPercent ?? null,w.window?.resetsAt ?? null))
-            : dual
-                ? [tipRow("5h", short?.usedPercent ?? null, short?.resetsAt ?? null), tipRow("Weekly", weekly?.usedPercent ?? null, weekly?.resetsAt ?? null)]
-                : [tipRow("Quota", known ? percent : null, entry.resetsAt)];
-        if (!unavailable && triple && !kimiWindows) rows.push(tipRow("Monthly", monthly?.usedPercent ?? null, monthly?.resetsAt ?? null));
-        if (parked) rows.push({ tone: "text-error", text: `${entry.parkedAgents} agent(s) parked`, html: `<span class="quota-tip-row text-error"><i class="ph ph-pause" aria-hidden="true"></i><span>${entry.parkedAgents} agent(s) parked</span></span>` });
-        const head = `${entry.label}${entry.planType ? ` · ${entry.planType}` : ""}`;
+        const periods = [
+            { key: "5h", label: "5 ч", detail: "5h", window: measured("primary", 300) },
+            { key: "weekly", label: "Неделя", detail: "Weekly", window: measured("secondary", 10080) },
+            { key: "monthly", label: "Месяц", detail: "Monthly", window: measured("tertiary", 43200) },
+        ];
+        const ruStamp = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+        const rows = periods.map(p => {
+            const percent = p.window ? Math.max(0, Math.min(100, p.window.usedPercent)) : null;
+            const tone = unavailable || stale ? "text-faint" : toneClass(percent, thresholds);
+            const used = percent == null ? "no data" : `${Math.round(percent)}% used${stale ? " (last known)" : ""}`;
+            const reset = p.window?.resetsAt;
+            const stamp = reset && Number.isFinite(reset) ? `${ruStamp.format(new Date(reset))} UTC` : null;
+            return { ...p, percent, tone, text: `${p.detail} ${used}${stamp ? ` · resets ${stamp}` : ""}`,
+                html: `<span class="quota-tip-row ${tone}"><i class="quota-tip-dot" aria-hidden="true"></i><span class="quota-tip-name">${p.detail}</span><span>${used}</span>${stamp ? `<span class="quota-tip-reset">resets <time datetime="${new Date(reset!).toISOString()}" data-quota-reset-detail>${esc(stamp)}</time></span>` : ""}</span>` };
+        });
+        const status = [
+            unavailable ? "quota unavailable — usage unknown" : stale ? "Устаревшие данные · stale quota snapshot" : "",
+            entry.tone === "error" ? "Ошибка квоты" : "",
+            parked ? `${entry.parkedAgents} agent(s) parked` : "",
+            budget ? entry.memberBudgetText ?? "Monthly member budget unavailable" : "",
+        ].filter(Boolean);
+        // Keep an unclassified quota accessible, without inventing its duration.
+        if (!budget && !unavailable && !rows.some(r => r.window) && (!windows.length || windows.some(([, w]) => (w.windowMinutes == null ? entry.provider === "codex" : ![300, 10080].includes(w.windowMinutes) && !(w.windowMinutes >= 40320 && w.windowMinutes <= 44640)) && (!w.resetsAt || w.resetsAt > now))) && entry.usedPercent != null && Number.isFinite(entry.usedPercent)) {
+            status.push(`Quota ${Math.round(Math.max(0, Math.min(100, entry.usedPercent)))}% used${stale ? " (last known)" : ""} · период неизвестен`);
+        }
+        if (gateway) {
+            const text = gateway.reason === "disabled" ? "disabled" : gateway.reason === "missing-key" ? "configured · key missing" : gateway.status;
+            status.push(`Asoft LLM Gate · ${text}`, "quota not measured", `${gateway.models?.length ?? 0} in catalogue`);
+            if (gateway.checkedAt && Number.isFinite(gateway.checkedAt)) status.push(`checked ${ruStamp.format(new Date(gateway.checkedAt))}`);
+        }
+        const generic = status.find(s => s.includes("период неизвестен"));
+        // Details stay in the accessible label and popover. A narrow matrix column
+        // must not turn gateway metadata or an error into a paragraph below its rows.
+        const statusIcon = entry.tone === "error" ? "warning-circle" : unavailable ? "question" : stale ? "clock" : gateway ? (gateway.status === "available" ? "check-circle" : "info") : null;
+        const compactStatus = [statusIcon ? `<i class="ph ph-${statusIcon}" aria-hidden="true"></i>` : "", parked ? `Ⅱ ${entry.parkedAgents}` : "", budget ? "PAYG" : ""].filter(Boolean).join(" ");
+        const head = `${entry.label}${entry.account !== "default" ? ` · ${entry.account}` : ""}${entry.planType ? ` · ${entry.planType}` : ""}`;
         const machine = entry.node ? `Hyper node ${entry.node}` : ssh ? `SSH ${ssh}` : null;
-        const aria = [head, machine, ...rows.map((row: { tone: string; text: string; html: string }) => row.text)].filter(Boolean).join(" · ");
-        const tip = `<span class="quota-tip" popover="auto" aria-hidden="true"><span class="quota-tip-head">${esc(head)}</span>${machine ? `<span class="quota-tip-sub">${esc(machine)}</span>` : ""}${rows.map((row: { tone: string; text: string; html: string }) => row.html).join("")}</span>`;
-
-        return `<a href="/llms" class="quota-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-base-300" aria-label="${esc(aria)}">
-          <span class="relative flex size-7 shrink-0 items-center justify-center ${colour}">
-            ${dual ? dualSvg : `<svg viewBox="0 0 28 28" class="absolute size-7 -rotate-90" aria-hidden="true">
-              <circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2" opacity="0.18"></circle>
-              ${known ? `<circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="${filled.toFixed(1)} ${circumference}"></circle>` : ""}
-            </svg>`}
-            ${parked
-            ? `<i class="ph ph-pause text-2xs" aria-hidden="true"></i>`
-            : ctx.fns.ui.modelLogo({ model: entry.model ?? (entry.node ? `hyper/${entry.node}:${entry.provider}:` : ssh ? `ssh/${ssh}:${entry.provider}:` : `${entry.provider}:`), bare: true, ...(dual ? { compact: true } : {}) })}
-          </span>
-          ${tip}
+        const aria = [head, machine, ...rows.map(r => r.text), ...status].filter(Boolean).join(" · ");
+        const tip = `<span class="quota-tip" popover="auto" aria-hidden="true"><span class="quota-tip-head">${esc(head)}</span>${machine ? `<span class="quota-tip-sub">${esc(machine)}</span>` : ""}${rows.map(r => r.html).join("")}${status.map(s => `<span class="quota-tip-row">${esc(s)}</span>`).join("")}</span>`;
+        return `<a href="/llms" class="quota-ring quota-matrix-card" ${gateway ? `data-gateway="oneapi" data-status="${esc(gateway.status)}"` : ""} ${budget ? 'data-member-budget="opencode"' : ''} aria-label="${esc(aria)}">
+            <span class="quota-matrix-provider"><span class="quota-matrix-logo" aria-hidden="true">${gateway ? `<i class="ph ph-plugs-connected" aria-hidden="true"></i>` : ctx.fns.ui.modelLogo({ model: entry.model ?? `${entry.provider}:`, bare: true, compact: true })}</span><span class="quota-matrix-name">${esc(entry.label)}${entry.account !== "default" ? `<span class="quota-matrix-account">${esc(entry.account)}</span>` : ""}</span></span>
+            <span class="quota-matrix-periods">${generic && entry.provider !== "codex" ? `<span class="quota-matrix-unknown ${toneClass(entry.usedPercent, thresholds)}">${Math.round(Math.max(0, Math.min(100, entry.usedPercent!)))}%<br>период<br>неизв.</span>` : rows.map(r => `<span class="quota-matrix-period" data-quota-window="${r.key}" style="grid-row:${r.key === '5h' ? 1 : r.key === 'weekly' ? 2 : 3}"><span>${r.label}</span><strong class="${r.tone}" aria-label="${r.percent == null ? "Нет данных" : `${Math.round(r.percent)}% использовано`}">${r.percent == null ? "—" : Math.round(r.percent)}</strong><span class="quota-matrix-bar ${r.tone}" aria-hidden="true"><span style="width:${r.percent ?? 0}%"></span></span></span>`).join("")}</span>
+            ${compactStatus ? `<span class="quota-matrix-status" aria-hidden="true">${compactStatus}</span>` : ""}${tip}
         </a>`;
     };
     const grouped = [...groups.entries()].sort(([a], [b]) => a === 'local' ? -1 : b === 'local' ? 1 : a.localeCompare(b));
-    const showHeadings = groups.size > 1 || !groups.has('local');
-    const html = grouped.map(([key, group]) => `<section data-quota-group="${esc(key)}" aria-label="${esc(group.label)}" class="min-w-0">${showHeadings ? `<h3 class="truncate px-1 text-[9px] font-medium leading-3 text-faint" title="${esc(group.label)}">${esc(group.label)}</h3>` : ''}<div class="flex flex-wrap items-center gap-0.5">${group.entries.map(ring).join('')}</div></section>`).join('');
-    return `<div class="w-full border-t border-ui-border pt-1" role="group" aria-label="Subscription quota"><div class="w-full min-w-0 space-y-1">${html}</div></div>`;
+    const flat = grouped.flatMap(([key, group]) => group.entries.map(entry => ({key, label: group.label, entry})));
+    const bands: string[] = [];
+    for (let i = 0; i < flat.length; i += 6) {
+        const chunk = flat.slice(i, i + 6);
+        const segments: Array<{key: string; label: string; count: number}> = [];
+        for (const row of chunk) {
+            const last = segments.at(-1);
+            if (last?.key === row.key) last.count++;
+            else segments.push({key: row.key, label: row.label, count: 1});
+        }
+        bands.push(`<div class="quota-matrix-band"><div class="quota-matrix-labels" aria-hidden="true"><span class="quota-matrix-label-spacer"></span><span>5 ч</span><span>Нед.</span><span>Мес.</span></div><div class="quota-matrix-band-content"><div class="quota-matrix-sources">${segments.map(g => `<h3 data-quota-group="${esc(g.key)}" class="quota-matrix-heading" style="grid-column:span ${g.count}">${esc(g.label)}</h3>`).join("")}</div><div class="quota-matrix-grid">${chunk.map(r => ring(r.entry)).join("")}</div></div></div>`);
+    }
+    return `<div class="quota-matrix w-full" role="group" aria-label="Subscription quota">${bands.join("")}</div>`;
 }

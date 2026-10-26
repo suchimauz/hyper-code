@@ -8,6 +8,16 @@
 // top layer and need no CSS anchor support.
 (function () {
   var current = null;
+  // Server timestamps explicitly say UTC until the viewer's timezone is known.
+  var localizeResets = function () {
+    var full = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+    document.querySelectorAll('time[data-quota-reset-detail]').forEach(function (time) {
+      var value = new Date(time.dateTime);
+      if (Number.isFinite(value.getTime())) time.textContent = full.format(value);
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', localizeResets, { once: true });
+  else localizeResets();
   var place = function (tip, ring) {
     var rect = ring.getBoundingClientRect();
     tip.style.left = Math.round(rect.left - 4) + 'px';
@@ -49,6 +59,7 @@
   });
   // A re-swapped strip leaves a dangling top-layer card; close what is gone.
   document.addEventListener('htmx:afterSwap', function (event) {
+    localizeResets();
     if (!event.target || !event.target.querySelectorAll) return;
     if (!event.target.querySelector('.quota-ring')) return;
     document.querySelectorAll('.quota-tip').forEach(function (tip) {
