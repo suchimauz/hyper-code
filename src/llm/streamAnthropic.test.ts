@@ -2,6 +2,7 @@ import { test, expect, describe, afterEach } from "bun:test";
 import stream from "./streamAnthropic";
 import parseSSE from "./parseSSE";
 import toAnthropicMessages from "./toAnthropicMessages";
+import classifyError from "./classifyError";
 
 // Offline: drive streamAnthropic through the shared parseSSE with a mocked fetch.
 // Uses provider 'anthropic' so no OAuth refresh path is touched.
@@ -128,9 +129,20 @@ describe('SSH replay safety', () => {
         ctx.fns.sshAccount={fetch:async()=>new Response(body)};
         return ctx;
     }
-    test('truncated EOF and malformed stream are never successful or replayable',async()=>{
+    test('truncated EOF and malformed stream are rejected without transport replay',async()=>{
         for(const body of ['', 'data: {bad json}\n\n']) {
             await expect(stream(sshCtx(body),null,{agent:agent()})).rejects.toMatchObject({transportFailure:{phase:'ambiguous',retryable:false}});
+        }
+    });
+    test('provider SSE quota/auth refusals retain classification rather than transport ambiguity',async()=>{
+        for (const [type, kind] of [['usage_limit_reached','usage_limit'],['authentication_error','auth']]) {
+            const ctx = sshCtx(`event: error\ndata: ${JSON.stringify({type:'error',error:{type,message:type}})}\n\n`);
+            const resolve = ctx.fns.llm.resolveEndpoint;
+            ctx.fns.llm.resolveEndpoint = () => ({...resolve(),kind:'subscription',quotaAccount:'ssh/mock/account'});
+            ctx.fns.llm.classifyError = (opts: any) => classifyError(ctx,null,opts);
+            const error = await stream(ctx,null,{agent:agent()}).catch(e => e);
+            expect(error.failure).toMatchObject({kind,account:'ssh/mock/account',retryable:false});
+            expect(error.transportFailure).toBeUndefined();
         }
     });
     test('valid terminal marker succeeds',async()=>{

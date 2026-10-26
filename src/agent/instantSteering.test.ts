@@ -11,15 +11,25 @@ function harness() {
         auth: { actorId: async () => null },
         session: {
             forAgent: () => null,
+            scrubUnicode: async ({ text }: any) => text,
+            mutateScratchpad: async ({ mutate }: any) => { mutate(agent.scratchpad, Date.now()); return agent.scratchpad; },
+            recordContextUsage: async () => {},
             appendMessage: async ({ message }: any) => { const row = { ...message, idx: rows.length }; rows.push(row); return row; },
             appendUserMessage: async ({ text }: any) => { const row = { role: "user", content: text, idx: rows.length }; rows.push(row); return row; },
             appendEvent: async ({ event }: any) => events.push(event), appendAssistantEvent: async () => {}, appendErrorEvent: async () => {},
             syncAgentState: async ({ agent }: any) => { agent.messages = rows.map(row => ({ ...row })); return agent; },
             getFullMessages: async () => rows, getMessages: async () => rows,
         },
-        procs: { db: { select: async ({ sql }: any) => sql.includes("MAX(idx)") ? [{ i: Math.max(...rows.filter(r => r.role === "user" && !r.excluded_from_cursor).map(r => r.idx), -1) }] : [{ id: "a" }], run: async () => ({ changes: 1 }) }, ui: { escape: ({ text }: any) => text }, log: { warn: () => {} } },
+        procs: { db: { select: async ({ sql }: any) => sql.includes("MAX(idx)") ? [{ i: Math.max(...rows.filter(r => r.role === "user" && !r.excluded_from_cursor).map(r => r.idx), -1) }] : [{ id: "a" }], transaction: async ({ fn }: any) => fn(), run: async ({ sql, params }: any) => {
+            if (sql.startsWith('INSERT INTO messages')) {
+                const row = { idx: rows.length, role: 'user', content: params[1] };
+                rows.push(row);
+                return { changes: 1, rows: [{ idx: row.idx }] };
+            }
+            return { changes: 1, rows: [] };
+        } }, events: { emit: () => {}, refresh: () => {} }, ui: { escape: ({ text }: any) => text }, log: { warn: () => {} } },
         settings: { getNumber: async () => 0 }, attachments: { saveUploads: async () => [], commitUploads: async () => {}, resolveContent: async ({ messages }: any) => messages },
-        agent: { renderEventHtml: async () => "", wakeWorker: () => {}, statusLineForTurn: async () => "", buildLlmRequest: async () => ({ system: "", messages: agent.messages }), functionRag: async () => null, fullSystemPrompt: async () => "", cacheRoot: async () => "a", wireTools: () => [], stashResult: async ({ output }: any) => ({ content: output }) },
+        agent: { autoCompactIfNeeded: async () => ({ status: 'disabled', overBudget: false }), wakeWaiters: async () => {}, renderEventHtml: async () => "", wakeWorker: () => {}, statusLineForTurn: async () => "", buildLlmRequest: async () => ({ system: "", messages: agent.messages }), functionRag: async () => null, fullSystemPrompt: async () => "", cacheRoot: async () => "a", wireTools: () => [], stashResult: async ({ output }: any) => ({ content: output }) },
         llm: { stream: async ({ signal }: any) => { streamCalls++; if (streamCalls === 1) return await new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true })); return { text: "steered answer", usage: {}, finishReason: "stop", toolCalls: [] }; } },
         markdown: { render: async ({ source }: any) => source }, tools: { runs: () => [], call: async () => ({ output: "" }) }, events: { refreshAgentMeta: () => {} },
     } };

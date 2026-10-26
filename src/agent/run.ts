@@ -13,6 +13,9 @@
  * durable assistant index; failed, aborted and observer turns do not launch it.
  * Refuses durably stopped agents, fences awaited work against Stop/replacement,
  * and passes an immutable runSignal to cooperative tools. Cannot preempt arbitrary JS.
+ * Retries an interrupted SSH inference once per run after 10 seconds, before persisting
+ * or executing its partial response. Refreshes the durable transcript and honors Stop,
+ * replacement and new input; provider auth/quota failures are not inference retries.
  * @param opts.agent Live agent whose transcript and turn state are updated.
  * @param opts.userText User input to append unless already persisted by ingestion.
  * @param opts.userMessageAlreadyAppended Skip appending input for worker-claimed messages. @default false
@@ -166,6 +169,8 @@ export default async function (
 
     const MAX_MALFORMED_RESPONSES = 3;
     let consecutiveMalformedResponses = 0;
+    // Shared across all model/tool cycles in this run; successful cycles do not reset it.
+    let sshInferenceRetries = 0;
     let goalIterations = 0;
     let lastGoalFeedback = "";
     const goalDeadline = Date.now() + 5 * 60_000;
@@ -256,6 +261,28 @@ export default async function (
                 // Nothing from the interrupted partial response is persisted.
                 // The next loop refreshes the durable transcript and includes
                 // every user message that arrived while sampling.
+                continue;
+            }
+            const transport = error?.transportFailure;
+            if (transport?.kind === 'ssh_transport' && transport.phase === 'ambiguous'
+                && !error.failure && !sampling.signal.aborted && sshInferenceRetries < 1) {
+                await assertRunActive();
+                sshInferenceRetries++;
+                // Only llm.stream failed: no calls from this partial response have been
+                // persisted or executed. Previous tool results stay in the transcript.
+                // retryable:false still forbids low-level transport replay; this is one
+                // new model request at the owned agent boundary, not a tool/run restart.
+                await ctx.fns.session.appendErrorEvent({ id: agent.id,
+                    error: 'SSH inference interrupted; one automatic model retry in 10 seconds. Completed tool results are preserved.' });
+                await assertRunActive();
+                try {
+                    const timers = await import('node:timers/promises');
+                    await timers.setTimeout(10_000, undefined, { signal: sampling.signal });
+                } catch (waitError) {
+                    if (!(sampling.signal.aborted && sampling.signal.reason === 'new_user_input' && !ac.signal.aborted)) throw waitError;
+                }
+                await assertRunActive();
+                // The outer loop refreshes input/results and installs a fresh sampling signal.
                 continue;
             }
             throw error;

@@ -3,9 +3,10 @@
 // ~/.codex/auth.json — refreshCodex() is called first to ensure freshness.
 // Same return shape as streamOpenAI / streamAnthropic so the dispatcher in
 // stream.ts can swap providers transparently.
-/** Performs the llm.streamCodex runtime operation. */
 /**
- * OpenAI Responses API streamer for the ChatGPT subscription via Codex backend.
+ * Stream OpenAI Responses into text, reasoning and native tool calls.
+ * Use for Codex-compatible providers, including SSH subscriptions. Rejects partial
+ * SSH responses and preserves explicit provider SSE auth/quota failure classification.
  * @param opts.agent Agent associated with the operation.
  * @param opts.signal Abort signal for cancelling the request.
  * @param opts.onEvent Callback invoked for each normalized stream event.
@@ -154,6 +155,13 @@ export default async function (
             terminal = true;
             break;
         } else if (t === "response.failed" || t === "error") {
+            if (ep.ssh) {
+                const info = ctx.fns.llm.classifyError({
+                    provider: ep.provider, account: ep.quotaAccount ?? ep.account, kind: ep.kind,
+                    body: JSON.stringify({ error: ev.response?.error ?? ev.error ?? { code: ev.code, message: ev.message } }), headers: res.headers,
+                });
+                throw failure(info);
+            }
             const msg =
                 ev.response?.error?.message ??
                 ev.error?.message ??
@@ -166,6 +174,8 @@ export default async function (
 
     if (ep.ssh && !terminal) throw new Error("Codex stream ended without a terminal response");
     } catch (error) {
+        // A provider's terminal refusal is not an interrupted SSH inference.
+        if (error && typeof error === 'object' && 'failure' in error) throw error;
         if (ep.ssh && !opts.signal?.aborted) {
             throw Object.assign(new Error("SSH inference interrupted; provider acceptance is uncertain. Resume manually.", { cause: error }), {
                 transportFailure: { kind: "ssh_transport", phase: "ambiguous", retryable: false },

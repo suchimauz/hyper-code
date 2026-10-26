@@ -13,9 +13,10 @@ function harness(error: any, options: { retries?: number; fenced?: boolean; stop
     const ctx: any = { state: { agent: { child }, agentRunRetries: { child: options.retries ?? 0 } }, fns: {
         agent: { run: async () => { if (options.stopped) child.abortController.abort('stopped_by_user'); if (error) throw error; return { consumedUserIdx: 7 }; }, wakeWorker: () => {}, autoCompactIfNeeded: async () => {}, parkOnUsageLimit: async () => { throw Error('SSH must not park on quota'); } },
         session: { appendErrorEvent: async (event: any) => { events.push(event); }, syncAgentState: async () => {}, deliverInbound: async (notice: any) => { if (!notices.some(n => n.delivery.key === notice.delivery.key)) notices.push(notice); } },
+        events: { emitAgentsChanged: () => {} },
         webPush: { recordFailure: async () => {} },
         procs: { log: { warn: () => {} }, db: {
-            select: async ({ sql }: any) => sql.includes('MAX(idx)') ? [{ max_idx: 3 }] : options.terminal === false || options.scheduled ? [] : [{ id: 'child' }],
+            select: async ({ sql }: any) => sql.includes('MAX(idx)') ? [{ max_idx: 3 }] : sql.startsWith('SELECT run_token, run_state, stopped_at') ? [{ run_token: 'token', run_state: 'running', stopped_at: null }] : options.terminal === false || options.scheduled ? [] : [{ id: 'child' }],
             run: async (query: any) => { updates.push(query); return { changes: options.fenced ? 0 : 1, rows: [{ next_run_at: options.scheduled ? 123 : query.params[5] }] }; },
         } },
     } };
@@ -81,16 +82,25 @@ describe('SSH worker recovery (isolated)', () => {
     });
 });
 
-test('run clears partial mobileStream on thrown streaming error and preserves the error metadata', async () => {
+test('run retries partial streaming once, clears mobileStream and preserves terminal error metadata', async () => {
     const source = await Bun.file(new URL('./run.ts', import.meta.url)).text();
     const start = source.indexOf('        const mobileStream =');
     const end = source.indexOf('        const { text, usage, finishReason', start);
-    const isolatedStream = new Function('ctx', 'agent', 'ac', new Bun.Transpiler({ loader: 'ts' }).transformSync('return (async () => { let discardTransient; while (true) {\n' + source.slice(start, end) + '\nbreak; } })();'));
-    const agent = { id: 'fixture', scratchpad: {}, samplingAbortController: null };
+    // Inject only the sleep dependency into this source-slice harness: no global
+    // timer/module mocks and no real ten-second wait.
+    const streamSource = source.slice(start, end).replace("await import('node:timers/promises')", 'fakeTimers');
+    const isolatedStream = new Function('ctx', 'agent', 'ac', 'fakeTimers', new Bun.Transpiler({ loader: 'ts' }).transformSync('return (async () => { let discardTransient; let sshInferenceRetries = 0; const assertRunActive = async () => ac.signal.throwIfAborted(); while (true) {\n' + streamSource + '\nbreak; } })();'));
+    const ac = new AbortController();
+    const agent = { id: 'fixture', scratchpad: {} as any, samplingAbortController: null, abortController: ac };
     const error = ssh('ambiguous', false);
-    let caught: any;
-    try { await isolatedStream({ fns: { procs: { events: { emit: () => {} } }, llm: { stream: async () => { throw error; } } } }, agent, new AbortController()); }
+    let caught: any, calls = 0;
+    const delays: number[] = [], notices: any[] = [];
+    try { await isolatedStream({ fns: { session: { appendErrorEvent: async (event: any) => notices.push(event) }, procs: { events: { emit: () => {} } }, llm: { stream: async ({ onEvent }: any) => { calls++; onEvent({ type: 'text_delta', delta: 'partial' }); throw error; } } } }, agent, ac, { setTimeout: async (ms: number) => { delays.push(ms); } }); }
     catch (e) { caught = e; }
     expect(caught).toBe(error);
+    expect(calls).toBe(2);
+    expect(delays).toEqual([10_000]);
+    expect(notices).toHaveLength(1);
+    expect(agent.samplingAbortController).toBeNull();
     expect(agent.scratchpad.mobileStream).toBeUndefined();
 });

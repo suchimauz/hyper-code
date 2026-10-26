@@ -3,6 +3,8 @@
  * Stream Anthropic Messages responses into text, reasoning and native tool calls.
  * Use for Anthropic-compatible providers, including SSH subscriptions. Removes
  * Kimi's leaked leading response-channel opener before emitting text deltas.
+ * SSH truncation rejects the partial response; explicit provider SSE failures retain
+ * auth/quota classification instead of being mislabeled as retryable inference loss.
  * @param opts.agent Agent associated with the operation.
  * @param opts.signal Abort signal for cancelling the request.
  * @param opts.onEvent Callback invoked for each normalized stream event.
@@ -203,7 +205,13 @@ export default async function (
         try { msg = JSON.parse(data); } catch (error) { if (ep.ssh) throw error; continue; }
         const type = event ?? msg.type ?? "message";
         if (type === "message_stop") { terminal = true; break; }
-        if (type === "error" && ep.ssh) throw new Error("Anthropic stream returned an error");
+        if (type === "error" && ep.ssh) {
+            const info = ctx.fns.llm.classifyError({
+                provider: ep.provider, account: ep.quotaAccount ?? ep.account, kind: ep.kind,
+                body: JSON.stringify(msg), headers: res.headers,
+            });
+            throw Object.assign(new Error(info.message), { failure: info });
+        }
         if (type === "message_start") {
             const u = msg.message?.usage;
             if (u) {
@@ -245,6 +253,8 @@ export default async function (
 
     if (ep.ssh && !terminal) throw new Error("Anthropic stream ended without message_stop");
     } catch (error) {
+        // A provider's terminal refusal is not an interrupted SSH inference.
+        if (error && typeof error === 'object' && 'failure' in error) throw error;
         if (ep.ssh && !opts.signal?.aborted) {
             throw Object.assign(new Error("SSH inference interrupted; provider acceptance is uncertain. Resume manually.", { cause: error }), {
                 transportFailure: { kind: "ssh_transport", phase: "ambiguous", retryable: false },
