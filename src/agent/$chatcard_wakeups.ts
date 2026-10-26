@@ -1,6 +1,6 @@
 // Panel card: the chat's wake-ups, schedules and watches that are still active; hidden when there are none.
 export default {
-    title: "Wake-ups",
+    title: "Расписания и триггеры",
     icon: "ph-alarm",
     order: 50,
     async render(ctx: Context, _session: Session | null, view: types.chat.RenderContext): Promise<types.chat.CardRow[] | null> {

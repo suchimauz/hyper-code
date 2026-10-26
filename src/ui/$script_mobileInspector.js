@@ -7,6 +7,9 @@
     const touch = matchMedia('(max-width: 1023px) and (pointer: coarse)');
     const mobile = () => small.matches || touch.matches;
     let active = null;
+    const observedPanels = new WeakSet();
+    const panelObserver = new MutationObserver(() => sync());
+    const pageFor = (trigger, panel) => trigger.closest('[data-page="agent"]') || panel?.closest('[data-page="agent"]') || (active?.panel === panel ? active.page : null);
 
     function close(restoreFocus = true) {
         const state = active;
@@ -27,23 +30,51 @@
                 if (!active && messages.isConnected) messages.scrollTop = scrollTop;
             });
         }
-        if (restoreFocus && mobile() && trigger.isConnected) trigger.focus({ preventScroll: true });
+        sync();
+        if (restoreFocus && mobile() && trigger.isConnected) {
+            // A lazy menu trigger lives in a popover that was closed before opening us.
+            const returnTo = trigger.closest('[data-chat-panel]')
+                ? [...document.querySelectorAll('[data-mobile-inspector-open]')].find(button => !button.closest('[data-chat-panel]') && button.getAttribute('aria-controls') === panel.id)
+                : trigger;
+            returnTo?.focus({ preventScroll: true });
+        }
     }
 
     function sync() {
         if (active && (!mobile() || !active.page.isConnected)) close(false);
         document.querySelectorAll('[data-mobile-inspector-open]').forEach(trigger => {
-            const page = trigger.closest('[data-page="agent"]');
             const panel = document.getElementById(trigger.getAttribute('aria-controls'));
+            const page = pageFor(trigger, panel);
             const allowed = page && panel && document.body.dataset.presentation !== 'sidebar';
             trigger.toggleAttribute('data-inspector-ready', Boolean(allowed));
+            const desktopExpanded = page?.hasAttribute('data-canvas-open')
+                ? page.hasAttribute('data-canvas-meta-open') : !panel?.classList.contains('agent-meta-collapsed');
+            const expanded = Boolean(allowed && (mobile() ? active?.panel === panel : desktopExpanded));
+            trigger.setAttribute('aria-expanded', String(expanded));
+            trigger.setAttribute('aria-pressed', String(expanded));
+            trigger.title = expanded ? 'Свернуть инспектор чата' : 'Открыть инспектор чата';
+            trigger.setAttribute('aria-label', trigger.title);
+            if (mobile()) trigger.setAttribute('aria-haspopup', 'dialog');
+            else trigger.removeAttribute('aria-haspopup');
+            if (panel && !observedPanels.has(panel)) {
+                observedPanels.add(panel);
+                panelObserver.observe(panel, { attributes: true, attributeFilter: ['class'] });
+                if (page) panelObserver.observe(page, { attributes: true, attributeFilter: ['data-canvas-open', 'data-canvas-meta-open'] });
+            }
         });
     }
 
     function open(trigger) {
-        if (!mobile() || active || !trigger.hasAttribute('data-inspector-ready')) return;
-        const page = trigger.closest('[data-page="agent"]');
+        sync();
+        if (!trigger.hasAttribute('data-inspector-ready')) return;
         const panel = document.getElementById(trigger.getAttribute('aria-controls'));
+        const page = pageFor(trigger, panel);
+        if (!mobile()) {
+            panel?.querySelector('[data-agent-meta-toggle]')?.click();
+            sync();
+            return;
+        }
+        if (active) return;
         const messages = page?.querySelector('#messages');
         if (!panel || !messages || typeof HTMLDialogElement === 'undefined') return;
         const dialog = document.createElement('dialog');
@@ -57,7 +88,7 @@
         dialog.append(panel);
         document.body.append(dialog);
         active = { panel, marker, dialog, trigger, page, messages, scrollTop };
-        trigger.setAttribute('aria-expanded', 'true');
+        sync();
         dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
         dialog.addEventListener('close', () => { if (active?.dialog === dialog) close(); });
         // No focus returns to the composer, so closing never summons the keyboard.
@@ -70,6 +101,7 @@
         const trigger = event.target.closest?.('[data-mobile-inspector-open]');
         if (trigger) { event.preventDefault(); open(trigger); return; }
         if (event.target.closest?.('[data-mobile-inspector-close]')) { event.preventDefault(); close(); }
+        if (event.target.closest?.('[data-agent-meta-toggle]')) queueMicrotask(sync);
     });
     document.addEventListener('htmx:before:swap', event => {
         if (!active) return;

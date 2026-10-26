@@ -1,6 +1,6 @@
 // Panel card: what the chat is working on — its plan progress and goal.
 export default {
-    title: "Work",
+    title: "План и цель",
     icon: "ph-list-checks",
     order: 30,
     render(_ctx: Context, _session: Session | null, view: types.chat.RenderContext): types.chat.CardRow[] | null {
@@ -16,6 +16,6 @@ export default {
         }
         const goalText = String(goal?.statement ?? goal?.text ?? "").trim();
         if (goalText) rows.push({ icon: "ph-target", label: goalText, hint: goal?.status ? String(goal.status) : undefined });
-        return rows.length ? rows : [{ icon: "ph-list-checks", label: "No plan yet" }];
+        return rows.length ? rows : [{ icon: "ph-list-checks", label: "Плана пока нет" }];
     },
 } satisfies types.chat.Card;

@@ -1,18 +1,17 @@
 /**
- * Draws the chat header: icon · name · badges … buttons · ⋯ panel button.
+ * Render agent identity and workspace controls in the chat toolbar.
  *
- * The icon (chat.icon; click opens the model picker) and the name (click renames) belong to the core.
- * On phones the icon identifies the model provider and a separate inspector button opens the existing Meta panel without replacing the chat; desktop retains the custom chat icon.
- * Badges come from `$chatbadge_` files, buttons from `$chatbutton_` files, the ⋯ panel from `$chatcard_`
- * files, ordered and hidden by the chat.layout setting. The panel content loads when it opens
- * (GET /chat/:id/panel), so its cards are always fresh and never slow down the chat.
- * @param opts.context The chat being drawn (chat.buildRenderContext).
+ * The avatar opens the icon picker, the name opens rename, and model selection
+ * stays in the composer and agent menu. Registered badges and buttons retain
+ * their layout order. The inspector reuses the live desktop rail/mobile dialog;
+ * the native popover lazily loads fresh registered cards from /chat/:id/panel.
+ * @param opts.context Agent and inherited conversation information to render.
  */
 export default async function (
     ctx: Context,
     _session: Session | null,
     opts: {
-        /** The chat being drawn (chat.buildRenderContext). */
+        /** Agent and inherited conversation information from chat.buildRenderContext. */
         context: types.chat.RenderContext;
     },
 ): Promise<string> {
@@ -24,33 +23,35 @@ export default async function (
         ctx.fns.chat.renderParts({ kind: "button", context: opts.context }),
     ]);
     const icon = ctx.fns.ui.popup({
-        method: "agent.modelPicker",
+        method: "chat.iconPopup",
         params: { agentId: id },
-        html: `<span data-chat-avatar>${ctx.fns.chat.icon({ icon: agent.icon, model: agent.model, size: "md", live: true })}</span><span data-chat-model-mark>${ctx.fns.ui.modelLogo({ model: agent.model, bare: true })}</span>`,
-        attrs: `class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-base-100/25 text-muted transition hover:bg-base-100/60 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/25" title="Change provider or model · ${esc(agent.model)}" aria-label="Change provider or model: ${esc(agent.model)}" data-chat-part="icon"`,
+        html: `<span data-chat-avatar>${ctx.fns.chat.icon({ icon: agent.icon, model: agent.model, size: "md", live: true })}</span>`,
+        attrs: 'class="chat-header-avatar" title="Изменить иконку агента" aria-label="Изменить иконку агента" data-chat-part="icon"',
     });
     const title = String(agent.title ?? "").slice(0, 60) || id;
     const name = ctx.fns.ui.popup({
         method: "chat.renamePopup",
         params: { agentId: id },
-        html: `${esc(title)} <span data-chat-technical-id class="text-faint">(${esc(id)})</span>`,
-        attrs: `class="min-w-0 truncate text-left font-mono font-medium leading-4 text-muted hover:text-base-content" title="Rename · ${esc(title)}" aria-label="Rename chat ${esc(title)}" data-chat-part="name"`,
+        html: `<span class="chat-header-title">${esc(title)}</span>`,
+        attrs: `class="chat-header-name" title="Переименовать · ${esc(title)}" aria-label="Переименовать агента ${esc(title)}" data-chat-part="name"`,
     });
     const panel = await ctx.fns.ui.inplacePopup({
         id: `chat-panel-${id}`,
-        triggerHtml: '<i class="ph ph-dots-three text-base" aria-hidden="true"></i>',
-        triggerAttrs: 'class="flex size-7 shrink-0 items-center justify-center rounded-full text-subtle hover:bg-base-200 hover:text-base-content" title="Chat panel" aria-label="Open chat panel"',
-        panelAttrs: `aria-label="Chat panel" data-chat-panel="/chat/${encodeURIComponent(id)}/panel"`,
-        contentHtml: '<div data-chat-panel-body class="p-3 text-xs text-faint">Loading…</div>',
+        triggerHtml: '<i class="ph ph-dots-three" aria-hidden="true"></i>',
+        triggerAttrs: 'class="chat-toolbar-button chat-toolbar-more" title="Управление агентом" aria-label="Управление агентом" aria-expanded="false" data-chat-menu-trigger',
+        panelAttrs: `role="dialog" aria-label="Управление агентом" data-chat-panel="/chat/${encodeURIComponent(id)}/panel"`,
+        contentHtml: '<div data-chat-panel-body class="chat-panel-body" aria-live="polite"><p class="chat-panel-loading">Загрузка…</p></div>',
     });
-    return `<header class="chat-header glass-bar absolute inset-x-0 top-0 z-40 mx-auto mt-2 flex h-11 w-[calc(100%-2rem)] max-w-3xl shrink-0 items-center gap-2 overflow-visible rounded-[22px] border border-ui-border pl-2 pr-3 text-xs text-muted" data-chat-header="${esc(id)}">
+    return `<header class="chat-header glass-bar" data-chat-header="${esc(id)}">
   ${icon}
-  <div class="flex min-w-0 shrink items-center gap-1.5">
+  <div class="chat-header-identity">
     ${name}
-    <div data-chat-badges class="flex min-w-0 items-center gap-1 overflow-hidden">${badges.join("")}</div>
+    <div class="chat-header-meta"><span class="chat-agent-id" data-chat-technical-id title="ID агента: ${esc(id)}" aria-label="ID агента ${esc(id)}">${esc(id)}</span><div data-chat-badges class="chat-header-badges">${badges.join("")}</div></div>
   </div>
-  <div class="ml-auto flex shrink-0 items-center gap-0.5" data-chat-buttons>${buttons.join("")}</div>
-  <button type="button" data-mobile-inspector-open aria-controls="agent-meta-${esc(id)}" aria-haspopup="dialog" aria-expanded="false" aria-label="Открыть инспектор чата" title="Инспектор чата"><i class="ph ph-sidebar-simple" aria-hidden="true"></i></button>
-  ${panel}
+  <div class="chat-header-actions">
+    <div data-chat-buttons>${buttons.join("")}</div>
+    <button type="button" class="chat-toolbar-button" data-mobile-inspector-open aria-controls="agent-meta-${esc(id)}" aria-haspopup="dialog" aria-expanded="false" aria-pressed="false" aria-label="Открыть инспектор чата" title="Инспектор чата"><i class="ph ph-sidebar-simple" aria-hidden="true"></i><span class="chat-toolbar-label">Инспектор</span></button>
+    ${panel}
+  </div>
 </header>`;
 }

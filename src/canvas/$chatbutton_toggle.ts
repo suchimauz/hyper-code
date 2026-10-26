@@ -4,11 +4,11 @@ export default {
     order: 10,
     render: (ctx: Context) => ctx.fns.procs.ui.button({
         action: "toggle-canvas",
-        html: '<i class="ph ph-square-half" aria-hidden="true"></i>',
+        html: '<i class="ph ph-square-half" aria-hidden="true"></i><span class="chat-toolbar-label">Canvas</span>',
         appearance: "plain",
-        ariaLabel: "Open canvas",
-        title: "Open canvas",
-        class: "canvas-toggle flex size-7 items-center justify-center rounded-full text-subtle hover:bg-base-200 hover:text-base-content aria-pressed:bg-primary/10 aria-pressed:text-primary",
+        ariaLabel: "Открыть Canvas",
+        title: "Открыть Canvas",
+        class: "canvas-toggle chat-toolbar-button",
         attrs: { "data-canvas-toggle": "toggle", "aria-pressed": "false" },
     }),
 } satisfies types.chat.Button;

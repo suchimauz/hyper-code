@@ -8,6 +8,7 @@ export default {
         const host = String(view.agent.workspaceHost ?? "").trim();
         return {
             icon: host ? "ph-hard-drives" : "ph-folder-open",
+            label: dir.replace(/\/+$/, "").split("/").pop() || dir,
             title: host ? `Remote files · ${host}:${dir}` : `Files · ${dir}`,
             popup: { method: "ui.previewFile", params: { path: dir, ...(host ? { host } : {}), mode: "auto", title: host ? `${host}:${dir}` : dir } },
         };

@@ -14,7 +14,7 @@ export default function (
     const base = "chat-row flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs";
     return opts.rows.map(row => {
         const icon = row.icon && /^ph-[a-z0-9-]+$/.test(row.icon) ? `<i class="ph ${esc(row.icon)} shrink-0 text-sm" aria-hidden="true"></i>` : "";
-        const hint = row.hint ? `<span class="ml-auto max-w-[45%] shrink-0 truncate font-mono text-3xs text-faint" title="${esc(row.hint)}">${esc(row.hint)}</span>` : "";
+        const hint = row.hint ? `<span class="chat-row-hint" title="${esc(row.hint)}">${esc(row.hint)}</span>` : "";
         const face = `${icon}<span class="min-w-0 truncate">${esc(row.label)}</span>${hint}`;
         const tone = row.tone === "danger" ? "text-error hover:bg-error/10" : "text-muted hover:bg-base-200 hover:text-base-content";
         if (row.popup?.method) return ctx.fns.ui.popup({ method: row.popup.method, params: row.popup.params ?? {}, html: face, attrs: `class="${base} ${tone}" title="${esc(row.label)}"` });

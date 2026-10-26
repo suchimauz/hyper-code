@@ -52,23 +52,25 @@ async function fixture(width: number, touchPoints: number, controlsHtml = '<butt
     return { window, html, styles, compose, chatHeader, nav, css: (selector: string) => window.getComputedStyle(window.document.querySelector(selector)!) };
 }
 
-test('mobile reading is 17px, quiet, and technical IDs are hidden only on phones', async () => {
+test('mobile reading is 17px, quiet, and header identity stays compact', async () => {
     for (const [width, touchPoints] of [[390, 5], [844, 5], [600, 0]]) {
         const f = await fixture(width, touchPoints);
         try {
             expect(f.css('#chat-panel .prose').fontSize).toBe('17px');
             expect(f.css('#nav-overlay [data-nav-label]').fontSize).toBe('17px');
-            expect(f.css('#chat-panel [data-chat-part="name"]').fontSize).toBe('17px');
+            expect(f.css('#chat-panel [data-chat-part="name"]').fontSize).toBe('15px');
             expect(f.css('#chat-panel #messages').backgroundImage).toBe('none');
             expect(f.css('#chat-panel .assistant').boxShadow).toBe('none');
             expect(f.css('#chat-panel .assistant').backdropFilter).toBe('none');
-            expect(f.css('[data-chat-technical-id]').display).toBe('none');
+            expect(f.window.document.querySelector('[data-chat-technical-id]')?.textContent).toBe('ab');
+            expect(f.css('[data-chat-technical-id]').display).not.toBe('none');
+            expect(f.css('[data-chat-technical-id]').fontSize).toBe('11px');
             expect(f.window.document.querySelector('[data-nav-technical-id]')).toBeNull();
             expect(f.css('[data-composer-toolbar]').flexWrap).toBe('wrap');
             expect(f.css('.project-tabs').display).toBe('none');
             expect(f.css('.project-mobile-bar').display).toBe('flex');
             expect(f.css('#project-tabs-host').display).not.toBe('none');
-            expect(f.css('[data-chat-model-mark]').display).toBe('none');
+            expect(f.window.document.querySelector('[data-chat-model-mark]')).toBeNull();
             expect(f.css('[data-chat-avatar]').display).not.toBe('none');
             expect(f.css('[data-context-total]').display).not.toBe('none');
             expect(f.css('.chat-table-scroll').display).toBe('block');
@@ -83,6 +85,12 @@ test('mobile reading is 17px, quiet, and technical IDs are hidden only on phones
             expect(f.window.document.querySelector('[data-chat-meters]')!.closest('[data-composer-settings]')).toBeNull();
             expect(f.css('#chat-panel > header').position).toBe('relative');
             expect(f.css('#chat-panel > header').marginTop).toBe('0px');
+            expect(f.css('.chat-header-identity').height).toBe('44px');
+            expect(f.css('.chat-header-meta').position).toBe('absolute');
+            expect(f.css('.chat-header-name').minHeight).toBe('44px');
+            expect(f.styles).toContain('#chat-panel #messages { scrollbar-gutter: stable both-edges; }');
+            expect(f.styles).toContain('.inplace-popup-panel[data-chat-panel]::-webkit-scrollbar { display: none; }');
+            expect(f.styles).toContain('border: 1px solid var(--color-ui-border); background: var(--color-base-200); color: var(--color-base-content); box-shadow: none;');
             expect(f.css('[data-composer-settings]').display).toBe('none');
             expect(f.css('[data-composer-settings-toggle]').display).toBe('inline-flex');
             expect(f.css('[data-chat-jump-wrap]').position).toBe('absolute');
@@ -107,19 +115,21 @@ test('mobile reading is 17px, quiet, and technical IDs are hidden only on phones
     }
 });
 
-test('desktop keeps compact type, chat technical IDs and existing textures', async () => {
+test('desktop keeps compact type and textures without a technical ID in the header', async () => {
     const f = await fixture(1280, 0);
     try {
         expect(f.css('#chat-panel .prose').fontSize).toBe('14px');
         expect(f.css('#nav-overlay [data-nav-label]').fontSize).toBe('12px');
-        expect(f.css('[data-chat-technical-id]').display).not.toBe('none');
+        expect(f.window.document.querySelector('[data-chat-technical-id]')?.textContent).toBe('ab');
+            expect(f.css('[data-chat-technical-id]').display).not.toBe('none');
+            expect(f.css('[data-chat-technical-id]').fontSize).toBe('11px');
         expect(f.window.document.querySelector('[data-nav-technical-id]')).toBeNull();
         expect(f.css('#chat-panel #messages').backgroundImage).not.toBe('none');
         expect(f.css('#chat-panel .assistant').backdropFilter).toBe('blur(2px)');
         expect(f.css('[data-composer-toolbar]').flexWrap).not.toBe('wrap');
         expect(f.css('#project-tabs-host').display).not.toBe('none');
         expect(f.css('.project-mobile-bar').display).toBe('none');
-        expect(f.css('[data-chat-model-mark]').display).toBe('none');
+        expect(f.window.document.querySelector('[data-chat-model-mark]')).toBeNull();
         expect(f.css('[data-chat-avatar]').display).not.toBe('none');
         expect(f.css('.chat-ring').display).toBe('block');
         expect(f.css('.chat-table-scroll').display).toBe('contents');
@@ -163,7 +173,7 @@ test('mobile inspector, code tools and attachment targets share the phone breakp
             f.window.document.querySelector('.assistant')!.insertAdjacentHTML('beforeend', '<div class="mobile-code-tools"><button>Копировать</button></div><pre data-mobile-code data-mobile-collapsed="true"><code>const x = 1;</code></pre>');
             f.window.document.querySelector('#form')!.insertAdjacentHTML('beforeend', '<div class="chat-attachment-card"><span class="chat-attachment-size">10 KB</span><button class="chat-attachment-remove">×</button></div>');
             f.window.document.body.insertAdjacentHTML('beforeend', '<dialog open data-mobile-inspector-dialog><aside class="agent-meta-panel agent-meta-collapsed"><header data-mobile-inspector-header><button data-mobile-inspector-close>Назад</button></header><header data-desktop-inspector-header>Desktop</header><div data-agent-meta-content><details open><summary><span class="truncate text-xs">Настройки</span></summary></details></div></aside></dialog>');
-            expect(f.css('[data-mobile-inspector-open]').display).toBe(mobile ? 'inline-flex' : 'none');
+            expect(f.css('[data-mobile-inspector-open]').display).toBe('inline-flex');
             expect(f.css('.mobile-code-tools').display).toBe(mobile ? 'flex' : 'none');
             expect(f.css('.chat-attachment-size').display).toBe(mobile ? 'block' : 'none');
             if (mobile) {
@@ -342,7 +352,7 @@ for (const width of [320, 390, 430, 1280]) {
                         expect(style.visibility).not.toBe('hidden');
                     }
                 }
-                expect(f.css('[data-chat-model-mark]').display).toBe('none');
+                expect(f.window.document.querySelector('[data-chat-model-mark]')).toBeNull();
             } finally { await f.window.happyDOM.close(); }
         });
     }

@@ -1,5 +1,5 @@
 /**
- * Render live navigation chats with project names, execution states and working-descendant counts.
+ * Render live navigation chats with agent IDs, project names, execution states and working-descendant counts.
  *
  * Use in the sidebar to show every unarchived navigation-visible chat running itself or with working descendants. Reads agent rows without changing their own execution state and renders native icons and links in a live region.
  */
@@ -26,10 +26,10 @@ export default async function (
         const ownState = row.run_state?.trim() || 'idle';
         const stateLabel = ({running: 'Работает', idle: 'Ожидает', queued: 'В очереди'} as Record<string,string>)[ownState] ?? ownState;
         const status = stateLabel + (count > 0 ? ' · Подагенты: ' + count : '');
-        const label = row.title + ' — ' + projectLabel + (workspace ? ' (' + workspace.dir + ')' : '') + ' — ' + status;
+        const label = row.title + ' [' + row.id + '] — ' + projectLabel + (workspace ? ' (' + workspace.dir + ')' : '') + ' — ' + status;
         return ctx.fns.procs.ui.button({
             href: '/agent/' + encodeURIComponent(row.id), get: '/agent/' + encodeURIComponent(row.id), target: '#main',
-            html: ctx.fns.chat.icon({ icon: row.icon, model: row.model, active: true, size: 'sm' }) + '<span class="dock-running-copy"><span class="dock-running-title">' + esc(row.title) + '</span><span class="dock-running-project">' + esc(projectLabel) + '</span><span class="dock-running-status">' + esc(status) + '</span></span>',
+            html: ctx.fns.chat.icon({ icon: row.icon, model: row.model, active: true, size: 'sm' }) + '<span class="dock-running-copy"><span class="dock-running-title">' + esc(row.title) + '</span><span class="dock-running-project">' + esc(projectLabel) + '</span><span class="dock-running-status">' + esc(status) + '</span></span><span class="dock-running-id" data-running-agent-id>' + esc(row.id) + '</span>',
             title: label, ariaLabel: label,
             appearance: 'plain', class: 'dock-running-row', attrs: { 'data-running-agent': row.id, 'hx-push-url': 'true' },
         });

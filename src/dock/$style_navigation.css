@@ -42,6 +42,7 @@
 .dock-running-title { font-size:12px; font-weight:550; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dock-running-status,.dock-running-empty { font-size:10px; color:var(--color-muted); }
 .dock-running-project { font-size:10px; line-height:14px; color:var(--color-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dock-running-id { flex:none; align-self:flex-start; padding-top:2px; color:var(--color-muted); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:10px; font-weight:400; line-height:16px; letter-spacing:.015em; }
 .dock-running-empty { padding:7px; }
 .dock-footer { flex-shrink:0; border-top:1px solid var(--color-ui-border); padding-top:5px; }
 #dock-limits { min-width:0; }
@@ -71,7 +72,7 @@
   #frame.dock-compact { grid-template-columns:64px minmax(0,1fr); }
   #dock.dock-collapsed { width:64px; padding:0 8px 8px; }
   .dock-collapsed .project-shell-header { height:auto; padding:12px 0 6px; flex-direction:column; gap:5px; }
-  .dock-collapsed .dock-brand-name,.dock-collapsed .dock-action-label,.dock-collapsed .dock-search kbd,.dock-collapsed .project-copy,.dock-collapsed .project-indicators,.dock-collapsed .project-heading,.dock-collapsed .dock-running-copy,.dock-collapsed .dock-running-heading,.dock-collapsed .dock-running-empty,.dock-collapsed .account-copy { display:none; }
+  .dock-collapsed .dock-brand-name,.dock-collapsed .dock-action-label,.dock-collapsed .dock-search kbd,.dock-collapsed .project-copy,.dock-collapsed .project-indicators,.dock-collapsed .project-heading,.dock-collapsed .dock-running-copy,.dock-collapsed .dock-running-heading,.dock-collapsed .dock-running-empty,.dock-collapsed .dock-running-id,.dock-collapsed .account-copy { display:none; }
   .dock-collapsed .dock-primary-actions { grid-template-columns:minmax(0,1fr); justify-items:center; }
   .dock-collapsed .dock-search,.dock-collapsed .dock-new-chat { justify-content:center; padding:8px 0; }
   .dock-collapsed .project-row,.dock-collapsed .dock-running-list>a { justify-content:center; padding:7px 0; }

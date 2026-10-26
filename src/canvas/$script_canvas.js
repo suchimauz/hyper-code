@@ -90,9 +90,9 @@
     };
     const paintButtons = root => {
         const open = root.hasAttribute('data-canvas-open');
-        root.querySelectorAll('[data-canvas-toggle="toggle"]').forEach(b => {
+        root.querySelectorAll('[data-canvas-toggle="toggle"], [data-chat-panel] [data-canvas-toggle="open"]').forEach(b => {
             b.setAttribute('aria-pressed', String(open));
-            b.title = open ? 'Close canvas' : 'Open canvas';
+            b.title = b.getAttribute('data-canvas-toggle') === 'open' ? 'Открыть Canvas' : open ? 'Закрыть Canvas' : 'Открыть Canvas';
             b.setAttribute('aria-label', b.title);
         });
     };
@@ -251,6 +251,9 @@
         if (toggle && root.contains(toggle)) {
             event.preventDefault();
             const mode = toggle.getAttribute('data-canvas-toggle');
+            if (mobile.matches && toggle.closest('[data-chat-panel]') && mode !== 'close') {
+                returnFocus = root.querySelector('.chat-header [data-canvas-toggle="toggle"]') || root.querySelector('[data-chat-menu-trigger]');
+            }
             setOpen(root, mode === 'open' ? true : mode === 'close' ? false : !root.hasAttribute('data-canvas-open'));
             return;
         }
@@ -428,6 +431,7 @@
     const init = () => { const root = page(); if (root) paintButtons(root); syncMobile(); };
     // HTMX navigation and server-driven attribute changes share the same lifecycle.
     new MutationObserver(syncMobile).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-canvas-open'] });
+    document.addEventListener('htmx:after:process', init);
     document.addEventListener('htmx:after:swap', init);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

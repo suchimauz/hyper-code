@@ -5,6 +5,7 @@ import header from '../chat/header';
 
 const source = await Bun.file(new URL('./$script_mobileInspector.js', import.meta.url)).text();
 const chatSource = await Bun.file(new URL('../agent/$script_chat.js', import.meta.url)).text();
+const metaSource = await Bun.file(new URL('./$script_meta.js', import.meta.url)).text();
 const context = { fns: {
     procs: { ui: { escape: ({ text }: any) => Bun.escapeHTML(String(text)), button: () => '<button data-agent-meta-toggle></button>' } },
     ui: { agentMetaSection: ({ section }: any) => `<details open><summary>${section}</summary><textarea data-section-edit>${section}</textarea></details>`, popup: () => '', modelLogo: () => '', inplacePopup: async () => '<button data-test-more>More</button>' },
@@ -19,6 +20,9 @@ async function fixture(width = 390) {
     const panel = renderPanel(context, null, { agent, collapsed: true });
     w.document.body.innerHTML = `<main id="main"><div data-page="agent"><section id="chat-panel" data-agent-id="a">${top}<div id="messages"><div id="m-1"><div class="assistant">History</div></div></div><form id="form" hx-post="/agent/a"><textarea id="input">My unsent draft</textarea></form></section>${panel}</div></main>`;
     w.eval(chatSource);
+    w.fetch = (async () => new w.Response('{}')) as any;
+    (w as any).hyperLive = { subscribe: () => {} };
+    w.eval(metaSource);
     w.eval(source);
     const doc = w.document;
     const click = (selector: string) => (doc.querySelector(selector) as any).click();
@@ -112,5 +116,81 @@ test('desktop, sidebar and missing panel do not open mobile inspector', async ()
         f.doc.querySelector('[data-agent-meta-panel]')!.remove();
         f.doc.dispatchEvent(new f.w.Event('htmx:after:process'));
         expect(f.doc.querySelector('[data-inspector-ready]')).toBeNull();
+    } finally { await f.w.happyDOM.close(); }
+});
+
+test('desktop delegates to persistent Meta toggle and synchronizes external collapse', async () => {
+    const f = await fixture(1280);
+    try {
+        const trigger = f.doc.querySelector('[data-mobile-inspector-open]')!;
+        const panel = f.doc.querySelector('[data-agent-meta-panel]')!;
+        const requests: string[] = [];
+        f.w.fetch = (async (url: any) => { requests.push(String(url)); return new f.w.Response('{}'); }) as any;
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(trigger.getAttribute('aria-haspopup')).toBeNull();
+        f.click('[data-mobile-inspector-open]');
+        expect(panel.classList.contains('agent-meta-collapsed')).toBe(false);
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+        expect(trigger.getAttribute('aria-pressed')).toBe('true');
+        expect(trigger.getAttribute('aria-label')).toBe('Свернуть инспектор чата');
+        expect(requests).toEqual(['/ui/right-panel']);
+        expect(f.doc.querySelector('dialog')).toBeNull();
+        f.click('[data-agent-meta-toggle]');
+        await new Promise(resolve => setTimeout(resolve, 10));
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(trigger.getAttribute('aria-pressed')).toBe('false');
+        expect(trigger.getAttribute('title')).toBe('Открыть инспектор чата');
+        panel.classList.remove('agent-meta-collapsed');
+        await new Promise(resolve => setTimeout(resolve, 10));
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    } finally { await f.w.happyDOM.close(); }
+});
+
+for (const width of [390, 1280]) test(`lazy portaled inspector shares the panel at width ${width}`, async () => {
+    const f = await fixture(width);
+    try {
+        const panel = f.doc.querySelector('[data-agent-meta-panel]')!;
+        f.doc.body.insertAdjacentHTML('beforeend', '<div data-chat-panel><button id="lazy-inspector" data-mobile-inspector-open aria-controls="agent-meta-a">Inspector</button></div>');
+        f.doc.dispatchEvent(new f.w.Event('htmx:after:process'));
+        const lazy = f.doc.getElementById('lazy-inspector')!;
+        expect(lazy.hasAttribute('data-inspector-ready')).toBe(true);
+        f.click('#lazy-inspector');
+        for (const trigger of f.doc.querySelectorAll('[data-mobile-inspector-open]')) {
+            expect(trigger.getAttribute('aria-expanded')).toBe('true');
+            expect(trigger.getAttribute('aria-pressed')).toBe('true');
+        }
+        expect(f.doc.querySelectorAll('[data-agent-meta-panel]').length).toBe(1);
+        if (width === 390) {
+            expect(f.doc.querySelector('dialog [data-agent-meta-panel]')).toBe(panel);
+            f.click('[data-mobile-inspector-close]');
+            expect(f.doc.querySelector('[data-page="agent"] [data-agent-meta-panel]')).toBe(panel);
+            expect(f.doc.activeElement).toBe(f.doc.querySelector('[data-mobile-inspector-open]'));
+        } else {
+            expect(f.doc.querySelector('dialog')).toBeNull();
+            f.click('#lazy-inspector');
+        }
+        for (const trigger of f.doc.querySelectorAll('[data-mobile-inspector-open]')) expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    } finally { await f.w.happyDOM.close(); }
+});
+
+test('desktop inspector pressed state follows Canvas peek rather than saved rail collapse', async () => {
+    const f = await fixture(1280);
+    try {
+        const page = f.doc.querySelector('[data-page="agent"]')!;
+        const panel = f.doc.querySelector('[data-agent-meta-panel]')!;
+        const trigger = f.doc.querySelector('[data-mobile-inspector-open]')!;
+        panel.classList.remove('agent-meta-collapsed');
+        page.setAttribute('data-canvas-open', '');
+        f.doc.dispatchEvent(new f.w.Event('htmx:after:process'));
+        expect(trigger.getAttribute('aria-pressed')).toBe('false');
+        page.setAttribute('data-canvas-meta-open', '');
+        await new Promise(resolve => setTimeout(resolve, 10));
+        expect(trigger.getAttribute('aria-pressed')).toBe('true');
+        page.removeAttribute('data-canvas-meta-open');
+        await new Promise(resolve => setTimeout(resolve, 10));
+        expect(trigger.getAttribute('aria-pressed')).toBe('false');
+        page.removeAttribute('data-canvas-open');
+        await new Promise(resolve => setTimeout(resolve, 10));
+        expect(trigger.getAttribute('aria-pressed')).toBe('true');
     } finally { await f.w.happyDOM.close(); }
 });

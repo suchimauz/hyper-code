@@ -19,6 +19,33 @@ async function fixtureCtx(): Promise<any> {
     return ctx;
 }
 
+test('shows a compact monospace ID on each row and escapes untrusted IDs', async () => {
+ const ctx = await fixtureCtx();
+ const id = '<id&"\'>';
+ ctx.fns.procs.db.select = async () => [
+  {id, title:'Named chat', run_state:'running'},
+  {id:'ab', title:'Another chat', run_state:'queued'},
+ ];
+ const html = await ctx.fns.dock.runningAgents({});
+ expect(html.match(/data-running-agent-id/g)).toHaveLength(2);
+ expect(html).toContain('class="dock-running-id" data-running-agent-id>');
+ expect(html).toContain('data-running-agent-id>ab</span>');
+ expect(html).toContain('data-running-agent-id>' + ctx.fns.procs.ui.escape({text:id}) + '</span>');
+ expect(html).not.toContain(id);
+ expect(html).toContain('/agent/' + ctx.fns.procs.ui.escape({text:encodeURIComponent(id)}));
+ expect(html).toContain('class="dock-running-title">Named chat</span>');
+ expect(html).toContain('class="dock-running-project">Без проекта</span>');
+ expect(html).toContain('class="dock-running-status">Работает</span>');
+});
+
+test('navigation ID stays subordinate and hides with the collapsed labels', async () => {
+ const css = await Bun.file(new URL('./$style_navigation.css', import.meta.url)).text();
+ const idRule = css.match(/\.dock-running-id \{([^}]+)\}/)?.[1] ?? '';
+ expect(idRule).toContain('font-size:10px');
+ expect(idRule).toContain('color:var(--color-muted)');
+ expect(css).toMatch(/\.dock-collapsed \.dock-running-id[^{}]*\{ display:none; \}/);
+});
+
 describe('dock.runningAgents', () => {
     test('reads all running nav rows and draws native icons with readable labels', async () => {
         const ctx: any = await fixtureCtx();
@@ -92,6 +119,6 @@ test('names exact projects and remote hosts with escaped accessible labels', asy
  expect(html).toContain('class="dock-running-project">Remote &amp; app · server</span>');
  expect(html).toContain('class="dock-running-project">fresh</span>');
  expect(html).toContain('class="dock-running-project">Без проекта</span>');
- expect(html).toContain('aria-label="Chat — Remote &amp; app · server (/work/app) — Работает"');
- expect(html).toContain('title="Chat — Local &lt;app&gt; (/work/app) — Работает"');
+ expect(html).toContain('aria-label="Chat [remote] — Remote &amp; app · server (/work/app) — Работает"');
+ expect(html).toContain('title="Chat [local] — Local &lt;app&gt; (/work/app) — Работает"');
 });

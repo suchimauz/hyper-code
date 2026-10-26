@@ -1,6 +1,6 @@
 // Panel card: what the model sees — size of the last request, compaction and the full system prompt.
 export default {
-    title: "Context",
+    title: "Контекст и инструкции",
     icon: "ph-stack",
     order: 20,
     async render(ctx: Context, _session: Session | null, view: types.chat.RenderContext): Promise<types.chat.CardRow[]> {
@@ -13,9 +13,9 @@ export default {
         const tokens = usage ? Number(usage.prompt_tokens ?? 0) + Number(usage.completion_tokens ?? 0) : 0;
         const agentId = view.agent.id;
         return [
-            { icon: "ph-gauge", label: "Last request", hint: tokens ? `${(tokens / 1000).toFixed(1)}k tokens` : "—" },
-            { icon: "ph-arrows-in-line-vertical", label: "Compact context…", popup: { method: "chat.compactPopup", params: { agentId } } },
-            { icon: "ph-scroll", label: "Initial prompt", popup: { method: "agent.initialPromptPopup", params: { agentId } } },
+            { icon: "ph-gauge", label: "Последний запрос", hint: tokens ? `${(tokens / 1000).toFixed(1)}k tokens` : "—" },
+            { icon: "ph-arrows-in-line-vertical", label: "Сжать контекст…", popup: { method: "chat.compactPopup", params: { agentId } } },
+            { icon: "ph-scroll", label: "Начальная инструкция", popup: { method: "agent.initialPromptPopup", params: { agentId } } },
         ];
     },
 } satisfies types.chat.Card;

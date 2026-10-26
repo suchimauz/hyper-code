@@ -57,7 +57,11 @@ describe("chat header parts", () => {
         const html = await ctx.fns.chat.header({ context: view });
         expect(Date.now() - started).toBeLessThan(2500);
         expect(html).toContain('data-chat-part="icon"');
-        expect(html).toContain('hx-popup="agent.modelPicker"');
+        expect(html).toContain('hx-popup="chat.iconPopup"');
+        expect(html).not.toContain('hx-popup="agent.modelPicker"');
+        expect(html).toContain('chat-toolbar-label');
+        expect(html).toContain('data-mobile-inspector-open');
+        expect(html).not.toContain('data-chat-model-mark');
         expect(html).toContain('hx-popup="chat.renamePopup"');
         expect(html).toContain("Header test");
         expect(html).toContain('data-chat-id="agent.workspace"');
@@ -122,7 +126,7 @@ describe("chat header parts", () => {
         ctx.state.registry.agent.triggers = () => [];
         const res = await ctx.fns.procs.http.dispatch({ method: "GET", url: "/chat/a1/panel" });
         expect(res.status).toBe(200);
-        expect(await res.text()).toContain("Danger zone");
+        expect(await res.text()).toContain("Хранение и удаление");
     });
 });
 

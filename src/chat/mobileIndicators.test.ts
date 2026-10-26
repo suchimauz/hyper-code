@@ -43,7 +43,7 @@ test('unknown context capacity shows tokens instead of a misleading percentage; 
     expect(await ring(0, 100000)).toBe('');
 });
 
-test('mobile header has the selected model mark even with a custom chat icon and escaped model metadata', async () => {
+test('header keeps the custom avatar separate from model selection', async () => {
     const model = 'vendor:model-"<test>';
     const calls: Array<Record<string, unknown>> = [];
     const ctx = { fns: {
@@ -56,8 +56,8 @@ test('mobile header has the selected model mark even with a custom chat icon and
     try {
         w.document.body.innerHTML = html;
         expect(w.document.querySelector('[data-chat-avatar] [data-custom-avatar]')).not.toBeNull();
-        expect(w.document.querySelector('[data-chat-model-mark] [data-selected-model]')).not.toBeNull();
-        expect(w.document.querySelector('[data-chat-part="icon"]')!.getAttribute('aria-label')).toBe('Change provider or model: ' + model);
-        expect(calls.some(c => c.model === model && c.bare === true && c.icon === undefined)).toBe(true);
+        expect(w.document.querySelector('[data-chat-model-mark]')).toBeNull();
+        expect(w.document.querySelector('[data-chat-part="icon"]')!.getAttribute('aria-label')).toBe('Изменить иконку агента');
+        expect(calls.some(c => c.model === model && c.icon === '<svg>custom</svg>')).toBe(true);
     } finally { await w.happyDOM.close(); }
 });
