@@ -1,0 +1,7 @@
+/* Reordering adds only a source cue and an insertion line; no layout animation. */
+@media (hover:hover) and (pointer:fine) {
+  #project-sidebar [data-project-order] > [data-reorder-id],
+  #project-tabs-host [data-project-order] > [data-reorder-id] > .project-tab-link { cursor:grab; }
+}
+[data-project-order] > .project-dragging { opacity:.45; }
+.project-drop-marker { position:fixed; z-index:10000; pointer-events:none; background:var(--color-primary); border-radius:2px; box-shadow:0 0 0 1px var(--color-base-100); }

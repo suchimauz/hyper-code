@@ -1,7 +1,7 @@
 /**
  * List persistent and discovered exact workspace projects without writes.
  *
- * Reads all navigation workspaces without a discovery cap. Null and relative workspaces remain unassigned. Includes personal archive state, active-chat running and viewer-specific native unread counts. A new navigation agent created after archival reactivates the project. Does not mutate agents or filesystem.
+ * Reads all navigation workspaces without a discovery cap. Null and relative workspaces remain unassigned. Includes personal archive state and saved sidebar order, active-chat running and viewer-specific native unread counts. A new navigation agent created after archival reactivates the project. Does not mutate agents or filesystem.
  */
 export default async function (
     ctx: Context,
@@ -52,5 +52,15 @@ export default async function (
       if(project) project.runningCount=(project.runningCount??0)+1;
      }
     }
-    return [...result.values()].sort((a,b)=>a.title.localeCompare(b.title)||a.id.localeCompare(b.id));
+    // Personal ordering is optional: old, stale and malformed preferences do not block navigation.
+    const saved = await ctx.fns.procs.db.select({sql:'SELECT value FROM kv WHERE key=?',params:['project-order:'+principal]});
+    let order: string[] = [];
+    if (saved[0]?.value) {
+        try {
+            const parsed: unknown = JSON.parse(saved[0].value);
+            if (Array.isArray(parsed)) order = parsed.filter((id): id is string => typeof id === 'string');
+        } catch { order = []; }
+    }
+    const rank = new Map([...new Set(order)].map((id,index)=>[id,index]));
+    return [...result.values()].sort((a,b)=>(rank.get(a.id)??Infinity)-(rank.get(b.id)??Infinity)||a.title.localeCompare(b.title)||a.id.localeCompare(b.id));
 }

@@ -956,7 +956,7 @@ ${opts.headExtra ?? ""}
 <script src="/ui/wake-timer.js" defer></script>
 <script src="/ui/spin-sync.js" defer></script>
 <script src="/ui/tool-timer.js" defer></script>
-${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
+${hideNavigation ? "" : '<script src="/projects/reorder.js" defer></script><script src="/projects/navigation.js" defer></script>'}
 <style>
 /* Quota ring hover card: the name, the limits and the reset moment — nothing else.
    It lives in the top layer (Popover API): the dock's backdrop-filter creates a

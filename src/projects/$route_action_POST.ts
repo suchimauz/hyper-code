@@ -4,7 +4,15 @@ export default async function(ctx: Context, session: Session | null, opts: {
 }): Promise<Response> {
     if (!await ctx.fns.auth.verifyCsrf({req:opts.req,token:opts.req.headers.get('x-csrf-token') || ''})) return Response.json({ok:false,error:'Invalid request token. Reload the page and retry.'},{status:403});
     try {
-        const data = await opts.req.json() as {action?:string;projectId?:string;agentId?:string;dir?:string;host?:string;title?:string};
+        const data = await opts.req.json() as {action?:string;projectId?:string;agentId?:string;dir?:string;host?:string;title?:string;projectIds?:string[];tabIds?:string[]};
+        const orderIds = (ids:unknown): string[] => {
+            if (!Array.isArray(ids) || ids.some(id=>typeof id!=='string' || !id) || new Set(ids).size!==ids.length) throw new Error('Order must contain unique identifiers');
+            return ids;
+        };
+        if (data.action === 'reorder-projects') {
+            const projectIds = await ctx.fns.projects.reorderProjects({projectIds:orderIds(data.projectIds)});
+            return Response.json({ok:true,projectIds});
+        }
         if (data.action === 'create') {
             if (!data.dir || typeof data.dir !== 'string') throw new Error('An absolute project directory is required');
             const p = await ctx.fns.projects.create({dir:data.dir,host:data.host || '',title:data.title || undefined});
@@ -16,6 +24,10 @@ export default async function(ctx: Context, session: Session | null, opts: {
             throw new Error('Project not found');
         }
         const projectId = selected.id;
+        if (data.action === 'reorder-tabs') {
+            const tabs = await ctx.fns.projects.reorder({projectId,tabIds:orderIds(data.tabIds)});
+            return Response.json({ok:true,tabs});
+        }
         if (data.action === 'archive-project' || data.action === 'restore-project') {
             await ctx.fns.projects.setArchived({projectId,archived:data.action === 'archive-project'});
             return Response.json({ok:true});

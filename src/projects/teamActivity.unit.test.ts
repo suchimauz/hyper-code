@@ -17,6 +17,7 @@ test('chat summary carries descendant count without changing own idle state',asy
 test('project counts idle team roots once, not each worker or already running root',async()=>{
  const {ctx}=fixture();let i=0;
  ctx.fns.procs.db.select=async(o:any)=>{
+  if(o.sql==='SELECT value FROM kv WHERE key=?')return [];
   i++;if(i===1)return [];
   if(i===2)return [{dir:'/work',host:'',running_count:1,unread_count:0,latest_created_at:0}];
   expect(o.sql).toContain("run_state IN ('','idle')");return [{id:'root',dir:'/work',host:''}];

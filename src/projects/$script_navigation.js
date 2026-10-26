@@ -3,6 +3,14 @@
   window.__projectsInstalled = true;
   let timer, request = 0, navigating = false;
   let selections = Promise.resolve(), visits = Promise.resolve(), lastSelected = '';
+  let reordering = false, reorderReady = Promise.resolve();
+  document.addEventListener('projects:reorder-start', e => {
+    reordering = true; ++request;
+    e.detail.ready = selections;
+    reorderReady = e.detail.done;
+  });
+  document.addEventListener('projects:reorder-end', () => { reordering = false; void refresh(); });
+  document.addEventListener('projects:reorder-error', e => error(e.detail.message));
   const hidden = () => new URLSearchParams(location.search).get('embed') === '1' || document.body.dataset.presentation === 'sidebar';
   // URL changes before HTMX swaps: never attribute the old panel to the new visit.
   const current = () => {
@@ -132,6 +140,7 @@
     closePanel(false);
     const visit = visits.then(async () => {
       await selections;
+      await reorderReady;
       navigating = true; ++request;
       pendingReturn = returning ? returning.parent || null : source;
       try {
@@ -150,7 +159,7 @@
     return data;
   };
   async function refresh(select = false) {
-    if (hidden() || navigating || !document.getElementById('project-sidebar')) return;
+    if (hidden() || navigating || reordering || !document.getElementById('project-sidebar')) return;
     const agentId = current(), path = location.pathname + location.search;
     if (location.pathname.startsWith('/agent/') && !agentId) return;
     const n = ++request;
@@ -165,7 +174,11 @@
       const r = await fetch('/projects/navigation?'+q, {headers:{Accept:'application/json'}});
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Could not load projects');
-      if (n !== request || navigating || path !== location.pathname + location.search) return;
+      if (n !== request || navigating || reordering || path !== location.pathname + location.search) return;
+      const focusItem = document.activeElement?.closest('[data-reorder-id]');
+      const focusKind = focusItem?.parentElement?.dataset.projectOrder;
+      const focusId = focusItem?.dataset.reorderId;
+      const restoreOrderFocus = focusItem && (document.activeElement === focusItem || document.activeElement.matches('.project-tab-link'));
       const sidebar = document.getElementById('project-sidebar');
       const sidebarScroll = sidebar.querySelector('.project-list')?.scrollTop || 0;
       sidebar.innerHTML = data.sidebar;
@@ -193,6 +206,10 @@
       }
       window.htmx?.process(sidebar);
       window.htmx?.process(tabs);
+      if (restoreOrderFocus) {
+        const item = [...document.querySelectorAll('[data-project-order="'+focusKind+'"] > [data-reorder-id]')].find(el => el.dataset.reorderId === focusId);
+        (item?.querySelector('.project-tab-link') || item)?.focus({preventScroll:true});
+      }
     } catch (e) { error(e.message); }
   }
   document.addEventListener('keydown', e => {
