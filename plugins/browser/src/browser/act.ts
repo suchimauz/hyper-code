@@ -500,8 +500,9 @@ async function dispatchKey(ctx: Context, session: string, input: string): Promis
 }
 
 function keyName(input: string): { key: string; code: string; keyCode: number; text?: string } {
-    const aliases: Record<string, { key: string; code: string; keyCode: number }> = {
-        enter: { key: "Enter", code: "Enter", keyCode: 13 },
+    const aliases: Record<string, { key: string; code: string; keyCode: number; text?: string }> = {
+        // Chrome needs the carriage-return character event for native Enter activation.
+        enter: { key: "Enter", code: "Enter", keyCode: 13, text: "\r" },
         tab: { key: "Tab", code: "Tab", keyCode: 9 },
         escape: { key: "Escape", code: "Escape", keyCode: 27 },
         esc: { key: "Escape", code: "Escape", keyCode: 27 },

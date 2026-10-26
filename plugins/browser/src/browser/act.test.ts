@@ -130,6 +130,37 @@ test("check supports visually hidden native controls idempotently", async () => 
 });
 
 
+test("Enter sends carriage-return keyDown for native activation, without text on keyUp", async () => {
+    const { ctx } = fakeContext();
+    const events: Record<string, unknown>[] = [];
+    (ctx.fns.cdp.send as any) = async ({ method, params }: any) => {
+        if (method === "Input.dispatchKeyEvent") events.push(params);
+        return {};
+    };
+    const result = await act(ctx, null, { actions: [{ kind: "press", key: "Enter" }] });
+    expect(result.ok).toBe(true);
+    expect(events).toEqual([
+        { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, modifiers: 0, type: "keyDown", text: "\r" },
+        { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, modifiers: 0, type: "keyUp", text: undefined },
+    ]);
+});
+
+test("Enter preserves modifier text suppression", async () => {
+    for (const [key, modifiers] of [["Shift+Enter", 8], ["Control+Enter", 2], ["Alt+Enter", 1], ["Meta+Enter", 4]] as const) {
+        const { ctx } = fakeContext();
+        const events: Record<string, unknown>[] = [];
+        (ctx.fns.cdp.send as any) = async ({ method, params }: any) => {
+            if (method === "Input.dispatchKeyEvent") events.push(params);
+            return {};
+        };
+        const result = await act(ctx, null, { actions: [{ kind: "press", key }] });
+        expect(result.ok).toBe(true);
+        expect(events[0]).toMatchObject({ modifiers, type: modifiers === 8 ? "keyDown" : "rawKeyDown" });
+        expect(events[0].text).toBe(modifiers === 8 ? "\r" : undefined);
+        expect(events[1].text).toBeUndefined();
+    }
+});
+
 test("rejects empty batches", async () => {
     await expect(act(fakeContext().ctx, null, { actions: [] })).rejects.toThrow(/non-empty/);
 });
