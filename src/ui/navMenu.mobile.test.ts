@@ -94,7 +94,7 @@ describe('mobile navigation menu', () => {
             expect(f.client.__navIsOpen()).toBe(false);
             f.client.__navOpen();
             const close = f.window.document.getElementById('nav-close')!;
-            expect(close.getAttribute('aria-label')).toBe('Close menu');
+            expect(close.getAttribute('aria-label')).toBe('Закрыть меню');
             close.focus();
             const key = new f.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
             close.dispatchEvent(key);
@@ -125,14 +125,15 @@ test('touch menu resets on each opening without auto-scroll after async selectio
         expect(results.scrollTop).toBe(0);
         resolveFetch({ ok: true, json: async () => ({ tabs: '<div class="project-tabs" data-project-id="p"></div>' }) });
         for (let i=0;i<10;i++) await Promise.resolve();
-        expect(results.querySelector('[data-nav-id="project:p"]')?.getAttribute('aria-selected')).toBe('true');
+        expect(results.querySelector('[data-nav-id="project:p"]')?.getAttribute('aria-current')).toBe('page');
+        expect(results.querySelector('[data-nav-id="project:p"]')?.hasAttribute('aria-selected')).toBe(false);
         expect(results.scrollTop).toBe(0);
         expect(reveals).toBe(0);
         results.scrollTop = 120;
         f.window.document.body.dispatchEvent(new f.window.CustomEvent('htmx:afterSwap', { detail: { target: results } }));
         expect(results.scrollTop).toBe(120);
         expect(reveals).toBe(0);
-        f.window.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'ArrowDown' }));
+        f.window.document.activeElement!.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
         expect(reveals).toBe(1);
         f.client.__navClose(); f.client.__navOpen();
         expect(results.scrollTop).toBe(0);

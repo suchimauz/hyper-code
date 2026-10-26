@@ -9,7 +9,7 @@ export default async function (
     session: Session | null,
     opts: {
         /** Agent cards from nav.agents. */
-        agents: Array<{ id: string; title?: string | null; model?: string; icon?: string | null; runState?: string; teamRunningCount?: number; hasUnread?: boolean; createdBy?: string | null }>;
+        agents: Array<{ id: string; title?: string | null; model?: string; icon?: string | null; runState?: string; teamRunningCount?: number; hasUnread?: boolean; createdBy?: string | null; workspaceDir?: string | null; workspaceHost?: string | null }>;
     },
 ): Promise<types.nav.Item[]> {
     const users = opts.agents.some(a => a.createdBy) ? await ctx.fns.auth.listUsers({}).catch(() => [] as types.auth.User[]) : [];
@@ -17,9 +17,12 @@ export default async function (
     const multi = users.length > 1 && !!me;
     const names = new Map(users.map((u: any) => [String(u.id), String(u.name ?? u.id)]));
     const teamActivity = await ctx.fns.agent.teamActivity({});
+    const projects = opts.agents.some(a => a.workspaceDir) ? await ctx.fns.projects.list({}) : [];
+    const projectNames = new Map(projects.map(p => [JSON.stringify([p.host || "", p.dir]), p.title && !p.title.startsWith("/") ? p.title : p.dir.split("/").filter(Boolean).at(-1) || "/"]));
     return opts.agents.map(agent => ({
         id: `agent:${agent.id}`,
-        label: String(agent.title || agent.id),
+        label: String(agent.title && agent.title !== agent.id ? agent.title : "Новый чат"),
+        ...(agent.workspaceDir ? { detail: projectNames.get(JSON.stringify([agent.workspaceHost || "", agent.workspaceDir])) || agent.workspaceDir.split("/").filter(Boolean).at(-1) || "/" } : {}),
         href: `/agent/${encodeURIComponent(agent.id)}`,
         model: String(agent.model ?? "?"),
         ...(agent.icon ? { avatar: agent.icon } : {}),

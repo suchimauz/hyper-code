@@ -52,7 +52,7 @@ export default async function (
             + button({ ...at, op: "remove" }, "ph-x", `Remove ${title}`)
             + `</div>` : "";
         const module = def && def.module !== "nav" ? `<span class="font-normal normal-case tracking-normal text-faint/70">${esc(def.module)}</span>` : "";
-        return `<section data-nav-widget="${esc(placement.id)}" data-widget-type="${esc(placement.widget)}" class="min-w-0 bg-base-100 p-2.5 ${span[placement.size ?? "M"] ?? ""}${edit ? " outline-dashed outline-1 -outline-offset-4 outline-ui-border" : ""}"><h3 class="mb-1 flex items-center gap-2 px-2 text-3xs font-semibold uppercase tracking-wider text-faint">${def?.icon ? `<i class="ph ${esc(def.icon)}" aria-hidden="true"></i>` : ""}<span class="truncate">${esc(title)}</span>${module}${controls}</h3>${html}</section>`;
+        return `<section data-nav-widget="${esc(placement.id)}" data-widget-type="${esc(placement.widget)}" class="min-w-0 bg-base-100 p-2.5 ${span[placement.size ?? "M"] ?? ""}${edit ? " outline-dashed outline-1 -outline-offset-4 outline-ui-border" : ""}"><h3 data-nav-title class="mb-1 flex items-center gap-2 px-2 text-3xs font-semibold uppercase tracking-wider text-faint">${def?.icon ? `<i class="ph ${esc(def.icon)}" aria-hidden="true"></i>` : ""}<span class="truncate">${esc(title)}</span>${module}${controls}</h3>${html}</section>`;
     }));
     if (edit) {
         const catalogue = Object.values(widgets).sort((a, b) => a.title.localeCompare(b.title));
@@ -73,7 +73,7 @@ export default async function (
     const editToggle = `<button type="button" data-nav-edit-toggle aria-pressed="${edit}" title="${edit ? "Done editing" : "Edit menu"}" aria-label="${edit ? "Done editing" : "Edit menu"}" class="ml-auto inline-flex shrink-0 items-center gap-1 self-center rounded px-2 py-1 text-xs ${edit ? "bg-primary text-primary-content" : "text-faint hover:bg-base-200 hover:text-base-content"}"><i class="ph ${edit ? "ph-check" : "ph-pencil-simple"}" aria-hidden="true"></i>${edit ? "Done" : ""}</button>`;
     const strip = `<nav class="flex items-end gap-1 overflow-x-auto border-b border-ui-border px-3" aria-label="Menu tabs">${tabs.length > 1 || edit ? pills : ""}${tabTools}${editToggle}</nav>`;
     const grid = tiles.length
-        ? `<div class="grid grid-cols-1 gap-px bg-base-200 lg:grid-cols-3" style="grid-template-rows:auto auto 1fr" data-nav-tab-body="${esc(tab.id)}"${source === "default" && tab.id === "home" && !edit ? ' data-nav-mobile-chats-first' : ""}>${tiles.join("")}</div>`
+        ? `<div class="grid grid-cols-1 gap-px bg-base-200 lg:grid-cols-3" style="grid-template-rows:auto auto 1fr" data-nav-tab-body="${esc(tab.id)}"${source === "default" && tab.id === "home" && !edit ? ' data-nav-overview data-nav-mobile-chats-first' : ""}>${tiles.join("")}</div>`
         : `<div class="px-4 py-5 text-sm text-faint" data-nav-tab-body="${esc(tab.id)}">No widgets on this tab yet.</div>`;
     return strip + grid;
 }

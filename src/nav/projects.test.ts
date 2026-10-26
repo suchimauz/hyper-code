@@ -19,12 +19,12 @@ test("projects menu uses active native project rows and always exposes archive",
     expect(calls).toBe(1);
     expect(output.html).toBeUndefined();
     expect(output.items?.map(i => i.id)).toEqual(["project:virtual:/a?b", "project:empty"]);
-    expect(output.items?.[0]).toMatchObject({ href: "/projects/view?projectId=virtual%3A%2Fa%3Fb", icon: "ph-folder-open", unread: true, hint: "2 running", detail: "server:/a?b" });
-    expect(output.sections?.[0]?.items?.[0]).toMatchObject({ href: "/projects/archive", label: "Archived projects" });
+    expect(output.items?.[0]).toMatchObject({ href: "/projects/view?projectId=virtual%3A%2Fa%3Fb", icon: "ph-folder-open", unread: true, hint: "2 в работе", detail: "server" });
+    expect(output.sections?.[0]?.items?.[0]).toMatchObject({ href: "/projects/archive", label: "Архив проектов" });
     const html = await rows(ctx, null, { items: output.items ?? [] });
     expect(html).toContain('class="nav-row');
     expect(html).toContain("&lt;Project&gt;");
-    expect(html).toContain('aria-label="New activity"');
+    expect(html).toContain('data-nav-unread-count');
     expect(html).not.toContain("/files?path=");
 });
 
@@ -39,7 +39,7 @@ test("default home orders projects before chats and pages; saved layout remains 
     let layout: object = {};
     const ctx: any = {
         state: { nav: { widgets: Object.fromEntries(["projects", "chats", "pages"].map(id => [id, { id, module: "nav", sizes: ["tall"] }])) } },
-        fns: { nav: { effectiveLayout: async () => ({ layout, source: "default" }) } },
+        fns: { nav: { effectiveLayout: async () => ({ layout, source: Object.keys(layout).length ? "user" : "default" }) } },
     };
     expect((await tabs(ctx, null, {})).tabs[0]?.widgets.map(w => w.widget)).toEqual(["projects", "chats", "pages"]);
     layout = { tabs: [{ id: "home", widgets: [{ widget: "pages" }, { widget: "chats" }] }] };

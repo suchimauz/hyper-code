@@ -84,8 +84,8 @@ describe('mobile default Home widget order', () => {
     test('keyboard traversal follows moved DOM order and resize preserves selected row', async () => {
         const f = setup();
         try {
-            f.refresh(grid); f.client.__navOpen();
-            const key = (key: string) => f.window.dispatchEvent(new f.window.KeyboardEvent('keydown', { key }));
+            f.refresh(grid.replaceAll('<a class="nav-row"', '<a href="#row" class="nav-row"')); f.client.__navOpen();
+            const key = (key: string) => f.window.document.activeElement!.dispatchEvent(new f.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
             key('ArrowDown');
             expect((f.window as any).__navSelId).toBe('chats');
             f.resize(1280);

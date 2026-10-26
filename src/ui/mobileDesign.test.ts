@@ -63,7 +63,7 @@ test('mobile reading is 17px, quiet, and technical IDs are hidden only on phones
             expect(f.css('#chat-panel .assistant').boxShadow).toBe('none');
             expect(f.css('#chat-panel .assistant').backdropFilter).toBe('none');
             expect(f.css('[data-chat-technical-id]').display).toBe('none');
-            expect(f.css('[data-nav-technical-id]').display).toBe('none');
+            expect(f.window.document.querySelector('[data-nav-technical-id]')).toBeNull();
             expect(f.css('[data-composer-toolbar]').flexWrap).toBe('wrap');
             expect(f.css('.project-tabs').display).toBe('none');
             expect(f.css('.project-mobile-bar').display).toBe('flex');
@@ -107,13 +107,13 @@ test('mobile reading is 17px, quiet, and technical IDs are hidden only on phones
     }
 });
 
-test('desktop keeps compact type, technical IDs and existing textures', async () => {
+test('desktop keeps compact type, chat technical IDs and existing textures', async () => {
     const f = await fixture(1280, 0);
     try {
         expect(f.css('#chat-panel .prose').fontSize).toBe('14px');
         expect(f.css('#nav-overlay [data-nav-label]').fontSize).toBe('12px');
         expect(f.css('[data-chat-technical-id]').display).not.toBe('none');
-        expect(f.css('[data-nav-technical-id]').display).not.toBe('none');
+        expect(f.window.document.querySelector('[data-nav-technical-id]')).toBeNull();
         expect(f.css('#chat-panel #messages').backgroundImage).not.toBe('none');
         expect(f.css('#chat-panel .assistant').backdropFilter).toBe('blur(2px)');
         expect(f.css('[data-composer-toolbar]').flexWrap).not.toBe('wrap');

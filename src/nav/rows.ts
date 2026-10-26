@@ -41,17 +41,18 @@ export default async function (
         else if (local(pagePin)) pin = `<form hx-post="/dock/pin" hx-swap="none" class="${formClass}"><input type="hidden" name="kind" value="page"><input type="hidden" name="target" value="${esc(pagePin)}"><input type="hidden" name="pinned" value="${isPinned ? "0" : "1"}"><button type="submit" title="${isPinned ? "Remove from" : "Add to"} Dock" aria-label="${isPinned ? "Remove" : "Add"} ${esc(item.label)} ${isPinned ? "from" : "to"} Dock" class="flex size-6 items-center justify-center rounded text-faint hover:bg-base-200 hover:text-muted"><i class="ph ${isPinned ? "ph-push-pin-slash" : "ph-push-pin"}"></i></button></form>`;
         const icon = item.model
             ? ctx.fns.chat.icon({ icon: item.avatar, model: item.model, active: !!item.active })
+            : item.avatar ? `<span data-nav-project-icon class="shrink-0">${ctx.fns.chat.icon({ icon: item.avatar, model: "" })}</span>`
             : `<i class="ph ${esc(/^ph-[a-z0-9-]+$/.test(String(item.icon ?? "")) ? item.icon : "ph-arrow-square-out")} shrink-0 text-faint${item.detail ? " mt-0.5" : ""}" aria-hidden="true"></i>`;
         const mark = item.model && agentPin && isPinned ? '<i class="ph ph-push-pin-fill mr-1 text-faint opacity-50" aria-label="Pinned"></i>' : "";
         const compact = opts.compact || !!item.model;
         const label = compact
-            ? `<span data-nav-label class="min-w-0 flex-1 truncate text-xs text-muted">${mark}${esc(item.label)}${item.model && agentPin ? ` <span data-nav-technical-id class="font-mono text-3xs font-normal text-faint">(${esc(agentPin)})</span>` : ""}</span>`
+            ? `<span data-nav-label class="min-w-0 flex-1 truncate text-xs text-muted">${mark}${esc(item.label)}${item.detail ? `<span data-nav-detail class="block truncate text-3xs font-normal text-faint">${esc(item.detail)}</span>` : ""}</span>`
             : item.detail
                 ? `<span class="min-w-0 flex-1"><span data-nav-label class="block truncate text-xs font-medium">${mark}${esc(item.label)}</span><span data-nav-detail class="line-clamp-2 block text-3xs text-faint">${esc(item.detail)}</span></span>`
                 : `<span data-nav-label class="min-w-0 flex-auto shrink truncate">${mark}${esc(item.label)}</span>`;
         const owner = item.owner ? `<span class="max-w-24 shrink-0 truncate text-3xs text-faint" data-owner>${esc(item.owner)}</span>` : "";
-        const hint = item.hint ? `<span data-nav-hint class="min-w-0 max-w-32 shrink-[100] truncate text-3xs text-faint">${esc(item.hint)}</span>` : "";
-        const dot = item.unread ? `<span class="size-2 shrink-0 rounded-full bg-success" title="New activity" aria-label="New activity"></span>` : "";
+        const hint = item.hint ? `<span data-nav-hint class="${item.active ? "rounded-full bg-primary/15 px-1.5 font-semibold text-primary" : "text-faint"} min-w-0 max-w-32 shrink-[100] truncate text-3xs">${esc(item.hint)}</span>` : "";
+        const dot = item.unreadCount && item.unreadCount > 0 ? `<span data-nav-unread-count class="shrink-0 rounded-full bg-success px-1.5 text-xs font-semibold text-success-content" aria-label="Непрочитанные: ${esc(item.unreadCount)}">${esc(item.unreadCount)}</span>` : item.unread ? `<span class="size-2 shrink-0 rounded-full bg-success" title="New activity" aria-label="New activity"></span>` : "";
         const size = compact ? "min-h-7 gap-1.5 px-1.5 py-0.5" : `min-h-8 gap-2 px-2 py-1 text-sm${item.detail ? " items-start" : ""}`;
         const safeHref = local(href) || /^https?:\/\//.test(href) ? href : "#";
         return `<div class="group flex items-center gap-0.5"><a href="${esc(safeHref)}"${item.newTab ? ' target="_blank" rel="noopener"' : ""}${item.id ? ` data-nav-id="${esc(item.id)}"` : ""} class="nav-row flex ${size} min-w-0 flex-1 items-center rounded text-left outline-none hover:bg-base-200/60">${icon}${label}${owner}${hint}${dot}</a>${pin}</div>`;

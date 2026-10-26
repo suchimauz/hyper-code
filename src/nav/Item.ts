@@ -14,12 +14,14 @@ export type Item = {
     icon?: string;
     /** Draw this model's logo instead of an icon (chat rows), spinning while `active`. */
     model?: string;
-    /** The chat's own avatar SVG (agents.icon), drawn instead of the model logo (with `model`). */
+    /** Personal avatar SVG, sanitized by chat.icon; project rows may use it without a model. */
     avatar?: string;
     /** The chat is running right now (with `model`). */
     active?: boolean;
     /** Show a dot for news the person has not seen. */
     unread?: boolean;
+    /** Real unread count when the source provides one; omitted for boolean-only chat activity. */
+    unreadCount?: number;
     /** Name of another person who owns the row, shown small at the right. */
     owner?: string;
     /** Menu section such as System, Projects & files, or Plugins (declared `$app_` pages). */

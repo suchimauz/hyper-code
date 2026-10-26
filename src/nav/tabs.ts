@@ -2,9 +2,10 @@
  * Lists the global menu (⌘/) tabs of the current viewer in display order, each resolved to its widget
  * placements and search sources.
  *
- * Built-in tabs: `home` with the core widgets (projects, chats, pages) and `plugins`, with the pages plugins declare
- * (pluginPages) followed by every plugin widget (module other than nav) the layout does not place on any tab nor list in widgetsHidden — shown only when it has
- * something. Both ask every search source unless the layout narrows them. The effective layout (nav.layout) lists tabs in order: an entry with id `home` or `plugins`
+ * Default tabs are Overview (`home`: projects, chats, daily pages), Capabilities (`plugins`: declared plugin pages
+ * and unplaced plugin widgets), and Management (`management`: administrative pages). Saved user and instance
+ * layouts retain their placements and do not gain Management unless explicitly listed; their empty Plugins tab
+ * stays hidden. Every tab asks all search sources unless narrowed. Layout entries with built-in ids
  * overrides that built-in tab's fields, any other id with a title is the person's own tab; built-in tabs not
  * listed go first; layout.hidden tabs are left out. Placements of unknown widgets are dropped and a size the widget does not declare falls back
  * to its first size; `search` keeps only known sources not in layout.searchHidden (omitted = every source).
@@ -29,9 +30,14 @@ export default async function (
     const unplaced = Object.values(widgets).filter(w => w.module !== "nav" && !placedAnywhere.has(w.id) && !widgetsHidden.has(w.id))
         .sort((a, b) => a.module.localeCompare(b.module) || a.id.localeCompare(b.id));
     const declared: Record<string, types.nav.Tab & { id: string }> = {
-        home: { id: "home", title: "Home", icon: "ph-house", order: 0, widgets: ["projects", "chats", "pages"].map(w => ({ id: w, widget: w, size: "tall" as const })) },
-        plugins: { id: "plugins", title: "Plugins", icon: "ph-plugs", order: 1, widgets: widgets.pluginPages ? [{ id: "pluginPages", widget: "pluginPages", size: "wide" }] : [] },
+        home: { id: "home", title: "Обзор", icon: "ph-house", order: 0, widgets: ["projects", "chats", "pages"].map(w => ({ id: w, widget: w, size: "tall" as const, ...(source === "default" && w === "chats" ? { config: { hideNewChat: true } } : {}), ...(source === "default" && w === "pages" ? { config: { section: "daily" } } : {}) })) },
+        plugins: { id: "plugins", title: "Возможности", icon: "ph-plugs", order: 1, widgets: widgets.pluginPages ? [{ id: "pluginPages", widget: "pluginPages", size: "wide" }] : [] },
     };
+    // Do not insert new tabs into saved personal or instance layouts. An explicit management tab
+    // continues to resolve after saving the new default layout.
+    if (source === "default" || layout.tabs?.some(t => t.id === "management")) {
+        declared.management = { id: "management", title: "Управление", icon: "ph-sliders-horizontal", order: 2, widgets: [{ id: "management", widget: "pages", size: "wide", config: { section: "management", title: "Управление Hyper" } }] };
+    }
     const sources = state.search ?? {};
     const hidden = new Set(layout.hidden ?? []);
     const searchHidden = new Set(layout.searchHidden ?? []);
@@ -65,6 +71,6 @@ export default async function (
     };
     const tabs = [...rest, ...listed].filter(t => !hidden.has(t.id) && (declared[t.id] || String(t.title ?? "").trim())).map(resolve)
         // An empty built-in Plugins tab (no plugin widgets at all) is not worth a tab.
-        .filter(t => t.id !== "plugins" || t.widgets.length > 0);
+        .filter(t => t.id !== "plugins" || source === "default" || t.widgets.length > 0);
     return { tabs, source };
 }

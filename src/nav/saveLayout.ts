@@ -1,7 +1,7 @@
 /**
  * Saves or resets the current person's own global menu (⌘/) layout (setting nav.layout, scope user).
  *
- * Tabs need an id; any id but the built-in `home` / `plugins` needs a title. Placements need a known widget; ids are made
+ * Tabs need an id; any id but the built-in `home` / `plugins` / `management` needs a title. Placements need a known widget; ids are made
  * unique within a tab. Unknown hidden / searchHidden ids are dropped. Pass `reset: true` to delete the
  * person's layout so the instance layout applies again. Without a signed-in person (open single-user
  * instance) the instance layout is written instead.
@@ -25,7 +25,7 @@ export default async function (
         return { scope: userId ? "user" : "global", layout: null };
     }
     const state = ((ctx.state as any).nav ?? {}) as Record<string, Record<string, unknown> | undefined>;
-    const declared: Record<string, true> = { home: true, plugins: true };
+    const declared: Record<string, true> = { home: true, plugins: true, management: true };
     const widgets = state.widgets ?? {};
     const sources = state.search ?? {};
     const sizes = new Set(["S", "M", "L", "wide", "tall"]);

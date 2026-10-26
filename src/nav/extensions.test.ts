@@ -33,10 +33,10 @@ test("tabs: built-in home, layout overrides and own tabs, unknown widgets droppe
     reg("search", { chats: { title: "Chats", search: () => [] }, "knowledge.people": { title: "People", search: () => [] } });
     let r = await ctx.fns.nav.tabs({});
     expect(r.source).toBe("default");
-    expect(r.tabs.map((t: any) => t.id)).toEqual(["home", "plugins"]);
+    expect(r.tabs.map((t: any) => t.id)).toEqual(["home", "plugins", "management"]);
     expect(r.tabs[1].widgets.map((w: any) => w.widget)).toEqual(["gcal.today"]);
     // Core widgets that are not loaded (shared, projects) drop out; a size the widget lacks falls back to its first.
-    expect(r.tabs[0].widgets).toEqual([{ id: "chats", widget: "chats", size: "tall" }, { id: "pages", widget: "pages", size: "M" }]);
+    expect(r.tabs[0].widgets).toEqual([{ id: "chats", widget: "chats", size: "tall", config: { hideNewChat: true } }, { id: "pages", widget: "pages", size: "M", config: { section: "daily" } }]);
     expect(r.tabs[0].search).toEqual(["chats", "knowledge.people"]);
 
     await ctx.fns.settings.set({ module: "nav", scopeType: "global", key: "layout", value: JSON.stringify({

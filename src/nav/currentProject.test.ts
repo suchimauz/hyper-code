@@ -50,7 +50,7 @@ test('mismatched swapped chat clears current project; Enter activates popup butt
     (window as any).__navOpen(); await flush();
     expect(selected()).toBeUndefined();
     expect(calls).toEqual([]);
-    window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    window.document.activeElement!.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     expect(clicks).toBe(1);
     await window.happyDOM.close();
 });
