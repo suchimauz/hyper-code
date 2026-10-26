@@ -10,7 +10,9 @@
  * Reads Anthropic's unified rate-limit headers and Codex's percent header or
  * rate_limits stream payload, and keeps the latest snapshot per credential in
  * kv under "llm:usage:<provider>:<account>". Call it after a successful call,
- * and from the usage-limit path with spent=true.
+ * and from the usage-limit path with spent=true. Partial Codex updates retain
+ * known duration and unexpired reset metadata for the same window; an explicit
+ * new duration replaces the old one and never inherits its reset.
  *
  * @param opts.provider Provider name from llm.resolveEndpoint.
  * @param opts.account Credential account within the provider.
@@ -100,7 +102,7 @@ export default async function (
         const reset = Number(raw.resets_at);
         windows[key] = {
             usedPercent: clampPercent(used),
-            windowMinutes: Number.isFinite(Number(raw.window_minutes)) ? Number(raw.window_minutes) : null,
+            windowMinutes: raw.window_minutes != null && Number.isFinite(Number(raw.window_minutes)) && Number(raw.window_minutes) > 0 ? Number(raw.window_minutes) : null,
             resetsAt: Number.isFinite(reset) && reset > 0 ? Math.round(reset * 1000) : null,
         };
         source = "stream";
@@ -121,6 +123,21 @@ export default async function (
 
     const key = `llm:usage:${provider}:${account}`;
     const previous = await read(ctx, key);
+    if (provider === "codex") {
+        // Percent-only responses are partial observations, not evidence that a
+        // previously reported period disappeared. Never invent a default period
+        // or carry an expired reset (or one belonging to a different duration).
+        for (const name of ["primary", "secondary", "tertiary"] as const) {
+            const incoming = windows[name];
+            const prior = previous?.windows?.[name];
+            if (!incoming || !prior) continue;
+            const sameDuration = incoming.windowMinutes == null || incoming.windowMinutes === prior.windowMinutes;
+            incoming.windowMinutes ??= prior.windowMinutes;
+            if (incoming.resetsAt == null && sameDuration && prior.resetsAt != null && prior.resetsAt > now) {
+                incoming.resetsAt = prior.resetsAt;
+            }
+        }
+    }
     const warnedAt = keepWarning(previous, windows, now);
     const worstWindow = Object.values(windows).sort((a, b) => b.usedPercent - a.usedPercent)[0];
     const worst = worstWindow?.usedPercent ?? 0;

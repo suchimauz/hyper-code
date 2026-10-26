@@ -1,6 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 import dial from "../ui/usageDial";
+import recordUsage from "./recordUsage";
+
+// These normalization regressions need no registry, browser or Postgres server.
+function quotaCtx(): any {
+    const values = new Map<string, string>();
+    const ctx: any = { fns: {
+        llm: { recordUsage: (opts: any) => recordUsage(ctx, null, opts) },
+        settings: { getNumber: async () => 75 },
+        ui: { notify: async () => undefined },
+        procs: {
+            events: { refresh: () => undefined },
+            db: {
+                select: async ({ params }: any) => values.has(params[0]) ? [{ value: values.get(params[0]) }] : [],
+                run: async ({ params }: any) => { values.set(params[0], params[1]); },
+            },
+        },
+    } };
+    return ctx;
+}
 
 const NOW = 1_786_900_000_000;
 const escCtx: any = {
@@ -38,6 +57,45 @@ describe("llm.recordUsage", () => {
         });
         expect(snapshot.windows.primary).toMatchObject({ usedPercent: 87.2, windowMinutes: 300 });
         expect(snapshot.source).toBe("stream");
+    });
+
+    test("partial Codex headers and streams preserve a reported weekly primary", async () => {
+        const ctx = quotaCtx();
+        const reset = NOW + 86_400_000;
+        await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW,
+            rateLimits: { primary: { used_percent: 10, window_minutes: 10080, resets_at: reset / 1000 } } });
+        const header = await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW + 1,
+            headers: { "x-codex-primary-used-percent": "20" } });
+        expect(header.windows.primary).toEqual({ usedPercent: 20, windowMinutes: 10080, resetsAt: reset });
+        const stream = await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW + 2,
+            rateLimits: { primary: { used_percent: 30, window_minutes: null, resets_at: null } } });
+        expect(stream.windows.primary).toEqual({ usedPercent: 30, windowMinutes: 10080, resetsAt: reset });
+        const rows = await ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = ?", params: ["llm:usage:codex:default"] });
+        expect(JSON.parse(rows[0].value).windows.primary).toEqual(stream.windows.primary);
+    });
+
+    test("Codex respects a new confirmed duration and does not borrow its old reset", async () => {
+        const ctx = quotaCtx();
+        await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW,
+            rateLimits: { primary: { used_percent: 10, window_minutes: 10080, resets_at: (NOW + 86_400_000) / 1000 } } });
+        const changed = await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW + 1,
+            rateLimits: { primary: { used_percent: 20, window_minutes: 300 } } });
+        expect(changed.windows.primary).toEqual({ usedPercent: 20, windowMinutes: 300, resetsAt: null });
+    });
+
+    test("Codex never guesses a period or preserves expired resets", async () => {
+        const ctx = quotaCtx();
+        const fresh = await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW,
+            rateLimits: { primary: { used_percent: 10, window_minutes: null } } });
+        expect(fresh.windows.primary.windowMinutes).toBeNull();
+        await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW,
+            rateLimits: { primary: { used_percent: 10, window_minutes: 10080, resets_at: (NOW + 1000) / 1000 } } });
+        const expired = await ctx.fns.llm.recordUsage({ provider: "codex", now: NOW + 2000,
+            headers: { "x-codex-primary-used-percent": "0" } });
+        expect(expired.windows.primary).toEqual({ usedPercent: 0, windowMinutes: 10080, resetsAt: null });
+        const other = await ctx.fns.llm.recordUsage({ provider: "codex", account: "other", now: NOW,
+            headers: { "x-codex-primary-used-percent": "5" } });
+        expect(other.windows.primary.windowMinutes).toBeNull();
     });
 
     test("reads xAI token/request capacity into a sidebar pressure ring", async () => {
