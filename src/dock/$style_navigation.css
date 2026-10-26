@@ -42,7 +42,7 @@
 .dock-running-title { font-size:12px; font-weight:550; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dock-running-status,.dock-running-empty { font-size:10px; color:var(--color-muted); }
 .dock-running-project { font-size:10px; line-height:14px; color:var(--color-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.dock-running-id { flex:none; align-self:flex-start; padding-top:2px; color:var(--color-muted); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:10px; font-weight:400; line-height:16px; letter-spacing:.015em; }
+.dock-running-id { flex:none; align-self:flex-start; padding-top:2px; color:var(--color-muted); font-family:var(--font-mono); font-size:10px; font-weight:400; line-height:16px; letter-spacing:.015em; }
 .dock-running-empty { padding:7px; }
 .dock-footer { flex-shrink:0; border-top:1px solid var(--color-ui-border); padding-top:5px; }
 #dock-limits { min-width:0; }

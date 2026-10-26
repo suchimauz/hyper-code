@@ -18,10 +18,28 @@ const SOURCES: Record<string, { url: string; type: string }> = {
     "phosphor.ttf": { url: "https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/Phosphor.ttf", type: "font/ttf" },
 };
 
-/** Handles the HTTP route vendor :name GET endpoint. */
+/** Serve pinned frontend assets from this origin; Medeo fonts and CSS come from the installed package without network access. */
 export default async function (ctx: Context, _session: Session | null, opts: {
         /** Route parameters captured from the request path. */ params: Record<string, string> }) {
     const name = opts.params.name!;
+    // An explicit allowlist keeps request paths out of filesystem resolution.
+    const medeo: Record<string, string> = {
+        "medeo-sans.woff2": "medeo-sans/MedeoSansVariable.woff2",
+        "medeo-sans-italic.woff2": "medeo-sans/MedeoSansVariable-Italic.woff2",
+        "medeo-mono.woff2": "medeo-mono/MedeoMonoVariable.woff2",
+        "medeo-mono-italic.woff2": "medeo-mono/MedeoMonoVariable-Italic.woff2",
+    };
+    const font = Object.hasOwn(medeo, name) ? medeo[name] : undefined;
+    if (font || name === "medeo.css") {
+        const headers = { "content-type": font ? "font/woff2" : "text/css; charset=utf-8", "cache-control": "public, max-age=3600" };
+        if (font) return new Response(Bun.file(Bun.resolveSync(`medeo-font/fonts/${font}`, import.meta.dir)), { headers });
+        const sheets = await Promise.all(["sans", "mono"].map(async family =>
+            Bun.file(Bun.resolveSync(`medeo-font/${family}.css`, import.meta.dir)).text()));
+        let css = sheets.join("\n");
+        for (const [asset, path] of Object.entries(medeo)) css = css.replaceAll(`./fonts/${path}`, `/ui/vendor/${asset}`);
+        css += '\n:root{--font-sans:var(--font-medeo-sans);--font-mono:var(--font-medeo-mono)}html{font-family:var(--font-sans);font-optical-sizing:auto}';
+        return new Response(css, { headers });
+    }
     const source = SOURCES[name];
     if (!source) return new Response("unknown asset", { status: 404 });
 

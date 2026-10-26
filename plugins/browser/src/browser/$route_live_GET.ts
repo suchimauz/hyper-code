@@ -13,10 +13,11 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>Live view</title>
+<link rel="stylesheet" href="/ui/vendor/medeo.css">
 <style>
   :root { color-scheme: light dark; --bar: #f3f3f4; --fg: #222; --line: #d6d6da; }
   @media (prefers-color-scheme: dark) { :root { --bar: #232327; --fg: #e8e8ea; --line: #3a3a40; } }
-  html, body { margin: 0; height: 100%; background: #6b6b70; font: 13px system-ui, sans-serif; color: var(--fg); }
+  html, body { margin: 0; height: 100%; background: #6b6b70; font: 13px var(--font-sans); color: var(--fg); }
   body { display: flex; flex-direction: column; }
   header { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: var(--bar); border-bottom: 1px solid var(--line); }
   header button { min-width: 30px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; font-size: 14px; }

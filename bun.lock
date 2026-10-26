@@ -25,6 +25,7 @@
         "htmx.org": "4.0.0",
         "lru-cache": "^11.5.3",
         "marked": "^18.0.7",
+        "medeo-font": "1.0.0-rc.3",
         "parse5": "^8.0.1",
         "shiki": "^4.0.2",
         "tailwindcss": "^4.3.3",
@@ -355,6 +356,8 @@
     "marked": ["marked@18.0.9", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-/Sa4qiiHZxf0/FQdBBowr9q4r10krCwMvpK48FUBdXdUXScDxiQGR9zCPrFgRVR5LU3iySOiIjy09ZQvADir1w=="],
 
     "mdast-util-to-hast": ["mdast-util-to-hast@13.2.1", "", { "dependencies": { "@types/hast": "^3.0.0", "@types/mdast": "^4.0.0", "@ungap/structured-clone": "^1.0.0", "devlop": "^1.0.0", "micromark-util-sanitize-uri": "^2.0.0", "trim-lines": "^3.0.0", "unist-util-position": "^5.0.0", "unist-util-visit": "^5.0.0", "vfile": "^6.0.0" } }, "sha512-cctsq2wp5vTsLIcaymblUriiTcZd0CwWtCbLvrOzYCDZoWyMNV8sZ7krj09FSnsiJi3WVsHLM4k6Dq/yaPyCXA=="],
+
+    "medeo-font": ["medeo-font@1.0.0-rc.3", "", { "peerDependencies": { "next": ">=13.2.0" }, "optionalPeers": ["next"] }, "sha512-daX+W0GKG8C3h0JeulC3cCDEMvtrHfbNyHQH4yd0Y4HsKkPgqtP6LMNGAiqcMYnx3OrpZPgf6GTYbzrCXlJuPw=="],
 
     "micromark-util-character": ["micromark-util-character@2.1.1", "", { "dependencies": { "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-wv8tdUTJ3thSFFFJKtpYKOYiGP2+v96Hvk4Tu8KpCAsTMs6yi+nVmGh1syvSCsaxz45J6Jbw+9DD6g97+NV67Q=="],
 

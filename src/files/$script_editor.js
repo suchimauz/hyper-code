@@ -40,7 +40,7 @@
 
     const theme = EditorView.theme({
         "&": { height: "100%", fontSize: "12.5px" },
-        ".cm-scroller": { overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" },
+        ".cm-scroller": { overflow: "auto", fontFamily: "var(--font-mono)" },
         ".cm-gutters": { background: "#f9fafb", borderRight: "1px solid #e5e7eb" },
         ".cm-activeLineGutter": { background: "#eef2ff" },
         ".cm-activeLine": { background: "#f5f3ff40" },

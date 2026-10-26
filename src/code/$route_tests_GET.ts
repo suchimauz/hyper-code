@@ -11,22 +11,23 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
 }
 
 const CSS = `
-body{font:13px/1.4 Inter,system-ui,sans-serif;margin:0;padding:16px 20px;color:#1f2937;background:#fff}
+@import url("/ui/vendor/medeo.css");
+body{font:13px/1.4 var(--font-sans);margin:0;padding:16px 20px;color:#1f2937;background:#fff}
 h1{font-size:17px;margin:0 0 4px} .sub{color:#6b7280;font-size:12px;margin-bottom:14px}
 .kpis{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}.k{border:1px solid #e5e7eb;border-radius:10px;padding:6px 10px;min-width:70px}.k b{display:block;font-size:20px}.k span{color:#6b7280;font-size:11px}
 .k.bad b{color:#dc2626}.k.ok b{color:#16a34a}
 h2{font-size:13px;margin:18px 0 8px;color:#374151;text-transform:uppercase;letter-spacing:.04em}
 .row{display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:2px 8px;align-items:center;padding:4px 0}.row .name{grid-column:1/3}
-.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);font-size:12px}
 .bar{height:12px;border-radius:4px;background:#3b82f6}.bar.hot{background:#f59e0b}.bar.very{background:#ef4444}
 .v{text-align:right;font-variant-numeric:tabular-nums;color:#374151}
 .f{border-left:3px solid #ef4444;padding:4px 8px;margin:4px 0;background:#fef2f2;border-radius:4px}
-.f .t{font-weight:600}.f .m{color:#6b7280;font-size:12px;font-family:ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.grp{color:#6b7280;font-size:12px;margin:8px 0 2px;font-family:ui-monospace,Menlo,monospace}
+.f .t{font-weight:600}.f .m{color:#6b7280;font-size:12px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp{color:#6b7280;font-size:12px;margin:8px 0 2px;font-family:var(--font-mono)}
 details>summary{list-style:none;cursor:pointer}details>summary::-webkit-details-marker{display:none}
 details[open]>summary .name{color:#2563eb}
 .code{margin:4px 0 10px;border:1px solid #e5e7eb;border-radius:6px;overflow:auto;max-height:420px;font-size:11.5px}
-.code pre{margin:0;padding:8px 10px}.code .loc{font:11px ui-monospace,Menlo,monospace;color:#6b7280;padding:4px 10px;border-bottom:1px solid #f3f4f6;background:#f9fafb}
+.code pre{margin:0;padding:8px 10px}.code .loc{font:11px var(--font-mono);color:#6b7280;padding:4px 10px;border-bottom:1px solid #f3f4f6;background:#f9fafb}
 .sub2{margin-left:12px;border-left:2px solid #e5e7eb;padding-left:8px}.nocode{color:#9ca3af;font-size:12px;padding:4px 0}
 
 
@@ -54,6 +55,6 @@ body.running .kpis,body.running h2,body.running details,body.running .grp,body.r
 .pbar{display:flex;height:14px;border-radius:7px;background:#e5e7eb;overflow:hidden}.pbar i{display:block;height:100%;transition:width .4s}
 .pp{background:#22c55e}.pf{background:#ef4444}.ps{background:#9ca3af}
 .pnum{margin-top:6px;font-size:12px;color:#374151;font-variant-numeric:tabular-nums}.okc{color:#16a34a}.badc{color:#dc2626}
-.pcur{font:11px ui-monospace,Menlo,monospace;color:#6b7280;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pfl{margin-top:6px;font:11px ui-monospace,Menlo,monospace;color:#b91c1c;max-height:160px;overflow:auto}
+.pcur{font:11px var(--font-mono);color:#6b7280;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pfl{margin-top:6px;font:11px var(--font-mono);color:#b91c1c;max-height:160px;overflow:auto}
 `;

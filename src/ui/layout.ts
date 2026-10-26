@@ -51,6 +51,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
 <meta name="htmx-config" content='{"morphIgnore":["data-htmx-powered","open"]}'>
 <script src="/procs/ui/htmx.js" defer></script>
 <link rel="stylesheet" href="/ui/vendor/phosphor.css">
+<link rel="stylesheet" href="/ui/vendor/medeo.css">
 <style>
 /* Compact lazy tool links. The tray is assembled client-side so consecutive
    calls occupy one visual row without wrapping each button in extra markup. */
@@ -71,7 +72,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
 .chat-header-name { display: block; min-width: 0; max-width: 100%; padding: .125rem .25rem; margin-left: -.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: .375rem; text-align: left; font-family: inherit; font-size: .9375rem; font-weight: 600; line-height: 1.35; color: var(--color-base-content); }
 .chat-header-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-header-meta { display: flex; align-items: center; gap: .4rem; min-width: 0; margin-top: .125rem; }
-.chat-agent-id { display: inline-flex; align-items: center; gap: .3rem; flex: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .6875rem; font-weight: 500; line-height: 1.4; letter-spacing: .015em; color: var(--color-muted); white-space: nowrap; }
+.chat-agent-id { display: inline-flex; align-items: center; gap: .3rem; flex: none; font-family: var(--font-mono); font-size: .6875rem; font-weight: 500; line-height: 1.4; letter-spacing: .015em; color: var(--color-muted); white-space: nowrap; }
 .chat-agent-id-label { font-size: .5625rem; font-family: inherit; opacity: .8; }
 .chat-header-badges { display: flex; align-items: center; gap: .25rem; min-width: 0; overflow: hidden; }
 .chat-header-badges [data-chat-id="agent.workspace"] { flex-shrink: 1; }
@@ -919,7 +920,7 @@ body[data-presentation="sidebar"] #chat-panel > header { padding-left: .55rem !i
 </style>
 
 <style>
-  body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  body { font-family: var(--font-sans); }
   .shiki { background: transparent !important; }
   .assistant pre.shiki { padding: .6em .8em; border-radius: 6px; overflow-x: auto; margin: .4em 0; font-size: 12.5px; line-height: 1.45; }
   .tool pre.shiki { padding: 0; margin: 0; overflow-x: auto; }
@@ -1055,7 +1056,7 @@ ${hideNavigation ? "" : '<script src="/projects/reorder.js" defer></script><scri
 /* Code has one shared surface on desktop and phone; lines never wrap implicitly. */
 #messages .chat-code-block { min-width: 0; max-width: 100%; margin: .8rem 0; overflow: hidden; border: 1px solid var(--color-ui-border); border-radius: .8rem; background: var(--color-base-100); }
 .chat-code-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: .3rem .5rem; border-bottom: 1px solid var(--color-ui-border); background: var(--color-base-200); font-size: .75rem; }
-.chat-code-language { flex: 1; min-width: 3rem; font-family: ui-monospace, monospace; color: var(--color-muted); }
+.chat-code-language { flex: 1; min-width: 3rem; font-family: var(--font-mono); color: var(--color-muted); }
 .chat-code-tools button, .chat-code-feedback button { min-height: 36px; padding: .35rem .65rem; border-radius: .5rem; color: var(--color-base-content); }
 .chat-code-tools button:hover, .chat-code-feedback button:hover { background: var(--color-base-300); }
 #messages .assistant .chat-code-block pre { margin: 0; padding: .85rem 1rem; min-width: 0; max-width: 100%; overflow: auto; overscroll-behavior-x: contain; white-space: pre; overflow-wrap: normal; word-break: normal; font-size: 13px; line-height: 1.6; border-radius: 0; }
