@@ -1,3 +1,4 @@
+import quotaCards from "./quotaCards";
 import { expect, test } from "bun:test";
 import accountsCard from "./accountsCard";
 import control from './modelControl';
@@ -16,7 +17,7 @@ const ctx: any = { state: { sshAccount: { flows: new Map() } }, fns: {
         popup: (o: any) => JSON.stringify(o),
         live: ({ html }: any) => html,
     },
-    llms: { modelControl: (opts: Parameters<typeof control>[2]) => control(ctx,null,opts) },
+    llms: { quotaCards: (opts: Parameters<typeof quotaCards>[2]) => quotaCards(ctx, null, opts), modelControl: (opts: Parameters<typeof control>[2]) => control(ctx,null,opts) },
 } };
 
 test("accounts card groups consistently by provider and renders plan/storage metadata", () => {
@@ -25,6 +26,10 @@ test("accounts card groups consistently by provider and renders plan/storage met
         { provider: "anthropic-oauth", account: "pro", label: "pro", model: "anthropic-oauth/pro:claude", source: "oauth", available: true, usedPercent: 22, planType: "max", resetsAt: null, parkedAgents: 0 },
         { provider: "xai", account: "default", label: "Grok managed", model: "xai:grok", source: "oauth", available: true, usedPercent: null, planType: null, resetsAt: null, parkedAgents: 0 },
     ] });
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('id="llm-provider-tab-codex" role="tab" aria-controls="llm-provider-panel-codex" aria-selected="true"');
+    expect(html).toContain('id="llm-provider-panel-codex" data-provider="codex" role="tabpanel" aria-labelledby="llm-provider-tab-codex" tabindex="0" class=');
+    expect(html).toContain('id="llm-provider-panel-claude" data-provider="claude" role="tabpanel" aria-labelledby="llm-provider-tab-claude" tabindex="0" hidden');
     expect(html).toContain('data-provider="codex"');
     expect(html).toContain('data-provider="claude"');
     expect(html).toContain('"role":"plan","text":"Team"');

@@ -1,3 +1,5 @@
+import quotaCards from "./quotaCards";
+import modelControl from "./modelControl";
 import { expect, test } from 'bun:test';
 import popup from './loginPopup';
 import popupFor from './loginPopupFor';
@@ -10,7 +12,7 @@ function fixture() {
  const ctx: any = { state: {sshAccount: {flows: new Map()}}, fns: {
  procs: {ui: {field: ({name}: any) => `<input name="${name}">`, escape: ({text}: any) => Bun.escapeHTML(String(text)), button: (o: any) => JSON.stringify(o), select: ({name, value, options}: any) => `<select name="${name}" value="${value}">${options.map((o: any) => `<option value="${o.value}">${o.label}</option>`).join('')}</select>`, row: (o: any) => JSON.stringify(o), heading: (o: any) => o.title, empty: () => '', toolbar: () => ''}},
  ui: {popupContent: ({html}: any) => html, popup: (o: any) => JSON.stringify(o), modelLogo: () => '', live: ({html}: any) => html},
- llms: {loginPopup: (o: any) => popup(ctx,null,o)},
+ llms: { quotaCards: (o: Parameters<typeof quotaCards>[2]) => quotaCards(ctx, null, o), modelControl: (o: Parameters<typeof modelControl>[2]) => modelControl(ctx, null, o),loginPopup: (o: any) => popup(ctx,null,o)},
  sshInstance: {list: record('instances',[])},
  sshAccount: {startLogin: record('remote',{id:'flow'}), progressPopup: record('progress','remote-progress')},
  llm: {startAccountLogin: record('local',null), startXaiOAuth: record('xai',null), accountLoginStatus: () => []}

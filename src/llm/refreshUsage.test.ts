@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
+import refreshUsage from "./refreshUsage";
+import recordUsage from "./recordUsage";
+import quotaCards from "../llms/quotaCards";
 
 const NOW = 1_786_900_000_000;
 
@@ -29,6 +32,37 @@ describe("llm.refreshUsage", () => {
         expect(result).toEqual([{ provider: "codex", account: "work", status: "refreshed", error: null }]);
         const usage = await ctx.fns.llm.usageOverview({ now: NOW });
         expect(usage[0]).toMatchObject({ provider: "codex", account: "work", usedPercent: 42, planType: "pro", resetCredits: { availableCount: 3, credits: [{ id: "credit-1", resetType: "codex_rate_limits" }] } });
+    });
+
+    test("Codex weekly-only primary stays weekly through refresh and quota rendering", async () => {
+        // Exercise the real parser, normalizer and renderer without booting the
+        // full browser/Postgres test registry or making a provider request.
+        const values = new Map<string, string>();
+        const ctx: any = { fns: {
+            procs: { db: {
+                select: async ({ params }: any) => values.has(params[0]) ? [{ value: values.get(params[0]) }] : [],
+                run: async ({ params }: any) => { values.set(params[0], params[1]); return { changes: 1 }; },
+            }, events: { refresh: () => undefined } },
+            settings: { getNumber: async () => 75 },
+            llm: { refreshCodex: async () => 'token', accountAuthHealth: async () => undefined,
+                recordUsage: (opts: any) => recordUsage(ctx, null, opts),
+                connectFetch: async () => Response.json({
+                    plan_type: 'pro',
+                    rate_limit: {
+                        primary_window: { used_percent: 41, limit_window_seconds: 604800, reset_after_seconds: 551897 },
+                        secondary_window: null,
+                    },
+                }),
+            },
+        } };
+        const result = await refreshUsage(ctx, null, { accounts: [{ provider: "codex", account: "weekly" }], maxAgeMs: 0, now: NOW });
+        expect(result[0]?.status).toBe("refreshed");
+        const snapshot = JSON.parse(values.get('llm:usage:codex:weekly')!);
+        expect(snapshot.windows).toEqual({ primary: { usedPercent: 41, windowMinutes: 10080, resetsAt: NOW + 551897000 } });
+        const html = quotaCards(ctx, null, { account: { available: true, usedPercent: 41, resetsAt: null, windows: snapshot.windows } });
+        expect(html).toContain("Неделя");
+        expect(html).not.toContain("5 часов");
+        expect(html).not.toContain("Месяц");
     });
 
     test("fetches Claude OAuth usage and converts percentages for recordUsage", async () => {

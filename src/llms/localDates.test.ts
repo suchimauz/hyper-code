@@ -1,3 +1,5 @@
+import quotaCards from "./quotaCards";
+import modelControl from "./modelControl";
 import { expect, test } from 'bun:test';
 import { runInNewContext } from 'node:vm';
 import card from './accountsCard';
@@ -34,6 +36,7 @@ test('node quota renders semantic timestamps for reset, measurement and rolling 
     escape: ({text}: any) => String(text).replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
     heading: () => '', button: () => '', row: () => '', empty: () => '',
   } }, ui: { live: ({html}: any) => html, popup: () => '' } } };
+ctx.fns.llms = { quotaCards: (o: Parameters<typeof quotaCards>[2]) => quotaCards(ctx, null, o), modelControl: (o: Parameters<typeof modelControl>[2]) => modelControl(ctx, null, o) };
   const node: any = { name: 'mini', enabled: true, catalogAt: now,
     catalog: [{ id: 'codex:sample', provider: 'codex', account: 'alice' }],
     usage: [{ provider: 'codex', account: 'alice', usedPercent: 43, updatedAt: now,

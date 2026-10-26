@@ -8,11 +8,11 @@ export type UsageSnapshot = {
     provider: string;
     /** Credential account within the provider, "default" when unnamed. */
     account: string;
-    /** Provider quota windows: primary is short (5h), secondary weekly, tertiary monthly when reported. */
+    /** Provider quota slots, not fixed periods. Read each windowMinutes for its duration: Codex primary can be weekly with no secondary. */
     windows: {
         primary?: types.llm.UsageWindow;
         secondary?: types.llm.UsageWindow;
-        /** Optional monthly quota, using the provider's nominal window length. */
+        /** Optional third quota window; use its reported windowMinutes for the period. */
         tertiary?: types.llm.UsageWindow;
     };
     /** Subscription plan reported by the provider, e.g. "prolite". */

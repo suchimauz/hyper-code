@@ -1,6 +1,6 @@
 // Unified LLM connections surface. Managed Anthropic OAuth is fully wired;
 // other providers retain their existing settings/login flows.
-/** Handles the HTTP route  GET endpoint. */
+/** Render Models and Limits with a provider focus panel, live quotas, model controls, API settings and Hyper nodes. */
 export default async function (ctx: Context, _session: Session | null, _opts: {
         /** Incoming HTTP request. */ req: Request;
         /** Route parameters captured from the request path. */ params: Record<string, string> }) {
@@ -51,7 +51,7 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     const prices = await ctx.fns.llm.modelPrices({models:Object.values(models).flat().filter(model => /^(?:(?:ssh|hyper)\/[^:]+:)*opencode(?:\/[\w.-]+)?:/.test(model)),nodes});
     const minimax = {
         serviceTier: (await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" })) ?? "standard",
-        maxTokens: await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }),
+        maxTokens: (await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 })) ?? 16384,
     };
 
     const oauthLabel = oauth.needsReconnect ? "reconnect required" : oauth.connected ? expiryLabel(oauth.expiresAt) : oauth.loginStatus === "pending" ? "login pending" : undefined;
@@ -90,14 +90,14 @@ ${addAccountForm}` : `
   ${oauth.connected ? `<p class="mt-3 text-2xs text-faint">Each account has its own quota and model prefix: <code>anthropic-oauth:</code> for the primary account, <code>anthropic-oauth/name:</code> for the others. Disconnect removes only that account and leaves Claude sessions untouched.</p>` : ""}
 </article>`;
 
-    const main = `<div class="llm-connections min-h-full bg-base-200">
-<header class="llm-connections-header border-b border-base-300 bg-base-100 px-6 py-5"><div class="mx-auto flex max-w-5xl items-start justify-between gap-4"><div><h1 class="text-xl font-semibold tracking-tight text-base-content">LLM connections</h1><p class="mt-1 text-sm text-subtle">Connect subscription accounts with +, or configure pay-per-token API providers.</p></div><div class="rounded-lg bg-base-200 px-3 py-2 text-right ring-1 ring-base-300"><div class="text-lg font-semibold text-base-content">${accounts.length}</div><div class="text-3xs uppercase tracking-wide text-faint">accounts</div></div></div></header>
-<div class="llm-connections-content mx-auto max-w-5xl space-y-7 px-6 py-6">
+    const main = `<div class="llm-connections llm-focus-page min-h-full bg-base-200">
+<header class="llm-connections-header"><div class="llm-page-heading"><div><h1>Модели и лимиты</h1><p>Подключения, доступные модели и расход подписок.</p><div class="llm-page-summary"><span><b>${accounts.length}</b> аккаунтов</span><span><b>${new Set(accounts.map(a => a.provider)).size}</b> провайдеров</span>${accounts.some(a => a.needsReconnect) ? '<span class="text-warning">● Требуется вход</span>' : ''}</div></div><a class="llm-page-settings" href="/settings" aria-label="Настройки подключений"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i></a></div><div class="llm-section-tabs" role="tablist" aria-label="Тип подключения"><button type="button" id="llm-section-subscriptions" role="tab" aria-selected="true" aria-controls="llm-section-content" data-llm-tab="subscriptions">Подписки</button><button type="button" id="llm-section-api" role="tab" aria-selected="false" tabindex="-1" aria-controls="llm-section-content" data-llm-tab="api">API и шлюзы</button><button type="button" id="llm-section-nodes" role="tab" aria-selected="false" tabindex="-1" aria-controls="llm-section-content" data-llm-tab="nodes">Узлы Hyper</button></div></header>
+<div id="llm-section-content" role="tabpanel" aria-labelledby="llm-section-subscriptions" tabindex="0" class="llm-connections-content">
 ${ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax, planInstances, disabledModels, prices })}
-${await ctx.fns.node.card({})}
-<section><div class="mb-3"><h2 class="text-xs font-semibold uppercase tracking-wider text-subtle">API providers</h2><p class="mt-1 text-xs text-faint">Pay-per-token keys are managed separately from subscription accounts.</p></div><div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">${staticCard({ icon: "ph-sparkle", name: "Anthropic API", description: "Claude models billed through an Anthropic API key.", on: status.anthropic.set, methods: [status.anthropic.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-circles-three-plus", name: "OpenAI", description: "OpenAI platform models and billing.", on: status.openai.set, methods: [status.openai.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-git-fork", name: "OpenRouter", description: "Multiple model vendors through one API.", on: status.openrouter.set, methods: [status.openrouter.set ? "Manage key in Settings" : "Add key in Settings"] })}</div></section>
+<div data-llm-section="nodes" class="llm-node-management" hidden>${await ctx.fns.node.card({})}</div>
+<section data-llm-section="api" hidden><div class="mb-3"><h2 class="text-xs font-semibold uppercase tracking-wider text-subtle">API-провайдеры</h2><p class="mt-1 text-xs text-muted">Оплата за токены. Ключи управляются отдельно от подписок.</p></div><div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">${staticCard({ icon: "ph-sparkle", name: "Anthropic API", description: "Claude models billed through an Anthropic API key.", on: status.anthropic.set, methods: [status.anthropic.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-circles-three-plus", name: "OpenAI", description: "OpenAI platform models and billing.", on: status.openai.set, methods: [status.openai.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-git-fork", name: "OpenRouter", description: "Multiple model vendors through one API.", on: status.openrouter.set, methods: [status.openrouter.set ? "Manage key in Settings" : "Add key in Settings"] })}</div></section>
 </div></div>`;
-    return { title: "LLMs", main };
+    return { title: "Модели и лимиты", main };
 }
 
 function expiryLabel(expiresAt: number | null): string {

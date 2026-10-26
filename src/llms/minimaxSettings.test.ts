@@ -1,3 +1,5 @@
+import quotaCards from "./quotaCards";
+import modelControl from "./modelControl";
 import { expect, test } from "bun:test";
 import accountsCard from "./accountsCard";
 import minimaxSettings from "./minimaxSettings";
@@ -16,7 +18,7 @@ const ctx: any = { fns: {
         popup: (o: any) => JSON.stringify(o),
         live: ({ html }: any) => html,
     },
-    llms: { minimaxSettings: (o: any) => minimaxSettings(ctx, null, o) },
+    llms: { quotaCards: (o: Parameters<typeof quotaCards>[2]) => quotaCards(ctx, null, o), modelControl: (o: Parameters<typeof modelControl>[2]) => modelControl(ctx, null, o), minimaxSettings: (o: any) => minimaxSettings(ctx, null, o) },
 } };
 
 const minimaxAccount = { provider: "minimax-coding", account: "default", label: "MiniMax", model: "minimax-coding:", source: "file" as const, available: true, usedPercent: 12, planType: "M Plan", resetsAt: null, parkedAgents: 0 };

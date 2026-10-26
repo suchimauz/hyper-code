@@ -1,3 +1,5 @@
+import quotaCards from "./quotaCards";
+import modelControl from "./modelControl";
 import { expect, test } from "bun:test";
 import card from "./accountsCard";
 import dial from "../ui/usageDial";
@@ -7,14 +9,15 @@ import logo from '../ui/modelLogo';
 
 const escape = ({text}: {text: string}) => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const ctx: any = {state: {llmUsageRefresh:{startedAt:Date.now()}}, fns:{procs:{ui:{escape, heading:({title}:any)=>title, empty:()=>'', button:()=>'', row:()=>''}},ui:{live:({html}:any)=>html, modelLogo:()=>'<i></i>', popup:()=>''}}};
+ctx.fns.llms = { quotaCards: (o: Parameters<typeof quotaCards>[2]) => quotaCards(ctx, null, o), modelControl: (o: Parameters<typeof modelControl>[2]) => modelControl(ctx, null, o) };
 const account:any={provider:'oneapi',account:'default',label:'Asoft LLM Gate',model:'oneapi:',source:'file',available:true,usedPercent:null,planType:null,resetsAt:null,parkedAgents:0,gatewayHealth:{status:'available',reason:'models-ok',models:['gpt-test'],checkedAt:1}};
 test('connections render gateway, account-grouped node and catalogue-only local models, never hidden models',()=>{
  const html=card(ctx,null,{accounts:[account],models:{'hyper/mini':['hyper/mini:good'],'lmstudio':['lmstudio:local']},nodes:[{name:'mini',enabled:true,catalogAt:Date.now(),catalog:[{id:'good',provider:'codex',account:'alice'},{id:'hidden',provider:'codex',account:'bob'}]} as any]});
  expect(html).toContain('oneapi:gpt-test');expect(html).toContain('data-node-account="codex/alice"');expect(html).toContain('hyper/mini:good');expect(html).toContain('lmstudio:local');expect(html).not.toContain('hyper/mini:hidden');expect(html).toContain('generation not verified');
 });
 test('gateway dock is a neutral circle with a minimal hover card, no model list',async()=>{
- ctx.fns.llm={usageOverview:async()=>[],listModels:async()=>({}),gatewayHealth:async()=>({...account.gatewayHealth,models:['gpt<test>']})};ctx.fns.node={list:async()=>[]};ctx.fns.ui.usageDial=(o:any)=>dial(ctx,null,o);
- ctx.fns.llms={usageData:(opts:any)=>usageData(ctx,null,opts)};
+ ctx.fns.llm={usageOverview:async()=>[],listAccounts:async()=>[],listModels:async()=>({}),gatewayHealth:async()=>({...account.gatewayHealth,models:['gpt<test>']})};ctx.fns.node={list:async()=>[]};ctx.fns.ui.usageDial=(o:any)=>dial(ctx,null,o);
+ ctx.fns.llms={...ctx.fns.llms,usageData:(opts:any)=>usageData(ctx,null,opts)};
  const html=await(await route(ctx,null,{})).text();
  expect(html).toContain('data-gateway="oneapi"');expect(html).toContain('size-7');expect(html).toContain('bg-success');expect(html).toContain('quota-ring');expect(html).toContain('quota-tip-head">Asoft LLM Gate');expect(html).toContain('in catalogue');expect(html).not.toContain('gpt<test>');expect(html).not.toContain('Available models');expect(html).not.toContain('stroke-dasharray');
 });

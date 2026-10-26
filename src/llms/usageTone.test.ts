@@ -1,3 +1,5 @@
+import quotaCards from "./quotaCards";
+import modelControl from "./modelControl";
 import { describe, expect, test } from "bun:test";
 import accountsCard from "./accountsCard";
 
@@ -19,6 +21,7 @@ const ctx: any = { fns: {
     ui: { modelLogo: () => "logo", popup: () => "", live: ({ html }: any) => html },
 } };
 
+ctx.fns.llms = { quotaCards: (o: Parameters<typeof quotaCards>[2]) => quotaCards(ctx, null, o), modelControl: (o: Parameters<typeof modelControl>[2]) => modelControl(ctx, null, o) };
 describe("quota colour is the same everywhere", () => {
     test("a spent quota is red, a half-spent one orange and a fresh one green", () => {
         const html = accountsCard(ctx, null, { accounts: [account(90), account(60), account(10)] });
@@ -38,7 +41,10 @@ describe("quota colour is the same everywhere", () => {
     test("a third spent is already yellow, not green", () => {
         const html = accountsCard(ctx, null, { accounts: [account(30)] });
         expect(html).toContain("text-warning");
-        expect(html).not.toContain("text-success");
+        // A green connection-status dot is not quota; scope to the account panel.
+        const panel = html.slice(html.indexOf('<section id="llm-provider-panel-codex"'), html.indexOf('</section>', html.indexOf('<section id="llm-provider-panel-codex"')));
+        expect(panel).not.toBe("");
+        expect(panel).not.toContain("text-success");
     });
 
     test("the configured thresholds decide the colour, not fixed numbers", () => {
@@ -51,6 +57,9 @@ describe("quota colour is the same everywhere", () => {
     test("an unknown quota is never painted as if it were known", () => {
         const html = accountsCard(ctx, null, { accounts: [account(null)] });
         expect(html).toContain("usage unavailable");
-        expect(html).not.toContain("text-success");
+        // A green connection-status dot is not quota; scope to the account panel.
+        const panel = html.slice(html.indexOf('<section id="llm-provider-panel-codex"'), html.indexOf('</section>', html.indexOf('<section id="llm-provider-panel-codex"')));
+        expect(panel).not.toBe("");
+        expect(panel).not.toContain("text-success");
     });
 });
