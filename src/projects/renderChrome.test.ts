@@ -40,9 +40,9 @@ describe('project navigation markup',()=>{
   const fallback=await render(ctx,null,{...base,chats:[{...base.chats[0]!,model:'openai:gpt-4o',runState:'idle'}]});
   expect(fallback.tabs).toContain('chat-icon');expect(fallback.tabs).not.toContain('chat-icon-ring');expect(fallback.tabs).not.toContain('data:image/svg+xml,');
  });
- test('sidebar keeps active projects, replaces add-project with ordinary agent popup, and links archive',async()=>{
+ test('sidebar keeps active projects and archive without duplicating the primary new chat action',async()=>{
   const out=await render(ctx,null,{...base,projects:[...base.projects,{id:'old',title:'Hidden archived',dir:'/old',host:'',archived:true}]});
-  expect(out.sidebar).not.toContain('Hidden archived');expect(out.sidebar).toContain('/projects/archive');expect(out.sidebar).toContain('hx-popup="ui.newAgentPopup"');expect(out.sidebar).not.toContain('data-project-action="new-project"');expect(out.sidebar).not.toContain('data-project-action="archive-project"');expect(out.tabs).toContain('data-project-action="archive-project"');expect(out.tabs).not.toContain('archive-current');expect(out.tabs).toContain('Архивировать проект');expect(out.tabs).not.toContain('title="Project archive"');
+  expect(out.sidebar).not.toContain('Hidden archived');expect(out.sidebar).toContain('/projects/archive');expect(out.sidebar).not.toContain('hx-popup="ui.newAgentPopup"');expect(out.sidebar).not.toContain('data-project-action="new-project"');expect(out.sidebar).not.toContain('data-project-action="archive-project"');expect(out.tabs).toContain('data-project-action="archive-project"');expect(out.tabs).not.toContain('archive-current');expect(out.tabs).toContain('Архивировать проект');expect(out.tabs).not.toContain('title="Project archive"');
  });
  test('archived selected project offers restore instead of archive',async()=>{
   const out=await render(ctx,null,{...base,projects:base.projects.map(p=>({...p,archived:true}))});
@@ -51,4 +51,22 @@ describe('project navigation markup',()=>{
  test('no selected project yields no stray tabs',async()=>{
   const out=await render(ctx,null,{...base,projectId:undefined}); expect(out.tabs).toBe('');
  });
+});
+
+test('project labels expose local or actual SSH host and only archive in heading', async()=>{
+ const out=await render(ctx,null,{...base,projects:[...base.projects,{id:'remote',title:'Remote',dir:'/srv',host:'ssh<&host'}]});
+ expect(out.sidebar).toContain('class="project-copy"');
+ expect(out.sidebar).toContain('class="project-host">Локально</span>');
+ expect(out.sidebar).toContain('ssh&lt;&amp;host');
+ expect(out.sidebar).toContain('/projects/archive');
+ expect(out.sidebar).not.toContain('ui.newAgentPopup');
+ expect(out.sidebar).toContain('aria-current="page"');
+});
+
+test('project logos use inert image URLs in expanded and mobile navigation with a reset editor',async()=>{
+ const svg='<svg viewBox="0 0 8 8"><path d="M0 0"/></svg>';
+ const out=await render(ctx,null,{...base,projects:[{...base.projects[0]!,icon:svg,unreadCount:2}]});
+ expect(out.sidebar).toContain('class="project-logo"');expect(out.sidebar).toContain(Buffer.from(svg).toString('base64'));
+ expect(out.sidebar).not.toContain(svg);expect(out.sidebar).toContain('project-unread-badge');
+ expect(out.tabs).toContain('class="project-logo"');expect(out.tabs).toContain('hx-popup="projects.iconPopup"');
 });

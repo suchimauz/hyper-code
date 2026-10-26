@@ -9,12 +9,12 @@ export default async function (
     opts: {},
 ): Promise<types.projects.Project[]> {
     const principal = await ctx.fns.projects.principal({});
-    const stored = await ctx.fns.procs.db.select({sql:'SELECT p.id,m.title,p.dir,p.host,m.archived_at FROM projects p JOIN project_members m ON m.project_id=p.id WHERE m.principal=?',params:[principal]});
+    const stored = await ctx.fns.procs.db.select({sql:'SELECT p.id,m.title,p.dir,p.host,m.archived_at,m.icon FROM projects p JOIN project_members m ON m.project_id=p.id WHERE m.principal=?',params:[principal]});
     const result = new Map<string,types.projects.Project>();
     const archiveTimes = new Map<string,number>();
     for (const p of stored) {
      if (p.archived_at != null) archiveTimes.set(p.id,Number(p.archived_at));
-     result.set(p.id,{id:p.id,title:p.title,dir:p.dir,host:p.host,archived:p.archived_at != null,virtual:false,runningCount:0,unreadCount:0});
+     result.set(p.id,{id:p.id,title:p.title,icon:p.icon??null,dir:p.dir,host:p.host,archived:p.archived_at != null,virtual:false,runningCount:0,unreadCount:0});
     }
     const viewer = await ctx.fns.auth.viewerId({});
     // Match session.list: single-user instances retain the native legacy read watermarks.
