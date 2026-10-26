@@ -2,6 +2,7 @@
  * Streams subscription HTTP requests over a pinned SSH connection
  *
  * Runs Python 3 on the SSH host to read and refresh isolated file credentials and stream provider HTTP back to existing protocol parsers. Requires a connected account for Codex/Claude; coding plans and OpenCode forward caller authorization only on SSH stdin, never in command arguments or logs.
+ * Active worker-bound cron grants may use only their exact OpenCode Go DeepSeek descriptor, body model and fixed endpoint. The live task, run, owner, grant and authority version are checked before dispatch; no SSH management capability is returned.
  * @param opts.ssh Pinned SSH instance and isolated subscription account identity.
  * @param opts.url Allowlisted HTTPS inference, model catalogue or quota URL for the selected provider.
  * @param opts.init HTTP payload and cancellation signal; real authorization is injected remotely.
@@ -18,7 +19,32 @@ export default async function (
         init: {method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal};
     },
 ): Promise<Response> {
-    await ctx.fns.sshInstance.authorize({});
+    // Snapshot caller data before any await; only this fixed bridge may use the
+    // private null-session connection after validating an active cron capability.
+    opts = { ssh: { ...opts.ssh }, url: opts.url, init: { ...opts.init, headers: { ...opts.init.headers } } };
+    const service = session ? (ctx.state as any).cron?.inferenceServices?.get(session) : null;
+    const checkService = async () => {
+        if (!session || (ctx.state as any).cron?.inferenceServices?.get(session) !== service) throw new Error("Expired cron inference capability");
+        const d = service.inference;
+        if (!d || d.provider !== "opencode" || d.account !== "default" || d.model !== "deepseek-v4.1-flash" || typeof d.instance !== "string" || !d.instance || opts.ssh.provider !== d.provider || opts.ssh.instance !== d.instance || opts.ssh.account !== d.account) throw new Error("Cron inference descriptor mismatch");
+        const read = ["https://opencode.ai/inference/go/v1/models", "https://opencode.ai/v2/docs/console/go"].includes(opts.url);
+        if (read) {
+            if (opts.init.method !== "GET" || opts.init.body !== undefined) throw new Error("Cron catalogue requires GET without body");
+        } else {
+            if (opts.url !== "https://opencode.ai/inference/go/openai/v1/chat/completions" || opts.init.method !== "POST" || typeof opts.init.body !== "string") throw new Error("Cron inference endpoint denied");
+            const body = JSON.parse(opts.init.body);
+            if (!body || Array.isArray(body) || body.model !== d.model) throw new Error("Cron inference model mismatch");
+        }
+        const rows = await ctx.fns.procs.db.select({sql:`SELECT g.scopes FROM cron_grants g JOIN cron_tasks t ON t.name=g.task_name JOIN cron_runs r ON r.id=?
+            WHERE g.task_name=? AND g.target_fn=? AND g.owner_id=? AND g.definition_version=?
+            AND t.fn=g.target_fn AND t.authority_version=g.definition_version AND t.enabled=TRUE
+            AND r.task_name=g.task_name AND r.fn=g.target_fn AND r.authority_version=g.definition_version AND r.status='running'`,
+            params:[service.runId,service.taskName,service.targetFn,service.ownerId,service.definitionVersion]});
+        const scopes = typeof rows[0]?.scopes === "string" ? JSON.parse(rows[0].scopes) : rows[0]?.scopes;
+        if (!scopes || JSON.stringify(scopes) !== service.storedScopes || (ctx.state as any).cron?.inferenceServices?.get(session) !== service) throw new Error("Revoked cron inference grant");
+    };
+    if (service) await checkService();
+    else await ctx.fns.sshInstance.authorize({});
     // Coding plans bridge the caller's own plan key, so they need no remote
     // account registry row; codex/claude-code load their credentials remotely.
     const plan=opts.ssh.provider==='zai-coding'||opts.ssh.provider==='minimax-coding'||opts.ssh.provider==='opencode';
@@ -27,7 +53,12 @@ export default async function (
     const rows=await ctx.fns.sshAccount.registry({action:'list'});
     if(!rows.some(r=>r.instance===opts.ssh.instance&&r.provider===opts.ssh.provider&&r.account===opts.ssh.account&&r.status==='connected'))throw new Error('SSH subscription account is not connected');
     }
-    const c = await ctx.fns.sshInstance.connection({name:opts.ssh.instance});
+    let c: {bin:string;args:string[];host:string};
+    if (service) {
+        // Never return or pass this derived context to the target or other helpers.
+        const bridge = Object.create(ctx); bridge.session = null;
+        c = await bridge.fns.sshInstance.connection({name:opts.ssh.instance});
+    } else c = await ctx.fns.sshInstance.connection({name:opts.ssh.instance});
     const script=await ctx.fns.sshAccount.inferenceScript({});
     const command="python3 -c '"+script.replaceAll("'","'\"'\"'")+"'";
     const fail = (phase: "before_dispatch" | "ambiguous" | "permanent", cause?: unknown) =>
@@ -64,6 +95,7 @@ export default async function (
         const ready=await line(deadline);
         if(ready.ready!==true)throw fail("permanent");
         opts.init.signal?.throwIfAborted();
+        if (service) await checkService();
         dispatched=true; // Set BEFORE writing: a failed write may still reach the remote process.
         stdin.write("dispatch\n");await Promise.race([stdin.flush(),deadline]);stdin.end();
         const header=await line(deadline);
