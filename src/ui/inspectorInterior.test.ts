@@ -12,14 +12,14 @@ function render(name: any, data: any = {}) { return section(ctx,null,{agent:{id:
 function dom(html: string) { const w = new Window(); w.document.body.innerHTML = `<div data-agent-meta-content>${html}</div>`; return w; }
 test('all seven sections remain discoverable with empty data', () => {
  for (const name of ['settings','compaction','automation','goal','knowledge','team','plan']) {
-  const w=dom(render(name)); expect(w.document.querySelector('details > summary')?.textContent?.trim().length).toBeGreaterThan(0); w.happyDOM.abort();
+  const w=dom(render(name)); expect(w.document.querySelector('section > header h3')?.textContent?.trim().length).toBeGreaterThan(0); w.happyDOM.abort();
  }
  expect(render('team')).toContain('No team yet'); expect(render('plan')).toContain('No plan yet'); expect(render('knowledge')).toContain('unavailable');
 });
 test('settings groups preserve all independent Jev flags and informed sharing copy', () => {
  const w=dom(render('settings')); const d=w.document;
  expect(d.querySelectorAll('fieldset').length).toBe(3);
- expect(d.querySelectorAll('details details').length).toBe(1);
+ expect(d.querySelectorAll('details details').length).toBe(0);
  expect(d.querySelectorAll('label .text-micro').length).toBe(0);
  expect(d.querySelectorAll('input[type=checkbox]').length).toBe(11);
  expect(d.querySelectorAll('input[type=hidden]').length).toBe(8);
@@ -62,7 +62,7 @@ test('real renderer action classes and collapsed task instructions are visible c
 
 test('shared surface roles cover settings, compaction, lists and native disclosures', () => {
  const samples = [render('settings'), render('compaction'), render('goal'), render('automation', {triggers:[{id:'t',status:'active',kind:'at',config:{},prompt:'Review'}]}), render('team',{team:[{id:'c',title:'Review',status:'working',plan:{tasks:[]}}]}), render('plan',{agent:{id:'ab',scratchpad:{plan:{tasks:[{id:'t',title:'Check',status:'pending'}]}}}}), knowledge(ctx,null,{agent:{id:'ab',scratchpad:{knowledgeSidecar:{mentions:[{name:'Entity',status:'new',evidence:'Source'}]}}} as any})];
- for(const html of samples) { const w=dom(html); expect(w.document.querySelector('.inspector-surface-group, .inspector-surface-row')).not.toBeNull(); for(const input of w.document.querySelectorAll('.ui-toggle-input')) expect(input.closest('.inspector-setting-row')).not.toBeNull(); w.happyDOM.abort(); }
+ for(const html of samples) { const w=dom(html); expect(w.document.querySelector('.inspector-list, .inspector-row')).not.toBeNull(); for(const input of w.document.querySelectorAll('.ui-toggle-input')) expect(input.closest('.inspector-setting-row')).not.toBeNull(); w.happyDOM.abort(); }
 });
 async function page(main: string) {
  return layout({...ctx, state:{procs:{styles:[{href:'/compiled-app.css'}]}}, fns:{...ctx.fns, ui:{...ctx.fns.ui,faviconUrl:async()=>'/favicon.ico',navMenu:()=>''},dock:{render:async()=>''}}},null,{main});
@@ -75,7 +75,7 @@ test('rendered shell does not predeclare layers before the compiled stylesheet o
  expect(before).not.toMatch(/@layer\s/);
  // No local tone, size or disabled-state rules: the shared component owns these.
  const css=Array.from(w.document.querySelectorAll('style')).map(s=>s.textContent).join('\n');
- expect(css.slice(css.indexOf('/* Agent Inspector:'),css.indexOf('@media (pointer: coarse)',css.indexOf('/* Agent Inspector:')))).not.toMatch(/\.ui-button/);
+ expect(css.slice(css.indexOf('/* Agent Inspector:'),css.indexOf('@media (pointer: coarse)',css.indexOf('/* Agent Inspector:'))).replaceAll(':not(.ui-button)', '')).not.toMatch(/\.ui-button/);
  for (const tone of ['default','primary','danger','ghost'] as const) {
   const control=button(ctx,null,{label:'Action',action:'test',tone,size:'xs',disabled:true});
   const d=dom(control); const el=d.document.querySelector('button')!;
@@ -93,15 +93,15 @@ test('rendered Inspector typography and group insets follow semantic roles, not 
  // These utility baselines deliberately precede Inspector CSS. Tests exercise actual selectors on renderer output.
  const style=w.document.createElement('style'); style.textContent='.font-semibold{font-weight:600}.font-medium{font-weight:500}'+css; w.document.head.append(style);
  const computed=(selector:string)=>{const el=w.document.querySelector(selector);expect(el).not.toBeNull();return w.getComputedStyle(el!);};
- expect(computed('.inspector-heading').fontWeight).toBe('500');
- expect(computed('legend').fontWeight).toBe('500');
+ expect(computed('.inspector-heading').fontWeight).toBe('600');
+ expect(computed('legend').fontWeight).toBe('600');
  expect(computed('.inspector-toggle-label').fontWeight).toBe('400');
  expect(computed('.inspector-field > span').fontWeight).toBe('400');
  expect(computed('[data-task-status="active"] .inspector-task-title').fontWeight).toBe('500');
- expect(computed('[data-task-status="pending"] .inspector-task-title').fontWeight).toBe('400');
- expect(computed('.inspector-surface-group').paddingLeft).toBe('0px');
- expect(computed('legend').paddingLeft).toBe('8px');
- expect(computed('.inspector-setting-row').paddingLeft).toBe('8px');
+ expect(computed('[data-task-status="pending"] .inspector-task-title').fontWeight).toBe('500');
+ expect(computed('.inspector-list').paddingLeft).toBe('0px');
+ expect(computed('legend').paddingLeft).toBe('12px'); // Gray group heading has an inset; flat setting rows do not.
+ expect(computed('.inspector-setting-row').paddingLeft).toBe('0px');
  const outside=w.document.createElement('div'); outside.innerHTML=toggle(ctx,null,{name:'outside',enabled:true,label:'Outside'}); w.document.body.append(outside);
  expect(w.getComputedStyle(outside.querySelector('.inspector-toggle-label')!).fontWeight).toBe('500');
  w.happyDOM.abort();

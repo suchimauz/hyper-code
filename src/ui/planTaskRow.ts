@@ -12,13 +12,19 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const seconds = Math.floor(elapsed / 1000);
     const time = seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m` : `${Math.floor(seconds / 3600)}h ${Math.floor(seconds % 3600 / 60)}m`;
     const controls = status === 'pending' ? `<div class="inspector-task-actions">${ctx.fns.procs.ui.button({ action: 'move-plan-task-up', label: 'Move up', type: 'button', tone: 'default', size: 'xs', attrs: { 'data-plan-move': 'up' } })}${ctx.fns.procs.ui.button({ action: 'move-plan-task-down', label: 'Move down', type: 'button', tone: 'default', size: 'xs', attrs: { 'data-plan-move': 'down' } })}${ctx.fns.procs.ui.button({ action: 'remove-plan-task', label: 'Remove', type: 'button', tone: 'danger', size: 'xs', ariaLabel: 'Remove task', attrs: { 'data-plan-remove': true } })}</div>` : '';
-    return `<details id="plan-task-${esc(task.id)}" data-plan-task data-task-id="${esc(task.id)}" data-task-status="${esc(status)}" data-inspector-disclosure="task-${esc(task.id)}" class="inspector-task inspector-disclosure inspector-surface-row" ${opts.autofocus ? 'open' : ''}>
-      <summary><span class="inspector-task-indicator" aria-hidden="true"></span><span class="inspector-task-heading"><span data-plan-task-title class="inspector-task-title">${esc(task.title || 'Untitled task')}</span><span class="inspector-task-status">${esc(label)}${elapsed > 0 ? ` <span class="inspector-task-time">· ${time}</span>` : ''}</span></span></summary>
-      <div class="inspector-task-editor">
+    return `<details id="plan-task-${esc(task.id)}" data-plan-task data-task-id="${esc(task.id)}" data-task-status="${esc(status)}" data-inspector-disclosure="task-${esc(task.id)}" class="inspector-task inspector-disclosure inspector-row" ${opts.autofocus ? 'open' : ''}>
+      <summary><span class="inspector-task-indicator" aria-hidden="true"></span><span class="inspector-task-heading"><span data-plan-task-title class="inspector-task-title inspector-row-title">${esc(task.title || 'Untitled task')}</span><span class="inspector-task-status inspector-row-caption"><span class="inspector-status-badge" data-tone="${status === 'done' ? 'success' : active ? 'active' : status === 'pending' ? 'waiting' : status === 'failed' || status === 'blocked' ? 'danger' : 'neutral'}">${esc(label)}</span>${elapsed > 0 ? ` <span class="inspector-task-time">· ${time}</span>` : ''}</span></span></summary>
+      <div class="inspector-detail-body">
+        <p class="inspector-row-caption whitespace-pre-wrap">${esc(task.instructions || 'No instructions yet.')}</p>
+        <details data-inspector-disclosure="task-edit-${esc(task.id)}" class="inspector-detail" ${opts.autofocus ? 'open' : ''}>
+          <summary class="inspector-row-caption">Edit task</summary>
+          <div class="inspector-task-editor">
         <input type="hidden" name="task_id" value="${esc(task.id)}">
         <label class="inspector-field"><span>Task title</span><input name="task_title" maxlength="300" value="${esc(task.title ?? '')}" required ${opts.autofocus ? 'autofocus' : ''} placeholder="Task title"></label>
         <label class="inspector-field"><span>Instructions &amp; completion criteria</span><textarea name="task_instructions" maxlength="12000" rows="3" placeholder="Detailed instructions">${esc(task.instructions ?? '')}</textarea></label>
         <p class="inspector-task-identity">Task ID: <code>${esc(task.id)}</code></p>${controls}
+          </div>
+        </details>
       </div>
     </details>`;
 }

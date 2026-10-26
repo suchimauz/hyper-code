@@ -5,16 +5,87 @@
 //
 // 2) Section redraws: the server pushes ui.metaSection (events.refreshAgentMeta)
 //    over the shared event stream, and the section re-fetches itself through
-//    the RPC endpoint (ui.agentMetaSectionHtml). The <details> shell comes back
-//    with the fragment, so "open" is restored around the swap — a redraw must
-//    never fold a section the user has open. Redraws are debounced per slot:
+//    the RPC endpoint (ui.agentMetaSectionHtml). Tab panes live outside the
+//    fragments; innerMorph preserves open details and form drafts. Redraws
+//    are debounced per slot:
 //    an active plan ticks many times a second and must cost one request.
 (() => {
     if (window.__hyperMetaInstalled) return;
     window.__hyperMetaInstalled = true;
 
 
+    // Tabs own navigation only: hidden panes stay mounted, including their forms.
+    const tabStates = new Map();
+    const initializedPanels = new WeakSet();
+    const selectTab = (panel, key, focus = false) => {
+        const tabs = [...panel.querySelectorAll('[data-agent-inspector-tab]')];
+        const selected = tabs.find(tab => tab.dataset.agentInspectorTab === key);
+        if (!selected) return;
+        const scroll = panel.querySelector('[data-agent-meta-content]');
+        const state = tabStates.get(panel.id) || { active: null, scroll: {} };
+        if (state.active && state.active !== key) state.scroll[state.active] = scroll?.scrollTop || 0;
+        const changed = state.active !== key;
+        state.active = key;
+        tabStates.set(panel.id, state);
+        tabs.forEach(tab => {
+            const active = tab === selected;
+            tab.setAttribute('aria-selected', String(active));
+            tab.tabIndex = active ? 0 : -1;
+        });
+        panel.querySelectorAll('[data-agent-inspector-pane]').forEach(pane => {
+            pane.hidden = pane.dataset.agentInspectorPane !== key;
+        });
+        if (scroll && changed) scroll.scrollTop = state.scroll[key] || 0;
+        if (focus) selected.focus({ preventScroll: true });
+    };
+    const initializeTabs = panel => {
+        if (initializedPanels.has(panel)) return;
+        initializedPanels.add(panel);
+        const state = tabStates.get(panel.id);
+        const key = state?.active || 'work';
+        selectTab(panel, key);
+        const scroll = panel.querySelector('[data-agent-meta-content]');
+        if (scroll) {
+            scroll.scrollTop = state?.scroll[key] || 0;
+            scroll.addEventListener('scroll', () => {
+                const current = tabStates.get(panel.id);
+                if (current) current.scroll[current.active] = scroll.scrollTop;
+            }, { passive: true });
+        }
+    };
+    document.addEventListener('keydown', event => {
+        const tab = event.target.closest?.('[data-agent-inspector-tab]');
+        if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const panel = tab.closest('[data-agent-meta-panel]');
+        const tabs = [...panel.querySelectorAll('[data-agent-inspector-tab]')];
+        const index = tabs.indexOf(tab);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+            : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        event.preventDefault();
+        selectTab(panel, tabs[next].dataset.agentInspectorTab, true);
+    });
+
+    // The checkbox remains the accessible state; badges mirror it without adding
+    // a second label. Re-sync after morphs because the server owns dependencies.
+    const syncToggleStates = root => {
+        const rows = [...(root?.matches?.('label:has(.inspector-toggle-state)') ? [root] : []), ...(root?.querySelectorAll?.('label:has(.inspector-toggle-state)') || [])];
+        rows.forEach(row => {
+            const input = row.querySelector('input[type="checkbox"]');
+            const state = row.querySelector('.inspector-toggle-state');
+            if (!input || !state) return;
+            const unavailable = input.disabled || row.title === 'Requires Function RAG';
+            state.textContent = unavailable ? 'Недоступно' : input.checked ? 'Вкл.' : 'Выкл.';
+            state.dataset.tone = unavailable ? 'neutral' : input.checked ? 'success' : 'neutral';
+        });
+    };
+    document.addEventListener('change', event => {
+        if (event.target.matches?.('[data-agent-meta-panel] input[type="checkbox"]')) syncToggleStates(event.target.closest('label'));
+    });
+    document.addEventListener('htmx:after:process', event => syncToggleStates(event.target));
+
     const applyPanelState = panel => {
+        initializeTabs(panel);
+        syncToggleStates(panel);
         const collapsed = panel.classList.contains('agent-meta-collapsed');
         const button = panel.querySelector('[data-agent-meta-toggle]');
         button?.setAttribute('aria-expanded', String(!collapsed));
@@ -24,13 +95,20 @@
         }
     };
     const applyAllPanelStates = root => {
-        if (root?.matches?.('[data-agent-meta-panel]')) applyPanelState(root);
+        const parent = root?.closest?.('[data-agent-meta-panel]');
+        if (parent) applyPanelState(parent);
         root?.querySelectorAll?.('[data-agent-meta-panel]').forEach(applyPanelState);
     };
     applyAllPanelStates(document);
     document.addEventListener('htmx:after:process', event => applyAllPanelStates(event.target));
 
     document.addEventListener('click', event => {
+        const tab = event.target.closest?.('[data-agent-inspector-tab]');
+        if (tab) {
+            event.preventDefault();
+            selectTab(tab.closest('[data-agent-meta-panel]'), tab.dataset.agentInspectorTab);
+            return;
+        }
         const button = event.target.closest?.('[data-plan-remove], [data-plan-move]');
 
 
@@ -72,9 +150,10 @@
         if (event.target.matches?.('[name="task_title"]')) syncTaskTitles(event.target.closest('[data-plan-tasks]'));
     });
     document.addEventListener('invalid', event => {
-        const row = event.target.closest?.('details[data-plan-task]');
-        if (row) {
-            for (let details = row; details; details = details.parentElement?.closest('details')) details.open = true;
+        const pane = event.target.closest?.('[data-agent-inspector-pane]');
+        if (pane?.hidden) selectTab(pane.closest('[data-agent-meta-panel]'), pane.dataset.agentInspectorPane);
+        if (event.target.closest?.('[data-agent-meta-content]')) {
+            for (let details = event.target.closest('details'); details; details = details.parentElement?.closest('details')) details.open = true;
         }
     }, true);
     document.addEventListener('htmx:after:process', event => syncTaskTitles(event.target));
@@ -186,7 +265,7 @@
             swap: 'innerMorph',
             values: { method: 'ui.agentMetaSectionHtml', params: JSON.stringify({ agentId, section: slot.dataset.metaSection }) },
             headers: window.hyperRpcCsrfHeaders?.() || {},
-        }).then(() => { updateCompaction(slot); syncTaskTitles(slot); }).catch(() => {});
+        }).then(() => { updateCompaction(slot); syncTaskTitles(slot); syncToggleStates(slot); }).catch(() => {});
     }
 
     const onEvent = data => {

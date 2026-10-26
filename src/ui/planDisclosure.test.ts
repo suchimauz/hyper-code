@@ -19,15 +19,15 @@ test('closed task disclosures show title and status, preserve all submitted inpu
  const rows=[...d.querySelectorAll('details[data-plan-task]')];
  expect(rows.length).toBe(3); expect(rows.every(r=>!r.hasAttribute('open'))).toBe(true);
  expect(rows[0].querySelector('summary')!.textContent).toContain('First task'); expect(rows[0].querySelector('summary')!.textContent).toContain('In progress');
- expect(rows[0].querySelectorAll('details').length).toBe(0); expect(rows[0].querySelector('input[type=checkbox]')).toBeNull();
+ expect(rows[0].querySelectorAll('details').length).toBe(1); expect(rows[0].querySelector('input[type=checkbox]')).toBeNull();
  const data=new w.FormData(form as any); expect(data.getAll('task_id')).toEqual(['a','b','c']); expect(data.getAll('task_title')).toEqual(tasks.map(t=>t.title)); expect(data.getAll('task_instructions')).toEqual(tasks.map(t=>t.instructions));
  expect(d.body.textContent).toContain('0 of 3 tasks complete'); w.happyDOM.abort();
 });
 test('editing updates read-first heading, invalid collapsed fields open, pending reorder retains edited ID association', () => {
  const w=fixture(), d=w.document; const row=d.querySelector('[data-task-id="b"]')!;
  const input:any=row.querySelector('[name=task_title]'); input.value='Edited B'; input.dispatchEvent(new w.Event('input',{bubbles:true})); expect(row.querySelector('summary')!.textContent).toContain('Edited B');
- const outer=row.parentElement!.closest('details')!; outer.removeAttribute('open');
- input.value=''; input.dispatchEvent(new w.Event('invalid')); expect(row.hasAttribute('open')).toBe(true); expect(outer.hasAttribute('open')).toBe(true); input.value='Edited B';
+ const editor=input.closest('details')!; editor.removeAttribute('open'); row.removeAttribute('open');
+ input.value=''; input.dispatchEvent(new w.Event('invalid')); expect(row.hasAttribute('open')).toBe(true); expect(editor.hasAttribute('open')).toBe(true); input.value='Edited B';
  row.querySelector('[data-plan-task-title]')!.textContent='Server title'; row.dispatchEvent(new w.Event('htmx:after:process',{bubbles:true})); expect(row.querySelector('summary')!.textContent).toContain('Edited B');
  (row.querySelector('[data-plan-move="down"]') as any).click();
  const data=new w.FormData(d.querySelector('[data-plan-editor]') as any); expect(data.getAll('task_id')).toEqual(['a','c','b']); expect(data.getAll('task_title')).toEqual(['First task','Third task','Edited B']);

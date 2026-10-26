@@ -38,18 +38,17 @@ test("agent meta panel is a static shell with per-section slots", () => {
     // No live region: sections are redrawn through the RPC push, not polling.
     expect(html).not.toContain("data-live-topic");
     expect(html).not.toContain("hx-get");
-    // Agent settings is pinned first: it is always present, and it holds the
-    // switches that change what the agent does with every prompt, which the
-    // user reaches for far more often than a trigger list.
+    // Execution comes first; every live slot remains mounted in its tab pane.
     const order = [...html.matchAll(/data-meta-section="([a-z]+)"/g)].map((match) => match[1]);
-    expect(order[0]).toBe("settings");
-    expect(order).toEqual(['settings', 'compaction', 'automation', 'goal', 'knowledge', 'team', 'plan']);
+    expect(order).toEqual(['plan', 'team', 'automation', 'goal', 'knowledge', 'settings', 'compaction']);
+    expect(html.match(/role="tab"/g)?.length).toBe(3);
+    expect(html.match(/role="tabpanel"/g)?.length).toBe(3);
 });
 
 test("renders the display-only observed goals preview", () => {
     const ctx = mkCtx();
     const empty = render(ctx, null, { agent: { id: "eh", scratchpad: {} } as any });
-    expect(empty).toContain('<summary>Goals<span data-tone="neutral">off</span></summary>');
+    expect(empty).toContain('<summary>Goals<span class="inspector-status-badge" data-tone="neutral">off</span></summary>');
     expect(empty).toContain('name="enabled"');
     expect(empty).not.toContain('<details open><summary>Goals');
     const observed = render(ctx, null, { agent: { id: "eh", scratchpad: { goalTrackingEnabled: true, goalSidecar: { status: "ready", sourceMessageIdx: 4, sidecarId: "sc", goals: [{ id: "g1", statement: "Ship goal-aware agent", verification: "A new message updates the displayed goal without changing execution", status: "active", sourceMessageIdx: 4 }] } } } as any });
@@ -102,15 +101,15 @@ test("renders team members as semantic nested accordions", () => {
         team: [{ id: "kid", title: "Visual QA", runState: "running", status: "blocked", plan: { title: "QA", tasks: [{ id: "see", title: "Inspect", status: "active" }] }, summary: null, updatedAt: Date.now() }],
     });
     expect(html).toContain("Team");
-    expect(html).toContain('data-tone="error"');
+    expect(html).toContain('class="inspector-status-badge" data-tone="danger">blocked</span>');
     expect(html).toContain('class="ui-button ui-button--xs ui-button--default');
     expect(html).toContain('<progress value="0" max="1">');
 });
 
-test("automation unifies wake, schedule and watch controls, below agent settings", () => {
+test("automation unifies wake, schedule and watch controls in the Work pane", () => {
     const html = render(mkCtx(), null, { agent: { id: "eh", goal: null } as any, triggers: [{ id: "tr_1", kind: "at", prompt: "Continue", status: "active", nextAt: Date.now() + 1000 }] });
     expect(html).toContain('>Automation');
-    const slot = html.slice(html.indexOf('id="agent-meta-compaction-eh"'));
+    const slot = html.slice(html.indexOf('id="agent-meta-automation-eh"'), html.indexOf('id="agent-inspector-pane-context-eh"'));
     expect(slot).toContain("Wake-up");
     expect(slot).toContain("Schedule");
     expect(slot).toContain("Watch condition");

@@ -90,7 +90,7 @@ export default function (
         const button = target && a.available && !isDisabled(target)
             ? `<form hx-post="/agent/${id}/model" hx-swap="none" class="contents"><input type="hidden" name="model" value="${esc(target)}"><input type="hidden" name="scope" value="provider">${ctx.fns.procs.ui.button({ action: 'use-model-account', label: 'Use', type: 'submit', size: 'xs' })}</form>`
             : `<span class="text-3xs text-faint">${target && isDisabled(target) ? "disabled" : a.available ? "no model" : "waiting"}</span>`;
-        return `<div class="inspector-surface-row flex items-center gap-1.5">
+        return `<div class="inspector-row flex items-center gap-1.5">
             ${ctx.fns.ui.modelLogo?.({ model: a.model || `${a.provider}:`, bare: true, compact: true }) ?? ""}
             <span class="min-w-0 flex-1 truncate" title="${esc(a.model)}">${esc(a.provider === parked.provider ? `${a.account} — same provider` : a.label)}</span>
             <span class="font-mono text-3xs ${tone}">${esc(state)}</span>
@@ -99,8 +99,8 @@ export default function (
     }).join("");
 
     const accountBlock = accountRows
-        ? `<div class="inspector-surface-group">
-             <div class="inspector-heading mb-0.5 text-faint">Switch account</div>
+        ? `<div class="inspector-list">
+             <div class="inspector-section-title">Switch account</div>
              ${spent ? `<div class="flex items-center gap-1.5 py-0.5 opacity-45"><span class="min-w-0 flex-1 truncate">${esc(spent.label)} (current)</span><span class="font-mono text-3xs text-error">exhausted</span></div>` : ""}
              ${accountRows}
            </div>`
@@ -125,10 +125,10 @@ export default function (
         <form hx-post="/agent/${id}/unpark" hx-swap="none" class="contents"><input type="hidden" name="action" value="cancel">${ctx.fns.procs.ui.button({ action: 'cancel-parking', label: 'Cancel parking', type: 'submit', tone: 'danger', size: 'xs', class: 'text-error' })}</form>
       </div>`;
 
-    return `<div class="inspector-surface-row text-xs leading-5">
-      <div class="inspector-heading flex items-center gap-1 font-medium text-warning"><i class="ph ph-pause-circle" aria-hidden="true"></i><span>Parked · usage limit</span></div>
+    return `<div class="inspector-row text-xs leading-5">
+      <div class="inspector-row-title flex items-center gap-1 text-warning"><i class="ph ph-pause-circle" aria-hidden="true"></i><span class="inspector-status-badge" data-tone="waiting">Parked · usage limit</span></div>
       <div class="mt-1 font-mono text-3xs text-muted">${esc(parked.provider)}${esc(account)}${parked.planType ? ` · ${esc(parked.planType)}` : ""}</div>
-      <div class="text-subtle">Quota resets at ${esc(when)}${left ? ` (in ${esc(left)})` : ""}</div>
+      <div class="inspector-row-caption">Quota resets at ${esc(when)}${left ? ` (in ${esc(left)})` : ""}</div>
       ${accountBlock}${quickButtons}${picker}${controls}
     </div>`;
 }

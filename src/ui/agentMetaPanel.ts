@@ -1,34 +1,9 @@
-// The right inspector panel is a STATIC shell with six slots. Sections are
-// rendered by ui.agentMetaSection and placed into id-addressable slots; a
-// pushed ui.metaSection event then makes the client re-fetch exactly one
-// section through ui.agentMetaSectionHtml and swap it in place — the shell,
-// the scroll position and the other sections never move.
-//
-// Agent settings comes first. It used to be Automation, on the reasoning that
-// Automation is the only section always present — but the switches that decide
-// what the agent DOES with every prompt (function retrieval, procedural
-// memory) are what the user reaches for, while triggers are consulted rarely.
-// Settings is also always present, so nothing above it can open the panel with
-// a blank gap.
-//
-// This used to be one live region around the whole <aside>: every plan tick
-// re-rendered everything, and every <details> lost its "open" state, so the
-// panel collapsed under the user's hands while an agent was working.
-/** Renders the six live inspector sections in a desktop rail or a mobile full-screen dialog, preserving the same section nodes and forms. */
 /**
- * Render the metadata panel for an agent.
+ * Render the agent inspector with Work, Context and Settings tabs.
  *
- * The returned <aside> carries no live behavior of its own. Each section slot
- * is a div with id "agent-meta-<section>-<agentId>"; the client redraws one
- * slot at a time when the server pushes ui.metaSection for it.
- *
- * @param opts.agent Agent associated with the operation.
- * @param opts.team Direct delegated children with their existing plans.
- * @param opts.archivedTeam Archived delegated children displayed by the Team filter.
- * @param opts.models Models grouped by provider, used by the parked-agent switcher.
- * @param opts.accounts Credential accounts with their quota, used by the parked-agent switcher.
- * @param opts.disabledModels Disabled exact routes to exclude from recovery actions.
- * @param opts.extraSettings Trusted HTML blocks answered by the `ui.agentSettings` point, appended to the settings section.
+ * Keeps all seven live section slots mounted in a static shell, so independent
+ * RPC redraws preserve tab selection, form drafts and scroll position. The same
+ * panel nodes serve the full-height desktop rail and the mobile full-screen dialog.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
     /** Agent associated with the operation. */ agent: types.agent.Agent;
@@ -47,23 +22,24 @@ export default function (ctx: Context, _session: Session | null, opts: {
         `<div id="agent-meta-${section}-${esc(agent.id)}" data-meta-section="${section}">`
         + ctx.fns.ui.agentMetaSection({ agent, section, team: opts.team, archivedTeam: opts.archivedTeam, models: opts.models, accounts: opts.accounts, disabledModels: opts.disabledModels, triggers: opts.triggers, extraSettings: opts.extraSettings, globalCompactionPercent: opts.globalCompactionPercent })
         + `</div>`;
+    const tabs = [{ key: 'work', label: 'Работа' }, { key: 'context', label: 'Контекст' }, { key: 'settings', label: 'Настройки' }];
+    const pane = (key: string, html: string) => `<div id="agent-inspector-pane-${key}-${esc(agent.id)}" data-agent-inspector-pane="${key}" role="tabpanel" aria-labelledby="agent-inspector-tab-${key}-${esc(agent.id)}" tabindex="0"${key === 'work' ? '' : ' hidden'}>${html}</div>`;
     const collapsed = opts.collapsed === true;
-    return `<aside id="agent-meta-${esc(agent.id)}" data-agent-meta-panel class="glass-panel agent-meta-panel${collapsed ? ' agent-meta-collapsed' : ''} my-2 mr-2 ml-1 flex h-[calc(100%-1rem)] w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-ui-border text-base-content shadow-sm">
+    return `<aside id="agent-meta-${esc(agent.id)}" data-agent-meta-panel class="agent-meta-panel${collapsed ? ' agent-meta-collapsed' : ''} flex h-full w-80 shrink-0 flex-col overflow-hidden border-l border-ui-border text-base-content">
       <header data-mobile-inspector-header>
         <button type="button" data-mobile-inspector-close aria-label="Назад в чат"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Назад</span></button>
         <div><h2 id="mobile-inspector-title-${esc(agent.id)}">Инспектор чата</h2><p>${esc(agent.title || agent.id)}</p></div>
       </header>
-      <header data-desktop-inspector-header class="glass-bar flex h-9 shrink-0 items-center gap-2 border-b border-ui-border px-2">
+      <header data-desktop-inspector-header class="flex h-9 shrink-0 items-center gap-2 border-b border-ui-border px-2">
         ${ctx.fns.procs.ui.button({ action: 'toggle-agent-meta', html: '<i class="ph ph-sidebar-simple" aria-hidden="true"></i>', appearance: 'plain', title: collapsed ? 'Expand agent inspector' : 'Collapse agent inspector', ariaLabel: collapsed ? 'Expand agent inspector' : 'Collapse agent inspector', class: 'agent-meta-toggle flex size-7 shrink-0 items-center justify-center rounded-full text-faint transition hover:bg-base-100/55 hover:text-base-content', attrs: { 'data-agent-meta-toggle': true, 'aria-expanded': String(!collapsed) } })}<span data-agent-meta-label class="min-w-0 flex-1 truncate text-xs font-semibold text-base-content">Agent inspector</span>${ctx.fns.auth?.onlineRegion?.({ agentId: agent.id }) ?? ""}<span data-agent-meta-label class="font-mono text-3xs text-faint">${esc(agent.id)}</span>
       </header>
+      <div data-agent-inspector-tabs role="tablist" aria-label="Разделы инспектора">
+        ${tabs.map(({ key, label }) => `<button type="button" id="agent-inspector-tab-${key}-${esc(agent.id)}" data-agent-inspector-tab="${key}" role="tab" aria-controls="agent-inspector-pane-${key}-${esc(agent.id)}" aria-selected="${key === 'work'}" tabindex="${key === 'work' ? '0' : '-1'}">${label}</button>`).join('')}
+      </div>
       <div data-agent-meta-content class="flex-1 overflow-y-auto bg-transparent">
-        ${slot("settings")}
-        ${slot("compaction")}
-        ${slot("automation")}
-        ${slot("goal")}
-        ${slot("knowledge")}
-        ${slot("team")}
-        ${slot("plan")}
+        ${pane('work', slot('plan') + slot('team') + slot('automation'))}
+        ${pane('context', slot('goal') + slot('knowledge'))}
+        ${pane('settings', slot('settings') + slot('compaction'))}
       </div>
     </aside>`;
 }
