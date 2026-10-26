@@ -848,15 +848,19 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
 .quota-tip-reset { margin-left:auto; padding-left:10px; color:var(--color-base-content-faint, #888); font-variant-numeric:tabular-nums; }
 .project-all-chats { display:flex; align-items:center; gap:9px; padding:9px; margin-bottom:8px; text-align:left; border-radius:6px; }
 #project-tabs-host { flex-shrink:0; min-width:0; }
-.project-tabs { display:flex; align-items:stretch; min-height:44px; border-bottom:1px solid var(--color-ui-border); background:var(--color-base-200); }
-.project-tab-list { display:flex; align-items:stretch; overflow-x:auto; min-width:0; scrollbar-width:thin; }
-.project-tab { display:flex; align-items:center; flex-shrink:0; max-width:260px; min-width:100px; border-right:1px solid var(--color-ui-border); color:var(--color-muted); }
+/* Open chats wrap in reading order; do not clip fixed action menus or keyboard focus. */
+.project-tabs { display:flex; align-items:flex-start; gap:6px; min-height:44px; padding:6px; border-bottom:1px solid var(--color-ui-border); background:var(--color-base-200); }
+.project-tab-list { display:flex; flex:1; flex-wrap:wrap; align-items:stretch; align-content:flex-start; gap:4px; min-width:0; overflow:visible; }
+.project-tab { display:flex; align-items:center; flex:1 1 180px; max-width:min(100%,260px); min-width:0; min-height:34px; border:1px solid var(--color-ui-border); border-radius:6px; color:var(--color-muted); }
+.project-tab:hover { background:var(--color-base-300); }
 .project-tab.selected { background:var(--color-base-100); color:var(--color-base-content); box-shadow:inset 0 -2px var(--color-primary); }
-.project-tab-link { display:flex; align-items:center; gap:7px; flex:1; padding:10px; min-width:0; font-size:12px; text-decoration:none; }
+.project-tab-link { display:flex; align-items:center; gap:6px; flex:1; align-self:stretch; padding:6px 8px; min-width:0; font-size:12px; text-decoration:none; }
+.project-tab-link .project-title { flex:1; }
+.project-tab-menu { flex-shrink:0; }
 .project-icon-button { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; flex-shrink:0; border-radius:5px; color:var(--color-muted); font-size:16px; cursor:pointer; list-style:none; }
 .project-icon-button::-webkit-details-marker { display:none; }
 .project-tab .project-icon-button { width:24px; height:24px; font-size:14px; }
-.project-tab-tools { display:flex; align-items:center; gap:3px; padding:6px; margin-left:auto; }
+.project-tab-tools { display:flex; flex-shrink:0; align-items:center; align-self:flex-start; gap:3px; min-height:34px; margin-left:auto; }
 .project-menu { position:fixed; z-index:90; padding:4px; border-radius:8px; }
 .project-menu-item { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:4px; font-size:12px; }
 #project-error { padding:10px 16px; background:var(--color-error); color:var(--color-error-content); }
