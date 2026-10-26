@@ -962,7 +962,7 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
    It lives in the top layer (Popover API): the dock's backdrop-filter creates a
    stacking context, so no z-index inside the dock can lift anything above the
    chat column. The quotaTip script pins it to the ring with fixed coordinates. */
-.quota-tip { position:fixed; inset:auto; margin:0; width:auto; height:auto; overflow:visible; display:flex; flex-direction:column; gap:3px; min-width:12.5rem; max-width:17rem; padding:.5rem .65rem .55rem; border:1px solid var(--ui-border-strong, var(--color-ui-border)); border-radius:.6rem; background:var(--color-base-100); box-shadow:0 10px 28px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .08); font-size:11px; line-height:1.45; color:var(--color-muted); pointer-events:none; opacity:1; transform:none; transition:opacity .12s ease, transform .12s ease, overlay .12s allow-discrete; }
+.quota-tip { position:fixed; inset:auto; margin:0; width:max-content; height:auto; box-sizing:border-box; overflow:visible; display:flex; flex-direction:column; gap:6px; min-width:min(12.5rem, calc(100vw - 16px)); max-width:min(24rem, calc(100vw - 16px)); max-height:calc(100dvh - 16px); text-align:left; white-space:normal; overflow-wrap:anywhere; padding:.5rem .65rem .55rem; border:1px solid var(--ui-border-strong, var(--color-ui-border)); border-radius:.6rem; background:var(--color-base-100); box-shadow:0 10px 28px rgb(0 0 0 / .16), 0 2px 6px rgb(0 0 0 / .08); font-size:11px; line-height:1.45; color:var(--color-muted); pointer-events:none; opacity:1; transform:none; transition:opacity .12s ease, transform .12s ease, overlay .12s allow-discrete; }
 /* Author styles outrank the UA sheet, so the closed state must be restated
    explicitly — otherwise every card is visible on load and hidePopover() has
    nothing to close. overflow:visible matters too: the UA popover default is
@@ -970,13 +970,18 @@ ${hideNavigation ? "" : '<script src="/projects/navigation.js" defer></script>'}
    scrollbar. */
 .quota-tip:not(:popover-open) { display:none; }
 @starting-style { .quota-tip:popover-open { opacity:0; transform:translateY(3px); } }
-.quota-tip::after { content:""; position:absolute; left:14px; bottom:-5px; width:9px; height:9px; border-right:1px solid var(--ui-border-strong, var(--color-ui-border)); border-bottom:1px solid var(--ui-border-strong, var(--color-ui-border)); background:var(--color-base-100); transform:rotate(-45deg); }
+.quota-tip::after { content:""; position:absolute; left:var(--quota-tip-arrow, 14px); bottom:-5px; width:9px; height:9px; border-right:1px solid var(--ui-border-strong, var(--color-ui-border)); border-bottom:1px solid var(--ui-border-strong, var(--color-ui-border)); background:var(--color-base-100); transform:rotate(45deg); }
+.quota-tip[data-side="below"]::after { top:-5px; bottom:auto; transform:rotate(225deg); }
+.quota-tip[data-clipped] { overflow:auto; }
+.quota-tip[data-clipped]::after { display:none; }
 .quota-tip-head { font-weight:600; font-size:11.5px; color:var(--color-base-content); letter-spacing:.01em; }
 .quota-tip-sub { font-size:10px; color:var(--color-base-content-faint, #888); margin-top:-2px; }
-.quota-tip-row { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.quota-tip-row { min-width:0; white-space:normal; }
+.quota-tip-row:has(.quota-tip-name) { display:grid; grid-template-columns:7px max-content minmax(0, 1fr); align-items:baseline; gap:2px 6px; }
+.quota-tip-row > span { min-width:0; }
 .quota-tip-dot { flex:none; width:7px; height:7px; border-radius:50%; background:currentColor; }
 .quota-tip-name { flex:none; min-width:2.6rem; color:var(--color-base-content); font-weight:500; }
-.quota-tip-reset { margin-left:auto; padding-left:10px; color:var(--color-base-content-faint, #888); font-variant-numeric:tabular-nums; }
+.quota-tip-reset { grid-column:2 / -1; color:var(--color-base-content-faint, #888); font-variant-numeric:tabular-nums; }
 .project-all-chats { display:flex; align-items:center; gap:9px; padding:9px; margin-bottom:8px; text-align:left; border-radius:6px; }
 #project-tabs-host { flex-shrink:0; min-width:0; }
 /* Open chats wrap in reading order; do not clip fixed action menus or keyboard focus. */
