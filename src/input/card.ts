@@ -37,6 +37,10 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         const cancel = kind.cancel === false ? "" : ctx.fns.procs.ui.button({
             action: "input-cancel", label: "Cancel", type: "submit", tone: "ghost", size: "sm", name: "_action", value: "cancel",
         }).replace("<button", "<button formnovalidate");
+        // Enter in a text field activates the first submit button in DOM order.
+        // Default forms must send the answer, not silently cancel it. Keep custom
+        // button order (including conservative confirmation defaults) unchanged.
+        const actions = kind.buttons ? cancel + buttons : buttons + cancel;
         const error = opts.error ? `<p class="text-2xs text-error" role="alert">${esc(opts.error)}</p>` : "";
         // The CSRF token rides in a header read from the page meta at submit time:
         // the card is rendered without a request (when the agent opens it), so
@@ -44,7 +48,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         body = `<form hx-post="/input/${esc(input.id)}" hx-target="#${domId}" hx-swap="outerHTML" `
             + `hx-headers='js:{"x-csrf-token": document.querySelector("meta[name=csrf-token]")?.content || ""}' class="mt-2 space-y-2" autocomplete="off">`
             + fields + error
-            + (buttons || cancel ? `<div class="flex flex-wrap items-center justify-end gap-2 pt-1">${cancel}${buttons}</div>` : "")
+            + (actions ? `<div class="flex flex-wrap items-center justify-end gap-2 pt-1">${actions}</div>` : "")
             + `</form>`;
     } else if (input.state === "submitted") body = `<div class="mt-2">${await kind.done(ctx, { input })}</div>`;
     else if (input.state === "processing") body = `<p class="mt-2 text-2xs text-muted">processing response…</p>`;
