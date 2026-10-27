@@ -11,7 +11,8 @@
 // listed here and passed to bun explicitly, so bun never walks the tree itself.
 // code.runTests (the Tests page) starts this same script.
 //
-// Per-test timeout: bun's 5 s is too tight for 16 parallel files on a busy machine —
+// Limit parallel test workers to 4 to avoid exhausting WSL memory.
+// Per-test timeout: bun's 5 s can be too tight on a busy machine —
 // a test that needs 1.5 s alone (first testCtx: template db + module load) times out
 // at load ~20 without anything being wrong. Default 20 s; TEST_TIMEOUT_MS or an
 // explicit --timeout=<ms> overrides it.
@@ -61,7 +62,7 @@ if (import.meta.main) {
     if (flags.includes("--list")) { if (files.length) console.log(files.join("\n")); process.exit(0); }
     if (!files.length) { console.error(`no ${kind} tests under ${paths.join(" ") || "src plugins script"}`); process.exit(0); }
     const p = Bun.spawn({
-        cmd: ["bun", "test", "--parallel=16", "--no-isolate", ...timeoutFlag(flags), ...flags, ...files.map(f => "./" + f)],
+        cmd: ["bun", "test", "--parallel=4", "--no-isolate", ...timeoutFlag(flags), ...flags, ...files.map(f => "./" + f)],
         cwd: ROOT, stdio: ["inherit", "inherit", "inherit"],
     });
     process.exit(await p.exited);
