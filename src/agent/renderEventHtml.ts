@@ -110,32 +110,24 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         return '<div class="relative opacity-50"><span class="absolute -top-2 right-2 z-10 text-3xs px-1.5 py-0.5 rounded-full border border-ui-border bg-base-200 text-subtle">outside context</span>' + inner + '</div>';
     }
 
+    if (ev.type === 'agent_message_outgoing' && ev.outgoingAgentMessage) {
+        return '<div id="event-' + esc(ev.idx) + '" class="chat-message chat-message--peer">'
+            + await ctx.fns.agent.renderPeerMessageHtml({ event: ev, agentId }) + '</div>';
+    }
+
+    if ((ev.type === 'wake_up' && !ev.watchId) || (['user', 'user_message'].includes(ev.type) && ev.automationKind === 'scheduled')) {
+        const card = await ctx.fns.agent.renderAutomationEventHtml({ event: ev });
+        const anchor = ev.messageIdx != null ? 'm-' + esc(ev.messageIdx) : 'event-' + esc(ev.idx);
+        return '<div id="' + anchor + '" class="chat-message chat-message--automation">' + card + '</div>';
+    }
+
     if (ev.type === "user") {
         const idx = ev.messageIdx ?? ev.idx ?? 0;
-        // Another agent speaking in this chat under its own name (agent.message): an incoming,
-        // left-aligned bubble with the sender's name/link, hop counter and the owner it acts for.
+        // Peer text stays verbatim; the compact native disclosure is shared with outgoing receipts.
         if (ev.agentMessage || String(ev.actor ?? '').startsWith('agent:')) {
-            const am = ev.agentMessage ?? {};
-            const fromId = String(am.from ?? String(ev.actor ?? '').slice(6));
-            const sender = (ctx as any).fns.auth?.author ? await (ctx as any).fns.auth.author({ userId: 'agent:' + fromId }).catch(() => null) : null;
-            const hue = sender?.hue ?? 210;
-            const name = sender?.name ?? ('agent ' + fromId);
-            const body = String(am.body ?? ev.text ?? '');
-            const ownerName = am.onBehalfOf ? await (ctx as any).fns.auth?.getUser?.({ id: String(am.onBehalfOf) }).then((u: any) => u?.name ?? null).catch(() => null) : null;
-            const meta = [am.hop ? 'hop ' + am.hop : '', ownerName ? 'for ' + ownerName : ''].filter(Boolean).join(' · ');
-            return '<div id="m-' + idx + '" class="chat-message chat-message--peer group relative flex items-end justify-start gap-2 pb-0" data-agent-message="' + esc(fromId) + '">'
-                + '<a href="/agent/' + encodeURIComponent(fromId) + '" class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-white no-underline" style="background:hsl(' + hue + ' 55% 40%)" title="' + esc(name) + '"><i class="ph ph-robot" aria-hidden="true"></i></a>'
-                + '<div class="relative mr-auto max-w-[80%]">'
-                + '<div class="rounded-2xl rounded-bl-md border px-3.5 py-2 whitespace-pre-wrap break-words shadow-sm bg-base-200 text-base-content" style="border-color:hsl(' + hue + ' 55% 45% / .5)">'
-                + '<div class="mb-0.5 flex items-center gap-1.5 text-xs font-semibold leading-tight whitespace-normal">'
-                + '<a href="/agent/' + encodeURIComponent(fromId) + '" class="no-underline hover:underline" data-author="agent:' + esc(fromId) + '" style="color:hsl(' + hue + ' 70% 60%)">' + esc(name) + '</a>'
-                + '<span class="rounded-full border border-ui-border px-1.5 text-3xs font-normal text-subtle">agent</span>'
-                + (meta ? '<span class="text-3xs font-normal text-subtle">' + esc(meta) + '</span>' : '')
-                + '</div>'
-                + appendTime(esc(body), ev.ts, 'light')
-                + '</div>'
-                + '<div class="absolute left-full top-1/2 z-10 ml-2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">' + deleteControls(ctx, idx, agentId, true, true, 'side') + '</div>'
-                + '</div></div>';
+            const card = await ctx.fns.agent.renderPeerMessageHtml({ event: ev, agentId });
+            return '<div id="m-' + idx + '" class="chat-message chat-message--peer group relative">' + card
+                + '<div class="service-actions">' + deleteControls(ctx, idx, agentId, true, true, 'side') + '</div></div>';
         }
         const ragFunctions = Array.isArray(ev.functionRag?.functions) ? ev.functionRag.functions : [];
         const ragNames = ragFunctions.map((item: any) => String(typeof item === "string" ? item : item?.name ?? "")).filter(Boolean);
@@ -385,16 +377,8 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
     }
 
 
-    if (ev.type === "compaction_start") {
-        return eventCard({ title: `Compacting context · v${Number(ev.revision ?? 0)}`, icon: 'arrows-in-line-vertical', tone: 'info', badge: badge('working', 'info') });
-    }
-    if (ev.type === "compaction_completed") {
-        const before = Math.round(Number(ev.tokensBefore ?? 0) / 1000);
-        const after = Math.round(Number(ev.tokensAfter ?? 0) / 1000);
-        return eventCard({ title: `Context compacted · ${before}k → ${after}k`, icon: 'arrows-in-line-vertical', tone: 'success', badge: badge(`${Number(ev.keptMessages ?? 0)} kept`, 'success'), details: `<pre class="whitespace-pre-wrap text-xs text-muted">${esc(ev.summary ?? '')}</pre>` });
-    }
-    if (ev.type === "compaction_failed") {
-        return eventCard({ title: 'Context compaction failed', icon: 'warning-circle', tone: 'error', body: `Context unchanged · ${esc(ev.error ?? '')}` });
+    if (['compaction_start', 'compaction_completed', 'compaction_failed'].includes(ev.type)) {
+        return await ctx.fns.agent.renderCompactionEventHtml({ event: ev });
     }
 
 

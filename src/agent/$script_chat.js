@@ -288,7 +288,20 @@
                 event.preventDefault();
                 this.toggleTray(toggle.closest('.tool-tray'), toggle.classList.contains('tool-tray-collapse'));
             }, { signal });
+            this.messages.addEventListener('click', event => {
+                const footer = event.target.closest('[data-service-collapse]');
+                if (!footer || !this.messages.contains(footer)) return;
+                const card = footer.closest('details.service-message, details.context-notice');
+                if (!card) return;
+                event.preventDefault();
+                card.open = false;
+                card.querySelector(':scope > summary')?.focus({ preventScroll: true });
+                card.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                this.shouldStick = this.isNearBottom();
+            }, { signal });
+
             this.arrangeTools(this.messages);
+            this.reconcileCompactionNotices();
             this.prepareTables();
             this.addInheritedNote();
             document.body.dataset.agentId = this.agentId;
@@ -634,11 +647,21 @@
             }
             if (target === this.messages || this.messages.contains(target) || target?.id === 'msg-tail' || target?.id === 'msg-head') {
                 this.arrangeTools(this.messages);
+                this.reconcileCompactionNotices();
             }
             this.renderOptimisticMessages();
             this.collectNewMessages(!wasFollowing && target?.id !== 'msg-head');
             this.updateJumpButton();
             this.scheduleJumpUpdate();
+        }
+
+        reconcileCompactionNotices() {
+            // Only hide a start when its own revision has an outcome in this loaded history.
+            // Paging or a live tail may supply either half later. Never discard the stored audit.
+            const outcomes = new Set([...this.messages.querySelectorAll('.context-notice[data-compaction-revision]:not([data-compaction-state="start"])')].map(node => node.dataset.compactionRevision));
+            this.messages.querySelectorAll('.context-notice[data-compaction-state="start"][data-compaction-revision]').forEach(node => {
+                node.hidden = outcomes.has(node.dataset.compactionRevision);
+            });
         }
 
         prepareTables() {

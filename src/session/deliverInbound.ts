@@ -12,13 +12,15 @@ export default async function (
         /** Recipient identifier. */
         id: string;
         /** Immutable keyed delivery; omit to drain pending receipts. */
-        delivery?: { key: string; text: string; author: string; messageType: string; event: Record<string, unknown>; wake: boolean };
+        delivery?: { key: string; text: string; author: string; messageType: string; event: Record<string, unknown>; wake: boolean; outgoing?: { from: string; title: string; body: string; hop: number } };
     },
 ): Promise<{ queued: boolean; messageIdx: number | null; duplicate: boolean; drained: number }> {
     const d=opts.delivery, payload=d?JSON.stringify(d):null;
     if(d&&(!d.key.trim()||!d.text.trim()))throw new Error('key and text required');
     let result!: {queued:boolean;messageIdx:number|null;duplicate:boolean;drained:number};
+    const senders = new Set<string>();
     for (let attempt=0; ; attempt++) {
+    senders.clear();
     try {
     result=await ctx.fns.procs.db.transaction({fn:async()=>{
      const target=(await ctx.fns.procs.db.select({sql:'SELECT sleep_context FROM agents WHERE id=? AND archived_at IS NULL FOR UPDATE',params:[opts.id]}))[0];
@@ -36,17 +38,31 @@ export default async function (
      const idx=Number(m.rows[0].idx),event:Record<string,unknown>={...item.event,messageIdx:idx,ts,actor:item.author};
      const e=await ctx.fns.procs.db.run({sql:'INSERT INTO events(agent_id,idx,type,payload,ts,actor) SELECT ?,COALESCE(MAX(idx),-1)+1,?,?,?,? FROM events WHERE agent_id=? RETURNING idx',params:[opts.id,String(event.type??'user'),JSON.stringify(event),ts,item.author,opts.id]});
      await ctx.fns.procs.db.run({sql:'UPDATE session_inbound_deliveries SET delivered_at=?,message_idx=?,event_idx=? WHERE seq=?',params:[ts,idx,Number(e.rows[0].idx),row.seq]});
+     // Same transaction as receipt completion: never infer delivery from a tool attempt.
+     if(item.outgoing){
+       await ctx.fns.session.projectOutgoingDelivery({...item.outgoing,to:opts.id,deliveryKey:item.key,createdAt:ts,messageIdx:idx});
+       senders.add(item.outgoing.from);
+     }
      await ctx.fns.procs.db.run({sql:"UPDATE agents SET updated_at=?,next_run_at=CASE WHEN ? AND stopped_at IS NULL AND COALESCE(last_error,'') NOT LIKE 'stopped by user%' AND COALESCE(last_error,'') <> 'context limit guard stopped work' AND COALESCE(NULLIF(scratchpad,'')::jsonb #>> '{plan,pausedAt}','') IN ('','0') THEN COALESCE(next_run_at,?) ELSE next_run_at END WHERE id=?",params:[ts,item.wake,ts,opts.id]});drained++;}}
      const receipt=d?(await ctx.fns.procs.db.select({sql:'SELECT message_idx,delivered_at FROM session_inbound_deliveries WHERE agent_id=? AND delivery_key=?',params:[opts.id,d.key]}))[0]:null;
      return {queued:!!receipt&&receipt.delivered_at==null,messageIdx:receipt?.message_idx==null?null:Number(receipt.message_idx),duplicate,drained};
     }}) as {queued:boolean;messageIdx:number|null;duplicate:boolean;drained:number};
     break;
     } catch (error) {
-      const e=error as {code?:string;message?:string};
-      if(attempt>=9 || !(e.code==='23505' || /messages_pkey|events_pkey/.test(e.message??''))) throw error;
+      const e=error as {code?:string;errno?:string;message?:string};
+      if(attempt>=9 || !(e.code==='23505' || e.code==='40P01' || e.errno==='23505' || e.errno==='40P01' || /messages_pkey|events_pkey|deadlock detected/.test(e.message??''))) throw error;
       await Bun.sleep(3+Math.random()*20*(attempt+1));
     }
     }
     if(result.drained){try{const live=ctx.state.agent?.[opts.id];if(live)await ctx.fns.session.syncAgentState({agent:live});await ctx.fns.agent.wakeWaiters({agentId:opts.id});ctx.fns.procs.events.refresh({topic:'agent:'+opts.id,reason:'inbound-delivery'});ctx.fns.agent.wakeWorker({});}catch(error){await ctx.fns.procs.log.warn({event:'inbound.projection.failed',msg:String(error),agentId:opts.id});}}
+    for (const id of senders) {
+      try {
+        // This projection is UI-only. Refresh the DB-backed tail without replacing
+        // the sender's in-flight LLM transcript with a concurrent DB snapshot.
+        ctx.fns.procs.events.refresh({topic:'agent:'+id,reason:'outgoing-delivery'});
+      } catch(error) {
+        await ctx.fns.procs.log.warn({event:'outgoing.projection.failed',msg:String(error),agentId:id});
+      }
+    }
     return result;
 }

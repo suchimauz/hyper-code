@@ -28,6 +28,14 @@ test('desktop inspector is an opaque square rail, without floating card margins 
     w.happyDOM.abort();
 });
 
+test('inspector does not reserve an empty right scrollbar gutter', () => {
+    const w = fixture();
+    const content = w.document.querySelector('[data-agent-meta-content]')!;
+    expect(w.getComputedStyle(content).getPropertyValue('scrollbar-gutter')).toBe('auto');
+    expect(content.classList.contains('overflow-y-auto')).toBe(true);
+    w.happyDOM.abort();
+});
+
 test('rail surfaces reuse the project canvas white and preserve dark theme depth', () => {
     const w = fixture();
     for (const selector of ['[data-agent-meta-panel]', '[data-desktop-inspector-header]', '[data-agent-meta-content]', '.inspector-section-body', '[data-agent-inspector-tab][aria-selected="true"]']) {

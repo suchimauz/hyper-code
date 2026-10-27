@@ -5,6 +5,8 @@
  * message_type `agent_message`, wrapped in an `<agent-message from=... hop=...>` envelope so the
  * receiving model knows who wrote it and whom to answer (with agent.message back to `from`).
  * The UI shows it as a separate bubble with the sender agent's name and a link to it.
+ * Durable delivery also appends a UI-only sender event; queued receipts gain that event
+ * only when drained. No outgoing copy is added to the sender's model transcript.
  * Any active non-hidden agent may be addressed directly by id. A hop counter
  * and a per-pair rate limit stop ping-pong loops. Use agent.search to resolve
  * names to ids, agent.delegate for new sub-tasks and agent.steer for team progress.
@@ -75,6 +77,7 @@ export default async function (
     const out = await ctx.fns.session.deliverInbound({ id: to, delivery: {
         key: crypto.randomUUID(), text: content, author: 'agent:' + sender.id,
         messageType: 'agent_message', event: { ...event, html }, wake: opts.wake !== false,
+        outgoing: { from: sender.id, title: String(target.title ?? to), body: text, hop },
     } });
     return { delivered: !out.queued, queued: out.queued, to, messageIdx: out.messageIdx, hop };
 }

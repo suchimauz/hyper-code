@@ -7,7 +7,7 @@
  * Use as the target of recurring Agent schedules.
  * @param opts.agentId Target agent identifier.
  * @param opts.text Fixed prompt injected on each schedule occurrence.
- * @param opts.scheduleId Stable schedule name recorded on the message.
+ * @param opts.scheduleId Stable schedule name recorded on the UI event; transcript text and message type stay unchanged.
  */
 export default async function (
     ctx: Context,
@@ -17,7 +17,7 @@ export default async function (
         agentId: string;
         /** Fixed prompt injected on each schedule occurrence. */
         text: string;
-        /** Stable schedule name recorded on the message. */
+        /** Stable schedule name recorded on the UI event; transcript text and message type stay unchanged. */
         scheduleId?: string;
     },
 ): Promise<{ agentId: string; messageIdx: number; scheduled: true } | { agentId: string; messageIdx: null; scheduled: false; reason: "stopped" }> {
@@ -29,7 +29,9 @@ export default async function (
         }) as { id: string; stopped_at: number | null }[])[0];
         if (!row) throw new Error(`agent not found: ${id}`);
         if (row.stopped_at != null) return null;
-        const appended = await ctx.fns.session.appendUserMessage({ id, text });
+        const appended = await ctx.fns.session.appendUserMessage({ id, text, eventExtra: {
+            automationKind: "scheduled", ...(opts.scheduleId ? { scheduleId: opts.scheduleId } : {}),
+        } });
         const now = Date.now();
         await ctx.fns.procs.db.run({
             sql: "UPDATE agents SET next_run_at=COALESCE(next_run_at,?),updated_at=? WHERE id=? AND archived_at IS NULL", params: [now, now, id],
