@@ -33,10 +33,10 @@ describe("agent.renderEventHtml", () => {
       eventType: "message.new",
       payload: { chatTitle: "TODO: work", senderName: "Nikolai", text: "что ты делаешь?", chatId: "-42", messageId: 7 },
     });
-    expect(html).toContain("TODO: work · new message");
+    expect(html).toContain("Telegram · TODO: work");
     expect(html).toContain("Nikolai");
     expect(html).toContain("что ты делаешь?");
-    expect(html).toContain("ph-telegram-logo");
+    expect(html).toContain("ph-arrow-square-out");
     expect(html).not.toContain("Scheduled wake-up");
   });
 
@@ -102,7 +102,7 @@ describe("agent.renderEventHtml", () => {
 
   test("renders plan task injections as visible system cards", async () => {
     const html = await renderEventHtml(ctx, { type: "plan_activation", taskId: "t1", title: "Build it", instructions: "Use the API" });
-    expect(html).toContain("Plan task injected");
+    expect(html).toContain("Начат шаг");
     expect(html).toContain("Build it");
     expect(html).toContain("Use the API");
     expect(html).toContain("ph-list-checks");
@@ -221,7 +221,7 @@ describe("agent.renderEventHtml", () => {
 
   test("renders goal check as a labelled message card", async () => {
     const html = await renderEventHtml(ctx, { type: "goal_check", status: "continue", reason: "not verified", nextStep: "run tests", iteration: 1, maxIterations: 3 });
-    expect(html).toContain("Goal check: continue · 1/3");
+    expect(html).toContain("Цель ещё не достигнута");
     expect(html).toContain("not verified");
     expect(html).toContain("run tests");
     expect(html).toContain("ph-target");
@@ -230,17 +230,17 @@ describe("agent.renderEventHtml", () => {
 
   test("renders exhausted goal budget as a terminal orange card", async () => {
     const html = await renderEventHtml(ctx, { type: "goal_check", status: "limit_reached", reason: "limit reached", iteration: 2, maxIterations: 2 });
-    expect(html).toContain("Goal check: limit_reached · 2/2");
-    expect(html).toContain("ph-stop-circle");
-    expect(html).toContain("badge");
+    expect(html).toContain("Лимит итераций достигнут");
+    expect(html).toContain("ph-pause-circle");
+    expect(html).toContain('service-event--warning');
   });
 
   test("renders conditional wake as a compact card with collapsible result", async () => {
     const html = await renderEventHtml(ctx, { type: "wake_up", watchId: "w1", watchStatus: "ready", reason: "Email arrived", result: { subject: "Hello", snippet: "Body" } });
-    expect(html).toContain("Condition met");
-    expect(html).toContain(">watch</span>");
+    expect(html).toContain("Условие выполнено");
+    expect(html).toContain(">w1</span>");
     expect(html).toContain("<summary");
-    expect(html).toContain("Details");
+    expect(html).toContain('data-service-collapse');
     expect(html).toContain('&quot;subject&quot;: &quot;Hello&quot;');
     expect(html).not.toContain("Wake condition met:");
   });
@@ -253,4 +253,87 @@ describe("agent.renderEventHtml — errors", () => {
         const html = await renderEventHtml(ctx, { type: "error", error: "codex 400: invalid schema" });
         expect(html).toBe("");
     });
+});
+
+describe('approved service event catalog', () => {
+  const cases: [any, string, string, string][] = [
+    [{type:'plan_activation',title:'task'}, 'Начат шаг','info','list-checks'],
+    ...[
+      ['task.completed','Шаг выполнен','neutral','check-circle'],
+      ['plan.completed','План завершён','success','checks'],
+      ['answer','Ответ агента','neutral','chat-text'],
+      ['blocked','Нужна помощь','warning','hand-palm'],
+      ['failed','Ошибка выполнения','error','x-circle'],
+    ].map(([event,title,tone,icon]) => [{type:'team_update',event,memberId:'qa',taskTitle:'Review',summary:'Full summary'},title,tone,icon] as [any,string,string,string]),
+    [{type:'wake_up',watchId:'w',watchStatus:'ready'},'Условие выполнено','success','eye'],
+    [{type:'wake_up',watchId:'w',watchStatus:'timeout'},'Условие не выполнено в срок','warning','timer'],
+    [{type:'wake_up',triggerKind:'watch'},'Сработало условие','neutral','eye'],
+    [{type:'wake_up',watchId:'legacy'},'Сработало условие','neutral','eye'],
+    [{type:'parked'},'Пауза: лимит подписки','warning','pause-circle'],
+    [{type:'unparked',reason:'wake',resumed:true},'Работа возобновлена','info','play-circle'],
+    [{type:'model_changed',from:'old',to:'new'},'Модель изменена','neutral','swap'],
+    [{type:'tool_busy',name:'bash'},'Сообщение ожидает обработки','warning','timer'],
+    [{type:'tool_aborted',name:'bash'},'Вызов остановлен','neutral','hand-palm'],
+    [{type:'attempt',error:'fixed',text:'text'},'Попытка исправлена','neutral','wrench'],
+    [{type:'goal_activation',text:'Goal'},'Цель включена','info','target'],
+    [{type:'goal_check',status:'achieved'},'Цель достигнута','success','target'],
+    [{type:'goal_check',status:'continue'},'Цель ещё не достигнута','info','target'],
+    [{type:'goal_check',status:'limit_reached'},'Лимит итераций достигнут','warning','pause-circle'],
+    [{type:'goal_check',status:'unclear'},'Результат требует проверки','warning','warning'],
+    [{type:'thinking',text:'stored'},'Размышление','neutral','brain'],
+    [{type:'canvas_ping',title:'page',text:'ping'},'Сигнал с canvas','neutral','square-half'],
+    [{type:'attachment_event',source:'telegram',payload:{text:'message'}},'Внешнее сообщение','info','arrow-square-out'],
+  ];
+  for (const [event,title,tone,icon] of cases) test(`${event.type}:${event.event ?? event.status ?? event.watchStatus ?? ''}`, async () => {
+    const html = await renderEventHtml(ctx,event);
+    expect(html).toContain(title);
+    expect(html).toContain(`service-event--${tone}`);
+    expect(html).toContain(`ph-${icon}`);
+    expect(html).toContain(`data-service-event="${event.type}"`);
+    expect(html).toContain('<details');
+    expect(html).not.toContain('<details open');
+  });
+  test('forwards real subtype, timestamp and milestone preview to shared renderer', async () => {
+    let card:any;
+    const c = {fns:{...ctx.fns,ui:{chatEventCard:(o:any)=>{card=o;return 'card';}}}};
+    await renderEventHtml(c,{type:'team_update',event:'plan.completed',memberId:'qa',summary:'<full>',ts:123});
+    expect(card.ts).toBe(123);
+    expect(card.preview).toBe('<full>');
+    expect(card.body).toContain('&lt;full&gt;');
+    expect(card.attrs).toContain('data-service-event="team_update"');
+    expect(card.attrs).toContain('data-team-update="plan.completed"');
+    await renderEventHtml(c,{type:'team_update',event:'task.completed',memberId:'qa',summary:'step'});
+    expect(card.preview).toBeUndefined();
+    expect(card.tone).toBe('neutral');
+  });
+  test('full escaped audit error, team summary and link remain inside collapsed body', async () => {
+    const error = 'long error '.repeat(60) + '<script>';
+    expect(await renderEventHtml(ctx,{type:'attempt',error,text:'original'})).toContain(Bun.escapeHTML(error));
+    const html = await renderEventHtml(ctx,{type:'team_update',event:'plan.completed',memberId:'qa',summary:'<full>'});
+    expect(html).toContain('&lt;full&gt;');
+    expect(html.indexOf('href="/agent/qa"')).toBeGreaterThan(html.indexOf('</summary>'));
+    expect(await renderEventHtml(ctx,{type:'unparked',resumed:false})).toContain('Пауза снята');
+  });
+  test('retains stop-call action and hides technical events', async () => {
+    const html = await renderEventHtml(ctx,{type:'tool_busy',name:'bash',runId:'call',elapsedSec:120},{agentId:'owner'});
+    expect(html).toContain('hx-post="/agent/owner/tool/call/abort"');
+    expect(html).toContain('2 мин');
+    expect(await renderEventHtml(ctx,{type:'job'})).toBe('');
+    expect(await renderEventHtml(ctx,{type:'error',error:'bad'})).toBe('');
+  });
+  test('technical subtype, step identity and full stored watch preview stay visible in details', async () => {
+    const team=await renderEventHtml(ctx,{type:'team_update',event:'custom.<event>',taskId:'step-42',memberId:'qa',summary:'result'});
+    expect(team).toContain('custom.&lt;event&gt;');expect(team).toContain('ID шага: step-42');
+    const watch=await renderEventHtml(ctx,{type:'wake_up',triggerKind:'watch',watchStatus:'ready',prompt:'original prompt',reason:'other',resultRef:{id:'stored-id'},resultPreview:'<preview>'});
+    expect(watch).toContain('original prompt');expect(watch).toContain('stored-id');expect(watch).toContain('&lt;preview&gt;');expect(watch).toContain('wake_up · ready');
+    const withAuthor={fns:{...ctx.fns,auth:{author:async()=>({name:'Тестировщик <qa>'})}}};
+    expect(await renderEventHtml(withAuthor,{type:'team_update',event:'task.completed',memberId:'qa'})).toContain('Тестировщик &lt;qa&gt; · qa');
+  });
+  test('automation and compaction still dispatch through their dedicated runtime renderers', async () => {
+    const seen:string[]=[];
+    const c={fns:{...ctx.fns,agent:{...ctx.fns.agent,renderAutomationEventHtml:async({event}:any)=>{seen.push(event.triggerKind??'legacy');return 'automation';},renderCompactionEventHtml:async({event}:any)=>{seen.push(event.type);return 'compaction';}}}};
+    for(const triggerKind of ['cron','at',undefined]) expect(await renderEventHtml(c,{type:'wake_up',triggerKind})).toContain('automation');
+    for(const type of ['compaction_start','compaction_completed','compaction_failed']) expect(await renderEventHtml(c,{type})).toBe('compaction');
+    expect(seen).toEqual(['cron','at','legacy','compaction_start','compaction_completed','compaction_failed']);
+  });
 });

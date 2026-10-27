@@ -95,9 +95,13 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
     const ev = opts.event;
     const agentId = String(opts.agentId ?? ev?.agentId ?? '');
     if (!ev || typeof ev !== "object") return "";
-    const eventCard = (card: any) => (ctx as any).fns.ui.chatEventCard
-        ? (ctx as any).fns.ui.chatEventCard(card)
-        : `<div class="w-full rounded-lg border border-ui-border bg-base-200/45 px-3 py-2"><div class="flex items-center gap-2 text-xs font-semibold">${card.icon ? `<i class="ph ph-${esc(card.icon)}"></i>` : ''}<span>${esc(card.title)}</span>${card.badge ?? ''}</div>${card.body ? `<div class="mt-1 text-2xs">${card.body}</div>` : ''}${card.details ? `<details><summary>Details</summary>${card.details}</details>` : ''}</div>`;
+    const eventCard = (input: any) => {
+        const technical = [ev.type, ev.event, ev.status, ev.watchStatus].filter(Boolean).map(esc).join(' · ');
+        const card = { ...input, ts: ev.ts, details: `<div class="service-meta"><code>${technical}</code>${ev.taskId ? `<span>ID шага: ${esc(ev.taskId)}</span>` : ''}</div>${input.details ?? ''}`, attrs: `data-service-event="${esc(ev.type)}"${input.attrs ? ' ' + input.attrs : ''}` };
+        return (ctx as any).fns.ui.chatEventCard
+            ? (ctx as any).fns.ui.chatEventCard(card)
+            : `<details class="service-event service-event--${esc(card.tone ?? 'neutral')}" ${card.attrs}><summary>${card.icon ? `<i class="ph ph-${esc(card.icon)}" aria-hidden="true"></i>` : ''}<span>${esc(card.title)}</span>${card.subtitle ? `<span>${esc(card.subtitle)}</span>` : ''}${card.preview ? `<span>${esc(String(card.preview).slice(0, 1000))}</span>` : ''}</summary><div>${card.body ?? ''}${card.details ?? ''}${card.href ? `<a href="${esc(card.href)}">Открыть чат</a>` : ''}</div><button type="button" data-service-collapse>Свернуть</button></details>`;
+    };
     const badge = (label: string, tone: 'neutral' | 'info' | 'success' | 'warning' | 'error' = 'neutral') => (ctx as any).fns.ui.statusBadge
         ? (ctx as any).fns.ui.statusBadge({ label, tone })
         : `<span class="badge badge-sm">${esc(label)}</span>`;
@@ -115,7 +119,7 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
             + await ctx.fns.agent.renderPeerMessageHtml({ event: ev, agentId }) + '</div>';
     }
 
-    if ((ev.type === 'wake_up' && !ev.watchId) || (['user', 'user_message'].includes(ev.type) && ev.automationKind === 'scheduled')) {
+    if ((ev.type === 'wake_up' && !ev.watchId && ev.triggerKind !== 'watch') || (['user', 'user_message'].includes(ev.type) && ev.automationKind === 'scheduled')) {
         const card = await ctx.fns.agent.renderAutomationEventHtml({ event: ev });
         const anchor = ev.messageIdx != null ? 'm-' + esc(ev.messageIdx) : 'event-' + esc(ev.idx);
         return '<div id="' + anchor + '" class="chat-message chat-message--automation">' + card + '</div>';
@@ -215,7 +219,7 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
     }
 
     if (ev.type === "thinking") {
-        return eventCard({ title: `Thinking · ${ev.text?.length ?? 0} chars`, icon: 'brain', tone: 'neutral', details: `<pre class="whitespace-pre-wrap font-mono text-2xs leading-snug text-muted">${esc(ev.text || '')}</pre>` });
+        return eventCard({ title: 'Размышление', subtitle: 'Подробности по раскрытию', icon: 'brain', tone: 'neutral', details: `<pre class="whitespace-pre-wrap font-mono text-2xs leading-snug text-muted">${esc(ev.text || '')}</pre>` });
     }
 
     if (ev.type === "tool_call") {
@@ -242,34 +246,34 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
     if (ev.type === "tool_busy") {
         const secs = Number(ev.elapsedSec ?? 0);
         const mins = Math.floor(secs / 60);
-        const been = mins >= 1 ? `${mins} min` : `${secs} s`;
-        const limit = Number(ev.timeoutMs) > 0 ? ` of a ${Math.round(Number(ev.timeoutMs) / 60000)} min limit` : '';
+        const been = mins >= 1 ? `${mins} мин` : `${secs} с`;
+        const limit = Number(ev.timeoutMs) > 0 ? ` · лимит ${Math.round(Number(ev.timeoutMs) / 60000)} мин` : '';
         const stop = ev.runId && agentId
             ? ctx.fns.procs.ui.button({
                 action: 'abort-tool-call',
-                label: `Stop ${String(ev.name ?? 'tool')}`,
+                label: `Остановить ${String(ev.name ?? 'инструмент')}`,
                 size: 'xs',
                 class: 'mt-2 rounded-full',
-                title: 'Stop only this call — the agent will continue and read your message',
+                title: 'Остановить только этот вызов — агент продолжит работу и прочитает сообщение',
                 post: `/agent/${encodeURIComponent(agentId)}/tool/${encodeURIComponent(String(ev.runId))}/abort`,
                 swap: 'none',
             })
             : '';
         return eventCard({
-            title: `Message received: ${String(ev.name ?? 'tool')} had been running for ${been}${limit}`,
-            icon: 'hourglass-high',
+            title: 'Сообщение ожидает обработки', subtitle: `${String(ev.name ?? 'инструмент')} · ${been}${limit}`,
+            icon: 'timer',
             tone: 'warning',
             body: `<div class="font-mono text-3xs text-muted">${esc(String(ev.subject ?? ''))}</div>`
-                + `<div class="mt-1">Message received and queued — the agent will read it when the call finishes.</div>${stop}`,
+                + `<div class="mt-1">Сообщение получено; агент прочитает его после завершения вызова.</div>${stop}`,
         });
     }
 
     if (ev.type === "tool_aborted") {
         return eventCard({
-            title: `Call ${String(ev.name ?? 'tool')} stopped by the user`,
+            title: 'Вызов остановлен', subtitle: `${String(ev.name ?? 'инструмент')} · по запросу пользователя`,
             icon: 'hand-palm',
-            tone: 'warning',
-            badge: badge(`${Number(ev.elapsedSec ?? 0)}s`, 'warning'),
+            tone: 'neutral',
+            badge: badge(`${Number(ev.elapsedSec ?? 0)} с`, 'neutral'),
             body: `<div class="font-mono text-3xs text-muted">${esc(String(ev.subject ?? ''))}</div>`,
         });
     }
@@ -283,11 +287,11 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
     if (ev.type === "canvas_ping") {
         // A canvas tab's page called hyper.ping: it woke the agent with this.
         const data = ev.data === undefined ? "" : JSON.stringify(ev.data, null, 2);
-        return eventCard({ title: `Canvas: ${String(ev.title ?? "tab")}`, icon: 'square-half', tone: 'info', body: esc(String(ev.text ?? "")), details: data ? `<pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-ui-border bg-base-100 p-2 font-mono text-3xs leading-4 text-muted">${esc(data)}</pre>` : undefined });
+        return eventCard({ title: 'Сигнал с canvas', subtitle: String(ev.title ?? 'Вкладка'), icon: 'square-half', tone: 'neutral', body: esc(String(ev.text ?? "")), details: data ? `<pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-ui-border bg-base-100 p-2 font-mono text-3xs leading-4 text-muted">${esc(data)}</pre>` : undefined });
     }
 
     if (ev.type === "plan_activation") {
-        return eventCard({ title: 'Plan task injected', icon: 'list-checks', tone: 'info', body: `<div class="font-medium text-muted">${esc(ev.title ?? ev.taskId ?? "Task")}</div>${ev.instructions ? `<div class="mt-1 whitespace-pre-wrap">${esc(ev.instructions)}</div>` : ""}` });
+        return eventCard({ title: 'Начат шаг', subtitle: String(ev.title ?? ev.taskId ?? 'Задача'), icon: 'list-checks', tone: 'info', body: `<div class="font-medium text-muted">${esc(ev.title ?? ev.taskId ?? "Task")}</div>${ev.instructions ? `<div class="mt-1 whitespace-pre-wrap">${esc(ev.instructions)}</div>` : ""}` });
     }
 
 
@@ -298,20 +302,21 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         const chat = String(payload.chatTitle ?? payload.chatId ?? source);
         const sender = String(payload.senderName ?? payload.senderId ?? "");
         const text = String(payload.text ?? payload.summary ?? "");
-        const title = isTelegram ? `${chat} · new message` : `${source} · ${String(ev.eventType ?? "new event")}`;
+        const subtitle = isTelegram ? `Telegram · ${chat}` : `${source} · ${String(ev.eventType ?? 'новое событие')}`;
         const body = `${sender ? `<div class="mb-1 text-3xs font-medium text-muted">${esc(sender)}</div>` : ""}<div class="whitespace-pre-wrap break-words">${esc(text)}</div>`;
         const details = `<pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-ui-border bg-base-100 p-2 font-mono text-3xs leading-4 text-muted">${esc(JSON.stringify(payload, null, 2))}</pre>`;
-        return eventCard({ title, icon: isTelegram ? "telegram-logo" : "broadcast", tone: "info", badge: badge(source, "info"), body, details });
+        return eventCard({ title: 'Внешнее сообщение', subtitle, icon: 'arrow-square-out', tone: 'info', body, details });
     }
 
 
     if (ev.type === "wake_up") {
-        const watched = !!ev.watchId;
-        const ready = ev.watchStatus === "ready";
-        const title = watched ? (ready ? "Condition met" : "Condition timed out") : "Scheduled wake-up";
-        const icon = watched ? (ready ? "ph-check-circle" : "ph-timer") : "ph-alarm";
-        const result = ev.result == null ? "" : JSON.stringify(ev.result, null, 2);
-        return eventCard({ title, icon: icon.replace(/^ph-/, ''), tone: ready || !watched ? 'info' : 'warning', badge: watched ? badge('watch', ready ? 'success' : 'warning') : undefined, body: esc(ev.reason ?? ev.summary ?? ""), details: result ? `<pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-ui-border bg-base-100 p-2 font-mono text-3xs leading-4 text-muted">${esc(result)}</pre>` : undefined });
+        const ready = ev.watchStatus === 'ready';
+        const timeout = ev.watchStatus === 'timeout';
+        const title = ready ? 'Условие выполнено' : timeout ? 'Условие не выполнено в срок' : 'Сработало условие';
+        const result = ev.result == null ? '' : JSON.stringify(ev.result, null, 2);
+        const storedResult = ev.resultRef?.id ? `<div class="service-meta">Сохранённый результат: <code>${esc(ev.resultRef.id)}</code></div>` : '';
+        const resultPreview = ev.resultPreview != null ? `<pre class="service-fulltext"><span>${esc(ev.resultPreview)}</span></pre>` : '';
+        return eventCard({ title, subtitle: String(ev.watchId ?? ev.triggerId ?? ''), icon: timeout ? 'timer' : 'eye', tone: ready ? 'success' : timeout ? 'warning' : 'neutral', body: `<div class="whitespace-pre-wrap">${esc(ev.prompt ?? ev.reason ?? '')}</div>${ev.summary ? `<div class="whitespace-pre-wrap">${esc(ev.summary)}</div>` : ''}`, details: storedResult + resultPreview + (result ? `<pre class="service-fulltext"><span>${esc(result)}</span></pre>` : '') });
     }
 
 
@@ -320,37 +325,37 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         // whose doing — otherwise a silent agent reads as a hang.
         const account = ev.account && ev.account !== "default" ? `/${ev.account}` : "";
         const resetsAt = Number(ev.resetsAt ?? ev.wakeAt ?? 0);
-        const when = resetsAt ? new Date(resetsAt).toLocaleString() : "time unknown";
+        const when = resetsAt ? new Date(resetsAt).toLocaleString('ru-RU') : 'время неизвестно';
         return eventCard({
-            title: "Parked — subscription limit",
+            title: 'Пауза: лимит подписки', subtitle: `Возобновление · ${when}`,
             icon: "pause-circle",
             tone: "warning",
             badge: badge(`${ev.provider ?? "provider"}${account}`, "warning"),
-            body: `${esc(ev.message ?? "Quota exhausted.")}<div class="mt-1 text-subtle">I will wake automatically at ${esc(when)} and continue. To resume sooner, switch models or accounts.</div>`,
+            body: `${esc(ev.message ?? 'Квота исчерпана.')}<div class="mt-1 text-subtle">${resetsAt ? `Автоматическое возобновление: ${esc(when)}.` : 'Время возобновления пока неизвестно.'} Чтобы продолжить раньше, смените модель или учётную запись.</div>`,
         });
     }
 
     if (ev.type === "unparked") {
-        const why = ev.reason === "wake" ? "quota restored" : ev.reason === "model-switch" ? "model changed" : "cleared manually";
+        const why = ev.reason === 'wake' ? 'Квота восстановлена' : ev.reason === 'model-switch' ? 'Модель изменена' : 'Пауза снята вручную';
         return eventCard({
-            title: "Unparked",
+            title: ev.resumed ? 'Работа возобновлена' : 'Пауза снята',
             icon: "play-circle",
-            tone: "info",
-            body: `${esc(why)}${ev.resumed ? " — resuming unfinished work" : ""}`,
+            tone: "info", subtitle: why,
+            body: `${esc(why)}${ev.resumed ? " — продолжается незавершённая работа" : ""}`,
         });
     }
 
     if (ev.type === "model_changed") {
         return eventCard({
-            title: "Model changed",
-            icon: "swap",
-            tone: "info",
+            title: 'Модель изменена', subtitle: `${String(ev.from ?? '?')} → ${String(ev.to ?? '?')}`,
+            icon: 'swap',
+            tone: 'neutral',
             body: `<span class="font-mono text-2xs">${esc(ev.from ?? "?")}</span> → <span class="font-mono text-2xs">${esc(ev.to ?? "?")}</span>`,
         });
     }
 
     if (ev.type === "goal_activation") {
-        return eventCard({ title: `Goal enabled · ${Number(ev.iterations ?? 3)} iterations`, icon: 'target', tone: 'info', body: esc(ev.text ?? '') });
+        return eventCard({ title: 'Цель включена', subtitle: `До ${Number(ev.iterations ?? 3)} итераций`, icon: 'target', tone: 'info', body: esc(ev.text ?? '') });
     }
 
 
@@ -358,22 +363,31 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         const status = String(ev.status ?? "unclear");
         const achieved = status === "achieved";
         const limited = status === "limit_reached";
-        const tone = achieved ? 'success' : limited ? 'error' : status === 'continue' ? 'info' : 'warning';
-        const icon = achieved ? "ph-check-circle" : limited ? "ph-stop-circle" : status === "continue" ? "ph-target" : "ph-warning-circle";
+        const tone = achieved ? 'success' : status === 'continue' ? 'info' : 'warning';
+        const icon = achieved || status === 'continue' ? 'target' : limited ? 'pause-circle' : 'warning';
+        const title = achieved ? 'Цель достигнута' : limited ? 'Лимит итераций достигнут' : status === 'continue' ? 'Цель ещё не достигнута' : 'Результат требует проверки';
         const count = ev.maxIterations ? ` · ${Number(ev.iteration ?? 0)}/${Number(ev.maxIterations)}` : "";
-        return eventCard({ title: `Goal check: ${status}${count}`, icon: icon.replace(/^ph-/, ''), tone, badge: badge(status, tone), body: `${esc(ev.reason ?? '')}${ev.nextStep ? `<div class="mt-1"><span class="font-medium text-muted">Next:</span> ${esc(ev.nextStep)}</div>` : ''}` });
+        return eventCard({ title, subtitle: count ? `Итерация ${Number(ev.iteration ?? 0)} из ${Number(ev.maxIterations)}` : undefined, icon, tone, body: `${esc(ev.reason ?? '')}${ev.nextStep ? `<div class="mt-1"><span class="font-medium text-muted">Следующий шаг:</span> ${esc(ev.nextStep)}</div>` : ''}` });
     }
 
 
     if (ev.type === "attempt") {
         // A protocol-invalid candidate that was repaired before commit — never
         // part of the LLM transcript; kept for the audit trail.
-        return '<div class="relative opacity-60">' + eventCard({ title: 'Invalid attempt · repaired before commit', icon: 'wrench', tone: 'warning', badge: badge('audit', 'warning'), body: esc(String(ev.error ?? '').slice(0, 160)), details: `<pre class="whitespace-pre-wrap break-words font-mono text-3xs text-muted">${esc(ev.text)}</pre>` }) + '</div>';
+        return '<div class="relative opacity-60">' + eventCard({ title: 'Попытка исправлена', subtitle: 'Только аудит', icon: 'wrench', tone: 'neutral', body: esc(String(ev.error ?? '')), details: `<pre class="whitespace-pre-wrap break-words font-mono text-3xs text-muted">${esc(ev.text)}</pre>` }) + '</div>';
     }
 
     if (ev.type === "team_update") {
-        const title = ev.taskTitle ? `Agent ${ev.memberId} · ${ev.taskTitle}` : `Agent ${ev.memberId} · ${ev.event}`;
-        return eventCard({ title, icon: 'users-three', tone: ev.event === 'failed' || ev.event === 'blocked' ? 'error' : ev.event === 'completed' ? 'success' : 'info', badge: badge(String(ev.event ?? 'update'), ev.event === 'failed' || ev.event === 'blocked' ? 'error' : ev.event === 'completed' ? 'success' : 'info'), href: '/agent/' + encodeURIComponent(String(ev.memberId ?? '')), body: esc(ev.summary ?? ''), attrs: 'data-team-update="' + esc(ev.event) + '"' });
+        const variants: Record<string, { title: string; icon: string; tone: string }> = {
+            'task.completed': { title: 'Шаг выполнен', icon: 'check-circle', tone: 'neutral' },
+            'plan.completed': { title: 'План завершён', icon: 'checks', tone: 'success' },
+            answer: { title: 'Ответ агента', icon: 'chat-text', tone: 'neutral' },
+            blocked: { title: 'Нужна помощь', icon: 'hand-palm', tone: 'warning' },
+            failed: { title: 'Ошибка выполнения', icon: 'x-circle', tone: 'error' },
+        };
+        const variant = variants[String(ev.event)] ?? { title: 'Событие команды', icon: 'users-three', tone: 'neutral' };
+        const member = ev.memberId && ctx.fns.auth?.author ? await ctx.fns.auth.author({userId:'agent:' + String(ev.memberId)}) : null;
+        return eventCard({ ...variant, subtitle: [member?.name, ev.memberId, ev.taskTitle].filter(Boolean).join(' · '), preview: ev.event === 'plan.completed' ? String(ev.summary ?? '') : undefined, href: ev.memberId ? '/agent/' + encodeURIComponent(String(ev.memberId)) : undefined, body: `<div class="whitespace-pre-wrap">${esc(ev.summary ?? '')}</div>`, attrs: 'data-team-update="' + esc(ev.event) + '"' });
     }
 
 

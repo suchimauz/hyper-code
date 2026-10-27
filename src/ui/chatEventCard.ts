@@ -1,46 +1,43 @@
 /**
- * Renders a consistent semantic card for chat lifecycle events
+ * Render a compact, expandable lifecycle event with a semantic icon and optional original details.
  *
- * Renders a compact theme-aware chat event card with icon, title, optional badge, body, details, link, and semantic tone. Use for plan, goal, wake, delegation, repair, and other non-message events in the agent transcript.
+ * Use for durable plan, goal, watch, execution and external events in chat history. The native disclosure keeps long bodies collapsed, preserves trusted server markup and places navigation/actions outside the summary. Does not alter the LLM transcript.
  * @param opts.title Visible event heading.
- * @param opts.body Trusted server-rendered event body HTML.
- * @param opts.icon Phosphor icon class without the ph prefix.
+ * @param opts.subtitle Plain-text context visible while collapsed.
+ * @param opts.preview Plain-text outcome preview, bounded to 1000 characters and three visual lines.
+ * @param opts.ts Persisted event timestamp in milliseconds; omitted or invalid timestamps are hidden.
+ * @param opts.body Trusted server-rendered original body HTML, shown after expansion.
+ * @param opts.icon Phosphor icon name without the ph prefix.
  * @param opts.tone Semantic visual tone. @default neutral
  * @param opts.badge Trusted compact badge HTML shown in the heading.
- * @param opts.href Optional internal destination that makes the whole card a link.
- * @param opts.details Trusted expandable details HTML.
- * @param opts.attrs Additional trusted HTML attributes on the outer card.
+ * @param opts.href Optional internal destination shown as a separate link in the expanded body.
+ * @param opts.details Trusted server-rendered technical details HTML.
+ * @param opts.attrs Additional trusted attributes on the outer disclosure.
  */
 export default function (
     ctx: Context,
     _session: Session | null,
     opts: {
-        /** Visible event heading. */
-        title: string;
-        /** Trusted server-rendered event body HTML. */
-        body?: string;
-        /** Phosphor icon class without the ph prefix. */
-        icon?: string;
-        /** Semantic visual tone. @default neutral */
-        tone?: "neutral" | "info" | "success" | "warning" | "error";
-        /** Trusted compact badge HTML shown in the heading. */
-        badge?: string;
-        /** Optional internal destination that makes the whole card a link. */
-        href?: string;
-        /** Trusted expandable details HTML. */
-        details?: string;
-        /** Additional trusted HTML attributes on the outer card. */
-        attrs?: string;
+        /** Visible event heading. */ title: string;
+        /** Plain-text context visible while collapsed. */ subtitle?: string;
+        /** Plain-text outcome preview, bounded to 1000 characters and three visual lines. */ preview?: string;
+        /** Persisted event timestamp in milliseconds; omitted or invalid timestamps are hidden. */ ts?: number;
+        /** Trusted server-rendered original body HTML, shown after expansion. */ body?: string;
+        /** Phosphor icon name without the ph prefix. */ icon?: string;
+        /** Semantic visual tone. @default neutral */ tone?: "neutral" | "info" | "success" | "warning" | "error";
+        /** Trusted compact badge HTML shown in the heading. */ badge?: string;
+        /** Optional internal destination shown as a separate link in the expanded body. */ href?: string;
+        /** Trusted server-rendered technical details HTML. */ details?: string;
+        /** Additional trusted attributes on the outer disclosure. */ attrs?: string;
     },
 ): string {
-    const esc = (value: string) => ctx.fns.procs.ui.escape({ text: value });
+    const esc = (value: string) => Bun.escapeHTML(value);
     const tone = opts.tone ?? 'neutral';
-    const tones = { neutral: 'border-ui-border bg-base-200/45 text-base-content', info: 'border-ui-border-strong bg-info/10 text-base-content', success: 'border-ui-border-strong bg-success/10 text-base-content', warning: 'border-ui-border-strong bg-warning/10 text-base-content', error: 'border-ui-border-strong bg-error/10 text-base-content' } as const;
-    const iconTones = { neutral: 'text-subtle', info: 'text-info', success: 'text-success', warning: 'text-warning', error: 'text-error' } as const;
-    const icon = opts.icon ? `<span class="flex size-6 shrink-0 items-center justify-center rounded-md bg-base-100/70"><i class="ph ph-${esc(opts.icon)} ${iconTones[tone]}" aria-hidden="true"></i></span>` : '';
-    const badge = opts.badge ? `<span class="ml-auto shrink-0">${opts.badge}</span>` : '';
-    const content = `<div class="flex items-start gap-2 px-3 py-2">${icon}<div class="min-w-0 flex-1"><div class="flex min-h-6 items-center gap-2"><span class="min-w-0 flex-1 truncate text-xs font-semibold">${esc(opts.title)}</span>${badge}</div>${opts.body ? `<div class="mt-1 text-2xs leading-5 text-muted">${opts.body}</div>` : ''}${opts.details ? `<details class="mt-2"><summary class="cursor-pointer text-3xs font-medium text-muted hover:text-base-content">Details</summary><div class="mt-1">${opts.details}</div></details>` : ''}</div></div>`;
-    const cls = `w-full overflow-hidden rounded-lg border ${tones[tone]}`;
-    const attrs = opts.attrs ? ` ${opts.attrs}` : '';
-    return opts.href ? `<a href="${esc(opts.href)}" class="block ${cls} !text-base-content transition hover:bg-base-200/70"${attrs}>${content}</a>` : `<div class="${cls}"${attrs}>${content}</div>`;
+    const date = new Date(opts.ts ?? NaN);
+    const stamp = Number.isFinite(date.getTime()) ? `<time datetime="${date.toISOString()}" title="${esc(date.toLocaleString('ru-RU'))}">${date.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'})}</time>` : '';
+    const icon = opts.icon ? `<span class="service-mark"><i class="ph ph-${esc(opts.icon)}" aria-hidden="true"></i></span>` : '';
+    const badge = opts.badge ? `<span class="service-event-badge">${opts.badge}</span>` : '';
+    const destination = opts.href && /^\/[^/]/.test(opts.href) ? `<a class="service-event-link" href="${esc(opts.href)}">Открыть агента <i class="ph ph-arrow-square-out" aria-hidden="true"></i></a>` : '';
+    const original = `${opts.body ? `<div class="service-event-original">${opts.body}</div>` : ''}${opts.details ? `<div class="service-event-details">${opts.details}</div>` : ''}${destination}`;
+    return `<details class="service-message service-event service-event--${tone}"${opts.attrs ? ' ' + opts.attrs : ''}><summary class="service-toggle"><span class="service-heading">${icon}<span class="service-identity"><span class="service-title">${esc(opts.title)}</span>${opts.subtitle ? `<span class="service-subtitle">${esc(opts.subtitle)}</span>` : ''}</span>${badge}${stamp}<i class="ph ph-caret-down service-chevron" aria-hidden="true"></i></span>${opts.preview ? `<span class="service-preview">${esc(opts.preview.slice(0, 1000))}</span>` : ''}</summary><div class="service-body">${original}</div><button type="button" class="service-collapse" data-service-collapse data-no-copy><i class="ph ph-caret-up" aria-hidden="true"></i>Свернуть</button></details>`;
 }

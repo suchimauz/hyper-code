@@ -38,7 +38,7 @@ export default async function (
     } catch {
         resultJson = JSON.stringify({truncated:true,preview:"[unserializable result]",storageError:"Full result unavailable: serialization failed"});
     }
-    try {if(prompt){const delivered=await ctx.fns.agent.deliverTriggerPrompt({triggerId:row.id,claimToken:opts.claimToken,prompt,now,resultRef,resultPreview:resultRef?resultPreview:undefined});if(!delivered)return{outcome:"cancelled"};}}catch(e:any){outcome="error";error=String(e?.message??e).slice(0,1000);nextAt=now+Math.min(15*60000,Math.max(60000,60000*Math.pow(2,Math.min(Number(row.attempts??0),4))));status="active";}
+    try {if(prompt){const delivered=await ctx.fns.agent.deliverTriggerPrompt({triggerId:row.id,claimToken:opts.claimToken,prompt,now,resultRef,resultPreview:resultRef?resultPreview:undefined,watchStatus:row.kind==='watch'?(outcome==='fired'?'ready':outcome==='timed_out'?'timeout':undefined):undefined});if(!delivered)return{outcome:"cancelled"};}}catch(e:any){outcome="error";error=String(e?.message??e).slice(0,1000);nextAt=now+Math.min(15*60000,Math.max(60000,60000*Math.pow(2,Math.min(Number(row.attempts??0),4))));status="active";}
     // Delivery remains outside this transaction: retries can repeat a prompt.
     // Final state must never commit without its audit record (or existing conflict).
     return await ctx.fns.procs.db.transaction({fn:async () => {

@@ -1,7 +1,7 @@
 /**
  * Render a collapsible incoming or confirmed outgoing agent message with its original text
  *
- * Use inside the chat event renderer for peer messages. Shows the first three lines, direction, route and sender color; native details keeps the complete escaped body accessible without JavaScript. Outgoing delivery events are UI-only and must be backed by a durable receipt.
+ * Use inside the chat event renderer for peer messages. Shows the first three lines, direction, route, exact delivery time and sender color; native details keeps the complete escaped body accessible without JavaScript. Delivered outgoing events link directly to the recipient message, stay UI-only and must be backed by a durable receipt.
  * @param opts.agentId Conversation owner, used as recipient for incoming messages and sender for outgoing messages.
  * @param opts.event Persisted peer event with original message body and explicit outgoing receipt metadata when applicable.
  */
@@ -33,15 +33,17 @@ export default async function (
     const direction = outgoing ? 'Исходящее' : 'Входящее';
     const state = outgoing ? (outgoing.status === 'delivered' ? 'Отправлено' : 'В очереди') : 'Получено';
     const date = new Date(Number(event.ts));
-    const time = Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('ru-RU', {hour:'2-digit',minute:'2-digit'}).format(date) : '';
+    const time = Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('ru-RU', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(date) : '';
+    const deliveredIdx = outgoing?.status === 'delivered' && Number.isInteger(outgoing.messageIdx) && Number(outgoing.messageIdx) >= 0 ? Number(outgoing.messageIdx) : null;
+    const destination = outgoing && deliveredIdx != null ? '<a class="service-delivery-link" data-no-copy href="/agent/' + encodeURIComponent(to) + '#m-' + deliveredIdx + '" aria-label="Сообщение у адресата ' + esc(title) + ', номер ' + deliveredIdx + '"><i class="ph ph-link" aria-hidden="true"></i>Сообщение у адресата <code>#m-' + deliveredIdx + '</code><i class="ph ph-arrow-square-out" aria-hidden="true"></i></a>' : '';
     const id = 'peer-body-' + encodeURIComponent(agentId) + '-' + (event.idx ?? 0);
     const arrow = outgoing ? '<path d="M5 19 19 5M9 5h10v10"/>' : '<path d="M19 5 5 19M5 9v10h10"/>';
     const svg = (path: string, cls: string) => '<svg class="' + cls + '" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
     const chars = new Intl.NumberFormat('ru-RU').format(body.length);
     return '<details class="service-message service-message--peer service-message--' + (outgoing ? 'outgoing' : 'incoming') + '" style="--service-hue:' + hue + '" data-agent-message="' + esc(peer) + '" data-message-direction="' + (outgoing ? 'outgoing' : 'incoming') + '">'
      + '<summary class="service-toggle" aria-controls="' + esc(id) + '">'
-     + '<span class="service-heading" data-no-copy><span class="service-mark">' + svg(arrow, 'service-direction-icon') + '</span><span class="service-identity"><span class="service-direction">' + direction + '</span><span class="service-title">' + (outgoing ? 'Кому: ' : 'От: ') + esc(title) + '</span><span class="service-meta"><span>' + state + '</span><span class="service-route">' + esc(from) + ' → ' + esc(to) + '</span>' + (time ? '<time datetime="' + date.toISOString() + '">' + time + '</time>' : '') + '</span></span>' + svg('<path d="m6 9 6 6 6-6"/>', 'service-chevron') + '</span>'
+     + '<span class="service-heading" data-no-copy><span class="service-mark">' + svg(arrow, 'service-direction-icon') + '</span><span class="service-identity"><span class="service-direction">' + direction + '</span><span class="service-title">' + (outgoing ? 'Кому: ' : 'От: ') + esc(title) + '</span><span class="service-meta"><span>' + state + '</span><span class="service-route">' + esc(from) + ' → ' + esc(to) + '</span>' + (time ? '<time datetime="' + date.toISOString() + '" title="' + esc(date.toLocaleString('ru-RU')) + '">' + time + '</time>' : '') + '</span></span>' + svg('<path d="m6 9 6 6 6-6"/>', 'service-chevron') + '</span>'
      + '<span class="service-preview">' + esc(body.slice(0, 1000)) + '</span><span class="service-hint" data-no-copy>' + chars + ' зн. · Нажмите, чтобы раскрыть</span></summary>'
      + '<div class="service-body" id="' + esc(id) + '"><div class="service-body-meta" data-no-copy><a href="/agent/' + encodeURIComponent(peer) + '" data-author="agent:' + esc(peer) + '">' + esc(title) + '</a>' + (hop ? ' · hop ' + esc(hop) : '') + (owner?.name ? ' · от имени ' + esc(owner.name) : '') + ' · ' + chars + ' зн. · оригинал</div><pre class="service-fulltext"><span>' + esc(body) + '</span></pre></div>'
-     + '<button type="button" class="service-collapse" data-service-collapse data-no-copy>' + svg('<path d="m6 15 6-6 6 6"/>', '') + 'Свернуть сообщение</button></details>';
+     + '<button type="button" class="service-collapse" data-service-collapse data-no-copy>' + svg('<path d="m6 15 6-6 6 6"/>', '') + 'Свернуть сообщение</button></details>' + destination;
 }

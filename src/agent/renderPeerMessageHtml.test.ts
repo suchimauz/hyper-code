@@ -39,7 +39,13 @@ describe('peer service message cards',()=>{
   const outgoingAgentMessage={deliveryKey:'receipt',to:'sender',body:'sent <b>plain</b>',status:'delivered' as const,messageIdx:99};
   const html=await render(ctx,null,{agentId:'owner',event:{idx:20,ts:event.ts,outgoingAgentMessage}});
   expect(html).toContain('service-message--outgoing');expect(html).toContain('Исходящее');expect(html).toContain('Отправлено');expect(html).toContain('Кому: Тестировщик');expect(html).toContain('owner → sender');expect(html).toContain('--service-hue:120');
-  const queued=await render(ctx,null,{agentId:'owner',event:{outgoingAgentMessage:{...outgoingAgentMessage,status:'queued'}}});expect(queued).toContain('В очереди');expect(queued).not.toContain('Отправлено');
+  expect(html).toContain('href="/agent/sender#m-99"');
+  const w=new Window();try{w.document.body.innerHTML=html;const link=w.document.querySelector('.service-delivery-link')!;expect(link.closest('summary')).toBeNull();expect(link.closest('details')).toBeNull();expect(w.document.querySelector('time')!.textContent).toMatch(/\d{2}:\d{2}:\d{2}/);expect(w.document.querySelector('time')!.getAttribute('datetime')).toBe(new Date(event.ts).toISOString());}finally{await w.happyDOM.close();}
+  const queued=await render(ctx,null,{agentId:'owner',event:{outgoingAgentMessage:{...outgoingAgentMessage,status:'queued'}}});expect(queued).toContain('В очереди');expect(queued).not.toContain('Отправлено');expect(queued).not.toContain('service-delivery-link');
+ });
+ test('delivery links require a confirmed nonnegative integer message index and encode the recipient',async()=>{
+  for(const messageIdx of [undefined,null,-1,1.5,NaN]){const html=await render(ctx,null,{agentId:'owner',event:{outgoingAgentMessage:{deliveryKey:'r',to:'peer',body:'text',status:'delivered',messageIdx}}});expect(html).not.toContain('service-delivery-link');}
+  const html=await render(ctx,null,{agentId:'owner',event:{outgoingAgentMessage:{deliveryKey:'r',to:'a/b?x',body:'text',status:'delivered',messageIdx:0}}});expect(html).toContain('href="/agent/a%2Fb%3Fx#m-0"');
  });
  test('missing agent uses durable title, no HTML injection or invalid timestamp',async()=>{
   const html=await render(ctx,null,{agentId:'owner',event:{idx:4,ts:NaN,agentMessage:{from:'deleted',title:'Past <agent>',body:'hello'}}});

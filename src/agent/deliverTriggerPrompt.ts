@@ -2,12 +2,14 @@
  * Delivers one claimed trigger prompt into its agent conversation
  *
  * Atomically check recipient pause and claim ownership, append the prompt, and schedule its agent. Row locks serialize with Stop and cancellation. A stopped recipient releases the claim back to active without consuming its schedule; false means no delivery.
+ * The wake_up event snapshots the locked trigger's kind, cron expression, timezone and watch identifier when present. Historical events are never enriched from mutable trigger rows.
  * @param opts.triggerId Claimed trigger identifier.
  * @param opts.claimToken Unique token proving ownership of the current claim.
  * @param opts.prompt Prompt to insert.
  * @param opts.now Delivery timestamp in milliseconds.
  * @param opts.resultRef Durable predicate result reference, attached only after successful storage.
  * @param opts.resultPreview Bounded predicate preview accompanying a stored reference.
+ * @param opts.watchStatus Observed watch evaluation outcome; omitted when unavailable. Never inferred from the prompt or schedule.
  */
 export default async function (
     ctx: Context,
@@ -25,13 +27,15 @@ export default async function (
         resultRef?: types.agent.ResultRef;
         /** Bounded predicate preview accompanying a stored reference. */
         resultPreview?: string;
+        /** Observed watch evaluation outcome; omit when unavailable. Recorded only for watch triggers. */
+        watchStatus?: 'ready' | 'timeout';
     },
 ): Promise<boolean> {
     const agentId = await ctx.fns.procs.db.transaction({ fn: async () => {
         const row = (await ctx.fns.procs.db.select({ sql: "SELECT agent_id FROM agent_triggers WHERE id=?", params: [opts.triggerId] }))[0];
         if (!row) return null;
         const target = (await ctx.fns.procs.db.select({ sql: "SELECT id,stopped_at,archived_at FROM agents WHERE id=? FOR UPDATE", params: [row.agent_id] }))[0];
-        const claim = (await ctx.fns.procs.db.select({ sql: "SELECT id FROM agent_triggers WHERE id=? AND status='checking' AND claim_token=? FOR UPDATE", params: [opts.triggerId, opts.claimToken] }))[0];
+        const claim = (await ctx.fns.procs.db.select({ sql: "SELECT id,kind,config,timezone FROM agent_triggers WHERE id=? AND status='checking' AND claim_token=? FOR UPDATE", params: [opts.triggerId, opts.claimToken] }))[0];
         if (!claim) return null;
         if (!target || target.stopped_at != null || target.archived_at != null) {
             await ctx.fns.procs.db.run({ sql: "UPDATE agent_triggers SET status='active',claim_token=NULL,claimed_at=NULL,updated_at=? WHERE id=? AND status='checking' AND claim_token=?", params: [opts.now, opts.triggerId, opts.claimToken] });
@@ -42,7 +46,16 @@ export default async function (
             role: 'user', content: String(opts.prompt) + (opts.resultRef ? `\n\nPredicate result preview: ${opts.resultPreview ?? ''}\nFull result: await ctx.fns.agent.readResult({ id: "${opts.resultRef.id}", offset: 0, limit: 4000 })` : ''),
             result_ref: opts.resultRef, message_type: 'trigger', excluded_from_cursor: true,
         } });
-        await ctx.fns.session.appendEvent({ id, event: { type: 'wake_up', reason: opts.prompt, messageIdx: message.idx, triggerId: opts.triggerId } });
+        const config = typeof claim.config === 'string' ? JSON.parse(claim.config) : claim.config;
+        await ctx.fns.session.appendEvent({ id, event: {
+            type: 'wake_up', reason: opts.prompt, messageIdx: message.idx, triggerId: opts.triggerId,
+            ...(typeof claim.kind === 'string' ? { triggerKind: claim.kind } : {}),
+            ...(claim.kind === 'cron' && typeof config?.expression === 'string' ? { cronExpression: config.expression } : {}),
+            ...(typeof claim.timezone === 'string' ? { timezone: claim.timezone } : {}),
+            ...(claim.kind === 'watch' ? { watchId: String(claim.id) } : {}),
+            ...(claim.kind === 'watch' && (opts.watchStatus === 'ready' || opts.watchStatus === 'timeout') ? { watchStatus: opts.watchStatus } : {}),
+            ...(opts.resultRef ? { resultRef: opts.resultRef, ...(opts.resultPreview !== undefined ? { resultPreview: opts.resultPreview } : {}) } : {}),
+        } });
         await ctx.fns.procs.db.run({ sql: "UPDATE agents SET next_run_at=COALESCE(next_run_at,?),updated_at=? WHERE id=?", params: [opts.now, opts.now, id] });
         return id;
     } }) as string | null;

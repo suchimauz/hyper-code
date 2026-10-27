@@ -380,7 +380,30 @@ body[data-presentation="sidebar"] [data-mobile-inspector-open] { display: none !
 .context-value { font-variant-numeric: tabular-nums; }
 .context-facts { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; margin: 0 0 14px; color: var(--color-base-content); }
 .context-facts dd { margin: 0; text-align: right; }
-.service-automation .service-meta { margin: 0 0 12px; }
+.service-automation .service-schedule-meta { margin-top: 4px; gap: 4px 10px; }
+.service-schedule-meta > span, .service-schedule-meta code { min-width: 0; overflow-wrap: anywhere; }
+.service-schedule-meta code { padding: 0 3px; border: 1px solid var(--color-ui-border); border-radius: 3px; font: 10px/1.6 ui-monospace, monospace; color: var(--color-base-content); }
+.service-automation .service-body > .service-meta { margin-bottom: 10px; }
+.service-delivery-link { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 5px; min-height: 44px; margin-left: auto; width: fit-content; max-width: 100%; padding: 6px 4px; color: var(--color-primary); font-size: 11px; overflow-wrap: anywhere; border-radius: 6px; }
+.service-delivery-link:hover, .service-event-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.service-delivery-link:focus-visible, .service-event-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.service-event, [data-theme="dark"] .service-event { --service-color: var(--color-muted); border: 1px solid var(--color-ui-border); background: var(--color-base-100); }
+.service-event--info, [data-theme="dark"] .service-event--info { --service-color: var(--color-info); }
+.service-event--success, [data-theme="dark"] .service-event--success { --service-color: var(--color-success); }
+.service-event--warning, [data-theme="dark"] .service-event--warning { --service-color: var(--color-warning); }
+.service-event--error, [data-theme="dark"] .service-event--error { --service-color: var(--color-error); }
+.service-event--success, .service-event--warning, .service-event--error { border-left: 3px solid var(--service-color); background: color-mix(in srgb, var(--service-color) 3%, var(--color-base-100)); }
+.service-event--neutral .service-mark { background: transparent; }
+.service-subtitle { display: block; margin-top: 2px; font-size: 11px; line-height: 1.5; color: var(--color-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.service-event .service-heading > time { flex: none; color: var(--color-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.service-event-badge { min-width: 0; max-width: 30%; overflow-wrap: anywhere; font-size: 10px; }
+.service-event .service-body { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.service-event-original { white-space: pre-wrap; }
+.service-event-original > *, .service-event-details > * { max-width: 100%; }
+.service-event-details { margin-top: 10px; color: var(--color-muted); }
+.service-event-link { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; margin-top: 8px; color: var(--color-primary); border-radius: 6px; }
+#messages .service-event pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; font-size: 11px; }
+.service-event[data-team-update="plan.completed"] .service-title { color: var(--service-color); }
 .context-notice[hidden] { display: none; }
 @media (max-width: 520px) { .service-message--peer { width: calc(100% - 14px); } .service-actions { right: 14px; } }
 @media (pointer: coarse) { .service-actions { position: static; opacity: 1; justify-content: flex-end; margin-right: 14px; } }
