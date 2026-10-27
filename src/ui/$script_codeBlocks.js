@@ -40,21 +40,36 @@
       const tools = document.createElement('div'); tools.className = 'chat-code-tools'; tools.dataset.noCopy = '';
       const language = document.createElement('span'); language.className = 'chat-code-language';
       language.textContent = pre.dataset.codeLanguage || (code.className.match(/language-([\w+-]+)/) || [])[1] || 'Код';
-      const copy = button('Копировать', 'data-code-copy'); copy.setAttribute('aria-label', 'Копировать код');
-      const status = document.createElement('span'); status.className = 'chat-code-status'; status.setAttribute('role', 'status');
+      const copy = button('', 'data-code-copy'); copy.setAttribute('aria-label', 'Копировать код');
+      copy.innerHTML = '<span class="chat-code-copy-label" aria-hidden="true">Копировать</span><span class="chat-code-copy-check" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>';
+      const status = document.createElement('span'); status.className = 'chat-code-status sr-only'; status.setAttribute('role', 'status'); status.setAttribute('aria-atomic', 'true');
+      const feedback = document.createElement('div'); feedback.className = 'chat-code-feedback'; feedback.dataset.noCopy = ''; feedback.hidden = true;
+      const errorText = document.createElement('span'); errorText.className = 'chat-code-error';
       const manual = button('Выделить код', 'data-code-select'); manual.hidden = true;
+      let resetTimer;
+      let copying = false;
+      const resetCopy = () => { delete copy.dataset.copied; copy.setAttribute('aria-label', 'Копировать код'); };
       manual.addEventListener('click', () => {
         const range = document.createRange(); range.selectNodeContents(code);
         const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-        status.textContent = 'Код выделен. Выберите «Копировать» в меню браузера.';
+        errorText.textContent = status.textContent = 'Код выделен. Выберите «Копировать» в меню браузера.';
       });
       copy.addEventListener('click', async () => {
+        if (copying) return;
+        copying = true;
+        clearTimeout(resetTimer);
+        status.textContent = '';
         try {
           await window.hyperCopyText(code.textContent || '');
-          status.textContent = 'Скопировано'; copy.textContent = 'Скопировано'; manual.hidden = true;
-          setTimeout(() => { if (copy.isConnected) { copy.textContent = 'Копировать'; status.textContent = ''; } }, 2000);
+          copy.dataset.copied = 'true'; copy.setAttribute('aria-label', 'Скопировано');
+          status.textContent = 'Скопировано'; feedback.hidden = true; manual.hidden = true; errorText.textContent = '';
+          resetTimer = setTimeout(() => { resetCopy(); status.textContent = ''; }, 2000);
         } catch (error) {
-          status.textContent = 'Не удалось скопировать. Можно выделить код вручную.'; manual.hidden = false;
+          resetCopy();
+          errorText.textContent = status.textContent = 'Не удалось скопировать. Можно выделить код вручную.';
+          feedback.hidden = false; manual.hidden = false;
+        } finally {
+          copying = false;
         }
       });
       tools.append(language, copy);
@@ -70,7 +85,7 @@
       }
       pre.tabIndex = 0; pre.setAttribute('aria-label', 'Код: ' + language.textContent + ', горизонтальная прокрутка');
       pre.before(block); block.append(tools, pre);
-      const feedback = document.createElement('div'); feedback.className = 'chat-code-feedback'; feedback.dataset.noCopy = ''; feedback.append(status, manual); block.append(feedback);
+      status.dataset.noCopy = ''; feedback.append(errorText, manual); block.append(status, feedback);
     });
   }
   let scheduled = false;

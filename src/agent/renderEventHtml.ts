@@ -45,13 +45,16 @@ function deleteControls(ctx: Context, idx: any, agentId: string, allowOne = true
         + '</div>';
 }
 
-/** Render event html for the runtime.  * @param opts.event Agent event to render.
- * @param opts.agentId Target agent identifier.
-*/
+/**
+ * Render one durable chat event with safe message markup, authorized action buttons and lazy tool details.
+ * Use for initial history and live event fragments; preserves message anchors and the original HTMX confirmations.
+ * @param opts.event Durable event to display, including type, message index, content and optional timestamp.
+ * @param opts.agentId Owning agent for action and detail URLs; falls back to the event agent ID.
+ */
 export default async function (ctx: Context, _session: Session | null, opts: {
-        /** Event to persist or render. */
+        /** Durable event to display, including its type, content and message index. */
 event: any;
-        /** Agent id used by the operation. */
+        /** Owning agent for action and detail URLs; falls back to event.agentId. */
 agentId?: string }): Promise<string> {
 
 function messageTime(ts: any): string {
@@ -120,7 +123,7 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
             const body = String(am.body ?? ev.text ?? '');
             const ownerName = am.onBehalfOf ? await (ctx as any).fns.auth?.getUser?.({ id: String(am.onBehalfOf) }).then((u: any) => u?.name ?? null).catch(() => null) : null;
             const meta = [am.hop ? 'hop ' + am.hop : '', ownerName ? 'for ' + ownerName : ''].filter(Boolean).join(' · ');
-            return '<div id="m-' + idx + '" class="group relative flex items-end justify-start gap-2 pb-0" data-agent-message="' + esc(fromId) + '">'
+            return '<div id="m-' + idx + '" class="chat-message chat-message--peer group relative flex items-end justify-start gap-2 pb-0" data-agent-message="' + esc(fromId) + '">'
                 + '<a href="/agent/' + encodeURIComponent(fromId) + '" class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-white no-underline" style="background:hsl(' + hue + ' 55% 40%)" title="' + esc(name) + '"><i class="ph ph-robot" aria-hidden="true"></i></a>'
                 + '<div class="relative mr-auto max-w-[80%]">'
                 + '<div class="rounded-2xl rounded-bl-md border px-3.5 py-2 whitespace-pre-wrap break-words shadow-sm bg-base-200 text-base-content" style="border-color:hsl(' + hue + ' 55% 45% / .5)">'
@@ -180,12 +183,12 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
                 ? '<img src="' + esc(author.picture) + '" alt="' + esc(author.name) + '" title="' + esc(author.name) + '" class="size-8 shrink-0 rounded-full object-cover" referrerpolicy="no-referrer" loading="lazy">'
                 : '<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white" style="background:hsl(' + author.hue + ' 55% 45%)" title="' + esc(author.name) + '" aria-hidden="true">' + esc(author.initials) + '</span>')
             : '';
-        return '<div id="m-' + idx + '" class="group relative flex items-end justify-end gap-2 pb-0">'
+        return '<div id="m-' + idx + '" class="chat-message chat-message--user group relative flex items-end justify-end gap-2 pb-0">'
             + '<div class="relative ml-auto max-w-[80%]">'
             + '<div class="chat-glass-primary ' + (author ? 'rounded-2xl rounded-br-md px-3.5 py-2' : 'rounded-xl px-4 py-3') + ' text-white whitespace-pre-wrap break-words shadow-sm border border-black/20">'
             + authorName
             + attachmentHtml
-            + appendTime((ev.text ? await mentionChips(ctx, esc(ev.text), 'dark') : '') + ragIcon, ev.ts, 'dark')
+            + appendTime((ev.text ? await mentionChips(ctx, esc(ev.text), 'light') : '') + ragIcon, ev.ts, 'dark')
             + '</div>'
             + '<div class="absolute right-full top-1/2 z-10 mr-2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">' + deleteControls(ctx, idx, agentId, true, true, 'side') + '</div>'
             + '</div>' + avatar + '</div>';
@@ -206,10 +209,12 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         const rawHtml = ev.html || ('<p>' + esc(ev.text || '') + '</p>');
         const safeHtml = await mentionChips(ctx, safeAssistantHtml(rawHtml)
             ?? '<pre class="text-xs whitespace-pre-wrap break-words">' + esc(ev.text || '') + '</pre>', 'light');
-        return '<div id="m-' + idx + '" class="group relative flex justify-start">'
-            + '<div class="assistant chat-glass w-full rounded-2xl px-4 py-3 text-base-content shadow-sm border border-ui-border">'
+        const assistantName = (ctx.state as any)?.agent?.[agentId]?.title || 'Hyper';
+        return '<div id="m-' + idx + '" class="chat-message chat-message--assistant group relative flex justify-start">'
+            + '<div class="assistant chat-glass w-full text-base-content">'
+            + '<div class="chat-message-meta" data-no-copy><span class="chat-message-author">' + esc(assistantName) + '</span>' + timeHtml(ev.ts, 'light', instructionMarks) + '</div>'
             + '<div class="prose prose-sm max-w-none text-base-content prose-headings:text-base-content prose-p:text-base-content prose-li:text-base-content prose-strong:text-base-content prose-code:text-base-content prose-a:text-muted prose-p:my-1 prose-headings:my-2 prose-pre:my-2">'
-            + appendTime(safeHtml, ev.ts, 'light', instructionMarks)
+            + safeHtml
             + '</div>'
             + usage
             + '</div>'
@@ -234,7 +239,7 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         return (ctx as any).fns.ui.popup({
             method: bodyMethod,
             params: { agentId, idx: Number(ev.idx) },
-            html: '<i class="ph ' + esc(meta.icon) + '" aria-hidden="true"></i>',
+            html: '<i class="ph ' + esc(meta.icon) + '" aria-hidden="true"></i><span class="chat-tool-label">' + esc(meta.label) + '</span><span class="chat-tool-subject">' + esc(meta.subject) + '</span>' + (ev.isError ? '<span class="chat-tool-state">Ошибка</span>' : ''),
             attrs: 'class="tool tool-tucked shrink-0 rounded-full border ' + cardStyle + '" data-tool="' + esc(ev.name || 'tool') + '" data-title="' + esc(title) + '"' + (ev.isError ? ' data-error="1"' : '') + ' title="' + esc(title) + '" aria-label="' + esc(title) + '"',
         });
     }

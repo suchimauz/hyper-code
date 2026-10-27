@@ -3,13 +3,13 @@
 // is harness, pages on the right are product. Extracted from the old
 // /agent/:id page; the long-poll (#msg-tail), statusbar poll and chat.js
 // behaviors are unchanged.
-/** Performs the ui.chatColumn runtime operation. */
 /**
- * The agent chat as ONE self-contained column (header + transcript + composer),.
- * @param opts.agentId Target agent identifier.
+ * Render the live chat column with history, transient prose, running tools and composer.
+ * Use in agent pages to keep all live-region cursors and action controls mounted together.
+ * @param opts.agentId Agent whose transcript and interactive controls should be displayed.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
-        /** Identifier of the agent whose scoped setting is used. */ agentId: string }): Promise<string> {
+        /** Agent whose transcript and live controls should be displayed. */ agentId: string }): Promise<string> {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
     const id = opts.agentId;
 
@@ -69,7 +69,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     // header names THIS agent and holds its controls, nothing more.
     return `
 ${headerHtml}
-<div id="messages" data-agent-id="${esc(id)}" data-inherited-count="${view?.inheritedCount ?? 0}" style="overflow-anchor:none" class="dot-grid-surface chat-dot-grid flex-1 overflow-y-auto px-3 py-3 space-y-2">${historyHead}${eventsHtml}
+<div id="messages" data-agent-id="${esc(id)}" data-inherited-count="${view?.inheritedCount ?? 0}" style="overflow-anchor:none" class="chat-dot-grid flex-1 overflow-y-auto px-3 py-3 space-y-2">${historyHead}${eventsHtml}
 ${agent.sleepContext?.active === true
   ? `<div id="msg-tail" hx-get="/agent/${encodeURIComponent(id)}/events.html?offset=${maxIdx + 1}&compact=1" hx-trigger="load" hx-target="this" hx-swap="outerHTML"></div>`
   : `<div id="msg-tail" hx-get="/agent/${encodeURIComponent(id)}/events.html?offset=${maxIdx + 1}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"></div>`}

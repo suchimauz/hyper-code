@@ -115,17 +115,17 @@ test('mobile reading is 17px, quiet, and header identity stays compact', async (
     }
 });
 
-test('desktop keeps compact type and textures without a technical ID in the header', async () => {
+test('desktop uses the same flat dialogue surface with readable prose and no texture', async () => {
     const f = await fixture(1280, 0);
     try {
-        expect(f.css('#chat-panel .prose').fontSize).toBe('14px');
+        expect(f.css('#chat-panel .prose').fontSize).toBe('15px');
         expect(f.css('#nav-overlay [data-nav-label]').fontSize).toBe('12px');
         expect(f.window.document.querySelector('[data-chat-technical-id]')?.textContent).toBe('ab');
             expect(f.css('[data-chat-technical-id]').display).not.toBe('none');
             expect(f.css('[data-chat-technical-id]').fontSize).toBe('11px');
         expect(f.window.document.querySelector('[data-nav-technical-id]')).toBeNull();
-        expect(f.css('#chat-panel #messages').backgroundImage).not.toBe('none');
-        expect(f.css('#chat-panel .assistant').backdropFilter).toBe('blur(2px)');
+        expect(f.css('#chat-panel #messages').backgroundImage).toBe('none');
+        expect(f.css('#chat-panel .assistant').backdropFilter).toBe('none');
         expect(f.css('[data-composer-toolbar]').flexWrap).not.toBe('wrap');
         expect(f.css('#project-tabs-host').display).not.toBe('none');
         expect(f.css('.project-mobile-bar').display).toBe('none');
@@ -195,23 +195,48 @@ test('mobile inspector, code tools and attachment targets share the phone breakp
 });
 
 
-test('message action trigger is outside flex flow and below the bubble on phones only', async () => {
-    for (const [width, touchPoints, mobile] of [[390, 5, true], [844, 5, true], [1280, 0, false]] as const) {
+test('message context actions reserve no ellipsis row; tool rows show a pointer and footer respects hidden', async () => {
+    for (const [width, touchPoints] of [[390, 5], [844, 5], [1280, 0]] as const) {
         const f = await fixture(width, touchPoints);
         try {
-            f.window.document.querySelector('#messages')!.insertAdjacentHTML('beforeend', '<div id="m-99" class="mobile-message-enhanced"><div class="chat-glass-primary">My text</div><button data-mobile-message-actions>⋯</button></div>');
-            expect(f.css('[data-mobile-message-actions]').display).toBe(mobile ? 'block' : 'none');
-            if (mobile) {
-                expect(f.css('[data-mobile-message-actions]').position).toBe('absolute');
-                expect(f.css('[data-mobile-message-actions]').right).toBe('0px');
-                expect(f.css('[data-mobile-message-actions]').bottom).toBe('0px');
-                expect(f.css('[data-mobile-message-actions]').width).toBe('44px');
-                expect(f.css('#m-99').paddingBottom).toBe('44px');
-            }
+            f.window.document.querySelector('#messages')!.insertAdjacentHTML('beforeend', '<div id="m-99" class="mobile-message-enhanced" tabindex="0"><div class="chat-glass-primary">My text</div><button data-action="delete-one">Delete</button></div><div class="tool-tray"><button class="tool tool-tucked">read</button><button class="tool-tray-toggle tool-tray-collapse" aria-label="Свернуть вызовы" hidden><svg width="16" height="16" aria-hidden="true"></svg></button></div>');
+            expect(f.css('#m-99').paddingBottom).not.toBe('44px');
+            expect(f.css('[data-action="delete-one"]').display).toBe('none');
+            expect(f.css('.tool.tool-tucked').cursor).toBe('pointer');
+            expect(f.css('.tool-tray-collapse').display).toBe('none');
+            f.window.document.querySelector('.tool-tray-collapse')!.removeAttribute('hidden');
+            expect(['32px', '44px']).toContain(f.css('.tool-tray-collapse').width);
+            expect(f.css('.tool-tray-collapse').padding).toBe('0px');
+            expect(f.css('.tool-tray-collapse').cursor).toBe('pointer');
+            expect(f.styles).toContain('.mobile-message-enhanced:focus-visible');
         } finally { await f.window.happyDOM.close(); }
     }
 });
 
+
+test('code copy uses an inline green check without a visible success row or motion when reduced', async () => {
+    const script = await Bun.file(new URL('./$script_codeBlocks.js', import.meta.url)).text();
+    for (const width of [390, 1280]) {
+        const f = await fixture(width, width < 700 ? 5 : 0);
+        try {
+            f.window.document.querySelector('.assistant')!.insertAdjacentHTML('beforeend', '<pre><code>const value = 1;</code></pre>');
+            f.window.eval(script);
+            f.window.document.dispatchEvent(new f.window.Event('DOMContentLoaded'));
+            f.window.eval('window.hyperCopyText = async () => {}');
+            const copy = f.window.document.querySelector('[data-code-copy]') as any;
+            copy.click();
+            for (let i = 0; i < 10; i++) await Promise.resolve();
+            expect(f.css('[data-code-copy]').display).toBe('inline-grid');
+            expect(f.css('.chat-code-copy-label').opacity).toBe('0');
+            expect(f.css('.chat-code-copy-check').opacity).toBe('1');
+            expect(f.css('.chat-code-status').position).toBe('absolute');
+            expect(f.css('.chat-code-status').width).toBe('1px');
+            expect(f.window.document.querySelector('.chat-code-feedback')!.hasAttribute('hidden')).toBe(true);
+            expect(f.styles).toContain('color: var(--color-success)');
+            expect(f.styles).toContain('@media (prefers-reduced-motion: reduce) { .chat-code-copy-label, .chat-code-copy-check { transition: none; } }');
+        } finally { await f.window.happyDOM.close(); }
+    }
+});
 
 test('mobile Canvas and search are fullscreen with safe input/action sizes, retry is always explicit', async () => {
     for (const [width, touchPoints, mobile] of [[390, 5, true], [844, 5, true], [1280, 0, false]] as const) {
@@ -384,4 +409,29 @@ test('composer rerender follows a changed model and preserves the draft fallback
     expect(openai).toContain(modelLogo(context, null, { model: 'openai:gpt-4.1', bare: true }));
     expect(openai).not.toContain('anthropic:claude-sonnet-4');
     expect(await render()).toContain('ph-sliders-horizontal');
+});
+
+
+test('failed-run retry stays reachable in the compact header without covering rename', async () => {
+    for (const width of [320, 390, 1280]) {
+        const f = await fixture(width, width < 1024 ? 5 : 0);
+        try {
+            f.window.document.querySelector('[data-chat-badges]')!.innerHTML = '<span class="chat-part" data-chat-id="agent.status"><div id="status-bar" class="flex items-center gap-2"><span class="truncate">error: response failed</span><button class="chat-response-retry" data-agent-retry aria-label="Повторить"><i class="ph ph-arrow-clockwise" aria-hidden="true"></i></button></div></span>';
+            expect(f.css('#status-bar').minWidth).toBe('0');
+            expect(f.css('[data-chat-id="agent.status"]').order).toBe('-1');
+            expect(f.css('[data-agent-retry]').flexShrink).toBe('0');
+            if (width < 1024) {
+                expect(f.css('.chat-header').display).toBe('grid');
+                expect(f.css('.chat-header-identity').display).toBe('contents');
+                expect(f.css('.chat-header-meta').position).toBe('static');
+                expect(f.css('.chat-header-meta').pointerEvents).toBe('auto');
+                expect(f.css('.chat-header-meta').overflow).toBe('visible');
+                expect(f.css('.chat-header-badges').maxHeight).toBe('none');
+                expect(f.css('[data-agent-retry]').minWidth).toBe('44px');
+                expect(f.css('[data-agent-retry]').minHeight).toBe('44px');
+            }
+            // Ancestor :has() invalidation after removing retry is verified in Chromium;
+            // Happy DOM retains its cached ancestor styles after descendant removal.
+        } finally { await f.window.happyDOM.close(); }
+    }
 });

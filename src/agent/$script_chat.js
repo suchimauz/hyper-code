@@ -286,7 +286,7 @@
                 const toggle = event.target.closest('.tool-tray-toggle');
                 if (!toggle || !this.messages.contains(toggle)) return;
                 event.preventDefault();
-                this.toggleTray(toggle.closest('.tool-tray'));
+                this.toggleTray(toggle.closest('.tool-tray'), toggle.classList.contains('tool-tray-collapse'));
             }, { signal });
             this.arrangeTools(this.messages);
             this.prepareTables();
@@ -705,7 +705,7 @@
         }
 
         // FLIP keeps wrapping rows spatially continuous in either direction.
-        toggleTray(tray) {
+        toggleTray(tray, fromFooter = false) {
             const nodes = [...tray.children];
             const before = new Map(nodes.map(node => [node, node.getBoundingClientRect()]));
             const oldHeight = tray.getBoundingClientRect().height;
@@ -714,6 +714,13 @@
             tray.querySelectorAll('[data-tray-exit]').forEach(node => node.remove());
             tray.dataset.open = tray.dataset.open === '1' ? '0' : '1';
             this.summarizeTray(tray);
+            if (fromFooter) {
+                // Collapsing a long list from its end must not leave focus hidden
+                // or strand the reader far below the remaining three rows.
+                tray.querySelector('.tool-tray-toggle:not(.tool-tray-collapse)')?.focus({ preventScroll: true });
+                tray.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                return;
+            }
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !tray.animate) return;
             const bounds = tray.getBoundingClientRect();
             const timing = { duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)' };
@@ -742,17 +749,22 @@
             }
         }
 
-        // Failed and running calls remain visible while older calls are folded.
+        // All calls follow chronological folding; errors are not pinned outside history.
         summarizeTray(tray) {
             const tools = [...tray.children].filter(node => node.matches('.tool[data-tool]:not([data-tray-exit])'));
-            // Keep the last three calls on screen; older calls slide in from the left.
+            // Short lists stay fully visible; longer lists keep only the latest three.
             tools.forEach((t, i) => {
                 t.classList.toggle('tool-latest', i >= tools.length - 3);
-                t.classList.toggle('tool-history', tools.length > 4 && i < tools.length - 3 && !t.classList.contains('text-error'));
+                t.classList.toggle('tool-history', tools.length > 4 && i < tools.length - 3);
             });
-            let toggle = tray.querySelector(':scope > .tool-tray-toggle');
+            const toggles = [...tray.querySelectorAll(':scope > .tool-tray-toggle:not(.tool-tray-collapse)')];
+            let toggle = toggles.shift();
+            toggles.forEach(duplicate => duplicate.remove());
+            const footers = [...tray.querySelectorAll(':scope > .tool-tray-collapse')];
+            let footer = footers.shift();
+            footers.forEach(duplicate => duplicate.remove());
             if (tools.length <= 4) {
-                toggle?.remove(); tray.classList.remove('tool-tray--folded');
+                toggle?.remove(); footer?.remove(); tray.classList.remove('tool-tray--folded');
                 tools.forEach(tool => { tool.inert = false; tool.removeAttribute('aria-hidden'); });
                 return;
             }
@@ -765,7 +777,19 @@
                 tray.prepend(toggle);
             } else if (toggle !== tray.firstElementChild) tray.prepend(toggle);
             const open = tray.dataset.open === '1';
-            const failed = tools.filter(t => /\btext-error\b/.test(t.className)).length;
+            if (!footer) {
+                footer = document.createElement('button');
+                footer.type = 'button';
+                footer.className = 'tool-tray-toggle tool-tray-collapse';
+                footer.dataset.action = 'collapse-tools';
+                footer.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg>';
+                footer.title = 'Свернуть вызовы';
+                footer.setAttribute('aria-label', 'Скрыть список, оставить последние 3 вызова');
+            }
+            footer.hidden = !open;
+            footer.setAttribute('aria-expanded', String(open));
+            tray.append(footer);
+            const failed = tools.filter(t => t.hasAttribute('data-error') || /\btext-error\b/.test(t.className)).length;
             tray.classList.toggle('tool-tray--folded', !open);
             for (const tool of tools) {
                 tool.inert = !open && tool.classList.contains('tool-history');
@@ -773,7 +797,7 @@
             }
             toggle.setAttribute('aria-expanded', String(open));
             toggle.setAttribute('aria-label', `${open ? 'Свернуть' : 'Показать'} вызовы инструментов: ${tools.length}${failed ? `, ошибок: ${failed}` : ''}`);
-            toggle.innerHTML = `<i class="ph ph-caret-right" aria-hidden="true"></i><span>${tools.length}</span>${failed ? `<span class="text-error" aria-label="Ошибок: ${failed}">· ${failed}</span>` : ''}`;
+            toggle.innerHTML = `<i class="ph ph-caret-right" aria-hidden="true"></i><span>Вызовы инструментов · ${tools.length}</span>${failed ? `<span class="text-error" aria-label="Ошибок: ${failed}">· ${failed}</span>` : ''}`;
         }
 
         moveToTray(card) {
@@ -791,6 +815,7 @@
             tray.appendChild(card);
             const next = tray.nextElementSibling;
             if (next?.classList.contains('tool-tray')) {
+                if (next.dataset.open === '1') tray.dataset.open = '1';
                 while (next.firstChild) tray.appendChild(next.firstChild);
                 next.remove();
             }

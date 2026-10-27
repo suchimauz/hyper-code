@@ -53,8 +53,8 @@ describe("agent.renderEventHtml", () => {
     expect(evalHtml).toContain('hx-popup-params=');
     expect(evalHtml).not.toContain('hx-post');
     expect(evalHtml).not.toContain('hx-target');
-    expect(evalHtml).not.toContain('tool-label');
-    expect(evalHtml).not.toContain('tool-subject');
+    expect(evalHtml).toContain('chat-tool-label');
+    expect(evalHtml).toContain('chat-tool-subject');
     expect(evalHtml).not.toContain('tool-size');
     expect(evalHtml).not.toContain('tool-status');
     // Arguments and result alike are fetched from /agent/:id/tool/:idx only
@@ -119,14 +119,17 @@ describe("agent.renderEventHtml", () => {
     expect(html).toContain(`hx-confirm="delete this message?"`);
   });
 
-  test("puts time in the final text line instead of a separate row", async () => {
+  test("puts assistant time with the author, not into copied prose; user keeps compact inline time", async () => {
     const ts = new Date(2025, 0, 1, 12, 34).getTime();
     const user = await renderEventHtml(ctx, { type: "user", text: "one line", ts, messageIdx: 1 });
     expect(user).toContain('one line<span data-no-copy class="inline-block ml-2');
     expect(user).not.toContain('class="mt-1 text-[10px]');
 
     const assistant = await renderEventHtml(ctx, { type: "assistant", html: "<p>one line</p>", text: "one line", ts, messageIdx: 2 });
-    expect(assistant).toMatch(/one line<span data-no-copy class="inline-block ml-2[^>]*>[^<]+<\/span><\/p>/);
+    expect(assistant).toContain('class="chat-message-meta" data-no-copy');
+    expect(assistant).toContain('class="chat-message-author">Hyper</span>');
+    expect(assistant).toContain('<p>one line</p>');
+    expect(assistant).toContain('12:34');
     expect(assistant).not.toContain('class="mt-1 text-[10px]');
   });
 

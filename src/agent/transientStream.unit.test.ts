@@ -22,8 +22,8 @@ test('RAM-only fragment escapes partial prose, replaces one region and clears wi
   expect(html).toContain('&lt;script&gt;unsafe&lt;/script&gt; partial');
   expect(html).not.toContain('<script>');expect(html).toContain('data-streaming-message');
   expect(html).toContain('assistant chat-glass');expect(html).toContain('data-stream-activity');
-  expect(html.match(/<circle /g)).toHaveLength(3);expect(html).toContain('<animate attributeName="opacity"');
-  expect(html).toContain('border-inline-start:3px solid');
+  expect(html.match(/<circle /g)).toHaveLength(3);expect(html).toContain('class="chat-stream-dot"');expect(html).not.toContain('<animate');
+  expect(html).toContain('chat-message-meta');expect(html).toContain('Пишет…');
   expect(html).not.toContain('Streaming response');expect(html).not.toContain('role="status"');
   expect(html).toContain('data-live-topic="agent:sample:stream"');
   expect(response.headers.get('cache-control')).toBe('no-store');
@@ -82,7 +82,7 @@ test('stream renders safe Markdown in the shared assistant style without active 
  const html=await render(ctx,null,{agentId:'sample'});
  expect(html).toContain('<strong>Готово</strong>');expect(html).toContain('<ul>');expect(html).toContain('<code>code</code>');
  expect(html).not.toContain('href=');expect(html).not.toContain('<img');expect(html).not.toContain('<script');
- expect(html).toContain('rounded-2xl');expect(html).toContain('prose prose-sm');expect(html).toContain('aria-busy="true"');
+ expect(html).toContain('chat-message--assistant');expect(html).toContain('prose prose-sm');expect(html).toContain('aria-busy="true"');
 });
 
 test('activity follows the last words inline, including lists and emphasis, but stays out of code',async()=>{

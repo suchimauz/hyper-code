@@ -45,13 +45,13 @@ export default function (
     const chip = ctx.fns.agent.toolSpinner({
         icon: run.icon,
         startedAt: run.startedAt,
-        timeoutMs: run.timeoutMs,
+        timeoutMs: run.timeoutMs ?? undefined,
     });
 
     return ctx.fns.ui.popup({
         method: "agent.activeToolDetails",
         params: { agentId: opts.agentId },
-        html: chip,
+        html: `<span class="chat-tool-icon">${chip}</span><span class="chat-tool-label">${esc(run.name)}</span><span class="chat-tool-subject">${esc(run.subject)}</span><span class="chat-tool-state">Выполняется</span>`,
         attrs: `class="tool tool-tucked relative shrink-0 rounded-full border-0 bg-info/10 text-info"`
             + ` data-tool="${esc(run.name)}" data-tool-running="1" data-title="${esc(label)}"`
             + ` title="${esc(title)}" aria-label="${esc(title)}" aria-busy="true"`,

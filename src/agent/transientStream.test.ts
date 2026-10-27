@@ -16,7 +16,7 @@ describe('web transient stream', () => {
             expect(html.match(/id="msg-stream"/g)).toHaveLength(1);
             expect(html).toContain('data-streaming-message');
             expect(html).toContain('data-stream-activity');
-            expect(html).toContain('<animate attributeName="opacity"');
+            expect(html).toContain('class="chat-stream-dot"');
             expect(html).toContain(`data-live-topic="agent:${agent.id}:stream"`);
             expect(html).not.toContain('<script>');
         }

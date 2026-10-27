@@ -3,6 +3,8 @@
  * Use part='stop' for the event-refreshed composer region; idle chats expose only send.
  * Informational status restores compaction progress from durable sleep_context on every
  * render (including navigation/reload), and shows running descendants without enabling parent Stop controls.
+ * Failed idle runs expose an explicit continuation request through the existing chat endpoint;
+ * this never replays stored tool calls or automatically retries.
  * @param opts.agentId Target agent identifier.
  * @param opts.initialUsage Initial token usage shown in the status bar.
  */
@@ -19,7 +21,7 @@ initialUsage?: any;
     const now = Date.now();
     const teamRunningCount = part === 'status' ? Number((await ctx.fns.agent.teamActivity({}))[agentId] ?? 0) : 0;
     const row = ((await ctx.fns.procs.db.select({
-        sql: 'SELECT run_state, run_started_at, next_run_at, last_processed_msg_idx, last_error, wake_at, scratchpad, sleep_context FROM agents WHERE id = ?',
+        sql: 'SELECT run_state, run_started_at, next_run_at, last_processed_msg_idx, last_error, wake_at, scratchpad, sleep_context, (SELECT MAX(idx) FROM events WHERE agent_id = agents.id AND type = \'error\') AS last_error_idx FROM agents WHERE id = ?',
         params: [agentId],
     })) as any[])[0];
     let parked: any = null;
@@ -72,7 +74,7 @@ initialUsage?: any;
         cls = 'text-warning bg-warning/10 border-ui-border';
     } else if (row?.last_error) {
         // A failed run does NOT auto-retry (by design) — without this badge it
-        // looks like a hang. The next user message retries; say so.
+        // looks like a hang. Offer an explicit continuation through normal chat submission.
         label = 'error';
         title = 'error';
         cls = 'text-error bg-error/10 border-ui-border';
@@ -86,7 +88,7 @@ initialUsage?: any;
     const url = `/agent/${encodeURIComponent(agentId)}/statusbar`;
     const esc = (t: any) => ctx.fns.procs.ui.escape({ text: t });
     const ownStatusBadge = row?.last_error && row?.run_state !== 'running' && !parked
-        ? `<span class="text-xs px-2 py-0.5 rounded border font-mono ${cls} max-w-[16rem] truncate inline-block align-bottom" title="${esc(String(row.last_error))} — send a message to retry">error: ${esc(String(row.last_error).slice(0, 48))}</span>`
+        ? `<span class="text-xs px-2 py-0.5 rounded border font-mono ${cls} max-w-[16rem] truncate inline-block align-bottom" title="${esc(String(row.last_error))}">error: ${esc(String(row.last_error).slice(0, 48))}</span>`
         : row?.run_state === 'running' ? `<span class="inline-flex items-center ${cls}" title="${esc(title)}" data-agent-running>${label}</span>`
         : label ? `<span class="text-xs px-1.5 py-0.5 rounded ${borderCls} font-mono inline-flex items-center gap-1.5 ${cls}" title="${esc(title)}"${row?.run_state === 'running' ? ' data-agent-running' : ''}>${label}</span>` : '';
     const teamBadge = teamRunningCount > 0
@@ -109,7 +111,23 @@ initialUsage?: any;
     const compactionBadge = hasDraft
         ? `<span class="inline-flex items-center gap-1.5 text-xs ${compacting ? 'text-info' : 'text-warning'}" data-agent-compaction="${compacting ? 'working' : 'blocked'}" role="status" aria-live="polite" title="${esc(compactionTitle)}">${compacting ? runRing({ seconds: elapsed ? (now - startedAt) / 1000 : 0, dots: 8, still: false }) : '<i class="ph ph-warning-circle" aria-hidden="true"></i>'}<span>${compactionLabel}</span></span>`
         : '';
-    const statusBadge = (hasDraft ? compactionBadge : ownStatusBadge) + teamBadge;
+    // A stable per-failure key makes double clicks and fragment refreshes idempotent.
+    // Keep this outside the composer: neither its draft nor attachments belong to retry.
+    const retryButton = part === 'status' && row?.last_error && row?.run_state !== 'running'
+        && !row?.next_run_at && !parked && !hasDraft
+        ? ctx.fns.procs.ui.button({
+            action: 'retry-response', entity: 'agent', id: agentId,
+            post: `/agent/${encodeURIComponent(agentId)}`, swap: 'none',
+            appearance: 'plain', class: 'chat-response-retry',
+            html: '<i class="ph ph-arrow-clockwise" aria-hidden="true"></i>',
+            ariaLabel: 'Повторить', title: 'Повторить',
+            vals: {
+                text: 'Continue from where you stopped after the error. Do not repeat actions that have already completed.',
+                requestId: `retry-response-${Bun.hash(JSON.stringify([agentId, row.last_error_idx, row.last_processed_msg_idx, row.last_error])).toString(16)}`,
+            },
+            attrs: { 'data-agent-retry': '', 'hx-disabled-elt': 'this', 'hx-sync': 'this:drop', 'hx-params': 'text,requestId' },
+        }) : '';
+    const statusBadge = (hasDraft ? compactionBadge : ownStatusBadge) + retryButton + teamBadge;
     // Stop is rendered by this live fragment so it appears and disappears with
     // the run, but CSS anchors it inside the composer instead of the top bar.
     const busy = row?.run_state === 'running' || !!row?.next_run_at;
