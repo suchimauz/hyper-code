@@ -21,7 +21,7 @@ export default async function (
         model?: string;
         /** Sampling temperature where supported. */
         temperature?: number;
-        /** Maximum output tokens where supported. */
+        /** Maximum output tokens where supported; MiniMax uses its server default and ignores this option. */
         max_tokens?: number;
         /** Groq GPT-OSS reasoning budget; use low for short completions so reasoning does not consume the whole output limit. Ignored by other providers. */
         groqReasoningEffort?: "low" | "medium" | "high";
@@ -264,14 +264,10 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
     if (!apiKey && endpoint.provider !== "opencode") throw new Error(`${endpoint.provider}: no credentials`);
     const body: any = { model: endpoint.modelId, max_tokens: opts.max_tokens ?? 2048, messages: [{ role: "user", content: opts.user }] };
     if (endpoint.provider === "opencode") Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: opts.model, modelId: endpoint.modelId, api: "anthropic", effort: opts.reasoningEffort }));
-    // MiniMax counts thinking tokens against max_tokens: a small budget is
-    // spent entirely on reasoning and the visible text comes back empty. Its
-    // reasoning is a fixed trait of the model, so every MiniMax request gets
-    // a floor large enough to leave room for the answer itself.
+    // MiniMax uses its server-selected generation budget, including thinking.
+    // Do not inherit the generic Anthropic default or the removed plan setting.
     if (upstream === "minimax-coding") {
-        const configured = Number(await ctx.fns.settings?.getNumber?.({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }) ?? 16384);
-        const requested = Number(opts.max_tokens ?? 0);
-        body.max_tokens = Math.max(requested || configured, 8192);
+        delete body.max_tokens;
         body.thinking = { type: "adaptive" };
         body.output_config = { effort: "low" };
     }

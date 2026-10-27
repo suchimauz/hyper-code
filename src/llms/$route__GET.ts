@@ -51,7 +51,6 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     const prices = await ctx.fns.llm.modelPrices({models:Object.values(models).flat().filter(model => /^(?:(?:ssh|hyper)\/[^:]+:)*opencode(?:\/[\w.-]+)?:/.test(model)),nodes});
     const minimax = {
         serviceTier: (await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" })) ?? "standard",
-        maxTokens: (await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 })) ?? 16384,
     };
 
     const oauthLabel = oauth.needsReconnect ? "reconnect required" : oauth.connected ? expiryLabel(oauth.expiresAt) : oauth.loginStatus === "pending" ? "login pending" : undefined;

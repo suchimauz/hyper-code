@@ -19,7 +19,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Exact locally disabled routes; kept visible with an enable action. @default [] */ disabledModels?: string[];
     /** Saved node catalogue snapshots used to group available models by provider and account. */ nodes?: types.node.NodeEntry[];
     /** MiniMax M Plan request settings shown next to the plan account. */
-    minimax?: { serviceTier: string; maxTokens: number };
+    minimax?: { serviceTier: string };
     /** Coding-plan egress instances: current selection per provider plus trusted instance names. */
     planInstances?: { zai: string | null; minimax: string | null; opencode?: string | null; instances: string[] };
     /** Current timestamp in ms. */ now?: number;
@@ -120,7 +120,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     // and change them where the plan itself lives.
     const minimaxSettings = (a: typeof opts.accounts[number]) => {
         if (a.provider !== "minimax-coding" || !opts.minimax) return "";
-        return ctx.fns.llms.minimaxSettings({ serviceTier: opts.minimax.serviceTier, maxTokens: opts.minimax.maxTokens });
+        return ctx.fns.llms.minimaxSettings({ serviceTier: opts.minimax.serviceTier });
     };
     const localRow = (a: typeof opts.accounts[number]) => {
         const models = Object.values(opts.models ?? {}).flat().filter(model => model.startsWith(prefix(a)));

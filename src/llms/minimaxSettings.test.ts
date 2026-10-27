@@ -24,27 +24,27 @@ const ctx: any = { fns: {
 const minimaxAccount = { provider: "minimax-coding", account: "default", label: "MiniMax", model: "minimax-coding:", source: "file" as const, available: true, usedPercent: 12, planType: "M Plan", resetsAt: null, parkedAgents: 0 };
 
 test("the MiniMax plan account carries its request settings", () => {
-    const html = accountsCard(ctx, null, { accounts: [minimaxAccount], models: {}, minimax: { serviceTier: "priority", maxTokens: 32768 } });
+    const html = accountsCard(ctx, null, { accounts: [minimaxAccount], models: {}, minimax: { serviceTier: "priority" } });
     expect(html).toContain('data-provider="minimax-coding"');
     expect(html).toContain("llm-minimax-settings");
     expect(html).toContain('name="minimaxCodingServiceTier"');
-    expect(html).toContain('name="minimaxCodingMaxTokens"');
+    expect(html).not.toContain('name="minimaxCodingMaxTokens"');
     expect(html).toContain("/llms/minimax/settings");
 });
 
 test("other providers get no MiniMax settings", () => {
-    const html = accountsCard(ctx, null, { accounts: [{ provider: "codex", account: "default", label: "codex", model: "codex:gpt", source: "file", available: true, usedPercent: 1, planType: null, resetsAt: null, parkedAgents: 0 }], models: {}, minimax: { serviceTier: "standard", maxTokens: 16384 } });
+    const html = accountsCard(ctx, null, { accounts: [{ provider: "codex", account: "default", label: "codex", model: "codex:gpt", source: "file", available: true, usedPercent: 1, planType: null, resetsAt: null, parkedAgents: 0 }], models: {}, minimax: { serviceTier: "standard" } });
     expect(html).not.toContain("llm-minimax-settings");
 });
 
-test("the settings form shows the current tier and budget", () => {
-    const html = minimaxSettings(ctx, null, { serviceTier: "priority", maxTokens: 32768 });
+test("the settings form shows the tier but no output budget", () => {
+    const html = minimaxSettings(ctx, null, { serviceTier: "priority" });
     expect(html).toContain('<option value="priority" selected>');
-    expect(html).toContain('value="32768"');
-    expect(html).toContain("Thinking tokens count against this budget");
+    expect(html).not.toContain('type="number"');
+    expect(html).not.toContain("Max output tokens");
 });
 
 test("an unknown tier falls back to standard rather than rendering nonsense", () => {
-    const html = minimaxSettings(ctx, null, { serviceTier: "gold", maxTokens: 16384 });
+    const html = minimaxSettings(ctx, null, { serviceTier: "gold" });
     expect(html).toContain('<option value="standard" selected>');
 });

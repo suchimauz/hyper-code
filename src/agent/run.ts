@@ -345,9 +345,15 @@ export default async function (
 
         // The assistant turn is ONE row, carrying both what it said and what it
         // called — that pairing is what the next request replays.
+        // Truncation is not a successful final answer, even when all tool JSON
+        // happens to be valid. Never execute a partial batch or silently finish.
+        if (finishReason === 'length' || finishReason === 'max_tokens') {
+            clearStream();
+            throw new Error('Model response reached its output token limit. No tools from this response were executed and no final answer was delivered. Continue from the saved checkpoint with a smaller response.');
+        }
         if (!prose.trim() && toolCalls.length === 0) {
             clearStream();
-            return { text: prose, usage, consumedUserIdx };
+            throw new Error('Model returned an empty response without text or tool calls. No final answer was delivered; the provider did not report an output token limit. Retry explicitly from the saved checkpoint.');
         }
 
         const append = await ctx.fns.session.appendMessage({ id: agent.id, message: {

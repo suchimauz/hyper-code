@@ -64,3 +64,27 @@ describe('malformed argument guard without external services', () => {
         expect(h.calls).toBe(1);
     });
 });
+
+describe('empty and truncated model responses are not silent success', () => {
+    for (const finishReason of ['length', 'max_tokens']) {
+        for (const text of ['', 'Partial answer']) test(`reports ${finishReason} with ${text ? 'partial' : 'empty'} text without retry`, async () => {
+            const h = harness([{ text, finishReason, usage: { completion_tokens: 16384 }, toolCalls: [] }]);
+            await expect(execute(h)).rejects.toThrow('output token limit');
+            expect(h.sampled).toBe(1);
+            expect(h.calls).toBe(0);
+            expect(h.rows.filter(r => r.role === 'assistant')).toHaveLength(0);
+        });
+    }
+    for (const finishReason of ['stop', 'end_turn', null]) test(`reports empty response with ${finishReason} without claiming a quota or length error`, async () => {
+        const h = harness([{ text: '  ', finishReason, usage: null, toolCalls: [] }]);
+        await expect(execute(h)).rejects.toThrow('Model returned an empty response');
+        expect(h.sampled).toBe(1);
+        expect(h.calls).toBe(0);
+    });
+    test('valid-looking tool calls in a truncated response are not executed', async () => {
+        const h = harness([{ text: '', finishReason: 'length', usage: null, toolCalls: [{ id: 'cut', name: 'read', args: { path: 'file' } }] }]);
+        await expect(execute(h)).rejects.toThrow('No tools from this response were executed');
+        expect(h.calls).toBe(0);
+        expect(h.rows.some(r => r.tool_calls?.length)).toBe(false);
+    });
+});

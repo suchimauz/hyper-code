@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import route from "./$route_minimax_settings_POST";
 
 // The route is exercised with a plain context: it only reads the form, writes
-// two settings and renders the form again. No database, no provider call.
+// the admission tier and renders the form again. No database, no provider call.
 function makeCtx(stored: Record<string, any>) {
     const ctx: any = { state: {}, env: {}, fns: {
         settings: {
@@ -10,7 +10,7 @@ function makeCtx(stored: Record<string, any>) {
             getString: async (o: any) => stored[o.key] ?? null,
             getNumber: async (o: any) => stored[o.key] ?? o.fallback ?? null,
         },
-        llms: { minimaxSettings: (o: any) => `<form class="llm-minimax-settings" data-tier="${o.serviceTier}" data-max="${o.maxTokens}"></form>` },
+        llms: { minimaxSettings: (o: any) => `<form class="llm-minimax-settings" data-tier="${o.serviceTier}"></form>` },
     } };
     return ctx;
 }
@@ -22,13 +22,13 @@ async function post(body: string, stored: Record<string, any> = {}) {
 }
 
 describe("POST /llms/minimax/settings", () => {
-    test("stores the admission tier and the output budget, and renders them back", async () => {
+    test("stores only the admission tier and ignores a legacy budget field", async () => {
         const { res, stored, html } = await post("minimaxCodingServiceTier=priority&minimaxCodingMaxTokens=32768");
         expect(res.status).toBe(200);
         expect(stored.minimaxCodingServiceTier).toBe("priority");
-        expect(stored.minimaxCodingMaxTokens).toBe(32768);
+        expect(stored.minimaxCodingMaxTokens).toBeUndefined();
         expect(html).toContain('data-tier="priority"');
-        expect(html).toContain('data-max="32768"');
+        expect(html).not.toContain("data-max");
     });
 
     test("an out-of-range budget is ignored instead of stored", async () => {

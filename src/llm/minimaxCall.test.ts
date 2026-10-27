@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import call from "./call";
 
-// MiniMax counts thinking tokens against max_tokens. A small budget would be
-// spent entirely on reasoning and the visible text would come back empty, so
-// llm.call must give every MiniMax request room for the answer itself.
+// MiniMax selects its server budget; neither generic caller budgets nor the
+// removed plan setting should cap its hidden reasoning.
 async function captureRequest(run: (callMiniMax: (opts: { max_tokens?: number }) => Promise<any>) => Promise<void>): Promise<{ request: any; headers: any }> {
     const previousFetch = globalThis.fetch;
     const captured: { request: any; headers: any } = { request: null, headers: null };
@@ -23,18 +22,19 @@ async function captureRequest(run: (callMiniMax: (opts: { max_tokens?: number })
 }
 
 describe("llm.call — MiniMax M Plan", () => {
-    test("a tiny requested budget is raised so the answer is not eaten by thinking", async () => {
+    test("a generic small caller budget is not imposed on MiniMax", async () => {
         const { request } = await captureRequest(async callMiniMax => { await callMiniMax({ max_tokens: 120 }); });
-        expect(request.max_tokens).toBeGreaterThanOrEqual(8192);
+        expect(request).not.toHaveProperty("max_tokens");
     });
 
-    test("a larger requested budget is kept", async () => {
+    test("a generic larger caller budget is not imposed on MiniMax", async () => {
         const { request } = await captureRequest(async callMiniMax => { await callMiniMax({ max_tokens: 32768 }); });
-        expect(request.max_tokens).toBe(32768);
+        expect(request).not.toHaveProperty("max_tokens");
     });
 
     test("the request asks for adaptive thinking and a shallow effort", async () => {
         const { request } = await captureRequest(async callMiniMax => { await callMiniMax({}); });
+        expect(request).not.toHaveProperty("max_tokens");
         expect(request.thinking).toEqual({ type: "adaptive" });
         expect(request.output_config).toEqual({ effort: "low" });
     });

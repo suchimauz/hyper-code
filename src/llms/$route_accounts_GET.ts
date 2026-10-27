@@ -22,7 +22,6 @@ export default async function (ctx: Context, _session: Session | null, _opts: { 
     const planInstances = { zai: zaiPlan.instance, minimax: minimaxPlan.instance, opencode: opencodePlan.instance, instances: (instanceRows as any[]).filter(i => i?.pinnedHostKey).map(i => String(i.name)) };
     const minimax = {
         serviceTier: (await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" })) ?? "standard",
-        maxTokens: await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 }),
     };
     return new Response(ctx.fns.llms.accountsCard({ accounts, logins, models, nodes, minimax, planInstances, disabledModels, prices }), { headers: { "content-type": "text/html; charset=utf-8" } });
 }

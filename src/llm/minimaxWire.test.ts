@@ -95,8 +95,8 @@ describe("streamAnthropic — MiniMax M Plan wire format", () => {
         expect(flash.service_tier).toBeUndefined();
     });
 
-    test("the output budget follows the setting, because thinking counts against it", async () => {
+    test("legacy output-budget settings do not reach the MiniMax request", async () => {
         const body = await capture("MiniMax-M3", "high", { maxTokens: 32768 });
-        expect(body.max_tokens).toBe(32768);
+        expect(body).not.toHaveProperty("max_tokens");
     });
 });

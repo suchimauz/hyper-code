@@ -67,7 +67,7 @@ describe('Knowledge completed-turn hook (isolated)', () => {
     });
     test('LLM errors, aborted responses and empty responses do not launch', async () => {
         const h = harness([new Error('provider failed')]); await expect(h.execute()).rejects.toThrow('provider failed'); expect(h.launches).toHaveLength(0);
-        const empty = harness([{ text: '' }]); await empty.execute(); expect(empty.launches).toHaveLength(0);
+        const empty = harness([{ text: '' }]); await expect(empty.execute()).rejects.toThrow('Model returned an empty response'); expect(empty.launches).toHaveLength(0);
         const aborted = harness([]); aborted.ctx.fns.llm.stream = async () => { aborted.agent.abortController.abort(); return { text: 'partial' }; };
         await expect(aborted.execute()).rejects.toMatchObject({ name: 'AbortError' }); expect(aborted.launches).toHaveLength(0);
     });

@@ -87,10 +87,9 @@ export default async function (
                 body.output_config = { effort: reasoning.applied === "xhigh" ? "max" : reasoning.applied };
             }
         }
-        // Thinking tokens count against max_tokens, so the budget must leave
-        // room for the visible answer as well as the reasoning.
-        const maxTokens = await ctx.fns.settings.getNumber({ module: "llm", scopeType: "global", key: "minimaxCodingMaxTokens", fallback: 16384 });
-        body.max_tokens = Math.max(2048, Math.min(131072, Number(maxTokens) || 16384));
+        // MiniMax accepts omission: use its model-specific server budget instead
+        // of inheriting the Anthropic default, which also caps hidden thinking.
+        delete body.max_tokens;
         // M3.1-Flash does not accept a tier; the others do.
         if (!isM31) {
             const tier = await ctx.fns.settings.getString({ module: "llm", scopeType: "global", key: "minimaxCodingServiceTier" });
