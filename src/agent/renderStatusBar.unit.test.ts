@@ -56,3 +56,56 @@ test('finished descendants leave no stale team activity badge', async () => {
     } };
     expect(await renderStatusBar(ctx, null, { agentId: 'parent', initialUsage: {} })).not.toContain('data-team-running');
 });
+
+function compactionFixture(runState = 'idle', queued = false) {
+    const row: any = { run_state: runState, run_started_at: Date.now(), next_run_at: queued ? Date.now() : null, scratchpad: '{}',
+        sleep_context: { activeRevision: 1, draftRevision: 2, generations: [{ revision: 2, status: 'draft', createdAt: Date.now() - 65000 }] } };
+    const ctx: any = { fns: {
+        agent: { teamActivity: async () => ({}) },
+        procs: {
+            db: { select: async ({ sql }: any) => sql.includes('FROM agents') ? [row] : [] },
+            ui: { escape: ({ text }: any) => String(text), button: () => '<button data-stop></button>' },
+        },
+        ui: { live: ({ html, every, topic }: any) => { expect(every).toBe(5); expect(topic).toBe('agent:compact'); return html; } },
+    } };
+    return { row, ctx, render: () => renderStatusBar(ctx, null, { agentId: 'compact', initialUsage: {} }) };
+}
+
+for (const state of ['idle', 'running', 'queued']) test(`compaction restores from DB without live agent/events after navigation: ${state}`, async () => {
+    const f = compactionFixture(state === 'running' ? 'running' : 'idle', state === 'queued');
+    for (let visit = 0; visit < 2; visit++) {
+        const html = await f.render();
+        expect(html).toContain('data-agent-compaction="working"');
+        expect(html).toContain('Compacting context');
+        expect(html).toContain('v2');
+        expect(html).toContain('role="status"');
+        expect(html).toContain('chat-run-ring--live');
+        expect(html).not.toContain('data-agent-running');
+    }
+    const controls = await renderStatusBar(f.ctx, null, { agentId: 'compact', part: 'stop', initialUsage: {} });
+    expect(controls).toContain('data-composer-send');
+    expect(controls.includes('data-stop')).toBe(state !== 'idle');
+});
+
+for (const status of ['active', 'failed', 'stale']) test(`resolved compaction ${status} clears the indicator on refresh`, async () => {
+    const f = compactionFixture();
+    expect(await f.render()).toContain('Compacting context');
+    f.row.sleep_context.draftRevision = null;
+    f.row.sleep_context.generations[0].status = status;
+    expect(await f.render()).not.toContain('data-agent-compaction');
+});
+
+for (const status of ['stale', 'failed', 'missing']) test(`unresolved ${status} draft is shown as blocked rather than working`, async () => {
+    const f = compactionFixture();
+    f.row.sleep_context.generations = status === 'missing' ? [] : [{ revision: 2, status }];
+    const html = await f.render();
+    expect(html).toContain('data-agent-compaction="blocked"');
+    expect(html).toContain('Compaction blocked');
+    expect(html).not.toContain('chat-run-ring--live');
+});
+
+test('compaction restores from serialized DB JSON too', async () => {
+    const f = compactionFixture();
+    f.row.sleep_context = JSON.stringify(f.row.sleep_context);
+    expect(await f.render()).toContain('data-agent-compaction="working"');
+});

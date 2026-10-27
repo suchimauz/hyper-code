@@ -1,7 +1,8 @@
 /** Render live agent status or composer controls. Busy and queued chats retain stop
  * alongside send so a nonempty draft can steer the agent without stopping its run.
  * Use part='stop' for the event-refreshed composer region; idle chats expose only send.
- * Informational status also shows running descendants without enabling parent Stop controls.
+ * Informational status restores compaction progress from durable sleep_context on every
+ * render (including navigation/reload), and shows running descendants without enabling parent Stop controls.
  * @param opts.agentId Target agent identifier.
  * @param opts.initialUsage Initial token usage shown in the status bar.
  */
@@ -18,7 +19,7 @@ initialUsage?: any;
     const now = Date.now();
     const teamRunningCount = part === 'status' ? Number((await ctx.fns.agent.teamActivity({}))[agentId] ?? 0) : 0;
     const row = ((await ctx.fns.procs.db.select({
-        sql: 'SELECT run_state, run_started_at, next_run_at, last_processed_msg_idx, last_error, wake_at, scratchpad FROM agents WHERE id = ?',
+        sql: 'SELECT run_state, run_started_at, next_run_at, last_processed_msg_idx, last_error, wake_at, scratchpad, sleep_context FROM agents WHERE id = ?',
         params: [agentId],
     })) as any[])[0];
     let parked: any = null;
@@ -91,7 +92,24 @@ initialUsage?: any;
     const teamBadge = teamRunningCount > 0
         ? `<span class="inline-flex items-center gap-1 text-blue-500" data-team-running="${teamRunningCount}" role="status" aria-label="Работают сабагенты: ${teamRunningCount}" title="Работают сабагенты: ${teamRunningCount}"><i class="ph ph-users-three" aria-hidden="true"></i><svg class="chat-run-ring chat-run-ring--live" style="display:block;flex-shrink:0" width="24" height="24" viewBox="0 0 28 28" aria-hidden="true"><g class="chat-run-dots" data-spin-sync>${Array.from({ length: 8 }, (_, i) => { const a = i * Math.PI / 4; return `<circle cx="${(14 + 11 * Math.sin(a)).toFixed(2)}" cy="${(14 - 11 * Math.cos(a)).toFixed(2)}" r="1.25" fill="currentColor" opacity="${(0.2 + i * 0.1).toFixed(1)}"/>`; }).join('')}</g><text x="14" y="14" dy=".35em" text-anchor="middle" font-size="${teamRunningCount > 9 ? 9 : 11}" font-weight="600" fill="currentColor" font-family="ui-sans-serif,system-ui">${teamRunningCount}</text></svg></span>`
         : '';
-    const statusBadge = ownStatusBadge + teamBadge;
+    // A compaction can run while the parent is idle. Its start event alone cannot
+    // restore a live indicator after navigation; the durable draft is authoritative.
+    const sleep = typeof row?.sleep_context === 'string' ? JSON.parse(row.sleep_context) : row?.sleep_context;
+    const revision = sleep?.draftRevision;
+    const generation = Array.isArray(sleep?.generations)
+        ? sleep.generations.find((g: { revision: number }) => Number(g.revision) === Number(revision)) : null;
+    const hasDraft = revision != null;
+    const compacting = hasDraft && generation?.status === 'draft';
+    const startedAt = Number(generation?.createdAt);
+    const elapsed = Number.isFinite(startedAt) && startedAt > 0 ? shortDuration(now - startedAt) : null;
+    const compactionLabel = compacting ? 'Compacting context' : 'Compaction blocked';
+    const compactionTitle = compacting
+        ? `Compacting context · v${revision}${elapsed ? ` · ${elapsed}` : ''}. Queued messages are preserved.`
+        : `Compaction v${revision} has an unresolved lock (${generation?.status ?? 'missing generation'}). Recovery is needed; this is not active progress.`;
+    const compactionBadge = hasDraft
+        ? `<span class="inline-flex items-center gap-1.5 text-xs ${compacting ? 'text-info' : 'text-warning'}" data-agent-compaction="${compacting ? 'working' : 'blocked'}" role="status" aria-live="polite" title="${esc(compactionTitle)}">${compacting ? runRing({ seconds: elapsed ? (now - startedAt) / 1000 : 0, dots: 8, still: false }) : '<i class="ph ph-warning-circle" aria-hidden="true"></i>'}<span>${compactionLabel}</span></span>`
+        : '';
+    const statusBadge = (hasDraft ? compactionBadge : ownStatusBadge) + teamBadge;
     // Stop is rendered by this live fragment so it appears and disappears with
     // the run, but CSS anchors it inside the composer instead of the top bar.
     const busy = row?.run_state === 'running' || !!row?.next_run_at;
