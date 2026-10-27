@@ -4,14 +4,19 @@
 // No long-poll: #msg-tail is a standard live region on `agent:<id>`.
 // The shared topic-filtered SSE client triggers its HTMX refresh, while a
 // 30-second watchdog repairs a notification missed during disconnection.
-/** Handles the id events.html get HTTP route.  * @param opts.req Incoming HTTP request.
- * @param opts.params Route path parameters.
-*/
+/**
+ * Serve visible older-history pages or raw-cursor live chat updates as HTML.
+ * Older pages count rendered cards, skipping hidden audit rows; live updates retain
+ * the durable event cursor and shared topic refresh behavior.
+ * @param opts.req Request with exclusive before/limit pagination or inclusive offset.
+ * @param opts.params Route parameters containing the owning agent id.
+ */
 export default async function (ctx: Context, _session: Session | null, opts: {
-        /** Incoming HTTP request. */
-req: Request;
-        /** Values bound to the operation. */
-params: Record<string, string> }) {
+    /** Request with exclusive before/limit pagination or inclusive offset. */
+    req: Request;
+    /** Route parameters containing the owning agent id. */
+    params: Record<string, string>;
+}): Promise<Response> {
     const id = opts.params.id!;
     const url = new URL(opts.req.url);
     const offset = Math.max(0, Number(url.searchParams.get('offset') ?? '0') || 0);
@@ -26,13 +31,11 @@ params: Record<string, string> }) {
     // `before` is the upward history pager. It returns a new head sentinel plus
     // the page, while the ordinary `offset` mode remains the live bottom tail.
     if (before != null) {
-        const events = await ctx.fns.session.getEvents({ id, beforeIdx: before, limit });
-        const eventsHtml = await ctx.fns.agent.renderEventsHtml({ events, agentId: id });
-        const firstIdx = events.length ? Number(events[0]?.idx ?? 0) : 0;
-        const head = firstIdx > 0
-            ? `<div id="msg-head" hx-get="/agent/${encodeURIComponent(id)}/events.html?before=${firstIdx}&limit=${limit}" hx-trigger="load-older" hx-target="this" hx-swap="outerHTML" class="flex justify-center py-1">${ctx.fns.procs.ui.button({ action: 'load-older-messages', label: 'older messages', size: 'xs', class: 'rounded-full text-3xs', attrs: { onclick: "htmx.trigger(this.parentElement, 'load-older')" } })}</div>`
+        const history = await ctx.fns.agent.renderHistoryPage({ agentId: id, beforeIdx: before, limit });
+        const head = history.nextBefore != null
+            ? `<div id="msg-head" hx-get="/agent/${encodeURIComponent(id)}/events.html?before=${history.nextBefore}&limit=${limit}" hx-trigger="load-older" hx-target="this" hx-swap="outerHTML" class="flex justify-center py-1">${ctx.fns.procs.ui.button({ action: 'load-older-messages', label: 'Показать предыдущие сообщения', size: 'xs', class: 'rounded-full text-3xs', attrs: { onclick: "htmx.trigger(this.parentElement, 'load-older')" } })}</div>`
             : '';
-        return new Response(head + eventsHtml, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+        return new Response(head + history.html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
 
     const maxIdx = await ctx.fns.session.getMaxEventIdx({ id });

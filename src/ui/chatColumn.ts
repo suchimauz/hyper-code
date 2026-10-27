@@ -29,15 +29,16 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     if (!agent) return `<div class="p-4 text-sm text-faint">agent ${esc(id)} not found</div>`;
 
     const maxIdx = await ctx.fns.session.getMaxEventIdx({ id });
-    const events = await ctx.fns.session.getEvents({ id, beforeIdx: maxIdx + 1, limit: 100 });
-
-    const historyHead = events.length && Number(events[0]?.idx ?? 0) > 0
-        ? `<div id="msg-head" hx-get="/agent/${encodeURIComponent(id)}/events.html?before=${Number(events[0].idx)}&limit=100" hx-trigger="load-older" hx-target="this" hx-swap="outerHTML" class="flex justify-center py-1">${ctx.fns.procs.ui.button({ action: 'load-older-messages', label: 'older messages', appearance: 'plain', class: 'rounded-full border border-ui-border bg-base-100 px-3 py-1 text-3xs text-faint hover:text-muted', attrs: { onclick: "htmx.trigger(this.parentElement, 'load-older')" } })}</div>`
+    // Page by rendered cards, not hidden telemetry. Model compaction never
+    // changes which durable UI events belong to the person's conversation.
+    const history = await ctx.fns.agent.renderHistoryPage({ agentId: id, beforeIdx: maxIdx + 1, limit: 100 });
+    const historyHead = history.nextBefore != null
+        ? `<div id="msg-head" hx-get="/agent/${encodeURIComponent(id)}/events.html?before=${history.nextBefore}&limit=100" hx-trigger="load-older" hx-target="this" hx-swap="outerHTML" class="flex justify-center py-1">${ctx.fns.procs.ui.button({ action: 'load-older-messages', label: 'Показать предыдущие сообщения', appearance: 'plain', class: 'rounded-full border border-ui-border bg-base-100 px-3 py-1 text-3xs text-faint hover:bg-base-200 hover:text-muted', attrs: { onclick: "htmx.trigger(this.parentElement, 'load-older')" } })}</div>`
         : '';
     const activeSleepForView = ctx.fns.agent.getSleepGeneration({ sleepContext: agent.sleepContext, kind: "active" });
     const eventsHtml = activeSleepForView
-        ? await ctx.fns.agent.renderSleepContextHtml({ sleepContext: agent.sleepContext!, events, agentId: id })
-        : await ctx.fns.agent.renderEventsHtml({ events, agentId: id });
+        ? await ctx.fns.agent.renderSleepContextHtml({ sleepContext: agent.sleepContext!, events: [], agentId: id, historyHtml: history.html })
+        : history.html;
     const stopControlHtml = await ctx.fns.agent.renderStatusBar({ agentId: id, part: 'stop' });
     const stopControlRegion = ctx.fns.ui.live({
         id: 'chat-stop-control',

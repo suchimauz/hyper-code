@@ -4,7 +4,7 @@ import renderEventHtml from "./renderEventHtml";
 import renderEventsHtml from "./renderEventsHtml";
 
 describe("renderSleepContextHtml", () => {
-    test("shows synthetic consolidation and only the visible real tail", async () => {
+    test("shows collapsed consolidation without filtering durable conversation history", async () => {
         const errors: string[] = [];
         const ctx: any = { fns: { agent: {}, procs: { ui: { escape: ({ text }: any) => String(text), button: (o: any) => `<button>${o.html ?? ""}</button>` }, log: { warn: (o: any) => errors.push(o.msg) } } } };
         ctx.fns.agent.renderEventHtml = (opts: any) => renderEventHtml(ctx, null, opts);
@@ -23,12 +23,20 @@ describe("renderSleepContextHtml", () => {
                 { type: "user", text: "visible recent", messageIdx: 7 },
             ],
         });
-        expect(html).toContain("Compact context active");
+        expect(html).toContain("Контекст модели сжат · переписка сохранена");
+        expect(html).toContain('data-compact-context');
+        expect(html).not.toContain(' open');
         expect(html).toContain("kept fact");
         expect(html).toContain("visible recent");
-        expect(html).not.toContain("hidden old");
+        expect(html).toContain("hidden old");
         expect(errors).toEqual([]);   // every event rendered, none fell back to an error card
         expect(html).not.toContain(`hx-vals='{\"idx\":\"0\"`);
+    });
+
+    test('missing consolidation content cannot hide supplied UI-only history', async () => {
+        const ctx: any = { fns: { agent: { normalizeSleepContext: ({sleepContext}: any) => sleepContext, getSleepGeneration: () => ({revision: 1}) } } };
+        const html = await renderSleepContextHtml(ctx, null, {agentId: 'a1', sleepContext: {mode: 'compact'}, events: [], historyHtml: '<div>outgoing retained</div>'});
+        expect(html).toContain('outgoing retained');
     });
 
     test("renders nothing when compact context is inactive", async () => {
