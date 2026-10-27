@@ -42,7 +42,7 @@ export default async function (
         } else text = (await req.text()).trim();
         if (!text && files.length === 0) return Response.json({ error: "empty input" }, { status: 400 });
 
-        if (files.length > 10 || files.some(file => file.size > 25 * 1024 * 1024) || files.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024) return Response.json({ error: 'Не более 10 файлов, до 25 МБ каждый и 50 МБ суммарно.' }, { status: 400 });
+        if (files.length > 10 || files.some(file => file.size > 40 * 1024 * 1024) || files.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) return Response.json({ error: 'Не более 10 файлов, до 40 МБ каждый и 80 МБ суммарно.' }, { status: 400 });
         // The fingerprint binds the idempotency key to text AND exact file bytes.
         const digests = await Promise.all(files.map(async file => ({ name: file.name, type: file.type, hash: new Bun.CryptoHasher('sha256').update(await file.arrayBuffer()).digest('hex') })));
         const fingerprint = new Bun.CryptoHasher('sha256').update(JSON.stringify({ text, files: digests })).digest('hex');

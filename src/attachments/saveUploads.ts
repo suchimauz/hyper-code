@@ -20,15 +20,14 @@ export default async function (
     const { createHash } = await import("node:crypto");
     if (!Array.isArray(opts.files) || opts.files.length === 0) return [];
     if (opts.files.length > 10) throw new Error("maximum 10 files per message");
-    let total = 0;
+    // Validate the entire batch before reading or persisting any file.
+    const files = opts.files.filter(file => file instanceof File && file.size > 0);
+    if (files.some(file => file.size > 40 * 1024 * 1024)) throw new Error("each attachment must be at most 40 MB");
+    if (files.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) throw new Error("attachments exceed 80 MB");
     const root = resolve(String((ctx.state as any).root ?? process.cwd()), ".runtime", "uploads", "blobs");
     await mkdir(root, { recursive: true });
     const out: any[] = [];
-    for (const file of opts.files) {
-        if (!(file instanceof File) || file.size <= 0) continue;
-        total += file.size;
-        if (file.size > 25 * 1024 * 1024) throw new Error(`file too large: ${file.name}`);
-        if (total > 50 * 1024 * 1024) throw new Error("attachments exceed 50 MB");
+    for (const file of files) {
         const bytes = new Uint8Array(await file.arrayBuffer());
         const head = Buffer.from(bytes.subarray(0, 16));
         let magic: string | null = null;

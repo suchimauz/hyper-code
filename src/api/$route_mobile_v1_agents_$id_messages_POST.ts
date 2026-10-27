@@ -25,7 +25,8 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     if (!text && files.length === 0) return Response.json({ error: "empty_message", message: "Message text or an attachment is required" }, { status: 400 });
     if (text.length > 200_000) return Response.json({ error: "message_too_large", message: "Message is too large" }, { status: 413 });
     if (files.length > 10) return Response.json({ error: "too_many_files", message: "At most 10 attachments are allowed" }, { status: 413 });
-    if (files.some(file => file.size > 25 * 1024 * 1024)) return Response.json({ error: "file_too_large", message: "Each attachment must be at most 25 MB" }, { status: 413 });
+    if (files.some(file => file.size > 40 * 1024 * 1024)) return Response.json({ error: "file_too_large", message: "Each attachment must be at most 40 MB" }, { status: 413 });
+    if (files.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) return Response.json({ error: "attachments_too_large", message: "Attachments must total at most 80 MB" }, { status: 413 });
 
     let uploads: Awaited<ReturnType<typeof ctx.fns.attachments.saveUploads>> = [];
     try { uploads = await ctx.fns.attachments.saveUploads({ agentId: id, files }); }

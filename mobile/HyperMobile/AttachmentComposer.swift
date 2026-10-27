@@ -100,7 +100,7 @@ struct AttachmentComposer: View {
         .fullScreenCover(isPresented: $showingCamera) {
             CameraPicker { result in
                 switch result {
-                case .success(let attachment): if attachment.data.count <= 25 * 1024 * 1024 { attachments.append(attachment) } else { importError = "Photo must be at most 25 MB" }
+                case .success(let attachment): if canAddAttachment(bytes: attachment.data.count) { attachments.append(attachment) }
                 case .failure(let error): importError = error.localizedDescription
                 }
             }.ignoresSafeArea()
@@ -150,9 +150,17 @@ struct AttachmentComposer: View {
         focused.wrappedValue = true
     }
 
+    private func canAddAttachment(bytes: Int) -> Bool {
+        guard attachments.count < 10 else { importError = "At most 10 attachments are allowed"; return false }
+        guard bytes <= 40 * 1024 * 1024 else { importError = "Each attachment must be at most 40 MB"; return false }
+        guard attachments.reduce(0, { $0 + $1.data.count }) + bytes <= 80 * 1024 * 1024 else { importError = "Attachments must total at most 80 MB"; return false }
+        return true
+    }
+
     private func loadPhotos(_ items: [PhotosPickerItem]) async {
         for item in items.prefix(max(0, 10 - attachments.count)) {
-            guard let data = try? await item.loadTransferable(type: Data.self), data.count <= 25 * 1024 * 1024 else { importError = "Each attachment must be at most 25 MB"; continue }
+            guard let data = try? await item.loadTransferable(type: Data.self) else { importError = "Unable to load photo"; continue }
+            guard canAddAttachment(bytes: data.count) else { continue }
             let type = item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
             let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
             attachments.append(.init(id: UUID(), name: "photo-\(attachments.count + 1).\(ext)", contentType: type, data: data))
@@ -164,7 +172,8 @@ struct AttachmentComposer: View {
         do {
             for url in try result.get().prefix(max(0, 10 - attachments.count)) {
                 let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let data = try Data(contentsOf: url); guard data.count <= 25 * 1024 * 1024 else { throw NSError(domain: "Hyper", code: 1, userInfo: [NSLocalizedDescriptionKey: "Each attachment must be at most 25 MB"]) }
+                let data = try Data(contentsOf: url)
+                guard canAddAttachment(bytes: data.count) else { continue }
                 let type = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType?.preferredMIMEType) ?? "application/octet-stream"
                 attachments.append(.init(id: UUID(), name: url.lastPathComponent, contentType: type, data: data))
             }
