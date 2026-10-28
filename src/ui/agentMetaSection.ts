@@ -156,7 +156,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         const extraHtml = extra.length
             ? `<div class="mt-1 space-y-1 border-t border-ui-border pt-1">${extra.join('')}</div>`
             : '';
-        return inspectorSection({ title: 'Agent settings', icon: 'sliders-horizontal', html: body + extraHtml, collapsible: true });
+        return inspectorSection({ title: 'Agent settings', icon: 'sliders-horizontal', html: body + `<form hx-post="/agent/${id}/message-limits" hx-swap="none" hx-trigger="change" class="mt-3">${toggle({ name: 'enabled', enabled: agent.scratchpad?.messageLimitsEnabled !== false, label: 'Inter-agent message limits', hint: 'Outgoing messages: 50 hops and 30 messages per recipient in 10 minutes. Turning off permits unlimited exchanges and may increase costs. Other agents keep their own limits.' })}</form>` + extraHtml, collapsible: true });
     }
 
 

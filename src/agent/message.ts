@@ -8,7 +8,8 @@
  * Durable delivery also appends a UI-only sender event; queued receipts gain that event
  * only when drained. No outgoing copy is added to the sender's model transcript.
  * Any active non-hidden agent may be addressed directly by id. A hop counter
- * and a per-pair rate limit stop ping-pong loops. Use agent.search to resolve
+ * and a per-pair rate limit stop ping-pong loops by default. The sender's durable
+ * scratchpad.messageLimitsEnabled=false disables both limits for its outgoing messages. Use agent.search to resolve
  * names to ids, agent.delegate for new sub-tasks and agent.steer for team progress.
  * @param opts.agent Sending agent (its id becomes the author).
  * @param opts.to Target agent id.
@@ -39,7 +40,7 @@ export default async function (
     if (to === sender.id) throw new Error("agent.message: cannot message yourself");
 
     const rows = (await ctx.fns.procs.db.select({
-        sql: "SELECT id, title, parent_id, created_by, visibility FROM agents WHERE id IN (?, ?) AND archived_at IS NULL",
+        sql: "SELECT id, title, parent_id, created_by, visibility, scratchpad FROM agents WHERE id IN (?, ?) AND archived_at IS NULL",
         params: [sender.id, to],
     })) as any[];
     const target = rows.find((r) => r.id === to);
@@ -55,14 +56,16 @@ export default async function (
     })) as any[];
     const prevHop = last[0]?.message_type === "agent_message" ? Number(/hop="(\d+)"/.exec(String(last[0].content))?.[1] ?? 0) : 0;
     const hop = prevHop + 1;
-    if (hop > MAX_HOPS) throw new Error(`agent.message: hop limit ${MAX_HOPS} reached — stop the agent-to-agent exchange and report to your user instead`);
+    const persistedScratchpad = typeof from?.scratchpad === "string" ? JSON.parse(from.scratchpad) : from?.scratchpad;
+    const limitsEnabled = persistedScratchpad?.messageLimitsEnabled !== false;
+    if (limitsEnabled && hop > MAX_HOPS) throw new Error(`agent.message: hop limit ${MAX_HOPS} reached — stop the agent-to-agent exchange and report to your user instead`);
 
     const since = Date.now() - 10 * 60_000;
-    const recent = (await ctx.fns.procs.db.select({
+    const recent = limitsEnabled ? (await ctx.fns.procs.db.select({
         sql: "SELECT COUNT(*)::int AS n FROM messages WHERE agent_id = ? AND author = ? AND ts > ?",
         params: [to, "agent:" + sender.id, since],
-    })) as any[];
-    if (Number(recent[0]?.n ?? 0) >= MAX_PER_10_MIN) throw new Error("agent.message: rate limit — too many messages to " + to + " in 10 minutes");
+    })) as any[] : [];
+    if (limitsEnabled && Number(recent[0]?.n ?? 0) >= MAX_PER_10_MIN) throw new Error("agent.message: rate limit — too many messages to " + to + " in 10 minutes");
 
     const owner = from?.created_by ?? sender.createdBy ?? null;
     const title = String(sender.title ?? from?.title ?? "").replace(/["<>\n]/g, " ").slice(0, 80);
