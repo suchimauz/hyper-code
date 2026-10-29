@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import autoCompact from './autoCompactIfNeeded';
+import estimateTokens from '../compaction/estimateTokens';
 
 function fixture({ reported=140000, active=false, available=true }={}) {
  const controller=new AbortController();
@@ -8,7 +9,7 @@ function fixture({ reported=140000, active=false, available=true }={}) {
  const generation=active?{tailStart:2,activatedAt:1,model:agent.model,contextMessages:[{role:'assistant',content:'summary'}]}:null;
  const events:any[]=[{type:'assistant',ts:2,payload:JSON.stringify({usage:{prompt_tokens:reported}})}];
  const ctx:any={fns:{
-  compaction:{resolve:()=>{if(!available)throw Error('unavailable');return {};},portable:({messages}:any)=>messages,contextWindow:()=>200000},
+  compaction:{estimateTokens:(opts:any)=>estimateTokens(null as any,null,opts),resolve:()=>{if(!available)throw Error('unavailable');return {};},portable:({messages}:any)=>messages,contextWindow:()=>200000},
   procs:{db:{select:({sql}:any)=>{if(sql.includes('FROM agents'))return [{run_state:'running',run_token:'owner',sleep_context:generation}];expect(sql).toContain("type = 'context_usage'");expect(sql).toContain('NOT EXISTS');expect(sql).toContain('LIMIT 1');const dedicated=events.some(e=>e.type==='context_usage');return events.filter(e=>e.type==='context_usage'||(!dedicated&&e.type==='assistant')).slice(-1);}}},
   session:{getMessages:()=>[{role:'user',content:'task'},{role:'assistant',content:'response'}],appendEventWithHtml:()=>{}},
   agent:{normalizeSleepContext:({sleepContext}:any)=>sleepContext,getSleepGeneration:()=>generation,compactContext:()=>{calls++;return {status:'compacted'};}},
@@ -93,4 +94,31 @@ test('window threshold supports 15 percent and fractional lower overrides withou
  }
  const f=fixture();f.agent.autoCompactWindowPercent=14.9;
  expect((await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true})).threshold).toBe(30000);
+});
+
+
+test('Raylane image-heavy retained context no longer falsely exceeds the hard stop budget',async()=>{
+ const f=fixture({reported:27657,active:true});
+ f.agent.autoCompactWindowPercent=70;
+ f.ctx.fns.compaction.contextWindow=()=>272000;
+ const images=Array.from({length:7},(_,i)=>({role:'tool',content:[{type:'text',text:`Screenshot ${i}`},{type:'image',mimeType:'image/png',data:'a'.repeat(i===6?345820:150000)}]}));
+ f.ctx.fns.agent.getSleepGeneration=()=>({tailStart:0,activatedAt:3,model:f.agent.model,contextMessages:[{role:'user',message_type:'codex_compaction',content:'x'.repeat(41000)}]});
+ f.ctx.fns.session.getMessages=()=>images;
+ // The provider count precedes the checkpoint, so this must also work when
+ // only the fallback estimator is valid. No actual summary is performed.
+ const opts={agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true};
+ const result=await autoCompact(f.ctx,null,opts);
+ expect(result.status).toBe('below_threshold');expect(result.threshold).toBe(190400);
+ expect(result.estimatedTokens).toBeGreaterThan(28000);expect(result.estimatedTokens).toBeLessThan(45000);expect(f.calls()).toBe(0);
+ // Vision-heavy provider usage is never capped to the image heuristic.
+ f.events.push({type:'context_usage',ts:4,payload:JSON.stringify({usage:{prompt_tokens:250000,completion_tokens:500}})});
+ expect((await autoCompact(f.ctx,null,opts)).estimatedTokens).toBe(250500);
+ expect((await autoCompact(f.ctx,null,opts)).status).toBe('over_threshold');
+});
+
+test('large ordinary tool text is still over budget and cannot be mistaken for an image',async()=>{
+ const f=fixture({reported:1000});
+ f.ctx.fns.session.getMessages=()=>[{role:'tool',content:'x'.repeat(800000)}];
+ const result=await autoCompact(f.ctx,null,{agent:f.agent,signal:f.signal,runToken:'owner',checkOnly:true});
+ expect(result.status).toBe('over_threshold');expect(result.estimatedTokens).toBeGreaterThanOrEqual(200000);
 });

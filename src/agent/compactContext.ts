@@ -1,7 +1,7 @@
 /**
  * Compact idle context, or an owned run at a completed tool-batch boundary, into a hidden summary and verbatim tail
  *
- * Use for manual, non-destructive context compaction. It summarizes the current effective projection, preserves a safe recent tail, and atomically activates only when the root transcript and compact head remain unchanged.
+ * Use for manual, non-destructive context compaction. It summarizes the current effective projection, preserves a recent tail bounded by token and serialized-size budgets at whole tool-exchange boundaries, and atomically activates only when the root transcript and compact head remain unchanged.
  * @param opts.agent Live root agent whose effective model context is compacted.
  * @param opts.instructions Optional focus instructions appended to the handoff summarizer prompt.
  * @param opts.runToken Owning worker token for a completed tool-batch boundary.
@@ -28,7 +28,6 @@ export default async function (
     const ownershipSql = midTurn && opts.runToken ? "run_state = 'running' AND run_token = ?" : "run_state = 'idle' AND run_token IS NULL";
     const ownershipParams = midTurn && opts.runToken ? [opts.runToken] : [];
     if (!ownsRun() || (!midTurn && (parent.activeRunCount ?? 0) > 0)) throw new Error("compaction run ownership lost");
-    const estimate = (messages: any[]) => Math.ceil(messages.reduce((n: number, m: any) => n + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length) + JSON.stringify(m.tool_calls ?? []).length, 0) / 4);
     const compactMessage = (m: any) => ({ role: m.role, content: m.content, ...(m.message_type ? { message_type: m.message_type } : {}), ...(m.tool_calls?.length ? { tool_calls: m.tool_calls } : {}), ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}) });
     const rootMessages = await ctx.fns.session.getMessages({ id: parent.id });
     const sourceFrontier = rootMessages.length;
@@ -38,7 +37,7 @@ export default async function (
     const fingerprintSql = "SELECT md5(COALESCE(jsonb_agg(to_jsonb(m) ORDER BY idx)::text, '[]')) AS fingerprint FROM messages m WHERE agent_id = ?";
     const fingerprint = ((await ctx.fns.procs.db.select({ sql: fingerprintSql, params: [parent.id] })) as any[])[0].fingerprint;
     // Capture must describe the messages read above, not a concurrent append/edit.
-    if (JSON.stringify(await ctx.fns.session.getMessages({ id: parent.id })) !== JSON.stringify(rootMessages)) return { status: "stale", tokensBefore: estimate(rootMessages) };
+    if (JSON.stringify(await ctx.fns.session.getMessages({ id: parent.id })) !== JSON.stringify(rootMessages)) return { status: "stale", tokensBefore: await ctx.fns.compaction.estimateTokens({ messages: rootMessages }) };
     const sleep = ctx.fns.agent.normalizeSleepContext({ sleepContext: row.sleep_context });
     if (sleep?.draftRevision != null) throw new Error("compaction already running");
     const active = sleep ? ctx.fns.agent.getSleepGeneration({ sleepContext: sleep, kind: "active" }) : null;
@@ -47,21 +46,10 @@ export default async function (
     // Same view as buildLlmRequest: a foreign checkpoint is adapted, an unreadable one means the full transcript.
     const activeMessages = active ? ctx.fns.compaction.portable({ model: parent.model, producedBy: active.model, messages: storedActive }) : [];
     const effective = active && activeMessages ? [...activeMessages, ...rootMessages.slice(Math.max(0, Number(active.tailStart ?? active.sourceOffset ?? 0)))] : rootMessages;
-    const tokensBefore = estimate(effective);
-    let tailStart = rootMessages.length;
-    let chars = 0;
-    let textCount = 0;
-    for (let i = rootMessages.length - 1; i >= 0; i--) {
-      const m = rootMessages[i];
-      if (!m) continue;
-      const size = (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length) + JSON.stringify(m.tool_calls ?? []).length;
-      if (chars + size > 120000 && textCount >= 5) break;
-      chars += size; tailStart = i;
-      if (typeof m.content === "string" && m.content.trim()) textCount++;
-      if (chars >= 160000 && textCount >= 5) break;
-    }
-    while (tailStart > 0 && rootMessages[tailStart]?.role === "tool") tailStart--;
-    if (tailStart > 0 && rootMessages[tailStart - 1]?.role === "assistant" && rootMessages[tailStart - 1]?.tool_calls?.length) tailStart--;
+    const tokensBefore = await ctx.fns.compaction.estimateTokens({ messages: effective });
+    // Budget complete exchanges, not a minimum text-message count: one image
+    // or parallel tool batch must not make the retained suffix unbounded.
+    const { tailStart } = await ctx.fns.compaction.selectTail({ messages: rootMessages });
     if (tailStart <= Math.max(0, activeMessages ? Number(active?.tailStart ?? 0) : 0)) return { status: "not_needed", tokensBefore };
     const revision = Math.max(0, ...(sleep?.generations ?? []).map((g: any) => Number(g.revision ?? 0))) + 1;
     const createdAt = Date.now();
@@ -103,7 +91,7 @@ export default async function (
       });
       const summary = result.summary;
       const summaryMessage: any = result.message;
-      const tokensAfter = estimate([summaryMessage, ...rootMessages.slice(tailStart)]);
+      const tokensAfter = await ctx.fns.compaction.estimateTokens({ messages: [summaryMessage, ...rootMessages.slice(tailStart)] });
       generation.compactor = compactor.provider;
       if (parent.jevCompactionEnabled === true) {
         generation.preservationReview = await ctx.fns.agent.reviewCompaction({

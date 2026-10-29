@@ -1,7 +1,7 @@
 /**
  * Compact oversized context after a successful turn or at an owned completed tool batch
  *
- * Estimate the effective context after a completed run and invoke the provider's `$compaction_<provider>` compactor (or `$compaction_default`) when it exceeds the threshold: the smaller of the global `autoCompactTokens` setting and the per-agent `autoCompactWindowPercent` override (or the dynamically inherited global percentage) of the model's context window (Claude 200K, Codex 272K). The size is the larger of a chars/4 estimate and the latest provider-reported request plus completion tokens, including tool-only responses. Skip agents without a compactor, running, already compacted, or too-small agents; failures are recorded as events but do not fail the completed user turn.
+ * Estimate the effective context after a completed run and invoke the provider's `$compaction_<provider>` compactor (or `$compaction_default`) when it exceeds the threshold: the smaller of the global `autoCompactTokens` setting and the per-agent `autoCompactWindowPercent` override (or the dynamically inherited global percentage) of the model's context window (Claude 200K, Codex 272K). The size is the larger of an image-aware local estimate and the latest provider-reported request plus completion tokens, including tool-only responses. Skip agents without a compactor, running, already compacted, or too-small agents; failures are recorded as events but do not fail the completed user turn.
  * @param opts.agent Live agent to inspect after its run has finalized.
  * @param opts.thresholdTokens Token threshold overriding both settings. @minimum 10000
  * @param opts.runToken Worker ownership token at a completed tool batch.
@@ -25,7 +25,6 @@ export default async function (
     },
 ): Promise<{ status: "compacted" | "below_threshold" | "no_compactor" | "already_compact" | "busy" | "failed" | "stale" | "not_needed" | "over_threshold"; estimatedTokens: number; threshold?: number; contextWindow?: number; error?: string }> {
     const agent = opts.agent;
-    const estimate = (messages: any[]) => Math.ceil(messages.reduce((n: number, m: any) => n + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length) + JSON.stringify(m.tool_calls ?? []).length, 0) / 4);
     let hasCompactor = true;
     try { (await ctx.fns.compaction.resolve({ model: agent.model })); } catch { hasCompactor = false; }
     const row = ((await ctx.fns.procs.db.select({ sql: "SELECT run_state, run_token, sleep_context FROM agents WHERE id = ? AND archived_at IS NULL", params: [agent.id] })) as any[])[0];
@@ -38,8 +37,8 @@ export default async function (
     // Same view as buildLlmRequest: a foreign checkpoint is adapted, an unreadable one means the full transcript.
     const activeMessages = active ? ctx.fns.compaction.portable({ model: agent.model, producedBy: active.model, messages: storedActive }) : [];
     const effective = active && activeMessages ? [...activeMessages, ...root.slice(Math.max(0, Number(active.tailStart ?? active.sourceOffset ?? 0)))] : root;
-    // chars/4 underestimates code and JSON; the provider's own count of the last
-    // request plus completion is authoritative, including empty-text tool turns.
+    // Vision payloads are not text tokens. The provider's own count remains a
+    // lower bound for expensive images, code/JSON and empty-text tool turns.
     // Legacy assistant usage is only a fallback before dedicated usage events exist.
     const last = ((await ctx.fns.procs.db.select({ sql: "SELECT payload, ts FROM events e WHERE agent_id = ? AND (type = 'context_usage' OR (type = 'assistant' AND NOT EXISTS (SELECT 1 FROM events usage_event WHERE usage_event.agent_id = e.agent_id AND usage_event.type = 'context_usage'))) ORDER BY idx DESC LIMIT 1", params: [agent.id] })) as any[])[0];
     let reported = 0;
@@ -51,7 +50,7 @@ export default async function (
     } catch { reported = 0; }
     // A usage recorded before the active compaction describes the old, larger context.
     const fresh = !active || Number(last?.ts ?? 0) > Number(active.activatedAt ?? 0);
-    const estimatedTokens = Math.max(estimate(effective), fresh ? reported : 0);
+    const estimatedTokens = Math.max(await ctx.fns.compaction.estimateTokens({ messages: effective }), fresh ? reported : 0);
     const configured = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactTokens", fallback: 700000 });
     const percent = agent.autoCompactWindowPercent ?? await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
     const window = (await ctx.fns.compaction.contextWindow({ model: agent.model }));

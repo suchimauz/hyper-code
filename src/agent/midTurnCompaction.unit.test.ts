@@ -1,11 +1,13 @@
 import { test, expect } from 'bun:test';
 import compact from './compactContext';
 import run from './run';
+import estimateTokens from '../compaction/estimateTokens';
+import selectTail from '../compaction/selectTail';
 
 function fixture() {
  const ac = new AbortController();
  const agent: any = { id:'root', model:'test', messages:[], scratchpad:{}, activeRunCount:1, abortController:ac, currentJobId:'owner' };
- const root = Array.from({length:12},(_,i)=>({role:i%2?'assistant':'user',content:'x'.repeat(16000)+i}));
+ const root: any[] = Array.from({length:12},(_,i)=>({role:i%2?'assistant':'user',content:'x'.repeat(16000)+i}));
  const rows: any = { root };
  const row: any = { updated_at:1,run_state:'running',run_token:'owner',sleep_context:null };
  let summarize: any = async()=>({summary:'summary',message:{role:'user',content:'summary'}});
@@ -22,7 +24,7 @@ function fixture() {
   }}},
   session:{deliverInbound:async()=>({drained:0}),getMessages:async({id}:any)=>structuredClone(rows[id]??[]), updateScratchpad:async()=>{},appendEventWithHtml:async()=>{},archive:async()=>{},appendMessage:async({id,message}:any)=>{(rows[id]??=[]).push(message);},syncAgentState:async()=>{agent.sleepContext=row.sleep_context;}},
   agent:{normalizeSleepContext:({sleepContext}:any)=>sleepContext,getSleepGeneration:()=>null,start:async()=>({id:'child',model:'test'}),fullSystemPrompt:async()=>''},
-  compaction:{resolve:async()=>({provider:'test',compact:async()=>summarize()})}
+  compaction:{estimateTokens:(opts:any)=>estimateTokens(ctx,null,opts),selectTail:(opts:any)=>selectTail(ctx,null,opts),resolve:async()=>({provider:'test',compact:async(_c:any,_s:any,opts:any)=>summarize(opts)})}
  }};
  return {ctx,agent,root,row,ac,setSummary:(fn:any)=>{summarize=fn;},call:()=>compact(ctx,null,{agent,runToken:'owner',signal:ac.signal})};
 }
@@ -86,3 +88,25 @@ test('manual resume keeps completed effects and never replays the old batch', as
  expect(f.agent.messages.filter((m:any)=>m.role==='tool')).toEqual(oldTools);
 });
 
+
+
+test('image-only parallel tool batch is summarized intact instead of retained over budget',async()=>{
+ const f=fixture();
+ const calls=Array.from({length:7},(_,i)=>({id:`image-${i}`,name:'read',args:{path:`screen-${i}.png`}}));
+ const batch=[{role:'assistant',content:'',tool_calls:calls},...calls.map(call=>({role:'tool',tool_call_id:call.id,content:[{type:'text',text:'Screenshot'},{type:'image',mimeType:'image/png',data:'a'.repeat(150000)}]}))];
+ f.root.push(...batch);const before=structuredClone(f.root);
+ let input:any;
+ f.setSummary(async(opts:any)=>{input=opts.messages;return {summary:'Visual findings preserved',message:{role:'user',content:'Visual findings preserved'}};});
+ const result=await f.call();
+ expect(result.status).toBe('compacted');expect(result.keptMessages).toBe(0);expect(result.tokensAfter).toBeLessThan(100);
+ expect(input.slice(-batch.length)).toEqual(batch);expect(f.root).toEqual(before);
+ expect(f.row.sleep_context.generations.at(-1).tailStart).toBe(f.root.length);
+});
+
+test('oversized latest text remains represented in summary without splitting or mutating transcript',async()=>{
+ const f=fixture();f.root.push({role:'user',content:'important detail '.repeat(30000)});
+ const before=structuredClone(f.root);let supplied=0;
+ f.setSummary(async(opts:any)=>{supplied=opts.messages.at(-1).content.length;return {summary:'Retained task and decisions',message:{role:'user',content:'Retained task and decisions'}};});
+ const result=await f.call();expect(result.status).toBe('compacted');expect(result.keptMessages).toBe(0);
+ expect(supplied).toBe(before.at(-1).content.length);expect(f.root).toEqual(before);
+});
