@@ -34,7 +34,10 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     // account happens to complete an LLM turn. Failures stay per-account inside
     // refreshUsage, so one unavailable provider never breaks /llms.
     const inventory = await ctx.fns.llm.listAccounts({}).catch(() => [] as any[]);
-    await ctx.fns.llm.refreshUsage({ accounts: inventory.map((a: any) => ({ provider: a.provider, account: a.account })) }).catch(() => undefined);
+    // Hover preloads render stored snapshots; only an actual visit probes providers.
+    if (_opts.req.headers.get("X-Hyper-Prefetch") !== "1") {
+        await ctx.fns.llm.refreshUsage({ accounts: inventory.map((a: any) => ({ provider: a.provider, account: a.account })) }).catch(() => undefined);
+    }
     const accounts = await ctx.fns.llm.listAccounts({}).catch(() => inventory);
     // Coding-plan egress: current per-provider instance plus trusted instance names.
     const [zaiPlan, minimaxPlan, opencodePlan, instanceRows] = await Promise.all([

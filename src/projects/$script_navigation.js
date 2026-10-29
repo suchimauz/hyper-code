@@ -134,25 +134,28 @@
     dialog.querySelector('[data-confirm-cancel]').focus();
   });
   const go = (url, returning = null) => {
-    // Serialize visits too: two different links otherwise have independent HTMX
-    // requests, and the older response can replace the newer page.
+    // Preserve selection/reorder ordering, but show intent immediately. The
+    // preload client aborts an old page fetch and queued obsolete visits skip.
     const source = projectPage(url) ? (panel ? snapshot() : returnState() || (url === here() ? null : snapshot())) : null;
+    const ticket = window.hyperNavigation?.prepare(url);
     closePanel(false);
     const visit = visits.then(async () => {
       await selections;
       await reorderReady;
+      if (ticket && !window.hyperNavigation.isCurrent(ticket)) return;
       navigating = true; ++request;
       pendingReturn = returning ? returning.parent || null : source;
       try {
         if (!window.htmx) { location.assign(url); return; }
         await window.htmx.ajax('GET', url, {target:'#main', push:'true'});
       } finally { navigating = false; navigated(); pendingReturn = undefined; }
-      if (returning) { restoreView(returning); requestAnimationFrame(() => restoreView(returning)); }
+      if (returning && here() === returning.url) { restoreView(returning); requestAnimationFrame(() => restoreView(returning)); }
     });
     visits = visit.catch(e => error(e.message));
     return visit;
   };
   const post = async (url, body) => {
+    window.hyperNavigation?.invalidate();
     const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json', Accept:'application/json', 'X-CSRF-Token':document.querySelector('meta[name="csrf-token"]')?.content || ''}, body:JSON.stringify(body)});
     const data = await r.json().catch(() => ({error:'Request failed ('+r.status+')'}));
     if (!r.ok || data.ok === false) throw new Error(data.error || 'Request failed ('+r.status+')');

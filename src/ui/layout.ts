@@ -1046,6 +1046,36 @@ body[data-presentation="sidebar"] #chat-panel > header { padding-left: .55rem !i
 </style>
 
 <style>
+  #main { position: relative; }
+  /* Keep the old layout in place. Only the fixed veil participates in loading. */
+  #main[data-navigation-pending] > [data-navigation-obscured] { pointer-events: none; }
+  .navigation-loading-layer { position: fixed; z-index: 44; display: grid; place-items: center; box-sizing: border-box; overflow: hidden; padding: 1rem; isolation: isolate; color: var(--color-base-content); background: color-mix(in srgb, var(--color-base-100) 64%, transparent); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); opacity: 1; transition: opacity 160ms ease-out; }
+  @starting-style { .navigation-loading-layer { opacity: 0; } }
+  .navigation-loading-layer[data-navigation-leaving] { opacity: 0; pointer-events: none; }
+  .navigation-loading-content { max-width: min(24rem, 100%); text-align: center; animation: navigation-indicator-in 140ms ease-out 90ms both; }
+  .navigation-loading-content:focus-within { animation: none; }
+  .navigation-loading-layer[data-navigation-leaving] .navigation-loading-content { animation: none; opacity: 0; transition: opacity 100ms ease-out; }
+  .navigation-loading-layer h2 { margin: 1rem 0 .375rem; font-size: 1rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+  .navigation-loading-layer p { margin: 0; color: var(--color-muted); font-size: .875rem; }
+  .navigation-spinner { display: block; width: 30px; height: 30px; box-sizing: border-box; margin: 0 auto; border: 2.5px solid color-mix(in srgb, var(--color-base-content) 15%, transparent); border-top-color: var(--color-primary); border-radius: 50%; animation: navigation-spin 800ms linear infinite; }
+  .navigation-cancel { min-height: 44px; margin-top: 1rem; padding: .5rem .85rem; border: 1px solid var(--color-ui-border); border-radius: .75rem; color: var(--color-base-content); background: color-mix(in srgb, var(--color-base-100) 88%, transparent); font-size: .8125rem; cursor: pointer; }
+  .navigation-cancel:hover { background: var(--color-base-100); }
+  .navigation-cancel:focus-visible, #navigation-error a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  [data-navigation-destination] { background: color-mix(in srgb, var(--color-primary) 12%, var(--color-base-100)) !important; }
+  #main > [data-navigation-entering] { animation: navigation-page-in 180ms ease-out; }
+  @keyframes navigation-spin { to { transform: rotate(360deg); } }
+  @keyframes navigation-indicator-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes navigation-page-in { from { opacity: .6; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .navigation-loading-layer, .navigation-loading-layer[data-navigation-leaving] .navigation-loading-content { transition: none; }
+    .navigation-spinner, .navigation-loading-content, #main > [data-navigation-entering] { animation: none; }
+    @starting-style { .navigation-loading-layer { opacity: 1; } }
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .navigation-loading-layer { background: color-mix(in srgb, var(--color-base-100) 94%, transparent); }
+  }
+  #navigation-error { position: absolute; inset: 0 0 auto; z-index: 46; padding: .75rem 1rem; border-bottom: 1px solid var(--color-ui-border); background: var(--color-base-100); font-size: .875rem; }
+  #navigation-error a { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-primary); text-decoration: underline; }
   body { font-family: var(--font-sans); }
   .shiki { background: transparent !important; }
   .assistant pre.shiki { padding: .6em .8em; border-radius: 6px; overflow-x: auto; margin: .4em 0; font-size: 12.5px; line-height: 1.45; }
@@ -1067,6 +1097,7 @@ ${opts.headExtra ?? ""}
 <script src="/ui/hotkeys.js" defer></script>
 <script src="/ui/rpc.js?v=6" defer></script>
 <script src="/ui/pressFeedback.js" defer></script>
+<script src="/ui/navigationPreload.js" defer></script>
 <script src="/agent/chat.js" defer></script>
 <script src="/ui/dictation.js" defer></script>
 <script src="/ui/popup.js" defer></script>

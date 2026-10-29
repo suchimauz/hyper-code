@@ -9,7 +9,9 @@
  * @param opts.agentId Agent whose transcript and interactive controls should be displayed.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
-        /** Agent whose transcript and live controls should be displayed. */ agentId: string }): Promise<string> {
+        /** Agent whose transcript and live controls should be displayed. */ agentId: string;
+        /** Render a speculative navigation without marking messages read. @default false */ prefetch?: boolean;
+}): Promise<string> {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
     const id = opts.agentId;
 
@@ -17,7 +19,9 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     // ships, so the rail (which fetches itself right after load) already sees
     // zero unread — no badge lingering for a refresh cycle. The events.html
     // poll keeps moving it while the chat stays open.
-    await ctx.fns.auth.markSeen({ agentId: id }).catch(() => { /* a lingering badge, not a broken page */ });
+    if (!opts.prefetch) {
+        await ctx.fns.auth.markSeen({ agentId: id }).catch(() => { /* a lingering badge, not a broken page */ });
+    }
     let agent = (ctx.state as any).agent?.[id];
     if (!agent) {
         agent = (await ctx.fns.session?.load?.({ id })) ?? null;
