@@ -6,7 +6,9 @@
  * The photo comes from the sign-in ID token's `picture` claim (https only). Use when rendering
  * user messages; `auth.badge` is the compact label form.
  * An `agent:<id>` author (another agent speaking in this chat) is always shown, even on a
- * single-user instance, with the sending agent's title and kind "agent".
+ * single-user instance, with the sending agent's title, persisted random hue and kind "agent".
+ * Agent hues are assigned once by the database on creation (including forks); saves and reloads
+ * preserve them. Missing/deleted agents use a neutral fallback, never a new random color.
  * @param opts.userId Author id (messages.author / events.actor): user id or `agent:<id>`; null returns null.
  */
 export default async function (
@@ -20,12 +22,12 @@ export default async function (
     if (!opts.userId) return null;
     if (opts.userId.startsWith("agent:")) {
         const agentId = opts.userId.slice(6);
-        const live = (ctx.state as any).agent?.[agentId];
-        const title = live?.title ?? ((await ctx.fns.procs.db.select({ sql: "SELECT title FROM agents WHERE id = ?", params: [agentId] })) as any[])[0]?.title;
+        const live = ctx.state.agent?.[agentId];
+        const rows = await ctx.fns.procs.db.select({ sql: "SELECT title, color_hue FROM agents WHERE id = ?", params: [agentId] }) as Array<{ title: string | null; color_hue: number }>;
+        const title = live?.title ?? rows[0]?.title;
         const name = (title ? String(title).slice(0, 60) + " · " : "") + "agent " + agentId;
-        let hash = 0;
-        for (const ch of agentId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-        return { id: opts.userId, name, initials: agentId.slice(0, 2).toUpperCase(), hue: hash % 360, picture: null, kind: "agent", agentId };
+        const hue = rows[0]?.color_hue ?? 210;
+        return { id: opts.userId, name, initials: agentId.slice(0, 2).toUpperCase(), hue, picture: null, kind: "agent", agentId };
     }
     const users = await ctx.fns.auth.listUsers({ includeDisabled: true });
     const shared = users.filter((u) => u.disabledAt == null).length >= 2
