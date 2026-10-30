@@ -62,10 +62,10 @@ describe("node native compaction parity without credentials or generation", () =
         expect(request.init.headers["chatgpt-account-id"]).toBeUndefined();
         expect(JSON.parse(request.init.body)).toMatchObject({ model: "codex/named:gpt-6-astra", input: [{ role: "user", content: "hello" }, { type: "compaction_trigger" }] });
     });
-    test("same node checkpoints replay; different account or transport fails closed to root", () => {
+    test("same upstream checkpoints replay across account names and transports", () => {
         const messages = [{ role: "user", content: JSON.stringify({ type: "compaction", encrypted_content: "opaque" }), message_type: "codex_compaction" }];
         expect(portable(fixture(), null, { model: route, producedBy: route, messages })).toEqual(messages);
-        for (const model of ["codex/named:gpt-6-astra", "hyper/mini6:codex/other:gpt-6-astra"]) expect(portable(fixture(), null, { model, producedBy: route, messages })).toBeNull();
+        for (const model of ["codex/named:gpt-6-astra", "hyper/mini6:codex/other:gpt-6-astra"]) expect(portable(fixture(), null, { model, producedBy: route, messages })).toEqual(messages);
     });
     test("generic overflow retries with oldest removed, single oversized item fails explicitly", async () => {
         const ctx = fixture(); const sizes: number[] = [];

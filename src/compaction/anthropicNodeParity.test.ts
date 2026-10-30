@@ -38,7 +38,7 @@ describe("Anthropic native node compaction (mocked)", () => {
                 const messages = [{ role: "user", message_type: "anthropic_compaction", content: JSON.stringify(block) }];
                 const route = `hyper/test:${opts.model}`;
                 expect(portable(ctx, null, { model: route, producedBy: route, messages })).toEqual(messages);
-                expect(portable(ctx, null, { model: opts.model, producedBy: route, messages })![0]).toMatchObject({ message_type: "compaction_summary" });
+                expect(portable(ctx, null, { model: opts.model, producedBy: route, messages })).toEqual(messages);
                 ctx.fns.llm.resolveEndpoint = async () => ({ provider: "hyper", upstream: "unknown", api: "anthropic" });
                 await expect(compact(ctx, null, opts)).rejects.toThrow("not supported");
                 expect(sent).toHaveLength(2);
