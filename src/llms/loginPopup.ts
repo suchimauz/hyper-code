@@ -11,7 +11,7 @@
  */
 export default function (ctx: Context, _session: Session | null, opts: {
     /** Provider login type. */ provider: "claude-code" | "codex" | "xai" | "kimi-coding";
-    /** Safe login progress, never credentials. */ flow?: { account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null } | null;
+    /** Safe login progress, never credentials. */ flow?: { id?: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null } | null;
     /** Existing account slot to reconnect. */ account?: string;
     /** Configured SSH targets for new CLI accounts; omitted or empty keeps local-only UI. */ instances?: Array<{ name: string; pinnedHostKey: string | null }>;
     /** Fixed SSH target when reconnecting a remote account. */ instance?: string;
@@ -34,6 +34,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ${flow.verificationUri ? `<div class="mt-3 rounded-lg border border-ui-border bg-base-100 p-3 text-center">${ctx.fns.procs.ui.button({ action: 'open-authorization-page', label: 'Open authorization page', href: flow.verificationUri, tone: 'primary', attrs: { target: '_blank', rel: 'noreferrer' } })}${flow.userCode ? `<div class="mt-3 text-3xs uppercase tracking-wide text-faint">Enter this one-time code</div><div class="mt-1 flex items-center justify-center gap-2"><code class="select-all rounded-md bg-base-200 px-4 py-2 font-mono text-xl font-semibold tracking-widest text-base-content">${esc(flow.userCode)}</code>${ctx.fns.procs.ui.button({ action: 'copy-login-code', label: 'Copy', attrs: { 'data-copy-code': flow.userCode, onclick: "navigator.clipboard?.writeText(this.dataset.copyCode);this.textContent='Copied'" } })}</div>` : ""}</div>` : ""}
         ${claude && flow.status === "pending" ? `<form hx-popup="llms.submitLoginCode" hx-popup-params="${esc(JSON.stringify({ provider: "claude-code", account: flow.account }))}" class="mt-3 space-y-2"><label class="block text-2xs font-medium">One-time code from Claude<input name="code" autocomplete="one-time-code" required placeholder="Paste code from the browser" class="input input-bordered input-sm mt-1 w-full font-mono text-xs"></label>${button("submit-claude-code", "Submit code", "primary", "w-full")}<p class="text-3xs text-faint">Sent directly to Claude CLI stdin; never stored.</p></form>` : ""}
         ${flow.error ? `<p class="mt-1 text-error">${esc(flow.error)}</p>` : ""}
+        ${kimi && flow.id && flow.status === "pending" ? `<form hx-popup="sshAccount.cancelFromPopup" hx-popup-params="${esc(JSON.stringify({ id: flow.id }))}" class="mt-3">${button("cancel-kimi-login", "Cancel authorization")}</form>` : ""}
       </div>
       <p class="text-2xs text-faint">This popup may be closed; login continues in the background and the account list updates automatically.</p>
     </div>`;

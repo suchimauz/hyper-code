@@ -1,6 +1,6 @@
 /** Returns safe UI state of in-progress subscription account logins. */
 export default function (ctx: Context, _session: Session | null, _opts?: {}): Array<{
-    provider: string; account: string; status: "pending" | "connected" | "failed";
+    id?: string; provider: string; account: string; status: "pending" | "connected" | "failed";
     verificationUri: string | null; userCode: string | null; needsCode: boolean; error: string | null;
 }> {
     const flows: Map<string, any> | undefined = (ctx.state as any).llm?.accountLogins;
@@ -18,5 +18,13 @@ export default function (ctx: Context, _session: Session | null, _opts?: {}): Ar
             verificationUri: flow.verificationUri ?? null, userCode: flow.userCode ?? null,
             needsCode: false, error: flow.error ?? (flow.status === "expired" ? "device code expired" : null),
         }));
-    return [...cli, ...xai];
+    const kimi = [...((ctx.state as any).sshAccount?.flows?.values?.() ?? [])]
+        .filter((flow: any) => flow.provider === "kimi-coding" && !flow.instance && flow.status !== "connected")
+        .map((flow: any) => ({
+            id: String(flow.id), provider: "kimi-coding", account: String(flow.account),
+            status: flow.status === "pending" ? "pending" as const : "failed" as const,
+            verificationUri: flow.verificationUri ?? null, userCode: flow.userCode ?? null,
+            needsCode: false, error: flow.error ?? null,
+        }));
+    return [...cli, ...xai, ...kimi];
 }
