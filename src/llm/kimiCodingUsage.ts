@@ -1,7 +1,7 @@
 /**
  * Fetch measured Kimi Coding Plan quota windows and the account's plan name.
  *
- * Use for subscription quota refresh of a Kimi Coding account, local or held on a trusted SSH instance. Calls only the account's /coding/v1/usages endpoint (and /coding/v1/me for the plan name) with a bounded deadline and no redirects. Rejects failed or unrecognized quota responses instead of inferring unused quota; returns normalized windows for llm.recordUsage. Each window is reported as a used ratio between 0 and 1, which is scaled to used percent. The plan name comes from user_level_name (e.g. "Pro"); when /me fails the plan falls back to "Kimi Coding".
+ * Use for subscription quota refresh of a Kimi Coding account, including named local credentials or credentials held on a trusted SSH instance. Local OAuth access tokens are refreshed before use; configured API keys apply only to the default account. Calls only the account's /coding/v1/usages endpoint (and /coding/v1/me for the plan name) with a bounded deadline and no redirects. Rejects failed or unrecognized quota responses instead of inferring unused quota; returns normalized windows for llm.recordUsage. Each window is reported as a used ratio between 0 and 1, which is scaled to used percent. The plan name comes from user_level_name (e.g. "Pro"); when /me fails the plan falls back to "Kimi Coding".
  * @param opts.account Kimi Coding account slot; omit for the default local credential. @default "default"
  * @param opts.timeoutMs Request deadline in milliseconds. @default 5000 @minimum 500 @maximum 30000
  */
@@ -26,8 +26,8 @@ export default async function (
     // explicitly — the bridge defaults to POST and these endpoints are GET-only.
     const remote = /^ssh\.(.+)\.([^.]+)$/.exec(account)?.slice(1);
     let res: Response, meRes: Response | null = null;
-    if (account === "default") {
-        const token = await localToken(ctx);
+    if (!account.startsWith("ssh.")) {
+        const token = await localToken(ctx, account);
         const auth = { ...init.headers, authorization: "Bearer " + token };
         [res, meRes] = await Promise.all([
             ctx.fns.llm.connectFetch({ url, init: { ...init, headers: auth, redirect: "error" } }),
@@ -75,14 +75,13 @@ export default async function (
     return result;
 }
 
-/** Read the access token of the default local Kimi Coding credential. */
-async function localToken(ctx: Context): Promise<string> {
-    const configured = await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key: "kimiCodingApiKey" });
-    if (configured) return configured;
-    const { readFileSync } = await import("node:fs");
-    const { file } = ctx.fns.llm.accountCredentialPath({ provider: "kimi-coding", account: "default" });
-    if (!file) throw new Error("Kimi Coding key is not configured");
-    const token = String(JSON.parse(readFileSync(file, "utf8")).access_token ?? "");
-    if (!token) throw new Error("Kimi Coding credential has no access token");
+/** Resolve only the selected local account and refresh its short-lived OAuth token. */
+async function localToken(ctx: Context, account: string): Promise<string> {
+    if (account === "default") {
+        const configured = await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key: "kimiCodingApiKey" });
+        if (configured) return configured;
+    }
+    const token = await ctx.fns.llm.refreshKimiCode({ account });
+    if (!token) throw new Error("Kimi Coding credential is unavailable; reconnect the selected account");
     return token;
 }

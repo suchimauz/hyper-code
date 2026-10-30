@@ -83,7 +83,25 @@ test('new Kimi plans omit weekly and missing 5h windows instead of inventing quo
   }
 });
 
-test('Kimi quota rejects an account that is neither local nor an ssh identity', async () => {
+test('Kimi quota uses and refreshes the named local credential, never the default key', async () => {
+  const { ctx, requests } = setup();
+  const accounts: string[] = [];
+  ctx.fns.secrets.resolveSetting = async () => { throw new Error('must not read default key'); };
+  ctx.fns.llm.refreshKimiCode = async ({ account }: { account: string }) => { accounts.push(account); return 'named-token'; };
+  const result = await usage(ctx, null, { account: 'ThienHoang' });
+  expect(accounts).toEqual(['ThienHoang']);
+  expect(result.primary?.used_percent).toBe(25);
+  expect(requests).toHaveLength(2);
+  expect(requests.every(r => r.via === 'local' && r.o.init.headers.authorization === 'Bearer named-token')).toBe(true);
+});
+
+test('Kimi quota refreshes default OAuth when no configured API key exists', async () => {
   const { ctx } = setup();
-  await expect(usage(ctx, null, { account: 'plain-name' })).rejects.toThrow('Not a Kimi Coding account');
+  ctx.fns.secrets.resolveSetting = async () => null;
+  const accounts: string[] = [];
+  ctx.fns.llm.refreshKimiCode = async ({ account }: { account: string }) => { accounts.push(account); return 'fresh-token'; };
+  expect((await usage(ctx, null, {})).primary?.used_percent).toBe(25);
+  expect(accounts).toEqual(['default']);
+  ctx.fns.llm.refreshKimiCode = async () => null;
+  await expect(usage(ctx, null, {})).rejects.toThrow('credential is unavailable');
 });
