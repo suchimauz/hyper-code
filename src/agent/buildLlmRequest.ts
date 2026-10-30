@@ -15,35 +15,28 @@
 // Returns:
 //   { system: string, messages: Message[] }  — both ready to feed to a
 //   streamer. messages is [bootstrap-user, bootstrap-ack, ...transcript].
-/** Build llm request for the runtime.  * @param opts.agent Agent whose state is read or updated.
-*/
+/**
+ * Assemble the outgoing system prompt and effective transcript, including checkpoint fallback metadata.
+ * Use preview for a read-only context estimate: it may reuse existing Jev decisions but never requests new scores.
+ * @param opts.agent Agent whose prompt and transcript are assembled.
+ * @param opts.preview Avoid external relevance scoring and repair logs for UI previews. @default false
+ */
 export default async function (
     ctx: Context,
     _session: Session | null,
     opts: {
         /** Live agent instance to operate on. */
-    agent: types.agent.Agent },
-): Promise<{ system: string; messages: any[] }> {
+    agent: types.agent.Agent;
+        /** Read-only preview; reuse cached relevance choices without external calls or repair logs. @default false */
+    preview?: boolean },
+): Promise<{ system: string; messages: any[]; context: { mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null } }> {
     const { agent } = opts;
     const fullPrompt = await ctx.fns.agent.fullSystemPrompt({ agent });
     const fullHistory = agent.parentId
         ? await ctx.fns.session.getFullMessages({ id: agent.id })
         : (agent.messages ?? []);
-    const sleep = ctx.fns.agent.normalizeSleepContext({ sleepContext: agent.sleepContext });
-    const generation = sleep?.mode === "compact"
-        ? ctx.fns.agent.getSleepGeneration({ sleepContext: sleep, kind: "active" })
-        : null;
-    const storedSleepMessages = generation?.contextAgentId
-        ? await ctx.fns.session.getMessages({ id: String(generation.contextAgentId) })
-        : generation?.contextMessages;
-    // A checkpoint made by another model is adapted (Claude block → text) or,
-    // when unreadable (Codex item), dropped in favour of the full transcript.
-    const sleepMessages = storedSleepMessages?.length
-        ? ctx.fns.compaction.portable({ model: agent.model, producedBy: generation?.model, messages: storedSleepMessages })
-        : storedSleepMessages;
-    const raw = generation && sleepMessages?.length && Number(generation.sourceOffset) <= fullHistory.length
-        ? [...sleepMessages, ...fullHistory.slice(Math.max(0, Number(generation.tailStart ?? generation.sourceOffset)))]
-        : fullHistory;
+    const projection = await ctx.fns.compaction.project({ model: agent.model, messages: fullHistory, sleepContext: agent.sleepContext });
+    const raw = projection.messages;
 
     // A call with no result is a transcript every provider refuses, and a run
     // that dies between the two writes leaves one behind. Repairing here — on
@@ -52,7 +45,7 @@ export default async function (
     const { messages: repairedBase, repaired } = ctx.fns.session.repairToolPairs({ messages: raw });
     // Opt-in, outgoing-only selection: stored transcript and tool pairs stay intact.
     // Relevance failures must never prevent the main model from receiving history.
-    const base = await ctx.fns.agent.selectJevContext({ agent, messages: repairedBase }).catch(() => repairedBase);
+    const base = await ctx.fns.agent.selectJevContext({ agent, messages: repairedBase, cachedOnly: opts.preview }).catch(() => repairedBase);
     // The retrieved function catalogue USED to be spliced into the last user
     // message from here, and was never persisted: the transcript disagreed with
     // what the model saw, and a catalogue that changed between requests
@@ -60,7 +53,7 @@ export default async function (
     // `world_state` transcript row now — see agent.syncWorldState, called once
     // per turn by agent.run. This function only reads history; it no longer
     // rewrites it.
-    if (repaired.length) {
+    if (repaired.length && !opts.preview) {
         ctx.fns.procs.log.warn({
             event: "transcript.repair",
             msg: `${agent.id}: closed ${repaired.length} unanswered tool call(s)`,
@@ -156,6 +149,7 @@ export default async function (
     return {
         system,
         messages,
+        context: { mode: projection.mode, fallback: projection.fallback, revision: projection.revision },
     };
 }
 

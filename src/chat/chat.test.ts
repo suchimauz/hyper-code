@@ -103,12 +103,14 @@ describe("chat header parts", () => {
         expect(html.lastIndexOf('data-chat-id="danger"')).toBeGreaterThan(html.lastIndexOf('data-chat-id="share"'));
     });
 
-    test("model chip opens the provider picker; context ring is empty before the first answer", async () => {
+    test("model chip opens the provider picker; context ring estimates the next payload before the first answer", async () => {
         const { ctx } = await ctxWithAgent();
         const chip = await ctx.fns.chat.modelChip({ agentId: "a1" });
         expect(chip).toContain('hx-popup="agent.modelPicker"');
         expect(chip).toContain("Opus 4.5");
-        expect(await ctx.fns.chat.contextRing({ agentId: "a1" })).toBe("");
+        const ring = await ctx.fns.chat.contextRing({ agentId: "a1" });
+        expect(ring).toContain('data-context-meter');
+        expect(ring).toContain('Next request estimate');
     });
 
     test("icon: running ring around the logo, live ring follows the header status", async () => {

@@ -1,15 +1,16 @@
 import { expect, test } from 'bun:test';
 import autoCompact from './autoCompactIfNeeded';
 import estimateTokens from '../compaction/estimateTokens';
+import project from '../compaction/project';
 
 function fixture({ reported=140000, active=false, available=true }={}) {
  const controller=new AbortController();
  const agent:any={id:'fixture',model:'fixture:model',abortController:controller,activeRunCount:1,currentJobId:'owner'};
  let calls=0;
- const generation=active?{tailStart:2,activatedAt:1,model:agent.model,contextMessages:[{role:'assistant',content:'summary'}]}:null;
+ const generation=active?{mode:'compact',sourceOffset:2,tailStart:2,activatedAt:1,model:agent.model,contextMessages:[{role:'assistant',content:'summary'}]}:null;
  const events:any[]=[{type:'assistant',ts:2,payload:JSON.stringify({usage:{prompt_tokens:reported}})}];
  const ctx:any={fns:{
-  compaction:{estimateTokens:(opts:any)=>estimateTokens(null as any,null,opts),resolve:()=>{if(!available)throw Error('unavailable');return {};},portable:({messages}:any)=>messages,contextWindow:()=>200000},
+  compaction:{project:(opts:any)=>project(ctx,null,opts),estimateTokens:(opts:any)=>estimateTokens(null as any,null,opts),resolve:()=>{if(!available)throw Error('unavailable');return {};},portable:({messages}:any)=>messages,contextWindow:()=>200000},
   procs:{db:{select:({sql}:any)=>{if(sql.includes('FROM agents'))return [{run_state:'running',run_token:'owner',sleep_context:generation}];expect(sql).toContain("type = 'context_usage'");expect(sql).toContain('NOT EXISTS');expect(sql).toContain('LIMIT 1');const dedicated=events.some(e=>e.type==='context_usage');return events.filter(e=>e.type==='context_usage'||(!dedicated&&e.type==='assistant')).slice(-1);}}},
   session:{getMessages:()=>[{role:'user',content:'task'},{role:'assistant',content:'response'}],appendEventWithHtml:()=>{}},
   agent:{normalizeSleepContext:({sleepContext}:any)=>sleepContext,getSleepGeneration:()=>generation,compactContext:()=>{calls++;return {status:'compacted'};}},

@@ -47,3 +47,17 @@ test('positive and uncertain relevance preserve original tool outputs',async()=>
  const {messages,ctx,agent}=fixture();ctx.fns.jev.decide=async(o:any)=>({answers:Object.fromEntries(Object.keys(o.questions).map(k=>[k,{type:'noul',noul:0.5}])),usage:{inputTokens:1,outputTokens:1,cost:null}});
  expect(await select(ctx,null,{agent,messages})).toBe(messages);
 });
+
+test('preview without a cached turn never scores or mutates scratchpad',async()=>{
+ const {messages,calls,ctx,agent}=fixture();const before=structuredClone({messages,scratchpad:agent.scratchpad});
+ expect(await select(ctx,null,{agent,messages,cachedOnly:true})).toBe(messages);
+ expect(calls).toHaveLength(0);expect({messages,scratchpad:agent.scratchpad}).toEqual(before);
+});
+test('preview reuses matching cached choices without updating metrics; new turns stay full',async()=>{
+ const {messages,calls,ctx,agent}=fixture();const selected=await select(ctx,null,{agent,messages});
+ agent.scratchpad.jevContextMetrics={sentinel:true};const before=structuredClone(agent.scratchpad);
+ expect(await select(ctx,null,{agent,messages,cachedOnly:true})).toEqual(selected);
+ messages.push({role:'user',content:'A new task with no relevance scores available',id:'new'});
+ expect(await select(ctx,null,{agent,messages,cachedOnly:true})).toBe(messages);
+ expect(agent.scratchpad).toEqual(before);expect(calls).toHaveLength(1);
+});

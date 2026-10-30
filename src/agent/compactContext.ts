@@ -40,17 +40,15 @@ export default async function (
     if (JSON.stringify(await ctx.fns.session.getMessages({ id: parent.id })) !== JSON.stringify(rootMessages)) return { status: "stale", tokensBefore: await ctx.fns.compaction.estimateTokens({ messages: rootMessages }) };
     const sleep = ctx.fns.agent.normalizeSleepContext({ sleepContext: row.sleep_context });
     if (sleep?.draftRevision != null) throw new Error("compaction already running");
-    const active = sleep ? ctx.fns.agent.getSleepGeneration({ sleepContext: sleep, kind: "active" }) : null;
+
     const oldHead = sleep?.activeRevision ?? null;
-    const storedActive = active?.contextAgentId ? await ctx.fns.session.getMessages({ id: String(active.contextAgentId) }) : (active?.contextMessages ?? []);
-    // Same view as buildLlmRequest: a foreign checkpoint is adapted, an unreadable one means the full transcript.
-    const activeMessages = active ? ctx.fns.compaction.portable({ model: parent.model, producedBy: active.model, messages: storedActive }) : [];
-    const effective = active && activeMessages ? [...activeMessages, ...rootMessages.slice(Math.max(0, Number(active.tailStart ?? active.sourceOffset ?? 0)))] : rootMessages;
+    const projection = await ctx.fns.compaction.project({ model: parent.model, messages: rootMessages, sleepContext: sleep });
+    const effective = projection.messages;
     const tokensBefore = await ctx.fns.compaction.estimateTokens({ messages: effective });
     // Budget complete exchanges, not a minimum text-message count: one image
     // or parallel tool batch must not make the retained suffix unbounded.
     const { tailStart } = await ctx.fns.compaction.selectTail({ messages: rootMessages });
-    if (tailStart <= Math.max(0, activeMessages ? Number(active?.tailStart ?? 0) : 0)) return { status: "not_needed", tokensBefore };
+    if (tailStart <= Math.max(0, projection.tailStart ?? 0)) return { status: "not_needed", tokensBefore };
     const revision = Math.max(0, ...(sleep?.generations ?? []).map((g: any) => Number(g.revision ?? 0))) + 1;
     const createdAt = Date.now();
     const draftOwner = ((ctx.state as any).compactionOwner ??= crypto.randomUUID());
@@ -58,7 +56,7 @@ export default async function (
     child.scratchpad = { compaction: { sourceAgentId: parent.id, revision, status: "draft" } };
     await ctx.fns.session.updateScratchpad({ id: child.id, scratchpad: child.scratchpad });
     const generation: any = { revision, kind: "compaction", status: "draft", contextAgentId: child.id, sourceAgentId: parent.id, sourceOffset: sourceFrontier, sourceFrontier, tailStart, summary: "", ...(opts.instructions?.trim() ? { instructions: opts.instructions.trim() } : {}), tokensBefore, tokensAfter: 0, model: parent.model, createdAt };
-    const draftContext = { mode: sleep?.mode ?? "full", activeRevision: oldHead, draftRevision: revision, draftOwner, generations: [...(sleep?.generations ?? []), generation].slice(-8) };
+    const draftContext = { mode: sleep?.mode ?? "full", activeRevision: oldHead, draftRevision: revision, draftOwner, generations: await ctx.fns.compaction.retainGenerations({ generations: [...(sleep?.generations ?? []), generation], activeRevision: oldHead, draftRevision: revision }) };
     const draftAt = Date.now();
     if (!ownsRun()) { await ctx.fns.session.archive({ id: child.id }); return { status: "stale", tokensBefore }; }
     const drafted = await ctx.fns.procs.db.transaction({ fn: async () => {

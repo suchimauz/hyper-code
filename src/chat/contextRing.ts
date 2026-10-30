@@ -1,39 +1,41 @@
 /**
- * Draw the context ring from the latest model usage or successful compaction estimate.
+ * Render the next-request context estimate with checkpoint fallback details in its tooltip.
  *
- * Grey up to 70 %, amber to 90 %, red beyond; the used/window total ("253k/1m") sits left of the ring.
- * The tooltip gives the exact numbers and a click opens the compact form. Percentages above 100 remain
- * readable while the visual ring stops at full. Without a known window it shows tokens. Empty until usage is known.
- * Tool-only responses update usage too; completed compaction supersedes older provider counts with a labeled estimate.
- * @param opts.agentId Agent whose context is measured.
+ * Use in chat headers: the main total is always an estimate of the upcoming payload, never the
+ * last provider usage. The tooltip explains fallback reasons and reports successful usage only
+ * as secondary history. Text percentages may exceed 100%; only the ring fill is capped.
+ * A zero or invalid estimate renders nothing; unknown capacity shows only the estimated tokens.
+ * Unavailable model routes show an explicit unavailable marker instead of breaking the chat or reusing stale counts.
+ * @param opts.agentId Agent whose next request is measured.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
-    /** Agent whose context is measured. */
+    /** Agent whose next request is measured. */
     agentId: string;
 }): Promise<string> {
     const id = String(opts.agentId ?? "");
-    const agent = (ctx.state as any).agent?.[id] ?? await ctx.fns.session.load({ id });
-    if (!agent) return "";
-    const last = ((await ctx.fns.procs.db.select({
-        sql: "SELECT payload FROM events e WHERE agent_id = ? AND (type IN ('context_usage', 'compaction_completed') OR (type = 'assistant' AND NOT EXISTS (SELECT 1 FROM events newer WHERE newer.agent_id = e.agent_id AND newer.type IN ('context_usage', 'compaction_completed')))) ORDER BY idx DESC LIMIT 1",
-        params: [id],
-    })) as any[])[0];
-    let event: { type?: string; tokensAfter?: number; usage?: { prompt_tokens?: number; completion_tokens?: number } } | null = null;
-    try { event = last ? JSON.parse(last.payload) : null; } catch { event = null; }
-    const estimated = event?.type === 'compaction_completed';
-    const usage = event?.usage;
-    const used = estimated ? Number(event?.tokensAfter) : usage ? Number(usage.prompt_tokens) + Number(usage.completion_tokens) : NaN;
+    const budget = await ctx.fns.agent.contextBudget({ agentId: id }).catch(() => null);
+    if (!budget) return '<span data-context-unavailable class="font-mono text-3xs text-faint" title="Оценка контекста следующего запроса недоступна" aria-label="Оценка контекста следующего запроса недоступна">—</span>';
+    const used = budget.estimatedTokens;
     if (!Number.isFinite(used) || used <= 0) return "";
-    const window = Number((await ctx.fns.compaction.contextWindow({ model: String(agent.model) })) ?? 0);
+    const window = budget.contextWindow ?? 0;
     const k = (n: number) => n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}m` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
     const share = window > 0 ? used / window : 0;
     const percent = Math.round(share * 100);
     const colour = share >= 0.9 ? "var(--color-error)" : share >= 0.7 ? "var(--color-warning)" : "var(--color-subtle)";
-    const label = estimated ? 'Context estimate after compaction' : 'Context';
-    const title = window > 0 ? `${label} ${k(used)} of ${k(window)} · ${percent}% — click to compact` : `${label} ${k(used)} tokens — click to compact`;
+    const reasons = {
+        missing_generation: 'нет поколения сжатого контекста',
+        missing_checkpoint: 'нет сохранённого checkpoint',
+        incompatible_checkpoint: 'checkpoint несовместим с текущим запросом',
+        invalid_boundary: 'некорректная граница сжатой истории',
+    };
+    const fallback = budget.fallback !== null ? ` Сжатый снимок не используется: ${reasons[budget.fallback]}.` : '';
+    const reported = budget.lastReportedTokens;
+    const history = reported !== null && Number.isFinite(reported) && reported >= 0
+        ? ` Last successful request: ${reported} tokens (not the next-request estimate).` : '';
+    const title = `Next request estimate ${used} tokens${window > 0 ? ` of ${window} · ${percent}%` : ''} — click to compact.${fallback}${history}`;
     const face = window > 0
         ? `<span data-context-total class="font-mono text-3xs text-faint" aria-hidden="true">${k(used)}/${k(window)}</span><span class="chat-ring" style="--p:${(Math.min(1, share) * 100).toFixed(1)}%;--c:${colour}" aria-hidden="true"></span>`
-        : `<span class="font-mono text-3xs">${k(used)}</span>`;
+        : `<span class="font-mono text-3xs" aria-hidden="true">${k(used)}</span>`;
     return ctx.fns.ui.popup({
         method: "chat.compactPopup",
         params: { agentId: id },

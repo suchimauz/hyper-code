@@ -30,13 +30,9 @@ export default async function (
     const row = ((await ctx.fns.procs.db.select({ sql: "SELECT run_state, run_token, sleep_context FROM agents WHERE id = ? AND archived_at IS NULL", params: [agent.id] })) as any[])[0];
     if (!row || (opts.signal && opts.runToken ? row.run_state !== "running" || row.run_token !== opts.runToken : row.run_state !== "idle" || row.run_token != null)) return { status: "busy", estimatedTokens: 0 };
     if (opts.signal && (opts.signal.aborted || agent.abortController?.signal !== opts.signal || (agent.activeRunCount ?? 0) !== 1)) return { status: "busy", estimatedTokens: 0 };
-    const sleep = ctx.fns.agent.normalizeSleepContext({ sleepContext: row.sleep_context });
-    const active = sleep ? ctx.fns.agent.getSleepGeneration({ sleepContext: sleep, kind: "active" }) : null;
-    const root = await ctx.fns.session.getMessages({ id: agent.id });
-    const storedActive = active?.contextAgentId ? await ctx.fns.session.getMessages({ id: String(active.contextAgentId) }) : (active?.contextMessages ?? []);
-    // Same view as buildLlmRequest: a foreign checkpoint is adapted, an unreadable one means the full transcript.
-    const activeMessages = active ? ctx.fns.compaction.portable({ model: agent.model, producedBy: active.model, messages: storedActive }) : [];
-    const effective = active && activeMessages ? [...activeMessages, ...root.slice(Math.max(0, Number(active.tailStart ?? active.sourceOffset ?? 0)))] : root;
+    const root = agent.parentId ? await ctx.fns.session.getFullMessages({ id: agent.id }) : await ctx.fns.session.getMessages({ id: agent.id });
+    const projection = await ctx.fns.compaction.project({ model: agent.model, messages: root, sleepContext: row.sleep_context });
+    const effective = projection.messages;
     // Vision payloads are not text tokens. The provider's own count remains a
     // lower bound for expensive images, code/JSON and empty-text tool turns.
     // Legacy assistant usage is only a fallback before dedicated usage events exist.
@@ -49,7 +45,7 @@ export default async function (
         reported = Number.isFinite(prompt) && prompt >= 0 && Number.isFinite(completion) && completion >= 0 ? prompt + completion : 0;
     } catch { reported = 0; }
     // A usage recorded before the active compaction describes the old, larger context.
-    const fresh = !active || Number(last?.ts ?? 0) > Number(active.activatedAt ?? 0);
+    const fresh = projection.mode !== 'compact' || Number(last?.ts ?? 0) > Number(projection.activatedAt ?? 0);
     const estimatedTokens = Math.max(await ctx.fns.compaction.estimateTokens({ messages: effective }), fresh ? reported : 0);
     const configured = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactTokens", fallback: 700000 });
     const percent = agent.autoCompactWindowPercent ?? await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
@@ -58,7 +54,7 @@ export default async function (
     const threshold = Math.max(10000, Number(opts.thresholdTokens ?? Math.min(Number(configured ?? 700000), byWindow)));
     if (!hasCompactor) return { status: 'no_compactor', estimatedTokens, threshold, contextWindow: window ?? undefined };
     if (opts.checkOnly) return { status: estimatedTokens < threshold ? 'below_threshold' : 'over_threshold', estimatedTokens, threshold, contextWindow: window ?? undefined };
-    if (active && activeMessages && active.tailStart >= root.length - 1) return { status: "already_compact", estimatedTokens, threshold, contextWindow: window ?? undefined };
+    if (projection.mode === 'compact' && projection.tailStart !== null && projection.tailStart >= root.length - 1) return { status: "already_compact", estimatedTokens, threshold, contextWindow: window ?? undefined };
     if (estimatedTokens < threshold) return { status: "below_threshold", estimatedTokens, threshold, contextWindow: window ?? undefined };
     try { const result = await ctx.fns.agent.compactContext({ agent, runToken: opts.runToken, signal: opts.signal }); return { status: result.status, estimatedTokens, threshold, contextWindow: window ?? undefined }; }
     catch (error: any) { const message = String(error?.message ?? error); await ctx.fns.session.appendEventWithHtml({ id: agent.id, type: "auto_compaction_failed", payload: { estimatedTokens, error: message } }).catch(() => undefined); return { status: "failed", estimatedTokens, error: message }; }

@@ -3,6 +3,7 @@
  *
  * Use only on the outgoing repaired transcript. Keeps persisted history, tool-call pairing, user instructions and recent results intact. Sends bounded excerpts to configured Jev only when jevContextEnabled is true. At most one attempt per latest user turn, no retries, 3-second timeout; missing/invalid answers or provider failure preserve all content. Cached decisions identify content by hash, never store excerpts. Records aggregate usage and character savings in scratchpad. This is lossy selection, not a summary or authorization mechanism.
  * @param opts.agent Agent with explicit per-agent consent via jevContextEnabled; scratchpad stores metrics and per-turn decisions.
+ * @param opts.cachedOnly Reuse existing decisions without scoring or updating scratchpad; use for read-only context previews. @default false
  * @param opts.messages Repaired outgoing messages; never mutated. Only old textual tool-result content is eligible.
  */
 export default async function (
@@ -13,6 +14,8 @@ export default async function (
         agent: types.agent.Agent;
         /** Repaired outgoing messages; never mutated. Only old textual tool-result content is eligible. */
         messages: Array<Record<string, unknown>>;
+        /** Reuse cached decisions only; never score or update metrics in a read-only preview. @default false */
+        cachedOnly?: boolean;
     },
 ): Promise<Array<Record<string, unknown>>> {
     const messages = opts.messages;
@@ -43,6 +46,7 @@ export default async function (
     if (!scratch) return messages;
     let cache = scratch.jevContextCache as Cache | undefined;
     if (!cache || cache.turn !== turn) {
+        if (opts.cachedOnly) return messages;
         cache = {turn,dropped:[],status:'pending',latencyMs:0,usage:null};
         scratch.jevContextCache = cache; // Claim before awaiting: no duplicate request this turn.
         const start = Date.now();
@@ -68,6 +72,6 @@ export default async function (
         savedChars += String(m.content).length-marker.length;
         return {...m,content:marker};
     });
-    scratch.jevContextMetrics={status:cache.status,candidates:candidates.length,omitted:indexes.size,savedChars,latencyMs:cache.latencyMs,usage:cache.usage};
+    if (!opts.cachedOnly) scratch.jevContextMetrics={status:cache.status,candidates:candidates.length,omitted:indexes.size,savedChars,latencyMs:cache.latencyMs,usage:cache.usage};
     return indexes.size ? output : messages;
 }

@@ -10,8 +10,8 @@ async function ring(used: number, capacity: number) {
     const ctx = {
         state: { agent: { ab: { model: 'test:echo' } } },
         fns: {
-            procs: { db: { select: async () => [{ payload: JSON.stringify({ usage: { prompt_tokens: used, completion_tokens: 0 } }) }] }, ui: { escape } },
-            compaction: { contextWindow: async () => capacity },
+            procs: { ui: { escape } },
+            agent: { contextBudget: async () => ({ estimatedTokens: used, contextWindow: capacity || null, mode: 'full', fallback: null, revision: null, messageCount: 1, lastReportedTokens: null, lastReportedAt: null }) },
             ui: { popup },
         },
     } as unknown as Context;
@@ -38,7 +38,8 @@ test('context meter formats the compact used/window total, with m for millions',
 
 test('unknown context capacity shows tokens instead of a misleading percentage; unused is empty', async () => {
     const html = await ring(12345, 0);
-    expect(html).toContain('12k');
+    expect(html).toContain('>12k<');
+    expect(html).not.toContain('≈');
     expect(html).not.toContain('data-context-total');
     expect(await ring(0, 100000)).toBe('');
 });

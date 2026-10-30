@@ -7,7 +7,9 @@ function ctx(provider: string): any {
             fullSystemPrompt: async () => "runtime instructions",
             normalizeSleepContext: () => null,
             getSleepGeneration: () => null,
+            selectJevContext: async ({ messages }: any) => messages,
         },
+        compaction: { project: async ({ messages }: any) => ({ messages, mode: 'full', fallback: null, revision: null }) },
         session: {
             repairToolPairs: ({ messages }: any) => ({ messages, repaired: [] }),
             getMessages: async () => [], getFullMessages: async () => [],
