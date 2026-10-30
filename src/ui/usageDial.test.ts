@@ -3,23 +3,23 @@ import dial from './usageDial';
 const ctx:any={fns:{procs:{ui:{escape:({text}:any)=>Bun.escapeHTML(String(text))}},ui:{modelLogo:({model}:any)=>`<svg data-logo="${Bun.escapeHTML(model)}"></svg>`}}};
 const base={provider:'claude-code',account:'default',label:'Claude',usedPercent:20,resetsAt:null,planType:null,parkedAgents:0,tone:'neutral' as const};
 const now=1700000000000, resetsAt=now+10000;
-test('packs different connections into six-column bands without dropping entries',()=>{
+test('packs connections into a single microcard grid without dropping entries',()=>{
  const html=dial(ctx,null,{entries:[base,{...base,node:'mini'},{...base,account:'ssh.box.work',model:'ssh/box:codex/work:'},...Array.from({length:5},(_,i)=>({...base,account:String(i)}))]});
- expect((html.match(/class="quota-matrix-band"/g)||[]).length).toBe(2);
+ expect((html.match(/class="quota-matrix-grid"/g)||[]).length).toBe(1);
  expect((html.match(/class="quota-ring quota-matrix-card"/g)||[]).length).toBe(8);
- expect(html).toContain('Hyper · mini');expect(html).toContain('SSH · box');
- expect(html.indexOf('data-quota-group="local"')).toBeLessThan(html.indexOf('data-quota-group="hyper/mini"'));
+ expect(html).toContain('Hyper node mini');expect(html).toContain('SSH box');
+ expect(html.indexOf('data-connection="local"')).toBeLessThan(html.indexOf('data-connection="hyper"'));
  expect(html).not.toContain('overflow-x');expect(html).not.toContain(' hidden');
 });
 test('gateway shares the band but never fabricates quota measurements',()=>{
  const html=dial(ctx,null,{entries:[base,{...base,node:'mini'}],gateway:{status:'available',models:['x'],checkedAt:now},now});
- expect((html.match(/class="quota-matrix-band"/g)||[]).length).toBe(1);
+ expect((html.match(/class="quota-matrix-grid"/g)||[]).length).toBe(1);
  expect(html).toContain('data-gateway="oneapi"');expect(html).toContain('quota not measured');expect(html).toContain('1 in catalogue');expect(html).toContain('ph-plugs-connected');expect(html).toContain('checked ');
- expect(html).toContain('data-quota-group="gateway"');
+ expect(html).toContain('>Asoft LLM Gate</span>');
 });
 test('escapes connection and account headings',()=>{
  const html=dial(ctx,null,{entries:[{...base,node:'<bad>',account:'<account>'}]});
- expect(html).toContain('Hyper · &lt;bad&gt;');expect(html).not.toContain('<bad>');expect(html).toContain('&lt;account&gt;');
+ expect(html).toContain('Hyper node &lt;bad&gt;');expect(html).not.toContain('<bad>');expect(html).toContain('&lt;account&gt;');
 });
 test('shows three simultaneous periods with thresholds, accessible reset details and real logos',()=>{
  const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:20,resetsAt},secondary:{usedPercent:40,resetsAt},tertiary:{usedPercent:85,resetsAt}}}],now});
@@ -42,13 +42,13 @@ test('undefined optional window slots remain missing instead of throwing',()=>{
 });
 test('long gateway diagnostics stay accessible without expanding narrow columns',()=>{
  const html=dial(ctx,null,{entries:[],gateway:{status:'available',models:['x'],checkedAt:now},now});
- expect(html).toContain('quota not measured');expect(html).toContain('ph-check-circle');
+ expect(html).toContain('quota not measured');expect(html).toContain('data-status="available"');
  const compact=html.match(/<span class="quota-matrix-status"[^>]*>(.*?)<\/span>/)?.[1];
- expect(compact).not.toContain('catalogue');expect(compact).not.toContain('Asoft LLM Gate');
+ expect(compact).toBeUndefined();
 });
 test('generic and non-five-hour measurements never become five-hour percentages',()=>{
  const html=dial(ctx,null,{entries:[{...base,usedPercent:14,windows:{primary:{usedPercent:14,windowMinutes:1440,resetsAt}}}],now});
- expect(html).toContain('quota-matrix-unknown');expect(html).toContain('14% used · период неизвестен');expect(html).not.toContain('5h</span><span>14%');
+ expect((html.match(/Нет данных/g)||[]).length).toBe(3);expect(html).toContain('14% used · период неизвестен');expect(html).not.toContain('5h</span><span>14%');
 });
 test('stale, unavailable, parked, errors and PAYG budget are preserved',()=>{
  const entry={...base,windows:{primary:{usedPercent:85,resetsAt}}};
@@ -84,4 +84,32 @@ test('reset timestamps appear only in quota tooltip and unknown resets are not i
  expect(tooltip).toContain(`datetime="${new Date(resetsAt).toISOString()}" data-quota-reset-detail`);
  const unavailable=dial(ctx,null,{entries:[{...base,quotaStatus:'unavailable',resetsAt,windows:{primary:{usedPercent:19,resetsAt}}}],now});
  expect(unavailable).not.toContain('<time');
+});
+
+test('SSH microcards show a three-character host and unprefixed account; Local has no host badge',()=>{
+ const local=dial(ctx,null,{entries:[{...base,account:'ThienHoang'}]});
+ expect(local).not.toContain('class="quota-matrix-host"');
+ const remote=dial(ctx,null,{entries:[{...base,account:'ssh.hiplet-130862.ThienHoang',model:'ssh/hiplet-130862:kimi-coding/ThienHoang:kimi-for-coding'}]});
+ expect(remote).toContain('data-connection="ssh"');
+ expect(remote).toContain('class="quota-matrix-host" aria-hidden="true">hip</span>');
+ expect(remote).toContain('class="quota-matrix-account" aria-hidden="true">ThienHoang</span>');
+ expect(remote).toContain('SSH hiplet-130862');
+ expect(remote).not.toContain('quota-matrix-heading');
+});
+test('4, 8 and 15 accounts remain complete in one grid',()=>{
+ for(const count of [4,8,15]) {
+  const html=dial(ctx,null,{entries:Array.from({length:count},(_,i)=>({...base,account:`account-${i}`}))});
+  expect((html.match(/class="quota-ring quota-matrix-card"/g)||[]).length).toBe(count);
+  expect((html.match(/class="quota-matrix-grid"/g)||[]).length).toBe(1);
+ }
+});
+
+test('gateway uses health symbols instead of fabricated quota cells',()=>{
+ for(const [status,reason,health,symbol] of [['available','models-ok','available','✓'],['unavailable','timeout-or-network','unavailable','!'],['unknown','missing-key','unknown','?'],['configured','disabled','disabled','−']]) {
+  const html=dial(ctx,null,{entries:[],gateway:{status:status!,reason,models:[]},now});
+  expect(html).toContain(`data-health="${health}" aria-hidden="true">${symbol}</span>`);
+  expect(html).not.toContain('data-quota-window=');
+  expect(html).toContain('quota-tip');
+  expect(html).toContain('quota not measured');
+ }
 });

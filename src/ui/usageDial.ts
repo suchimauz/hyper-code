@@ -115,33 +115,22 @@ export default function (
             status.push(`Asoft LLM Gate · ${text}`, "quota not measured", `${gateway.models?.length ?? 0} in catalogue`);
             if (gateway.checkedAt && Number.isFinite(gateway.checkedAt)) status.push(`checked ${ruStamp.format(new Date(gateway.checkedAt))}`);
         }
-        const generic = status.find(s => s.includes("период неизвестен"));
-        // Details stay in the accessible label and popover. A narrow matrix column
-        // must not turn gateway metadata or an error into a paragraph below its rows.
-        const statusIcon = entry.tone === "error" ? "warning-circle" : unavailable ? "question" : stale ? "clock" : gateway ? (gateway.status === "available" ? "check-circle" : "info") : null;
-        const compactStatus = [statusIcon ? `<i class="ph ph-${statusIcon}" aria-hidden="true"></i>` : "", parked ? `Ⅱ ${entry.parkedAgents}` : "", budget ? "PAYG" : ""].filter(Boolean).join(" ");
+        // Detailed status stays in the unchanged tooltip and accessible label.
         const head = `${entry.label}${entry.account !== "default" ? ` · ${entry.account}` : ""}${entry.planType ? ` · ${entry.planType}` : ""}`;
         const machine = entry.node ? `Hyper node ${entry.node}` : ssh ? `SSH ${ssh}` : null;
         const aria = [head, machine, ...rows.map(r => r.text), ...status].filter(Boolean).join(" · ");
         const tip = `<span class="quota-tip" popover="auto" aria-hidden="true"><span class="quota-tip-head">${esc(head)}</span>${machine ? `<span class="quota-tip-sub">${esc(machine)}</span>` : ""}${rows.map(r => r.html).join("")}${status.map(s => `<span class="quota-tip-row">${esc(s)}</span>`).join("")}</span>`;
-        return `<a href="/llms" class="quota-ring quota-matrix-card" ${gateway ? `data-gateway="oneapi" data-status="${esc(gateway.status)}"` : ""} ${budget ? 'data-member-budget="opencode"' : ''} aria-label="${esc(aria)}">
-            <span class="quota-matrix-provider"><span class="quota-matrix-logo" aria-hidden="true">${gateway ? `<i class="ph ph-plugs-connected" aria-hidden="true"></i>` : ctx.fns.ui.modelLogo({ model: entry.model ?? `${entry.provider}:`, bare: true, compact: true })}</span><span class="quota-matrix-name">${esc(entry.label)}${entry.account !== "default" ? `<span class="quota-matrix-account">${esc(entry.account)}</span>` : ""}</span></span>
-            <span class="quota-matrix-periods">${generic && entry.provider !== "codex" ? `<span class="quota-matrix-unknown ${toneClass(entry.usedPercent, thresholds)}">${Math.round(Math.max(0, Math.min(100, entry.usedPercent!)))}%<br>период<br>неизв.</span>` : rows.map(r => `<span class="quota-matrix-period" data-quota-window="${r.key}" style="grid-row:${r.key === '5h' ? 1 : r.key === 'weekly' ? 2 : 3}"><span>${r.label}</span><strong class="${r.tone}" aria-label="${r.percent == null ? "Нет данных" : `${Math.round(r.percent)}% использовано`}">${r.percent == null ? "—" : Math.round(r.percent)}</strong><span class="quota-matrix-bar ${r.tone}" aria-hidden="true"><span style="width:${r.percent ?? 0}%"></span></span></span>`).join("")}</span>
-            ${compactStatus ? `<span class="quota-matrix-status" aria-hidden="true">${compactStatus}</span>` : ""}${tip}
+        const accountLabel = gateway ? "Asoft LLM Gate" : ssh && entry.account.startsWith(`ssh.${ssh}.`) ? entry.account.slice(`ssh.${ssh}.`.length) : entry.account;
+        const source = ssh ?? entry.node;
+        const gateState = gateway?.reason === "disabled" ? "disabled" : gateway?.status === "available" ? "available" : gateway?.status === "unavailable" ? "unavailable" : "unknown";
+        const gateSymbol = { available: "✓", unavailable: "!", unknown: "?", disabled: "−" }[gateState];
+        return `<a href="/llms" class="quota-ring quota-matrix-card" ${ssh ? 'data-connection="ssh"' : entry.node ? 'data-connection="hyper"' : 'data-connection="local"'} ${gateway ? `data-gateway="oneapi" data-status="${esc(gateway.status)}"` : ""} ${budget ? 'data-member-budget="opencode"' : ''} aria-label="${esc(aria)}">
+            <span class="quota-matrix-provider"><span class="quota-matrix-logo" aria-hidden="true">${gateway ? `<i class="ph ph-plugs-connected" aria-hidden="true"></i>` : ctx.fns.ui.modelLogo({ model: entry.model ?? `${entry.provider}:`, bare: true, compact: true })}</span>${source ? `<span class="quota-matrix-host" aria-hidden="true">${esc(source.slice(0, 3))}</span>` : ''}<span class="quota-matrix-name">${esc(entry.label)}</span></span>
+            <span class="quota-matrix-account" aria-hidden="true">${esc(accountLabel)}</span>
+            ${gateway ? `<span class="quota-gateway-indicator" data-health="${gateState}" aria-hidden="true">${gateSymbol}</span>` : `<span class="quota-matrix-periods">${rows.map(r => `<span class="quota-matrix-period" data-quota-window="${r.key}"><span>${r.label}</span><strong class="${r.tone}" aria-label="${r.percent == null ? "Нет данных" : `${Math.round(r.percent)}% использовано`}">${r.percent == null ? "—" : Math.round(r.percent)}</strong></span>`).join("")}</span>`}${tip}
         </a>`;
     };
     const grouped = [...groups.entries()].sort(([a], [b]) => a === 'local' ? -1 : b === 'local' ? 1 : a.localeCompare(b));
-    const flat = grouped.flatMap(([key, group]) => group.entries.map(entry => ({key, label: group.label, entry})));
-    const bands: string[] = [];
-    for (let i = 0; i < flat.length; i += 6) {
-        const chunk = flat.slice(i, i + 6);
-        const segments: Array<{key: string; label: string; count: number}> = [];
-        for (const row of chunk) {
-            const last = segments.at(-1);
-            if (last?.key === row.key) last.count++;
-            else segments.push({key: row.key, label: row.label, count: 1});
-        }
-        bands.push(`<div class="quota-matrix-band"><div class="quota-matrix-labels" aria-hidden="true"><span class="quota-matrix-label-spacer"></span><span>5 ч</span><span>Нед.</span><span>Мес.</span></div><div class="quota-matrix-band-content"><div class="quota-matrix-sources">${segments.map(g => `<h3 data-quota-group="${esc(g.key)}" class="quota-matrix-heading" style="grid-column:span ${g.count}">${esc(g.label)}</h3>`).join("")}</div><div class="quota-matrix-grid">${chunk.map(r => ring(r.entry)).join("")}</div></div></div>`);
-    }
-    return `<div class="quota-matrix w-full" role="group" aria-label="Subscription quota">${bands.join("")}</div>`;
+    const cards = grouped.flatMap(([, group]) => group.entries.map(entry => ring(entry)));
+    return `<div class="quota-matrix w-full" role="group" aria-label="Subscription quota"><div class="quota-matrix-legend" aria-hidden="true">5 ч · Нед. · Мес. <span>использовано, %</span></div><div class="quota-matrix-grid">${cards.join("")}</div></div>`;
 }
