@@ -102,7 +102,7 @@ export default function (
         });
         const status = [
             unavailable ? "quota unavailable — usage unknown" : stale ? "Устаревшие данные · stale quota snapshot" : "",
-            entry.tone === "error" ? "Ошибка квоты" : "",
+            entry.tone === "error" && !unavailable ? "Высокое использование квоты" : "",
             parked ? `${entry.parkedAgents} agent(s) parked` : "",
             budget ? entry.memberBudgetText ?? "Monthly member budget unavailable" : "",
         ].filter(Boolean);

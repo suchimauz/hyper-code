@@ -54,7 +54,7 @@ test('stale, unavailable, parked, errors and PAYG budget are preserved',()=>{
  const entry={...base,windows:{primary:{usedPercent:85,resetsAt}}};
  expect(dial(ctx,null,{entries:[{...entry,quotaStatus:'stale'}],now})).toContain('85% used (last known)');
  const unavailable=dial(ctx,null,{entries:[{...entry,quotaStatus:'unavailable',parkedAgents:2,tone:'error'}],now});
- expect(unavailable).toContain('quota unavailable — usage unknown');expect(unavailable).not.toContain('85% used');expect(unavailable).toContain('2 agent(s) parked');expect(unavailable).toContain('Ошибка квоты');
+ expect(unavailable).toContain('quota unavailable — usage unknown');expect(unavailable).not.toContain('85% used');expect(unavailable).toContain('2 agent(s) parked');expect(unavailable).not.toContain('Высокое использование квоты');
  const payg=dial(ctx,null,{entries:[{...entry,provider:'opencode',memberBudgetText:'PAYG $10'}],now});expect(payg).toContain('data-member-budget="opencode"');expect(payg).toContain('PAYG $10');expect(payg).not.toContain('85% used');
  const go=dial(ctx,null,{entries:[{...entry,provider:'opencode',planType:'Go subscription',memberBudgetText:'PAYG $10'}],now});expect(go).toContain('85% used');expect(go).not.toContain('PAYG $10');
 });

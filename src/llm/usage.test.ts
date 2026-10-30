@@ -299,7 +299,7 @@ describe("ui.usageDial", () => {
 
     test("a parked credential shows an error and says how many wait", () => {
         const html = dial(escCtx, null, { entries: [entry({ usedPercent: 100, tone: "error", parkedAgents: 14 })], now: NOW });
-        expect(html).toContain("Ошибка квоты");
+        expect(html).toContain("Высокое использование квоты");
         expect(html).toContain("14 agent(s) parked");
     });
 
@@ -311,7 +311,7 @@ describe("ui.usageDial", () => {
 
         const hot = dial(escCtx, null, { entries: [entry({ usedPercent: 78, tone: "error" })], now: NOW });
         expect(hot).toContain("78% used");
-        expect(hot).toContain("Ошибка квоты");
+        expect(hot).toContain("Высокое использование квоты");
     });
 
     test("no data draws an empty ring instead of a fake zero", () => {
