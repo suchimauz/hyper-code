@@ -166,7 +166,7 @@ async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
         },
         body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await readResponsesSSE(response);
     if (endpoint.provider === "xai") ctx.fns.llm.refreshUsage?.({ provider: endpoint.provider, account: endpoint.account, maxAgeMs: 60_000 })?.catch(() => undefined);
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
@@ -213,9 +213,62 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
         },
         body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await readResponsesSSE(response);
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
+}
+
+/** Extract bounded JSON diagnostic fields without dumping response bodies or request text. */
+async function opencodeError(response: Response, sensitive: Array<string | undefined>): Promise<string> {
+    const prefix = `opencode ${response.status}`;
+    const reader = response.body?.getReader();
+    if (!reader) return prefix;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        const read = async () => {
+            const chunks: Uint8Array[] = [];
+            let bytes = 0;
+            for (;;) {
+                const part = await reader.read();
+                if (part.done) break;
+                bytes += part.value.byteLength;
+                if (bytes > 8192) return null;
+                chunks.push(part.value);
+            }
+            const data = new Uint8Array(bytes);
+            let offset = 0;
+            for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.byteLength; }
+            return new TextDecoder().decode(data);
+        };
+        const text = await Promise.race([read(), new Promise<null>(resolve => {
+            timer = setTimeout(() => resolve(null), 2000);
+        })]);
+        if (!text) return prefix + ' (error details unavailable or too large)';
+        let parsed: any;
+        try { parsed = JSON.parse(text); }
+        catch { return prefix + ' (non-JSON error body omitted)'; }
+        const error = parsed?.error;
+        const fields = error && typeof error === 'object' ? error : parsed;
+        const redact = (value: string) => {
+            for (const secret of sensitive) if (secret) value = value.split(secret).join('[redacted]');
+            return value
+                .replace(/Bearer\s+[^\s"',;]+/gi, 'Bearer [redacted]')
+                .replace(/\b(?:sk|sk-proj|oc|opencode)[-_][A-Za-z0-9_-]{8,}\b/g, '[redacted]')
+                .replace(/((?:api[_-]?key|authorization|token|password)\s*[=:]\s*)[^\s,;]+/gi, '$1[redacted]')
+                .replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 800);
+        };
+        const details = ['code', 'type', 'param', 'message'].flatMap(key => {
+            const value = fields?.[key];
+            return typeof value === 'string' || typeof value === 'number' ? [`${key}=${redact(String(value))}`] : [];
+        });
+        if (!details.length && typeof error === 'string') details.push(`message=${redact(error)}`);
+        return prefix + (details.length ? ': ' + details.join('; ').slice(0, 1600) : ' (no recognized error fields)');
+    } catch {
+        return prefix + ' (error details could not be read)';
+    } finally {
+        clearTimeout(timer);
+        void reader.cancel().catch(() => { /* Preserve the original HTTP failure if cancellation fails. */ });
+    }
 }
 
 async function openAI(ctx: Context, endpoint: any, opts: any) {
@@ -232,7 +285,7 @@ async function openAI(ctx: Context, endpoint: any, opts: any) {
     const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
     let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) });
     if (endpoint.provider !== "opencode") response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) }));
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await response.json();
     const choice = raw?.choices?.[0] ?? {};
     return { text: String(choice?.message?.content ?? ""), finishReason: choice?.finish_reason ?? null, usage: raw?.usage, raw };
@@ -281,7 +334,7 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
     const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
     let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) });
     if (endpoint.provider !== "opencode") response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) }));
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? `opencode ${response.status}` : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await response.json();
     return { text: (raw.content ?? []).filter((x: any) => x.type === "text").map((x: any) => x.text).join(""), finishReason: raw.stop_reason ?? null, usage: raw.usage, raw };
 }
