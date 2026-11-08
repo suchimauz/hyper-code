@@ -39,7 +39,7 @@ export default async function (
     if (subscription || ep.provider === "hyper") headers.authorization = `Bearer ${apiKey}`; else headers["x-api-key"] = apiKey;
     headers["anthropic-beta"] = [...(subscription ? ["claude-code-20250219", "oauth-2025-04-20"] : []), "compact-2026-09-04"].join(",");
     if (subscription) {
-        headers["user-agent"] = ctx.env.CLAUDE_CODE_USER_AGENT ?? `claude-cli/${await ctx.fns.llm.claudeCodeCliVersion({})} (external, sdk-cli)`;
+        headers["user-agent"] = ctx.env.CLAUDE_CODE_USER_AGENT ?? `claude-cli/${await ctx.fns.llm.claudeCodeCliVersion({ instance: ep.ssh?.instance })} (external, sdk-cli)`;
         headers["x-app"] = "cli";
         headers["anthropic-dangerous-direct-browser-access"] = "true";
     }
