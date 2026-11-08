@@ -11,7 +11,10 @@ export default async function (
     const apiKey = await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key: "zaiCodingApiKey" });
     if (!apiKey) return [];
     try {
-        const res = await ctx.fns.llm.connectFetch({ url: "https://api.z.ai/api/coding/paas/v4/models", init: { headers: { authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(10000), redirect: "error" } });
+        const { instance } = await ctx.fns.llm.codingInstance({ provider: 'zai-coding' });
+        const url = 'https://api.z.ai/api/coding/paas/v4/models';
+        const init = { method: 'GET', headers: { authorization: 'Bearer ' + apiKey }, signal: AbortSignal.timeout(10000) };
+        const res = instance ? await ctx.fns.sshAccount.fetch({ ssh: { instance, provider: 'zai-coding', account: 'default' }, url, init }) : await ctx.fns.llm.connectFetch({ url, init: { ...init, redirect: 'error' } });
         if (!res.ok) {
             await ctx.fns.procs.log.warn({ event: "llm.zai.catalogue", msg: "Z.ai Coding model discovery returned HTTP " + res.status });
             return [];

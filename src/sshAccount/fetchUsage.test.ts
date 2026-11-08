@@ -16,16 +16,8 @@ it('bounds startup and body deadlines even when cancellation stalls',async()=>{
  await expect(fetchUsage(fake(async(o:any)=>{signal=o.init.signal;return new Promise(()=>{});}),null,{...opts,timeoutMs:500})).rejects.toThrow('timed out');expect(signal?.aborted).toBe(true);
  await expect(fetchUsage(fake(async()=>new Response(new ReadableStream({pull(){return new Promise(()=>{});},cancel(){return new Promise(()=>{});}}))),null,{...opts,timeoutMs:500})).rejects.toThrow('timed out');expect(Date.now()-start).toBeLessThan(2500);
 });
-it('fetches quota through framed fake SSH process without auth or network',async()=>{
- const c:any={fns:{sshInstance:{authorize:async()=>{},connection:async()=>({bin:'python3',args:['-c',`import sys,json
-r=json.loads(sys.stdin.readline())
-print(json.dumps({'ready':True}),flush=True)
-assert sys.stdin.readline().strip()=='dispatch'
-assert r['url']=='https://chatgpt.com/backend-api/wham/usage'
-assert r['method']=='GET' and 'body' not in r
-assert 'authorization' not in r['headers']
-print(json.dumps({'status':200,'headers':{}}))
-print(json.dumps({'rate_limit':{'primary_window':{'used_percent':12}}}))`],host:'ignored'})},sshAccount:{registry:async()=>[{...opts,status:'connected'}],inferenceScript:async()=>''}}};
+it('fetches quota through shared SOCKS dispatcher without network',async()=>{
+ const c:any={fns:{sshProvider:{dispatch:async(o:any)=>{expect(o.url).toBe('https://chatgpt.com/backend-api/wham/usage');expect(o.init.method).toBe('GET');return Response.json({rate_limit:{primary_window:{used_percent:12}}});}},sshAccount:{}}};
  c.fns.sshAccount.fetch=(o:any)=>fetchRemote(c,null,o);
  const res=await fetchUsage(c,null,opts);expect((await res.json()).rate_limit.primary_window.used_percent).toBe(12);
 });

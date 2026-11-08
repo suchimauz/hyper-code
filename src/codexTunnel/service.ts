@@ -15,5 +15,5 @@ export default function (
      const st=(ctx as any).state.codexSocksCandidate??={tails:new Map(),pending:new Map(),cold:false};
      if(st.authority&&(st.authority!==a||st.protectedSlot!==a.protectedSlot||st.lockDirectory!==a.lockDirectory||st.owner!==a.owner))throw Error('Authority replacement prohibited');st.authority=a;st.protectedSlot=a.protectedSlot;st.lockDirectory=a.lockDirectory;st.owner=a.owner;
      st.cold=true;
-     return (ctx as any).fns.codexTunnel.runtime({options:{protectedSlot:a.protectedSlot,claim:()=>(ctx as any).fns.codexTunnel.claim({directory:a.lockDirectory}),legacy:(o:any)=>(ctx as any).fns.sshAccount.legacyFetch(o)}});
+     return (ctx as any).fns.codexTunnel.runtime({options:{protectedSlot:a.protectedSlot,claim:()=>(ctx as any).fns.codexTunnel.claim({directory:a.lockDirectory})}});
 }

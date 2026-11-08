@@ -109,7 +109,16 @@ export default async function (
             flow.error = tokenData?.error_description ?? err ?? "token endpoint failed";
             break;
         }
-        if (opts.instance) await ctx.fns.sshAccount.registry({ action: flow.status === "connected" ? "connect" : "fail", instance: opts.instance, provider: "kimi-coding", account: opts.account }).catch(() => undefined);
+        if (opts.instance) {
+            const identity = {instance:opts.instance,provider:'kimi-coding' as const,account:opts.account};
+            try {
+                await ctx.fns.sshAccount.registry({action:flow.status==='connected'?'connect':'fail',...identity});
+                if(flow.status==='connected') await ctx.fns.sshProvider.completeLogin(identity);
+            } catch {
+                flow.status='failed';flow.error='SSH login requires secure onboarding or recovery of the existing encrypted account; no HTTP fallback.';
+                await ctx.fns.sshAccount.registry({action:'fail',...identity});
+            }
+        }
         ctx.fns.procs.events.refresh({ topic: "ssh-accounts", reason: "kimi login finished" });
     })().catch(() => undefined);
 

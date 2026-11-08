@@ -12,7 +12,10 @@ export default async function (
     if (!apiKey) return [];
     try {
         // X-Api-Key is the only header this Anthropic-compatible gateway accepts.
-        const res = await ctx.fns.llm.connectFetch({ url: "https://api.minimax.io/anthropic/v1/models", init: { headers: { "x-api-key": apiKey }, signal: AbortSignal.timeout(10000), redirect: "error" } });
+        const { instance } = await ctx.fns.llm.codingInstance({ provider: 'minimax-coding' });
+        const url = 'https://api.minimax.io/anthropic/v1/models';
+        const init = { method: 'GET', headers: { 'x-api-key': apiKey }, signal: AbortSignal.timeout(10000) };
+        const res = instance ? await ctx.fns.sshAccount.fetch({ ssh: { instance, provider: 'minimax-coding', account: 'default' }, url, init }) : await ctx.fns.llm.connectFetch({ url, init: { ...init, redirect: 'error' } });
         if (!res.ok) {
             await ctx.fns.procs.log.warn({ event: "llm.minimax.catalogue", msg: "MiniMax M Plan model discovery returned HTTP " + res.status });
             return [];

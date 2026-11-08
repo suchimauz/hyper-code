@@ -5,7 +5,7 @@ function catalogueCtx(key: string | null, response: Response) {
     const requests: any[] = [];
     const ctx: any = { fns: {
         secrets: { resolveSetting: async () => key },
-        llm: { connectFetch: async (opts: any) => { requests.push(opts); return response; } },
+        llm: { codingInstance: async () => ({ instance: null }), connectFetch: async (opts: any) => { requests.push(opts); return response; } },
         procs: { log: { warn: async () => {} } },
     } };
     return { ctx, requests };
