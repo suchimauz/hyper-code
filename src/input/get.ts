@@ -13,9 +13,11 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const r = rows[0];
     if (!r) return null;
     const json = (v: any) => (typeof v === "string" ? JSON.parse(v) : v ?? null);
+    const spec = { ...(json(r.spec) ?? {}) };
+    delete spec._agentWait; // Server scheduling metadata is never a client form setting.
     return {
         id: r.id, agentId: r.agent_id, kind: r.kind, state: r.state, title: r.title, message: r.message,
-        spec: json(r.spec) ?? {}, result: json(r.result), error: r.error ?? null, answeredBy: r.answered_by ?? null,
+        spec, result: json(r.result), error: r.error ?? null, answeredBy: r.answered_by ?? null,
         createdAt: Number(r.created_at), updatedAt: Number(r.updated_at),
     };
 }

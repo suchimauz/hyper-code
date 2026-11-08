@@ -113,9 +113,11 @@ async function claimOne(ctx: Context, now: number): Promise<{ id: string; token:
                  AND archived_at IS NULL
                  AND stopped_at IS NULL
                  AND sleep_context->>'draftRevision' IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM inputs i WHERE i.agent_id = agents.id AND i.spec->>'_agentWait' = 'true' AND i.state IN ('open','processing'))
                ORDER BY next_run_at ASC
                LIMIT 1
           ) AND run_state = 'idle' AND stopped_at IS NULL AND sleep_context->>'draftRevision' IS NULL
+            AND NOT EXISTS (SELECT 1 FROM inputs i WHERE i.agent_id = agents.id AND i.spec->>'_agentWait' = 'true' AND i.state IN ('open','processing'))
           RETURNING id`,
         params: [now, now, token, now, now],
     }) as any[];

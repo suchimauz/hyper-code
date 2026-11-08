@@ -2,7 +2,10 @@
 // like; the answer arrives to the agent as a new user turn (message_type
 // "input"), so the agent ends its turn instead of waiting.
 /**
- * Opens a live form in the chat — a secret, a confirmation, a choice or a pick from a filtered grid — and returns immediately.
+ * Opens a live chat form and returns immediately; ordinary choice questions durably block further agent dispatch until answered or cancelled.
+ * The tool batch ends at its next safe boundary, including when the answer arrives early.
+ * Already-running JavaScript cannot be interrupted: call this last in an eval.
+ * Other kinds keep their existing nonblocking behavior unless waitForAnswer is explicitly set for grid or confirm.
  *
  * The form stays in the transcript as its own card: open while waiting, then replaced in
  * place by the answer. On submit or cancel the agent is woken with a user turn
@@ -15,6 +18,7 @@
  * @param opts.message Optional Markdown explanation under the heading.
  * @param opts.spec Kind-specific settings, e.g. { options } for choice or { saveAs } for secret.
  * @param opts.agentId Agent to wake with the answer. @default the current agent
+ * @param opts.waitForAnswer Persist an ordinary-question gate; true by default for choice, false otherwise.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
     /** Input kind, e.g. secret, confirm, choice or grid. */
@@ -27,6 +31,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     spec?: Record<string, any>;
     /** Agent to wake with the answer. @default the current agent */
     agentId?: string;
+    /** Wait durably for ordinary choice/grid/confirm answers; defaults to true for choice only. */
+    waitForAnswer?: boolean;
 }): Promise<{ id: string; kind: string; state: "open"; agentId: string }> {
     const kindName = String(opts.kind ?? "").trim().toLowerCase();
     const kind = (ctx.state as any).input?.kinds?.[kindName] as types.input.Registered | undefined;
@@ -37,7 +43,13 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const title = String(opts.title ?? "").trim();
     if (!title) throw new Error("input.request: title is required");
     const agentId = String(opts.agentId ?? (await ctx.fns.agent.current({})).id);
-    const spec = kind.prepare ? await kind.prepare(ctx, { spec: opts.spec ?? {} }) : (opts.spec ?? {});
+    const suppliedSpec = { ...(opts.spec ?? {}) };
+    delete suppliedSpec._agentWait;
+    const spec = { ...(kind.prepare ? await kind.prepare(ctx, { spec: suppliedSpec }) : suppliedSpec) };
+    delete spec._agentWait;
+    const wait = opts.waitForAnswer ?? kindName === 'choice';
+    if (wait && !['choice', 'grid', 'confirm'].includes(kindName)) throw new Error('Durable wait supports only choice, grid and confirm');
+    if (wait) spec._agentWait = true;
     const id = "in" + Bun.randomUUIDv7().replace(/[^a-zA-Z0-9]/g, "").slice(-16);
     const now = Date.now();
     await ctx.fns.procs.db.run({

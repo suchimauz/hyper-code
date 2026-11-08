@@ -47,8 +47,10 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 
     if (opts.cancel) {
         const reason = String(opts.reason ?? "").trim() || null;
-        await finish(ctx, input, "cancelled", null, reason, actor);
-        await deliver(ctx, input, "cancelled", reason ? `cancelled: ${reason}` : "cancelled by the person", null, actor);
+        await ctx.fns.procs.db.transaction({ fn: async () => {
+            await finish(ctx, input, "cancelled", null, reason, actor);
+            await deliver(ctx, input, "cancelled", reason ? `cancelled: ${reason}` : "cancelled by the person", null, actor);
+        } });
         return { state: "cancelled" };
     }
 
@@ -62,8 +64,10 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         await ctx.fns.procs.db.run({ sql: "UPDATE inputs SET state = 'open', updated_at = ? WHERE id = ?", params: [Date.now(), id] });
         return { state: "open", error: String(error?.message ?? error) };
     }
-    await finish(ctx, input, "submitted", outcome.result, null, actor);
-    await deliver(ctx, input, "submitted", outcome.summary, outcome.result, actor);
+    await ctx.fns.procs.db.transaction({ fn: async () => {
+        await finish(ctx, input, "submitted", outcome.result, null, actor);
+        await deliver(ctx, input, "submitted", outcome.summary, outcome.result, actor);
+    } });
     return { state: "submitted" };
 }
 
@@ -87,7 +91,9 @@ async function deliver(ctx: Context, input: types.input.Row, state: string, summ
     await ctx.fns.procs.db.transaction({ fn: async () => {
         await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [input.agentId] });
         // Agent withdrawal is not a human instruction to resume work.
-        const human = !actor?.startsWith("agent:");
+        const [gate] = await ctx.fns.procs.db.select({ sql: "SELECT spec->>'_agentWait' = 'true' AS blocking FROM inputs WHERE id = ?", params: [input.id] });
+        // Answering a blocking question is not permission to undo a later manual Stop.
+        const human = !actor?.startsWith("agent:") && gate?.blocking !== true;
         if (human) await ctx.fns.session.mutateScratchpad({ id: input.agentId, mutate: (scratchpad: Record<string, any>, ts: number) => {
             const plan = scratchpad.plan;
             if (!plan?.pausedAt) return;
