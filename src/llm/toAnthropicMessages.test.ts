@@ -4,6 +4,27 @@ import convert from "./toAnthropicMessages";
 const ctx = {} as Context;
 
 describe("llm.toAnthropicMessages", () => {
+    test("cache boundary survives appended turns without absorbing transient guidance", () => {
+        const base = [{ role: "user", content: "task" }];
+        const control = { role: "user", content: "planning mode" };
+        const first = convert(ctx, null, { messages: [...base, control], cacheableMessageCount: base.length });
+        expect(first[0].content).toEqual([
+            { type: "text", text: "task", cache_control: { type: "ephemeral" } },
+            { type: "text", text: "planning mode" },
+        ]);
+        const history = [...base,
+            { role: "assistant", tool_calls: [{ id: "t1", name: "read", args: {} }] },
+            { role: "tool", tool_call_id: "t1", content: "result" },
+        ];
+        const next = convert(ctx, null, { messages: [...history, control], cacheableMessageCount: history.length });
+        expect(next[0].content[0].text).toBe(first[0].content[0].text);
+        expect(next.at(-1).content).toEqual([
+            { type: "tool_result", tool_use_id: "t1", content: "result", cache_control: { type: "ephemeral" } },
+            { type: "text", text: "planning mode" },
+        ]);
+        expect(history.at(-1)).not.toHaveProperty("cache_control");
+    });
+
     test("user/assistant text round-trip", () => {
         expect(convert(ctx, null, { messages: [
             { role: "user", content: "hi" },

@@ -32,7 +32,7 @@ export default async function (
     agent: types.agent.Agent;
         /** Read-only preview; reuse cached relevance choices without external calls or repair logs. @default false */
     preview?: boolean },
-): Promise<{ system: string; messages: any[]; /** Number of leading synthetic instruction/ack messages, independent of wire role; excludes human transcript. */ bootstrapMessageCount: number; context: { mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null } }> {
+): Promise<{ system: string; messages: any[]; /** Number of leading synthetic instruction/ack messages, independent of wire role; excludes human transcript. */ bootstrapMessageCount: number; /** Exclusive canonical-message boundary before per-request control instructions. */ cacheableMessageCount: number; context: { mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null } }> {
     const { agent } = opts;
     const fullPrompt = await ctx.fns.agent.fullSystemPrompt({ agent });
     // Fresh authoritative state on every request, never cached in bootstrap or agent.goal.
@@ -159,6 +159,10 @@ export default async function (
         }
     }
 
+    // Only the durable prefix can be reused by the next request. Synthetic
+    // continuation, goal and planning instructions remain outside this boundary.
+    const cacheableMessageCount = messages.length;
+
     // A transcript that ENDS with an assistant message is a "prefill" request:
     // the model is asked to continue its own half-written turn. It happens
     // normally here — a run answers a mid-run user message with a terminal
@@ -186,6 +190,7 @@ export default async function (
         system,
         messages,
         bootstrapMessageCount: bootstrap.length,
+        cacheableMessageCount,
         context: { mode: projection.mode, fallback: projection.fallback, revision: projection.revision },
     };
 }
