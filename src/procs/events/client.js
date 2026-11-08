@@ -13,6 +13,15 @@
   window.__hyperEventsInstalled = true;
 
   let es;
+  let status = 'disconnected';
+  const statusListeners = new Set();
+  function setStatus(next) {
+    if (status === next) return;
+    status = next;
+    for (const listener of [...statusListeners]) {
+      try { listener(status); } catch (error) { console.error('hyperLive status:', error); }
+    }
+  }
   let reconnectTimer = null;
   let retryMs = 1000;
   let lastTopics = '';
@@ -64,6 +73,16 @@
   }
 
   window.hyperLive = {
+    /** Current transport state: connecting | connected | disconnected. */
+    getStatus: () => status,
+    /** Recompute DOM topics after non-htmx rendering; reconnect and resync on change. */
+    refreshTopics: () => refreshTopics(true),
+    /** Listen for state changes (not an immediate snapshot); returns unsubscribe. */
+    onStatus: listener => {
+      if (typeof listener !== 'function') throw new TypeError('hyperLive.onStatus: listener must be a function');
+      statusListeners.add(listener);
+      return () => statusListeners.delete(listener);
+    },
     /** State subscriber: { types?, onEvent(event), resync(reason), name? } → unsubscribe. */
     subscribe: opts => register('state', opts),
     /** One-shot instructions (no state to re-read): { types?, onEvent(event), name? } → unsubscribe. */
@@ -125,6 +144,7 @@
     deliver(data);
     // Server restarted under us — reload to pick up the new process.
     if (data?.type === 'hello') {
+      setStatus('connected');
       sawServer(data.serverStart);
       // Catching up is for connections that were LOST. The first greeting
       // follows a page the server just rendered, and a planned reconnect
@@ -162,6 +182,7 @@
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     try { es?.close(); } catch {}
     es = null;
+    setStatus('disconnected');
   }
 
   // ── Transport ───────────────────────────────────────────────────────────
@@ -192,14 +213,19 @@
     // Ask only for what this tab shows: server-side filtering beats waking up
     // and deciding the event was not ours.
     const want = topics();
-    es = new EventSource('/procs/events' + (want.length ? '?topics=' + encodeURIComponent(want.join(',')) : ''));
+    setStatus('connecting');
+    const source = new EventSource('/procs/events' + (want.length ? '?topics=' + encodeURIComponent(want.join(',')) : ''));
+    es = source;
+    es.onopen = () => { if (es === source) setStatus('connected'); };
     es.onmessage = (e) => {
+      if (es !== source) return;
       let data;
       try { data = JSON.parse(e.data); } catch { return; }
       retryMs = 1000;
       handle(data);
     };
     es.onerror = () => {
+      if (es !== source) return;
       disconnect();
       scheduleReconnect();
     };
@@ -232,16 +258,19 @@
   // with the server's current cursor, so it is already up to date. Sweeping
   // here made a request cause a swap, a swap cause a sweep, and a sweep cause a
   // request — two hundred fetches a second, on an idle page.
+  function refreshTopics(catchUp) {
+    const want = topics().join(',');
+    if (want === lastTopics) return;
+    lastTopics = want;
+    planned = !catchUp;
+    if (catchUp) resyncPending = true;
+    connect();
+  }
   let resubscribe = null;
   document.addEventListener('htmx:after:swap', () => {
     clearTimeout(resubscribe);
     resubscribe = setTimeout(() => {
-      const want = topics().join(',');
-      if (want === lastTopics) return;
-      lastTopics = want;
-      planned = true;
-      disconnect();
-      connect();
+      refreshTopics(false);
     }, 500);
   });
 

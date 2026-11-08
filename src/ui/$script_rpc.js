@@ -65,6 +65,10 @@
         // once on boot, but do not open an empty loading dialog.
         if (host && host.dataset.pending === '1') send(host);
         function send(elt) {
+            // Embedded Canvas pages can load shared live/RPC scripts without
+            // the popup shell. Resync must not POST to a nonexistent target.
+            const target = document.getElementById('app-popup-body');
+            if (!target?.isConnected) return;
             let params = {};
             try { params = JSON.parse(elt.getAttribute('hx-popup-params') || '{}'); } catch { return; }
             if (elt.tagName === 'FORM') for (const [key, value] of new FormData(elt)) {
@@ -85,7 +89,7 @@
             // on a phone it read as two modals stacking. The swap handler in
             // popup.js opens the dialog once, with the content's own title.
             if (!secureSubmit && document.getElementById('app-popup')?.open) window.hyperPopup?.loading(title, 'rpc');
-            htmx.ajax('POST', '/rpc', { target: '#app-popup-body', swap: 'innerHTML', values, headers: window.hyperRpcCsrfHeaders() });
+            htmx.ajax('POST', '/rpc', { target, swap: 'innerHTML', values, headers: window.hyperRpcCsrfHeaders() });
         }
     };
     if (!install()) document.addEventListener('DOMContentLoaded', install, { once: true });

@@ -61,6 +61,17 @@ HTTP/2 too).
 
 Nothing to configure. `window.hyperLive.keepsStreamWhileHidden()` tells which case a tab is in.
 
+`window.hyperLive.getStatus()` returns `"connecting" | "connected" | "disconnected"`.
+`onStatus(listener)` returns an unsubscribe function and reports changes only (read `getStatus()`
+for the initial snapshot). Open or hello means connected; errors, page hide, and intentional hidden
+HTTP/1 disconnects mean disconnected; retries mean connecting. Listener failures are isolated.
+Status describes the transport, not whether a state fetch has completed.
+
+After a non-htmx DOM render changes `data-live-topic` regions, call
+`window.hyperLive.refreshTopics(): void`. It reconnects only if the topic set changed and asks every
+state subscriber to resync on the next hello; unchanged sets do not reconnect. Hidden HTTP/1 tabs
+wait until visible. Existing htmx swap handling retains its fresh-markup behavior.
+
 ## Gaps and resync
 
 A gap is any period in which events may have been lost:
