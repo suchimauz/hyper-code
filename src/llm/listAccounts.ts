@@ -190,7 +190,7 @@ export default async function (
 
     // Remote identities share the inference provider's quota namespace, but
     // never its local credential slot. Registry metadata is secret-free.
-    const remote = ctx.fns.sshAccount?.registry ? await ctx.fns.sshAccount.registry({ action: "list" }) : [];
+    const remote = ctx.fns.sshAccount?.quotaAccounts ? await ctx.fns.sshAccount.quotaAccounts({}) : [];
     const instances = ctx.fns.sshInstance?.list ? new Set((await ctx.fns.sshInstance.list({})).map(item => item.name)) : null;
     for (const row of remote) {
         if (instances && !instances.has(row.instance)) continue;

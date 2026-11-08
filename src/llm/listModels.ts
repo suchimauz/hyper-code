@@ -217,8 +217,8 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
         "claude-fable-5-1",
     ];
     // Remote credentials and provider network calls remain on the selected SSH host.
-    if (ctx.fns.sshAccount?.registry) {
-        const [remoteAccounts, instances] = await Promise.all([ctx.fns.sshAccount.registry({action:'list'}).catch(()=>[]),ctx.fns.sshInstance.list({}).catch(()=>[])]);
+    if (typeof ctx.fns.sshAccount?.quotaAccounts === 'function') {
+        const [remoteAccounts, instances] = await Promise.all([ctx.fns.sshAccount.quotaAccounts({}).catch(()=>[]),ctx.fns.sshInstance.list({}).catch(()=>[])]);
         const remoteCache:Record<string,string[]> = (ctx as any).state ? ((ctx as any).state.sshModelCatalog??={}) : {};
         await Promise.all(remoteAccounts.filter(x=>(x.provider==='codex'||x.provider==='claude-code'||x.provider==='kimi-coding')&&x.status==='connected'&&instances.some(i=>i.name===x.instance&&i.pinnedHostKey)).map(async remote=>{
             const prefix=`ssh/${remote.instance}:${remote.provider}/${remote.account}`;

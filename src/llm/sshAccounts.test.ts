@@ -8,7 +8,7 @@ test("SSH inventory uses recorded normal-provider synthetic quota identities wit
     const ctx = { env: { HOME: "" }, fns: { llm: {
         usageOverview: async () => [{ provider: "codex", account: "ssh.alpha.main", usedPercent: 80, planType: "pro", resetsAt: 99 }],
         accountAuthHealth: async () => [{ provider: "codex", account: "ssh.alpha.blocked", needsReconnect: true }], accountCredentialExists: () => false,
-    }, sshInstance: { list: async () => [{ name: "alpha" }, { name: "beta" }] }, sshAccount: { registry: async () => [
+    }, sshInstance: { list: async () => [{ name: "alpha" }, { name: "beta" }] }, sshAccount: { registry: async () => { throw new Error("Owner-only registry must not be read"); }, quotaAccounts: async () => [
         { instance: "alpha", provider: "codex", account: "main", status: "connected" },
         { instance: "beta", provider: "codex", account: "main", status: "pending" },
         { instance: "alpha", provider: "codex", account: "blocked", status: "connected" },
