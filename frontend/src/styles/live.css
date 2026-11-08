@@ -1,0 +1,29 @@
+.agent-search { display: block; width: calc(100% - 16px); margin: 0 8px 20px; min-height: var(--control-height); padding: 8px 10px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.composer-actions { display: flex; align-items: center; gap: 8px; }
+.connection-error { padding: 12px 16px; background: var(--accent-soft); color: var(--text); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.connection-error a { color: var(--link); }
+.transcript-notice { color: var(--text-secondary); font-size: 12px; line-height: 1.7; padding: 12px; }
+.load-older-row { display: flex; justify-content: center; }
+.load-older { padding: 4px 12px; border: 0; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 400; line-height: normal; color: var(--text-secondary); background: var(--hover-solid); cursor: pointer; }
+.load-older:disabled { cursor: default; opacity: .6; }
+.chat-content > .load-older-row + .message { margin-top: 6px; }
+.markdown { overflow-wrap: anywhere; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown a, .attachment-link, .live-tool a { color: var(--link); }
+.markdown pre, .live-tool pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); padding: 12px; border-radius: 8px; font-size: 12px; max-height: 440px; overflow: auto; }
+.markdown :not(pre) > code { font-size: .92em; background: var(--bg); padding: 2px 4px; border-radius: 4px; }
+.markdown img { max-width: 100%; height: auto; }
+.markdown table { display: block; overflow-x: auto; border-collapse: collapse; max-width: 100%; }
+.markdown td, .markdown th { border: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+.markdown h1 { font-size: 24px; letter-spacing: -.5px; }
+.markdown h2 { font-size: 20px; }
+.markdown h3 { font-size: 17px; }
+.markdown blockquote { margin-inline: 0; padding-left: 14px; border-left: 2px solid var(--line); color: var(--text-secondary); }
+.live-tool { margin: 12px 0; }
+.live-tool summary { overflow-wrap: anywhere; display: block; }
+.live-tool a { display: inline-block; padding: 10px; }
+.attachment-link { display: block; padding-block: 6px; }
+.message--error { border-left: 3px solid var(--accent); padding-left: 12px; }
+@media (max-width: 1000px) { .agent-search { font-size: 16px; } }
+.markdown a:hover, .attachment-link:hover, .live-tool a:hover, .connection-error a:hover { color: var(--link-hover); }

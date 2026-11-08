@@ -1,0 +1,10 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { ChatViewport } from './ChatViewport';
+import { Composer } from '../hyper/Composer';
+import { Transcript } from '../hyper/Transcript';
+import { LiveComposer } from '../hyper/LiveComposer';
+import { CrabMascot } from '../hyper/CrabMascot';
+const meta = { title: 'Компоновка/ChatViewport', component: ChatViewport } satisfies Meta<typeof ChatViewport>;
+export default meta;
+export const ScrollReference: StoryObj = { render: () => <section className="chat-panel" style={{ height: '85vh' }}><ChatViewport><Transcript agentId="fixture" events={Array.from({ length: 30 }, (_, i) => ({ idx: i, ts: i * 1000, type: i % 2 ? 'assistant' : 'user', text: `Сообщение ${i + 1}. Проверка прокрутки: краб, плавное исчезновение текста и кнопка вниз.` }))} page={null} hasOlder={false} loadingOlder={false} loadOlder={async () => {}} /><div className="chat-bottom"><LiveComposer agentId="fixture" running={false} onAccepted={() => {}} mascot={<CrabMascot page={null} />} /></div></ChatViewport></section> };
+export const Resizable: StoryObj = { render: () => <section className="chat-panel" style={{ height: '85vh' }}><ChatViewport><div className="chat-scroll"><div className="chat-content">{Array.from({ length: 30 }, (_, i) => <p key={i}>Сообщение {i + 1}. Полоса прокрутки остаётся у края панели, а ширина содержимого меняется независимо.</p>)}</div></div><div className="chat-bottom"><Composer onSend={() => {}} /></div></ChatViewport></section> };

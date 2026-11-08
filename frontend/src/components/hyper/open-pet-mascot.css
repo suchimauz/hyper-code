@@ -1,0 +1,12 @@
+/* Scale the visible artwork, not the transparent 192×208 atlas cell.
+   Baselines measured from the idle alpha bounds; keep one stable anchor during jumps. */
+.open-pet-mascot { position: absolute; right: 8px; bottom: calc(100% - var(--pet-baseline)); width: 72px; height: 78px; transform: scale(var(--pet-scale)); transform-origin: bottom right; pointer-events: none; z-index: 5; }
+.open-pet-mascot[data-pet="bitty"] { --pet-scale: .65; --pet-baseline: 2px; }
+.open-pet-mascot[data-pet="tmuxai"] { --pet-scale: .65; --pet-baseline: 1.2px; }
+.open-pet-mascot[data-pet="planet"] { --pet-scale: .75; --pet-baseline: 10.7px; }
+.open-pet-mascot[data-pet="rainbow-terminal-cat"] { --pet-scale: .8; --pet-baseline: 12.6px; }
+.open-pet-window { display: block; width: 72px; height: 78px; overflow: hidden; }
+.open-pet-strip { display: block; width: 576px; height: 702px; background: var(--open-pet-sheet) 0 0 / 100% 100% no-repeat; image-rendering: pixelated; }
+.open-pet-hit { position: absolute; inset: 10px 4px 0; border: 0; padding: 0; background: transparent; pointer-events: auto; cursor: pointer; border-radius: 8px; }
+.open-pet-hit:disabled { pointer-events: none; }
+.open-pet-hit:focus-visible { outline: 2px solid var(--text-tertiary); outline-offset: 2px; }

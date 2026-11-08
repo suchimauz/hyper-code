@@ -1,0 +1,6 @@
+.agent-message .tool-row-leading, .agent-message-id { color: hsl(var(--agent-hue) 65% 45%); }
+[data-theme='dark'] .agent-message .tool-row-leading, [data-theme='dark'] .agent-message-id { color: hsl(var(--agent-hue) 65% 65%); }
+.agent-message-id { font-weight: 700; }
+.agent-message-content { min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.agent-message-meta { margin: 0 0 8px; color: var(--text-tertiary); font-size: 11px; }
+.tool-row-panel.agent-message-body pre { margin: 0; padding: 0; font-family: var(--font-sans, inherit); font-size: 13px; line-height: 1.6; max-height: none; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }

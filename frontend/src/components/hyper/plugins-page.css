@@ -1,0 +1,87 @@
+/* Measured against dsh "Plugins" (dsh-claude-style): 28px top inset, 20/500 title, 28px refresh,
+   32px accent split button, 120x34 segmented tabs, 14/500 section titles, 68px card pitch, 50px icon tile. */
+.plugins-page button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; appearance: none; }
+.plugins-page { height: 100%; overflow-y: auto; background: var(--bg); color: var(--text); }
+.plugins-pane { max-width: 840px; margin: 0 auto; padding: 28px 31px 40px; }
+.plugins-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.plugins-header h1 { margin: 0; font-size: 20px; font-weight: 500; line-height: 25px; }
+.plugins-sub { display: flex; align-items: center; gap: 4px; margin: 4px 0 0; color: var(--text-tertiary); font-size: 13px; line-height: 20px; }
+.plugins-page .plugins-info { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 8px; color: var(--text-tertiary); }
+.plugins-page .plugins-info:hover { background: var(--hover); color: var(--text); }
+.plugins-about { margin: 10px 0 0; max-width: 560px; color: var(--text-secondary); font-size: 13px; line-height: 19px; }
+.plugins-tools { display: flex; align-items: center; gap: 16px; }
+.plugins-page .plugins-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--text-tertiary); flex: none; }
+.plugins-page .plugins-icon:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.plugins-icon:disabled { opacity: .5; cursor: default; }
+.is-spinning { animation: plugins-spin .9s linear infinite; }
+@keyframes plugins-spin { to { transform: rotate(360deg); } }
+.plugins-split { display: inline-flex; }
+.plugins-split a, .plugins-split button { display: inline-flex; align-items: center; height: 32px; background: var(--accent); color: var(--on-accent); text-decoration: none; font-size: 13px; }
+.plugins-split a:hover, .plugins-split button:hover { background: var(--accent-hover); }
+.plugins-add { gap: 6px; padding: 0 12px; border-radius: 12px 0 0 12px; }
+.plugins-add-more { justify-content: center; width: 32px; border-radius: 0 12px 12px 0; border-left: 1px solid color-mix(in srgb, var(--on-accent) 25%, transparent); }
+.plugins-tabs { display: inline-flex; margin-top: 24px; padding: 4px; border-radius: 14px; background: var(--hover); }
+.plugins-page .plugins-tabs button { width: 120px; height: 34px; border-radius: 12px; color: var(--text-secondary); font-size: 14px; font-weight: 500; border: 1px solid transparent; }
+.plugins-page .plugins-tabs button[aria-selected='true'] { background: var(--bg); color: var(--text); border-color: var(--line-strong); }
+.plugins-search { display: flex; align-items: center; gap: 7px; height: 36px; margin-top: 20px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text-tertiary); }
+.plugins-search:focus-within { border-color: var(--text-tertiary); }
+.plugins-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; }
+.plugins-search input::-webkit-search-cancel-button { display: none; }
+.plugins-page .plugins-search button { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; }
+.plugins-section { margin-top: 32px; }
+.plugins-section h3 { margin: 0 0 12px; font-size: 14px; font-weight: 500; line-height: 17px; }
+.plugins-section h3 span { margin-left: 4px; color: var(--text-tertiary); font-weight: 400; }
+.plugins-list { list-style: none; margin: 0; padding: 0; }
+.plugins-card-row { display: flex; align-items: center; gap: 14px; min-height: 68px; }
+.plugins-tile { display: grid; place-items: center; flex: none; width: 50px; height: 50px; border: 1px solid var(--line-strong); border-radius: 12px; color: var(--text-secondary); font-size: 22px; }
+.plugins-card-main { flex: 1; min-width: 0; }
+.plugins-page .plugins-card-title { display: inline; padding: 0; color: var(--text); font-size: 14px; font-weight: 500; line-height: 20px; text-decoration: none; text-align: left; }
+.plugins-page .plugins-card-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.plugins-card-desc { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-tertiary); font-size: 14px; line-height: 20px; }
+.plugins-badge { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--hover); color: var(--text-secondary); font-size: 12px; line-height: 16px; }
+.plugins-badge.is-installed { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.plugins-get { flex: none; height: 28px; padding: 0 12px; display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text); font-size: 13px; text-decoration: none; }
+.plugins-get:hover { background: var(--hover); }
+button.plugins-get { background: transparent; font: inherit; font-size: 13px; cursor: pointer; }
+button.plugins-get:disabled { opacity: .5; cursor: default; }
+.plugins-split button { border: 0; font: inherit; font-size: 13px; cursor: pointer; }
+.plugins-details { margin: 0 0 12px 64px; padding: 10px 12px; border-radius: 10px; background: var(--hover); font-size: 13px; }
+.plugins-details dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+.plugins-details dt { color: var(--text-tertiary); }
+.plugins-details dd { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; min-width: 0; }
+.plugins-details code { font-family: var(--font-mono); font-size: 12px; }
+.plugins-links { display: flex; gap: 16px; margin-top: 10px; }
+.plugins-links a { color: var(--accent); text-decoration: none; }
+.plugins-links a:hover { text-decoration: underline; }
+.plugins-muted { color: var(--text-tertiary); font-size: 13px; }
+.plugins-error { margin: 16px 0 0; color: var(--tool-error); font-size: 13px; }
+@media (max-width: 700px) {
+  .plugins-pane { padding: 20px 16px 32px; }
+  .plugins-header { flex-wrap: wrap; }
+  .plugins-page .plugins-tabs button { width: auto; padding: 0 14px; }
+  .plugins-details { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .is-spinning { animation: none; } }
+
+.plugins-add.is-single { border-radius: 12px; }
+.plugin-detail { margin-top: 20px; }
+.plugins-page .plugin-detail-back { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; margin-left: -8px; border-radius: 8px; color: var(--text-secondary); font-size: 13px; }
+.plugins-page .plugin-detail-back:hover { background: var(--hover); color: var(--text); }
+.plugin-detail-head { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+.plugin-detail-head h2 { margin: 0; font-size: 18px; font-weight: 500; line-height: 24px; }
+.plugin-detail-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 16px 0 0; font-size: 13px; }
+.plugin-detail-facts dt { color: var(--text-tertiary); }
+.plugin-detail-facts dd { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; min-width: 0; }
+.plugin-detail-facts code, .plugin-detail-fns summary code, .plugin-detail-settings code { font-family: var(--font-mono); font-size: 12px; }
+.plugins-page .plugins-tabs button span { margin-left: 4px; color: var(--text-tertiary); font-weight: 400; }
+.plugin-detail .plugins-tabs button { width: auto; padding: 0 14px; }
+.plugin-detail-overview { margin-top: 20px; font-size: 14px; line-height: 1.55; }
+.plugin-detail-fns, .plugin-detail-settings { list-style: none; margin: 16px 0 0; padding: 0; }
+.plugin-detail-fns li, .plugin-detail-settings li { border-bottom: 1px solid var(--line); }
+.plugin-detail-fns summary { display: flex; gap: 12px; align-items: baseline; padding: 10px 4px; cursor: pointer; font-size: 13px; }
+.plugin-detail-fns summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-tertiary); }
+.plugin-detail-sig { margin: 0 0 10px; }
+.plugin-detail-sig pre { max-height: 320px; }
+.plugin-detail-settings li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 4px; font-size: 13px; }
+.plugin-detail-settings p { margin: 4px 0 0; color: var(--text-tertiary); }
+.plugin-detail-settings strong { font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }

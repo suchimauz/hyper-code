@@ -1,0 +1,12 @@
+{
+  "id": "rainbow-terminal-cat",
+  "displayName": "Rainbow Terminal Cat",
+  "source": "https://openpets.dev/pets/content/c34310dc98c6c2d6185cd51d046abbd2a1f97b2cca6e00661598e442452d61c5/rainbow-terminal-cat-d536e2b1/spritesheet.webp",
+  "metadata": {
+    "id": "rainbow-terminal-cat",
+    "displayName": "Rainbow Terminal Cat",
+    "description": "A compact rainbow-gradient pixel cat curled beside a tiny terminal.",
+    "spritesheetPath": "spritesheet.webp"
+  },
+  "artworkLicense": "Not specified by the source; rights remain with their respective owners. Local user-requested integration; no MIT artwork license claimed."
+}

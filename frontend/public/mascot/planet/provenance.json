@@ -1,0 +1,12 @@
+{
+  "id": "planet",
+  "displayName": "Planet",
+  "source": "https://openpets.dev/pets/content/0511e42fa17231359d3e3211c1000ad6079b9f08ffe22a342cccf2a264df6f06/planet-openpets/spritesheet.webp",
+  "metadata": {
+    "id": "planet",
+    "displayName": "Planet",
+    "description": "A small purple pixel planet with a blue ring.",
+    "spritesheetPath": "spritesheet.webp"
+  },
+  "artworkLicense": "Not specified by the source; rights remain with their respective owners. Local user-requested integration; no MIT artwork license claimed."
+}

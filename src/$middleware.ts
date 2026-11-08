@@ -41,6 +41,9 @@ export default async function (ctx: Context, session: Session | null, opts: { re
         }
     }
 
+    const frontendPage = await ctx.fns.frontendRuntime.page({ req: opts.req });
+    if (frontendPage) return frontendPage;
+
     if (opts.req.method !== "GET") return;
     const agent = /^\/(?:a|agent)\/([A-Za-z0-9_-]+)/.exec(url.pathname)?.[1];
     if (!agent || agent === "new") return;

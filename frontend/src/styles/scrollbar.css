@@ -1,0 +1,24 @@
+/* Scrollbar rules from dsh-claude-style (home-dev web profile).
+   Standard scrollbar-width/color intentionally take precedence in modern browsers;
+   native arrows and final geometry are browser/platform controlled, as upstream.
+   Legacy WebKit fallback is 8px. No custom scrollbar-button override. */
+:root, [data-theme='light'] {
+  --scrollbar-thumb: rgba(213, 213, 213, .9);
+  --scrollbar-thumb-hover: rgba(138, 138, 138, .8);
+}
+[data-theme='dark'] {
+  --scrollbar-thumb: rgba(62, 62, 62, .9);
+  --scrollbar-thumb-hover: rgba(113, 113, 113, .9);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']), [data-theme='system'] {
+    --scrollbar-thumb: rgba(62, 62, 62, .9);
+    --scrollbar-thumb-hover: rgba(113, 113, 113, .9);
+  }
+}
+body * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+body ::-webkit-scrollbar { width: 8px; height: 8px; }
+body ::-webkit-scrollbar-track { background: transparent; }
+body ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 9999px; }
+body ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+@media (forced-colors: active) { body * { scrollbar-color: auto; } }

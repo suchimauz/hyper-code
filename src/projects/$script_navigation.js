@@ -14,7 +14,7 @@
   const hidden = () => new URLSearchParams(location.search).get('embed') === '1' || document.body.dataset.presentation === 'sidebar';
   // URL changes before HTMX swaps: never attribute the old panel to the new visit.
   const current = () => {
-    const match = location.pathname.match(/^\/agent\/([^/]+)\/?$/);
+    const match = location.pathname.match(/^(?:\/old-ui)?\/agent\/([^/]+)\/?$/);
     const id = document.querySelector('#main #chat-panel')?.dataset.agentId || '';
     return match && decodeURIComponent(match[1]) === id ? id : '';
   };
@@ -22,7 +22,7 @@
   let panel = null, panelKind = '', panelOpener = null;
   let pendingReturn;
   const here = () => location.pathname + location.search + location.hash;
-  const projectPage = url => /^\/projects\/(view|archive)$/.test(new URL(url, location.href).pathname);
+  const projectPage = url => /^(?:\/old-ui)?\/projects\/(view|archive)$/.test(new URL(url, location.href).pathname);
   const localUrl = value => typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') && new URL(value, location.href).origin === location.origin;
   // Keep the entry point on this browser history entry, not in a global "last chat".
   // Internal archive/list visits carry it forward, including a full page reload.
@@ -134,6 +134,7 @@
     dialog.querySelector('[data-confirm-cancel]').focus();
   });
   const go = (url, returning = null) => {
+    url = window.hyperLegacyUrl(url);
     // Preserve selection/reorder ordering, but show intent immediately. The
     // preload client aborts an old page fetch and queued obsolete visits skip.
     const source = projectPage(url) ? (panel ? snapshot() : returnState() || (url === here() ? null : snapshot())) : null;
@@ -164,7 +165,7 @@
   async function refresh(select = false) {
     if (hidden() || navigating || reordering || !document.getElementById('project-sidebar')) return;
     const agentId = current(), path = location.pathname + location.search;
-    if (location.pathname.startsWith('/agent/') && !agentId) return;
+    if (/^(?:\/old-ui)?\/agent\//.test(location.pathname) && !agentId) return;
     const n = ++request;
     try {
       const q = new URLSearchParams({agentId, projectId:project()});

@@ -1,0 +1,14 @@
+.crab-mascot { position: absolute; right: 8px; bottom: 100%; width: 104px; height: 72px; pointer-events: none; z-index: 5; }
+.crab-window { position: absolute; left: var(--crab-left); top: var(--crab-top); width: var(--crab-width); height: var(--crab-height); overflow: hidden; }
+.crab-strip { display: block; position: absolute; width: var(--crab-sheet-width); height: var(--crab-sheet-height); background: var(--crab-body) 0 0 / 100% 100% no-repeat; image-rendering: pixelated; }
+.crab-strip::after { content: ''; position: absolute; inset: 0; background: var(--text-tertiary); mask: var(--crab-ink) 0 0 / 100% 100% no-repeat; }
+.crab-hit { position: absolute; left: 44px; top: 36px; width: 52px; height: 36px; border: 0; background: transparent; padding: 0; pointer-events: auto; touch-action: none; cursor: grab; }
+.crab-hit:disabled { pointer-events: none; }
+.crab-hit:active { cursor: grabbing; }
+.crab-mascot:not([data-pet="crab"]) .crab-strip::after { display: none; }
+/* Normalize visible characters against the crab, preserving sprite proportions and hit alignment. */
+.composer-input-anchor .crab-mascot[data-pet="deepy"] { width: 104px; height: 104px; bottom: calc(100% - 3px); transform: scale(.75); transform-origin: bottom right; }
+.crab-mascot[data-pet="deepy"] .crab-hit { left: 24px; top: 60px; width: 64px; height: 36px; }
+.composer-input-anchor .crab-mascot[data-pet="whalegirl"] { width: 138px; height: 132px; bottom: calc(100% - 6px); transform: scale(.5); transform-origin: bottom right; }
+.crab-mascot[data-pet="whalegirl"] .crab-hit { left: 24px; top: 20px; width: 104px; height: 104px; }
+.crab-hit:focus-visible { outline: 2px solid var(--text-tertiary); outline-offset: 2px; border-radius: 8px; }

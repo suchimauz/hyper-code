@@ -1,0 +1,8 @@
+/* Symbols Nerd Font Mono v3.4.0 (Nerd Fonts, MIT/OFL glyph sources). unicode-range limits it to icon code
+   points, so ordinary text never downloads it and never renders in it. */
+@font-face {
+  font-family: 'Symbols Nerd Font Mono';
+  src: url('../../assets/fonts/SymbolsNerdFontMono-Regular.ttf') format('truetype');
+  font-display: swap;
+  unicode-range: U+23FB-23FE, U+2665, U+26A1, U+2B58, U+E000-F8FF, U+F0000-FFFFD;
+}

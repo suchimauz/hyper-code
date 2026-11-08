@@ -1,0 +1,13 @@
+{
+  "id": "bitty",
+  "displayName": "Bitty",
+  "source": "https://openpets.dev/pets/content/0db8d45ee8ebf5df5c3c081584a9052cbaa4e226143c58a06b88caf246b8a756/bitty-openpets/spritesheet.webp",
+  "metadata": {
+    "id": "bitty",
+    "displayName": "Bitty",
+    "description": "A tiny retro handheld console with a smiling green screen.",
+    "spritesheetPath": "spritesheet.webp",
+    "category": "western"
+  },
+  "artworkLicense": "Not specified by the source; rights remain with their respective owners. Local user-requested integration; no MIT artwork license claimed."
+}

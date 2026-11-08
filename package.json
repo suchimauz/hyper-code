@@ -13,15 +13,29 @@
     "test": "bun script/test.ts fast",
     "test:it": "bun script/test.ts it",
     "test:live": "bun script/test.ts live",
-    "test:all": "bun script/test.ts all"
+    "test:all": "bun script/test.ts all",
+    "frontend:dev": "vite --config frontend/vite.config.ts",
+    "frontend:build": "tsc -b frontend/tsconfig.json && vite build --config frontend/vite.config.ts",
+    "frontend:test": "vitest run --config frontend/vite.config.ts",
+    "frontend:storybook": "storybook dev -c frontend/.storybook -p 6006 --host 127.0.0.1 --no-open",
+    "frontend:build-storybook": "storybook build -c frontend/.storybook -o frontend/storybook-static"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/web-push": "^3.6.4",
-    "happy-dom": "^20.11.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "happy-dom": "^20.11.2",
+    "@storybook/react-vite": "10.6.6",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "jsdom": "26.1.0",
+    "storybook": "10.6.6",
+    "typescript": "7.0.2",
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",
@@ -46,10 +60,18 @@
     "marked": "^18.0.7",
     "medeo-font": "1.0.0-rc.3",
     "parse5": "^8.0.1",
-    "shiki": "^4.0.2",
+    "shiki": "4.6.0",
     "tailwindcss": "^4.3.3",
     "telegram": "^2.26.22",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "@base-ui/react": "1.9.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "lucide-react": "1.70.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1"
   },
   "procs": {
     "plugins": [
@@ -71,7 +93,10 @@
       "procs/http": {
         "port": 3010
       },
-      "h2": {}
+      "h2": {},
+      "frontendRuntime": {
+        "required": true
+      }
     },
     "modules": {
       "browser": {},
@@ -146,7 +171,8 @@
       },
       "humanizer": {
         "path": "plugins/humanizer"
-      }
+      },
+      "hyper-ui-bridge": false
     }
   }
 }

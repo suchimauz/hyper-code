@@ -1,0 +1,45 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ToolRow } from '../components/hyper/ToolRow';
+const event = { idx: 3, ts: 1, type: 'tool_call', name: 'read', text: null, preview: 'Read App.tsx' };
+const detail = { ...event, args: '{"path":"src/App.tsx"}', argsTruncated: false, result: '<script>bad()</script>', resultTruncated: true, isError: false };
+afterEach(() => vi.unstubAllGlobals());
+it('uses SVG, loads structured file details and caches them across toggles', async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ event: detail }), { headers: { 'content-type': 'application/json' } }));
+  vi.stubGlobal('fetch', fetcher);
+  const { container } = render(<ToolRow event={event} agentId="fixture" />);
+  const row = screen.getByRole('button', { name: /Read/ });
+  expect(row.querySelector('svg')).not.toBeNull();
+  expect(row).toHaveAttribute('aria-expanded', 'false');
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+  await userEvent.click(row);
+  expect(await screen.findByText('<script>bad()</script>')).toBeInTheDocument();
+  expect(container.querySelector('script')).toBeNull();
+  expect(screen.getByText('Результат сокращён сервером.')).toBeVisible();
+  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/agents/fixture/events/3');
+  await userEvent.click(row); await userEvent.click(row);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('supports keyboard disclosure, errors and retry for unknown tools', async () => {
+  const fetcher = vi.fn().mockRejectedValueOnce(new Error('Network failed')).mockResolvedValueOnce(new Response(JSON.stringify({ event: { ...detail, name: 'plugin.custom' } }), { headers: { 'content-type': 'application/json' } }));
+  vi.stubGlobal('fetch', fetcher);
+  render(<ToolRow event={{ ...event, name: 'plugin.custom' }} agentId="fixture" />);
+  screen.getByRole('button', { name: /plugin.custom/ }).focus();
+  await userEvent.keyboard('{Enter}');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Network failed');
+  await userEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  expect(await screen.findByText('<script>bad()</script>')).toBeVisible();
+});
+it('renders actual edit pairs and distinguishes result errors', async () => {
+  render(<ToolRow agentId="fixture" event={{ ...event, name: 'edit', type: 'tool_result', isError: true }} initialDetails={{ ...detail, args: JSON.stringify({ edits: [{ oldText: 'old', newText: 'new' }] }), name: 'edit', isError: true }} />);
+  await userEvent.click(screen.getByRole('button', { name: /Edit/ }));
+  expect(document.querySelector('.tool-row-removed .syntax-line-content')).toHaveTextContent('old');
+  expect(document.querySelector('.tool-row-added .syntax-line-content')).toHaveTextContent('new');
+  expect(document.querySelector('.tool-row-removed .syntax-prefix')).toHaveTextContent('−');
+  expect(document.querySelector('.tool-row-added .syntax-prefix')).toHaveTextContent('+');
+  expect(document.querySelector('.tool-row-added .syntax-gutter')).toHaveTextContent('1');
+  expect(document.querySelector('.tool-row[data-error]')).toBeInTheDocument();
+  expect(document.querySelector('.tool-row-error')).toBeNull();
+});

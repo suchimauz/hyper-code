@@ -30,6 +30,8 @@ export default async function (ctx: Context, session: Session | null, opts: {
     return `<!doctype html>
 <html>
 <head>
+${(session as any)?.legacyUi ? '<script>window.hyperLegacyUi=true;</script>' : ''}
+<script>window.hyperLegacyPath=function(path){return path.replace(/^\\/old-ui(?=\\/|$)/,"")||"/"};window.hyperLegacyUrl=function(url){return window.hyperLegacyUi&&typeof url==="string"&&url.startsWith("/")&&!url.startsWith("//")&&!/^\\/old-ui(?:[/?#]|$)/.test(url)?"/old-ui"+url:url};</script>
 <meta charset="utf-8">
 <meta name="csrf-token" content="${esc(csrfToken)}">
 <meta name="theme-color" content="#ffffff">
@@ -52,6 +54,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
      instead of resetting it to whatever the server rendered. -->
 <meta name="htmx-config" content='{"morphIgnore":["data-htmx-powered","open"]}'>
 <script src="/procs/ui/htmx.js" defer></script>
+${(session as any)?.legacyUi ? '<script src="/legacyUi/navigation.js" defer></script>' : ''}
 <link rel="stylesheet" href="/ui/vendor/phosphor.css">
 <link rel="stylesheet" href="/ui/vendor/medeo.css">
 <style>

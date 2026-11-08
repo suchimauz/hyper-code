@@ -1,0 +1,10 @@
+/* Keep tool-row geometry and 6px spacing between history records, but use
+   transcript-group spacing outside the list. History stays outside collapsed work. */
+.process-group-body.question-history-list { margin-top: 16px; max-height: none; }
+.chat-content > .question-history-list + .message { margin-top: 16px; }
+.question-history-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+/* ToolBody's sections own backgrounds, borders, radius, padding and labels.
+   Match its preview typography while retaining semantic lists and plain text. */
+.question-history-copy { font: 12px/1.65 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.question-history-copy p { margin: 0; }
+.question-history-copy ul { margin: 0; padding-left: 16px; }

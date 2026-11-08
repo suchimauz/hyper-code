@@ -1,0 +1,24 @@
+.new-session-panel > .toolbar { height: 52px; border-bottom: 0; }
+.new-session-panel > .toolbar .toolbar-heading { visibility: hidden; }
+.new-session-panel .chat-viewport { min-height: 0; }
+.new-session-panel .chat-width-toolbar, .new-session-panel .chat-width-handle { display: none; }
+.new-session-panel .chat-readonly-boundary { padding: 2px 16px calc(var(--composer-height, 150px) + 16px); overflow-y: auto; display: block; }
+.chat-panel.new-session-panel .chat-viewport > .chat-bottom { width: min(720px, 100%); padding-inline: 16px; }
+.new-session-panel .new-session-welcome { max-width: 688px; }
+@media (max-height: 600px) { .new-session-panel .welcome-stats { max-height: 180px; overflow-y: auto; } }
+.new-session-composer { width: 100%; }
+.new-session-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 4px; margin-bottom: 10px; }
+.new-session-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 50%; height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: transparent; color: var(--text-secondary); font: 500 13px/20px var(--font-sans); white-space: nowrap; }
+.mascot-picker { max-width: 100%; }
+.new-session-chip span { overflow: hidden; text-overflow: ellipsis; }
+.new-session-chip svg { flex-shrink: 0; color: var(--text); }
+button.new-session-chip:hover { background: var(--hover); }
+.new-session-footer { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; min-height: 28px; gap: 8px; margin: 6px 0 0; padding: 0 4px; color: var(--text-secondary); font-size: 13px; }
+.new-session-footer > .composer-add { justify-self: start; }
+.new-session-draft-label { justify-self: center; font-size: 12px; color: var(--text-tertiary); }
+.new-session-model { justify-self: end; display: flex; align-items: center; gap: 8px; min-width: 0; }
+@media (pointer: coarse) { .new-session-footer { min-height: 44px; grid-template-columns: 44px minmax(0, 1fr) auto; } }
+.new-session-retry { margin-top: 8px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--text); }
+.workspace-draft-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 28px; padding: 4px 6px; border-radius: 6px; font: inherit; font-size: var(--font-body); text-align: left; }
+.workspace-draft-row.is-selected { background: var(--selected); }
+@media (max-width: 480px) { .new-session-chips { gap: 8px; } .new-session-model { gap: 8px; } }

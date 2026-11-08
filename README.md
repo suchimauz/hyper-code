@@ -55,6 +55,18 @@ Open **http://localhost:3010/**. Configure your provider, then create a chat and
 
 The installer can also update an existing installation: it fast-forwards the checkout, installs dependencies, and restarts the service. Review local changes before running it again.
 
+### Integrated frontend and hot reload
+
+The React UI lives in `frontend/` and shares the root `package.json`, `bun.lock`, and `node_modules` with Hyper. Install once with `bun install`; start everything with `bun run start` (or the existing Hyper service). Hyper starts and closes an in-process Vite server automatically. Do not run `frontend:dev` alongside the service: both use loopback port 5174.
+
+The main UI is served at `/`, and the previous interface remains available at `/old-ui/`. Frontend edits use Vite Fast Refresh through the same Hyper address; `/ui-lab/` carries assets and the HMR socket, while `/ui-lab-api/` is the integrated UI adapter. Port 5174 is internal, not a separate public entry point. No production bundle is required for this live-development setup; install dev dependencies too.
+
+- `bun run frontend:test` — React tests.
+- `bun run frontend:build` — optional typecheck and bundle verification.
+- `bun run frontend:storybook` — component development, separately from the main service.
+
+The former private `hyper-ui-bridge` plugin is replaced by `src/frontendBridge/` and disabled in the project configuration. Existing `workspace.json` overrides must also disable that plugin (`"hyper-ui-bridge": false`). Neither the original UI directory nor a private plugin is required on a fresh checkout.
+
 ### Connect a model
 
 API credentials belong in the checkout's `.env` or the corresponding provider settings. For example, add one of these to `.env` without removing the generated `DATABASE_URL`:

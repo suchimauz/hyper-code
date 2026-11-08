@@ -8,12 +8,13 @@
   const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
   const allowed = value => {
     try {
-      const url = new URL(value, location.href);
+      const url = new URL(window.hyperLegacyUrl(value), location.href);
+      const path = window.hyperLegacyPath(url.pathname);
       if (url.origin !== location.origin || url.username || url.password || url.hash) return null;
-      if (!/^\/(agent\/[A-Za-z0-9_-]+|projects\/(view|archive)|llms)\/?$/.test(url.pathname) || /^\/agent\/new\/?$/.test(url.pathname)) return null;
-      const keys = url.pathname.startsWith('/projects/') ? ['projectId','list','archive'] : url.pathname.startsWith('/llms') ? ['provider'] : [];
+      if (!/^\/(agent\/[A-Za-z0-9_-]+|projects\/(view|archive)|llms)\/?$/.test(path) || /^\/agent\/new\/?$/.test(path)) return null;
+      const keys = path.startsWith('/projects/') ? ['projectId','list','archive'] : path.startsWith('/llms') ? ['provider'] : [];
       if ([...url.searchParams.keys()].some(key => !keys.includes(key))) return null;
-      if (/^\/projects\/view\/?$/.test(url.pathname) && !url.searchParams.get('projectId')?.trim()) return null;
+      if (/^\/projects\/view\/?$/.test(path) && !url.searchParams.get('projectId')?.trim()) return null;
       return url.pathname + url.search;
     } catch { return null; }
   };
@@ -257,7 +258,7 @@
     // A speculative GET does not mark read/hot. Record a real visit only after
     // its cached page has actually landed. Never swap that second response over
     // the user's newly mounted form, selection or restored draft.
-    if (ticket && ctx.hyperNavigationCached && ticket.url.startsWith('/agent/')) {
+    if (ticket && ctx.hyperNavigationCached && /^(?:\/old-ui)?\/agent\//.test(ticket.url)) {
       void fetch(ticket.url,{credentials:'same-origin',cache:'no-store',headers:{'HX-Request':'true','HX-Target':'main#main'}})
         .then(response=>response.body?.cancel()).catch(error=>console.debug('Visit bookkeeping unavailable',error));
     }

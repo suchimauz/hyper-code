@@ -91,9 +91,9 @@
             entries.push('-');
         }
         for (const id of hidden()) entries.push({ icon: 'ph-eye', label: 'Show ' + (names[id] || id), run: async () => { await save({ hidden: hidden().filter(x => x !== id) }); location.reload(); } });
-        const here = location.pathname + location.search;
+        const here = window.hyperLegacyPath(location.pathname) + location.search;
         const pinnedHere = !!document.querySelector(`#dock [data-dock-id="${CSS.escape('page:' + here)}"]`);
-        const agentHere = /^\/agent\/([A-Za-z0-9_-]+)$/.exec(location.pathname)?.[1];
+        const agentHere = /^(?:\/old-ui)?\/agent\/([A-Za-z0-9_-]+)$/.exec(location.pathname)?.[1];
         if (agentHere && !document.querySelector(`#dock [data-dock-id="agent:${CSS.escape(agentHere)}"]`)) entries.push({ icon: 'ph-push-pin', label: 'Pin this chat', run: () => pin('agent', agentHere, true) });
         else if (!agentHere && !pinnedHere) entries.push({ icon: 'ph-push-pin', label: 'Pin this page', run: () => pin('page', here, true) });
         entries.push({ icon: 'ph-arrow-counter-clockwise', label: 'Reset Dock', run: reset });

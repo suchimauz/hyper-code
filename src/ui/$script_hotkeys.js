@@ -7,13 +7,13 @@
 
     const HISTORY_KEY = 'hyper:chat-jump-history';
     let navigating = false;
-    const currentAgentId = () => document.querySelector('#chat-panel')?.dataset.agentId || location.pathname.match(/^\/agent\/([^/]+)/)?.[1] || null;
+    const currentAgentId = () => document.querySelector('#chat-panel')?.dataset.agentId || location.pathname.match(/^(?:\/old-ui)?\/agent\/([^/]+)/)?.[1] || null;
     const history = () => {
         try { const value = JSON.parse(sessionStorage.getItem(HISTORY_KEY) || '[]'); return Array.isArray(value) ? value.filter(x => typeof x === 'string').slice(-20) : []; }
         catch { return []; }
     };
     const saveHistory = value => sessionStorage.setItem(HISTORY_KEY, JSON.stringify(value.slice(-20)));
-    const visit = id => { if (id) location.href = `/agent/${encodeURIComponent(id)}`; };
+    const visit = id => { if (id) location.href = window.hyperLegacyUrl(`/agent/${encodeURIComponent(id)}`); };
 
     async function nextUnread() {
         if (navigating) return;

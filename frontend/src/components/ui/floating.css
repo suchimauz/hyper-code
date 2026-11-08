@@ -1,0 +1,16 @@
+.floating-positioner { z-index: 1100; }
+.ui-tooltip { max-width: min(320px, calc(100vw - 24px)); padding: 6px 10px; border-radius: 7px; background: var(--text); color: var(--surface); font-size: 12px; line-height: 18px; box-shadow: var(--shadow); }
+.ui-action-menu { position: relative; isolation: isolate; width: 240px; max-width: calc(100vw - 24px); max-height: var(--available-height); overflow: auto; padding: 4px; border: 0; border-radius: 16px; background: transparent; color: var(--text); box-shadow: 0 0 0 .5px var(--line), 0 3px 8px #0000000a, 0 0 20px #0000000d; outline: none; }
+.ui-action-menu[data-wide] { width: var(--anchor-width); }
+.ui-menu-material { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: #f8f9fa94; backdrop-filter: blur(40px) saturate(150%); pointer-events: none; }
+[data-theme=dark] .ui-menu-material { background: #262626b3; }
+.ui-menu-content { position: relative; }
+.ui-menu-label { padding: 5px 8px 2px; color: var(--text-tertiary); font-size: 11px; line-height: 16px; margin: 4px 0 3px; }
+.ui-menu-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; min-height: 34px; border-radius: 12px; font-size: 13px; line-height: 22px; cursor: pointer; outline: none; }
+.ui-menu-item svg { width: 14px; height: 14px; flex: none; stroke-width: 1; }
+.ui-menu-item[data-highlighted] { background: rgba(6,6,6,.08); }
+[data-theme=dark] .ui-menu-item[data-highlighted] { background: #ffffff14; }
+.ui-menu-item[data-disabled] { opacity: .4; cursor: default; }
+.ui-menu-description { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-tertiary); font-size: 12px; line-height: 18px; }
+.ui-hover-panel { outline: none; }
+@media (pointer: coarse) { .ui-menu-item { min-height: 44px; } }

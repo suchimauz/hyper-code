@@ -1,0 +1,17 @@
+/* dsh MessageItem.module.css + configured Claude palette. */
+.chat-content .message { margin: 0; }
+.chat-content .message--assistant { padding: 0; font-size: 14px; line-height: 23px; }
+.chat-content > .message + .message { margin-top: 12px; }
+.chat-content > .work-group + .message { margin-top: 16px; }
+.user-message-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 0; max-width: min(calc(var(--chat-content-width, 748px) * .702), 82%); }
+.user-message-bubble { max-width: 100%; padding: 10px 16px; border-radius: 20px; background: var(--user-bubble, #f4f2f3); font-size: 14px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.user-message-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.user-message-actions { display: flex; align-items: center; gap: 8px; height: 28px; }
+.user-message-actions time { font-size: 13px; line-height: 24px; color: var(--text-tertiary); white-space: nowrap; padding-right: 12px; }
+.user-message-copy { width: 28px; height: 28px; display: inline-flex; justify-content: center; align-items: center; padding: 6px; border: 0; border-radius: 6px; color: var(--text-tertiary); background: transparent; cursor: pointer; }
+.user-message-copy:hover { color: var(--text-secondary); background: var(--hover); }
+@media (hover: hover) {
+  .message--user:has(~ .message--user) .user-message-actions { opacity: 0; transition: opacity 80ms; }
+  .message--user:has(~ .message--user):hover .user-message-actions, .message--user:focus-within .user-message-actions { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .user-message-actions { transition: none !important; } }

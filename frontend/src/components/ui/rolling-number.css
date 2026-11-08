@@ -1,0 +1,9 @@
+.rolling-number { display:inline-flex; position:relative; font-variant-numeric:tabular-nums; }
+.rolling-number-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.rolling-number-glyphs { display:inline-flex; }
+.rolling-digit { position:relative; display:inline-block; overflow:hidden; height:1lh; vertical-align:top; }
+.rolling-digit-sizer { visibility:hidden; }
+.rolling-digit-strip { position:absolute; inset:0 0 auto 0; display:flex; flex-direction:column; transition:transform 600ms cubic-bezier(.22,1,.36,1); will-change:transform; }
+.rolling-digit-strip > span { height:1lh; text-align:center; }
+.rolling-char { display:inline-block; }
+@media (prefers-reduced-motion: reduce) { .rolling-digit-strip { transition:none; } }

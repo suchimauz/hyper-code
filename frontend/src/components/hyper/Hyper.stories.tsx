@@ -1,0 +1,10 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { AgentListItem } from './AgentListItem';
+import { Composer } from './Composer';
+const meta = { title: 'Hyper/AgentListItem', component: AgentListItem, args: { title: 'Новый интерфейс Hyper', preview: 'Компоненты и компоновка', onSelect: () => {} } } satisfies Meta<typeof AgentListItem>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Default: Story = {};
+export const Selected: Story = { args: { selected: true } };
+export const Working: Story = { args: { active: true } };
+export const MessageComposer: Story = { render: () => <div style={{ maxWidth: 460 }}><Composer onSend={() => {}} /></div> };

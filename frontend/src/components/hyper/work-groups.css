@@ -1,0 +1,37 @@
+.work-group, .process-group { min-width: 0; margin-top: 16px; }
+.work-group-toggle { appearance: none; display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 0; border: 0; background: none; color: var(--text-tertiary); font: inherit; font-size: 14px; font-weight: 500; line-height: 17.5px; text-align: left; cursor: pointer; }
+.work-group-toggle > svg { flex: none; }
+.work-group-toggle[aria-expanded='true'] > svg { transform: rotate(180deg); }
+.work-group-toggle:hover { color: var(--text); }
+.work-group-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.work-group-heading { box-sizing: border-box; width: 100%; height: 33px; color: var(--text-tertiary); border-bottom: 1px solid var(--line-strong); font-size: 14px; font-weight: 400; line-height: 24px; padding-bottom: 8px; gap: 4px; }
+.chat-content .work-group > div > :not([hidden]) + :not([hidden]), .chat-content .process-group-body > :not([hidden]) + :not([hidden]) { margin-top: 6px; }
+.work-group > div > :first-child { margin-top: 16px; }
+.work-group + .message--assistant { margin-top: 16px; }
+.process-group-toggle[aria-expanded='true'] { padding-bottom: 8px; }
+.process-group-leading { position: relative; display: flex; align-items: center; justify-content: center; flex: 0 0 16px; width: 16px; height: 16px; }
+.process-group-leading > svg { position: absolute; }
+.process-group-leading [data-step-process-chevron] { opacity: 0; }
+.process-group-toggle[aria-expanded='true'] [data-step-process-chevron] { transform: rotate(180deg); }
+.process-group-toggle:hover [data-step-process-icon], .process-group-toggle:focus-visible [data-step-process-icon], .process-group-toggle[aria-expanded='true'] [data-step-process-icon] { opacity: 0; }
+.process-group-toggle:hover [data-step-process-chevron], .process-group-toggle:focus-visible [data-step-process-chevron], .process-group-toggle[aria-expanded='true'] [data-step-process-chevron] { opacity: 1; }
+.process-group-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.process-group-body { margin-top: 0; padding: 0; border: 0; max-height: min(400px, 50vh); overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior-y: auto; }
+.work-group [hidden], .process-group [hidden] { display: none !important; }
+@media (pointer: coarse) { .work-group-toggle { min-height: 44px; } }
+.process-group-body[data-scroll-up] { mask-image: linear-gradient(transparent, #000 24px, #000); }
+.process-group-body[data-scroll-down] { mask-image: linear-gradient(#000, #000 calc(100% - 24px), transparent); }
+.process-group-body[data-scroll-up][data-scroll-down] { mask-image: linear-gradient(transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+@media (prefers-reduced-motion: no-preference) { .work-group-toggle, .process-group-leading > svg { transition: color .1s, opacity .1s; } }
+
+.chat-content .work-group > div > .message--assistant + .process-group, .chat-content > .message--assistant + .process-group { margin-top: 12px; }
+
+/* Mobile: tool groups show every row in full (no inner scroll) and pack rows tighter.
+   Rows open a modal on tap, so a 36px target is enough inside a dense list. */
+@media (max-width: 1000px) {
+  .process-group-body { max-height: none; overflow: visible; scrollbar-gutter: auto; }
+  .process-group-body[data-scroll-up], .process-group-body[data-scroll-down] { mask-image: none; }
+  .chat-content .work-group > div > :not([hidden]) + :not([hidden]), .chat-content .process-group-body > :not([hidden]) + :not([hidden]) { margin-top: 0; }
+  .process-group-body .tool-row-summary, .process-group-body .command-row-heading { min-height: 36px; }
+  .process-group-toggle[aria-expanded='true'] { padding-bottom: 0; }
+}

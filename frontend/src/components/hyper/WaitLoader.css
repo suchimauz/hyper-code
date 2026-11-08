@@ -1,0 +1,125 @@
+/* Dot choreography adapted from dsh-claude-style (MIT); no Sodium engine code. */
+.wait-loader {
+  --dsh-claude-period-dot-bounce: .5s;
+  --dsh-claude-period-dot-line: 1.25s;
+  --dsh-claude-period-dot-orbit: 2.4s;
+  --dsh-claude-period-dot-rotate: 10s;
+  --dsh-claude-duration-dot-morph: .48s;
+  --dsh-claude-ease-harmonic: cubic-bezier(.37, 0, .63, 1);
+  --dsh-claude-ease-standard: ease;
+  --dsh-claude-ease-damped-in: cubic-bezier(.32, 0, .67, 0);
+  --dsh-claude-ease-damped-out: cubic-bezier(.33, 1, .68, 1);
+  --dsh-claude-distance-travel: 8px;
+  --dsh-claude-scale-dot-mid: .55;
+}
+.wait-loader{display:inline-flex;position:relative;flex:none;width:18px;height:14px;margin-right:6px}
+.wait-loader-lane{position:absolute;inset:0}
+.wait-loader-lane.is-resting{display:none}
+.wait-loader-dot{position:absolute;bottom:0;left:0;width:4px;height:4px;border-radius:50%;background:var(--dsw-alias-brand-primary, #d97757);transform-origin:50% 100%;opacity:0;--dsh-claude-dot-centre: 0px;--dsh-claude-dot-line-x: 0;--dsh-claude-dot-line-y: -1;--dsh-claude-dot-end-x: calc(var(--dsh-claude-dot-centre) + var(--dsh-claude-dot-line-x) * var(--dsh-claude-distance-travel));--dsh-claude-dot-end-y: calc((var(--dsh-claude-dot-line-y) - 1) * var(--dsh-claude-distance-travel))}
+.wait-loader-lane.is-active .wait-loader-dot,.wait-loader-lane.is-leaving .wait-loader-dot{opacity:1}
+.wait-loader-lane.is-bounce .wait-loader-dot:nth-child(2),.wait-loader-lane.is-line .wait-loader-dot:nth-child(2){left:7px}
+.wait-loader-lane.is-bounce .wait-loader-dot:nth-child(3),.wait-loader-lane.is-line .wait-loader-dot:nth-child(3){left:14px}
+.wait-loader-lane.is-line .wait-loader-dot:nth-child(1){--dsh-claude-dot-centre: 7px}
+.wait-loader-lane.is-line .wait-loader-dot:nth-child(2){--dsh-claude-dot-line-x: -.866;--dsh-claude-dot-line-y: -.5}
+.wait-loader-lane.is-line .wait-loader-dot:nth-child(3){--dsh-claude-dot-centre: -7px;--dsh-claude-dot-line-x: -.866;--dsh-claude-dot-line-y: .5}
+.wait-loader-lane.is-orbit .wait-loader-dot{top:50%;bottom:auto;left:50%;margin:-2px 0 0 -2px;animation:dsh-claude-wait-dot-orbit-1 var(--dsh-claude-period-dot-orbit) linear infinite}
+.wait-loader-lane.is-orbit .wait-loader-dot:nth-child(2){animation-name:dsh-claude-wait-dot-orbit-2}
+.wait-loader-lane.is-orbit .wait-loader-dot:nth-child(3){animation-name:dsh-claude-wait-dot-orbit-4}
+.wait-loader-lane.is-orbit .wait-loader-dot:nth-child(4){animation-name:dsh-claude-wait-dot-orbit-3}
+@keyframes dsh-claude-wait-dot-orbit-1{0%{translate:-4.75px -5.8px}
+0.46%{translate:-4.57px -3.54px}
+0.97%{translate:-4.03px -1.36px}
+1.55%{translate:-3.15px .64px}
+2.26%{translate:-1.97px 2.4px}
+3.21%{translate:-.53px 3.85px}
+4.6%{translate:1.11px 4.92px}
+7.09%{translate:2.9px 5.58px}
+16.67%,25%,50%{translate:4.75px 5.8px}
+50.46%{translate:4.57px 3.54px}
+50.97%{translate:4.03px 1.36px}
+51.55%{translate:3.15px -.64px}
+52.26%{translate:1.97px -2.4px}
+53.21%{translate:.53px -3.85px}
+54.6%{translate:-1.11px -4.92px}
+57.09%{translate:-2.9px -5.58px}
+66.67%,75%,to{translate:-4.75px -5.8px}
+}
+@keyframes dsh-claude-wait-dot-orbit-2{0%,25%{translate:4.75px -5.8px}
+25.46%{translate:4.57px -3.54px}
+25.97%{translate:4.03px -1.36px}
+26.55%{translate:3.15px .64px}
+27.26%{translate:1.97px 2.4px}
+28.21%{translate:.53px 3.85px}
+29.6%{translate:-1.11px 4.92px}
+32.09%{translate:-2.9px 5.58px}
+41.67%,50%,75%{translate:-4.75px 5.8px}
+75.46%{translate:-4.57px 3.54px}
+75.97%{translate:-4.03px 1.36px}
+76.55%{translate:-3.15px -.64px}
+77.26%{translate:-1.97px -2.4px}
+78.21%{translate:-.53px -3.85px}
+79.6%{translate:1.11px -4.92px}
+82.09%{translate:2.9px -5.58px}
+91.67%,to{translate:4.75px -5.8px}
+}
+@keyframes dsh-claude-wait-dot-orbit-4{0%{translate:4.75px 5.8px}
+0.46%{translate:4.57px 3.54px}
+0.97%{translate:4.03px 1.36px}
+1.55%{translate:3.15px -.64px}
+2.26%{translate:1.97px -2.4px}
+3.21%{translate:.53px -3.85px}
+4.6%{translate:-1.11px -4.92px}
+7.09%{translate:-2.9px -5.58px}
+16.67%,25%,50%{translate:-4.75px -5.8px}
+50.46%{translate:-4.57px -3.54px}
+50.97%{translate:-4.03px -1.36px}
+51.55%{translate:-3.15px .64px}
+52.26%{translate:-1.97px 2.4px}
+53.21%{translate:-.53px 3.85px}
+54.6%{translate:1.11px 4.92px}
+57.09%{translate:2.9px 5.58px}
+66.67%,75%,to{translate:4.75px 5.8px}
+}
+@keyframes dsh-claude-wait-dot-orbit-3{0%,25%{translate:-4.75px 5.8px}
+25.46%{translate:-4.57px 3.54px}
+25.97%{translate:-4.03px 1.36px}
+26.55%{translate:-3.15px -.64px}
+27.26%{translate:-1.97px -2.4px}
+28.21%{translate:-.53px -3.85px}
+29.6%{translate:1.11px -4.92px}
+32.09%{translate:2.9px -5.58px}
+41.67%,50%,75%{translate:4.75px -5.8px}
+75.46%{translate:4.57px -3.54px}
+75.97%{translate:4.03px -1.36px}
+76.55%{translate:3.15px .64px}
+77.26%{translate:1.97px 2.4px}
+78.21%{translate:.53px 3.85px}
+79.6%{translate:-1.11px 4.92px}
+82.09%{translate:-2.9px 5.58px}
+91.67%,to{translate:-4.75px 5.8px}
+}
+.wait-loader-lane.is-bounce .wait-loader-dot{animation:dsh-claude-wait-dot var(--dsh-claude-period-dot-bounce) var(--dsh-claude-ease-standard) infinite alternate}
+.wait-loader-lane.is-bounce .wait-loader-dot:nth-child(1){animation-delay:calc(-1 * var(--dsh-claude-period-dot-bounce))}
+.wait-loader-lane.is-bounce .wait-loader-dot:nth-child(2){animation-delay:calc(-3 * var(--dsh-claude-period-dot-bounce) / 5)}
+.wait-loader-lane.is-bounce .wait-loader-dot:nth-child(3){animation-delay:calc(-2 * var(--dsh-claude-period-dot-bounce) / 5)}
+.wait-loader-lane.is-line .wait-loader-dot{animation:dsh-claude-wait-dot-line var(--dsh-claude-period-dot-line) var(--dsh-claude-ease-harmonic) infinite;animation-delay:calc(-1 * var(--dsh-claude-period-dot-line) / 4)}
+.wait-loader-lane.is-line .wait-loader-dot:nth-child(2){animation-delay:calc(-7 * var(--dsh-claude-period-dot-line) / 12)}
+.wait-loader-lane.is-line .wait-loader-dot:nth-child(3){animation-delay:calc(-11 * var(--dsh-claude-period-dot-line) / 12)}
+.wait-loader-lane.is-bounce{--dsh-claude-dot-arrives: 1;--dsh-claude-dot-leaves: 1;--dsh-claude-dot-fade: .5}
+.wait-loader-lane.is-line{--dsh-claude-dot-arrives: .25 .75;--dsh-claude-dot-leaves: 0 .5;--dsh-claude-dot-fade: .25}
+.wait-loader-lane.is-orbit{--dsh-claude-dot-arrives: 0;--dsh-claude-dot-leaves: .2083 .4583 .7083 .9583;--dsh-claude-dot-fade: .125}
+.wait-loader[data-reduced-motion] .wait-loader-lane .wait-loader-dot{animation-play-state:paused}
+@keyframes dsh-claude-wait-dot{0%{translate:0 0;scale:1.7 .25;animation-timing-function:linear}
+40%{translate:0 calc(-2 * var(--dsh-claude-distance-travel) / 5);scale:1;animation-timing-function:linear}
+60%{translate:0 calc(-3 * var(--dsh-claude-distance-travel) / 5)}
+to{translate:0 calc(-1 * var(--dsh-claude-distance-travel))}
+}
+@keyframes dsh-claude-wait-dot-line{0%,to{translate:calc(2 * var(--dsh-claude-dot-centre) - var(--dsh-claude-dot-end-x)) calc(-2 * var(--dsh-claude-distance-travel) - var(--dsh-claude-dot-end-y));scale:1}
+25%,75%{scale:var(--dsh-claude-scale-dot-mid)}
+50%{translate:var(--dsh-claude-dot-end-x) var(--dsh-claude-dot-end-y);scale:1}
+}
+
+@media (prefers-reduced-motion: reduce) { .wait-loader-dot { animation-play-state: paused !important; } }
+/* A missing/pending CSS animation is not a chat error: retain visible dots. */
+.wait-loader[data-static] .wait-loader-lane .wait-loader-dot{animation:none!important;translate:none;scale:1}
+.wait-loader[data-static] .wait-loader-lane.is-active .wait-loader-dot{opacity:1}

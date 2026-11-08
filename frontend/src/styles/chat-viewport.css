@@ -1,0 +1,33 @@
+.chat-viewport { --chat-content-width: 800px; display: flex; flex: 1; flex-direction: column; position: relative; min-width: 0; min-height: 0; }
+/* Scrollport always fills the panel; only its inner content has a width limit. */
+.transcript-frame { display: flex; flex: 1; min-width: 0; min-height: 0; position: relative; }
+.chat-panel .chat-viewport .chat-scroll { width: 100%; max-width: none; margin: 0; padding: 16px 32px calc(var(--composer-height, 180px) + 57px); scroll-padding-bottom: calc(var(--composer-height, 180px) + 57px); scrollbar-gutter: stable; }
+.chat-content { width: min(100%, var(--chat-content-width)); min-width: 0; margin-inline: auto; }
+.chat-panel .chat-viewport > .chat-bottom { position: absolute; bottom: 0; left: 0; right: var(--chat-scrollbar-gutter, 0px); z-index: 4; width: min(calc(100% - var(--chat-scrollbar-gutter, 0px)), calc(var(--chat-content-width) + 64px)); max-width: none; margin-inline: auto; padding-top: 0; padding-bottom: max(16px, env(safe-area-inset-bottom)); background: var(--surface); }
+.chat-panel .chat-viewport > .chat-bottom::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 40px; background: linear-gradient(to top, var(--surface) 0%, color-mix(in srgb, var(--surface) 82%, transparent) 32%, color-mix(in srgb, var(--surface) 40%, transparent) 68%, transparent 100%); pointer-events: none; }
+.chat-width-toolbar { position: absolute; right: 8px; top: 4px; z-index: 3; }
+.chat-width-toolbar .icon-button { background: var(--surface); width: 26px; min-width: 26px; min-height: 26px; opacity: .6; }
+.chat-width-toolbar .icon-button:hover, .chat-width-toolbar .icon-button:focus-visible { opacity: 1; }
+.chat-width-handle { position: absolute; top: 0; bottom: 0; width: max(0px, min(10px, calc((100% - var(--chat-content-width)) / 2 - 48px))); cursor: col-resize; touch-action: none; z-index: 2; }
+.chat-width-handle--left { right: calc(50% + var(--chat-content-width) / 2 + 24px); }
+.chat-width-handle--right { left: calc(50% + var(--chat-content-width) / 2 + 24px); }
+.chat-width-handle::after { content: ''; position: absolute; width: 2px; left: 5px; top: 0; bottom: 0; border-radius: 2px; opacity: 0; pointer-events: none; background: linear-gradient(to bottom, transparent calc(var(--pointer-y, 50%) - 36px), var(--scrollbar-thumb) calc(var(--pointer-y, 50%) - 8px), var(--scrollbar-thumb) calc(var(--pointer-y, 50%) + 8px), transparent calc(var(--pointer-y, 50%) + 36px)); }
+.chat-width-handle:hover::after, .chat-width-handle[data-dragging]::after, .chat-width-handle:focus-visible::after { opacity: 1; }
+.chat-to-bottom-slot { position: absolute; bottom: calc(var(--composer-height, 180px) + 12px); left: 0; right: 0; height: 0; z-index: 8; display: flex; justify-content: center; padding-right: var(--chat-scrollbar-gutter, 0px); pointer-events: none; }
+.chat-to-bottom { width: 34px; height: 34px; margin-top: -34px; padding: 0; border: 0; border-radius: 100px; background: var(--surface-raised); color: var(--text); box-shadow: 0 0 0 .5px var(--line-strong), 0 3px 8px #00000008, 0 0 16px #00000005; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; }
+.chat-to-bottom:hover { background: var(--hover); }
+@media (pointer: coarse), (max-width: 600px) {
+  .chat-to-bottom { width: 44px; height: 44px; margin-top: -44px; }
+  .chat-panel .chat-viewport .chat-scroll { padding-inline: 16px; }
+  .chat-width-handle { display: none; }
+  .chat-width-toolbar { position: static; display: flex; justify-content: flex-end; padding-inline: 12px; }
+  .chat-width-toolbar .icon-button { width: 44px; min-width: 44px; min-height: 44px; }
+}
+
+.chat-readonly-boundary { display:flex; flex:1; min-width:0; min-height:0; border:0; margin:0; padding:0; }
+.composer-readonly-boundary { min-width:0; border:0; margin:0; padding:0; }
+.chat-readonly-boundary.is-archived { opacity:.65; }
+.chat-readonly-boundary.is-archived :is(button,a,input,select,textarea),.composer-readonly-boundary.is-archived { pointer-events:none; }
+.composer-readonly-boundary.is-archived { opacity:.45; }
+.archived-chat-notice { flex:none; margin:0; padding:8px 32px; background:var(--hover); color:var(--text-secondary); font-size:12px; line-height:18px; }
+

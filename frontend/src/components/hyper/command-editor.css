@@ -1,0 +1,39 @@
+.command-editor {
+  position: relative;
+  min-height: 24px;
+  max-height: 164px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  outline: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 24px;
+  cursor: text;
+}
+.command-editor[data-visual-caret] { caret-color: transparent; }
+@media (forced-colors: active) { .command-editor[data-visual-caret] { caret-color: auto; } }
+.command-editor:focus-visible { outline: none; }
+.command-editor[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted, #888);
+  pointer-events: none;
+  position: absolute;
+}
+.command-editor[aria-disabled="true"] { opacity: .6; cursor: default; }
+.command-editor .command-chip {
+  display: inline;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 24px;
+  color: rgb(217, 119, 87);
+  padding: 0 4px;
+  border-radius: 8px;
+  white-space: nowrap;
+  user-select: all;
+}
+.command-editor .command-chip[data-selected="true"] { background: rgb(246, 222, 215); }

@@ -1,0 +1,14 @@
+.planning-panel { min-width: 0; margin-bottom: var(--space-2); padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+.planning-panel__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+.planning-panel__header h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.planning-panel__advisory, .planning-panel__reason, .planning-panel__previous { margin: 6px 0 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.planning-panel__advisory, .planning-panel__previous { color: var(--text-secondary); }
+.planning-panel__content { max-height: min(40dvh, 360px); overflow: auto; overscroll-behavior: contain; min-width: 0; margin-top: 10px; padding: 2px 4px; border-block: 1px solid var(--line); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.planning-panel__content > :first-child { margin-top: 8px; }
+.planning-panel__content > :last-child { margin-bottom: 8px; }
+.planning-panel__content pre { max-width: 100%; overflow-x: auto; }
+.planning-panel__content table { display: block; max-width: 100%; overflow-x: auto; }
+.planning-panel__content img { max-width: 100%; height: auto; }
+.planning-panel__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.planning-panel .button { min-height: 32px; max-width: 100%; white-space: normal; font-size: 12px; transition: none; animation: none; }
+.planning-panel .button:not(:disabled):active { transform: none; }

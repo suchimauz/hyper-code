@@ -1,0 +1,42 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { MessageInput } from '../components/hyper/MessageInput';
+
+afterEach(() => vi.restoreAllMocks());
+it('keeps the native caret when geometry is unavailable and never intercepts input', () => {
+  const send = vi.fn();
+  const view = render(<MessageInput value="hello" onChange={() => {}} onSend={send} />);
+  const input = screen.getByRole('textbox');
+  fireEvent.focus(input);
+  expect(input).not.toHaveAttribute('data-visual-caret');
+  expect(view.container.querySelector('.input-caret')).toHaveAttribute('aria-hidden', 'true');
+  fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+  expect(send).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(send).toHaveBeenCalledTimes(1);
+});
+it('hides during selection and IME, including controlled value updates, and cleans up', async () => {
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400);
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(100);
+  vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockImplementation(function (this: HTMLElement) { return this.parentElement; });
+  Object.defineProperty(Range.prototype, 'getClientRects', { configurable: true, value: () => [{ left: 0, top: 3, height: 18 }] });
+  const props = { onChange: () => {}, onSend: () => {} };
+  const view = render(<MessageInput {...props} value="hello" />);
+  const input = screen.getByRole('textbox') as HTMLTextAreaElement;
+  input.focus(); input.setSelectionRange(5, 5);
+  await waitFor(() => expect(input).toHaveAttribute('data-visual-caret'));
+  input.setSelectionRange(0, 3); fireEvent.select(input);
+  await waitFor(() => expect(input).not.toHaveAttribute('data-visual-caret'));
+  input.setSelectionRange(5, 5); fireEvent.select(input);
+  await waitFor(() => expect(input).toHaveAttribute('data-visual-caret'));
+  fireEvent.compositionStart(input);
+  view.rerender(<MessageInput {...props} value="hello!" />);
+  expect(input).not.toHaveAttribute('data-visual-caret');
+  fireEvent.compositionEnd(input);
+  await waitFor(() => expect(input).toHaveAttribute('data-visual-caret'));
+  input.blur();
+  expect(input).not.toHaveAttribute('data-visual-caret');
+  view.unmount();
+  expect(document.querySelector('.input-caret')).toBeNull();
+  Reflect.deleteProperty(Range.prototype, 'getClientRects');
+});

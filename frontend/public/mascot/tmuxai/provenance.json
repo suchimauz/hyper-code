@@ -1,0 +1,14 @@
+{
+  "id": "tmuxai",
+  "displayName": "TmuxAI Official",
+  "source": "https://openpets.dev/pets/content/69537130fb99112931f71f8ddedd1939dc68bfae742c4393eeecb57e41ef8d94/tmuxai-openpets/spritesheet.webp",
+  "metadata": {
+    "id": "tmuxai",
+    "displayName": "TmuxAI Official",
+    "description": "Official TmuxAI mascot — a floating rounded white cube robot with antenna. Learn more at https://tmuxai.dev",
+    "spritesheetPath": "spritesheet.webp",
+    "sourceUrl": "https://tmuxai.dev",
+    "category": "western"
+  },
+  "artworkLicense": "Not specified by the source; rights remain with their respective owners. Local user-requested integration; no MIT artwork license claimed."
+}

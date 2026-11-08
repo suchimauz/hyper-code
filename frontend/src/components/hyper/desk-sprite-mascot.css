@@ -1,0 +1,11 @@
+.desk-sprite-mascot { position: absolute; right: 8px; bottom: calc(100% - 3px); width: 80px; height: 60px; transform: scale(.8); transform-origin: bottom right; z-index: 5; }
+/* No pointer events reach the upstream grab/throw handlers. No roaming over chat. */
+.desk-sprite-mount { width: 80px; height: 60px; overflow: hidden; pointer-events: none; }
+.desk-sprite-mount .desksprite-desk { box-sizing: border-box; padding: 3px; border-radius: 5px; box-shadow: none; }
+.desk-sprite-mount .desksprite-screen { border-radius: 3px; }
+.desk-sprite-hit { position: absolute; inset: 0; width: 80px; height: 60px; border: 0; border-radius: 5px; padding: 0; background: transparent; cursor: pointer; }
+.desk-sprite-hit:focus-visible { outline: 2px solid var(--accent, #3794ff); outline-offset: 2px; }
+.desk-sprite-caption { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap; border-radius: 5px; padding: 4px 7px; background: var(--background, #17191d); color: var(--foreground, #fafafa); font-size: 11px; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .desk-sprite-mount .desksprite-screen { transition: none; }
+}

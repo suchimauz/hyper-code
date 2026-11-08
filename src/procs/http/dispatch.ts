@@ -13,19 +13,21 @@ import { makeRequestCtx } from "../boot/requestCtx";
  * @param opts.url The target URL.
  * @param opts.body The HTTP body.
  * @param opts.headers The HTTP headers.
+ * @param opts.request Original HTTP request whose cookies, headers and body the adapter preserves.
+ * @param opts.legacyUi Trusted server-only marker selecting legacy rendering; never read from browser headers. @default false
  */
 export default async function (
     ctx: Context,
     _session: Session | null,
-    opts: { method?: string; url: string; body?: any; headers?: Record<string, string> },
+    opts: { method?: string; url: string; body?: any; headers?: Record<string, string>; /** Original request to preserve headers, cookies and streaming body for an in-process adapter. */ request?: Request; /** Trusted server-only legacy UI marker; never derived from request headers. @default false */ legacyUi?: boolean },
 ): Promise<Response> {
-    const method = (opts.method ?? "GET").toUpperCase();
+    const method = (opts.method ?? opts.request?.method ?? "GET").toUpperCase();
     const abs = opts.url.startsWith("http") ? opts.url : "http://localhost" + (opts.url.startsWith("/") ? "" : "/") + opts.url;
     const u = new URL(abs);
 
     const m = ctx.fns.procs.http.match({ method, pathname: u.pathname });
 
-    const headers = new Headers(opts.headers ?? {});
+    const headers = new Headers(opts.headers ?? opts.request?.headers ?? {});
     let body: any = opts.body;
     const plainObject = body && typeof body === "object"
         && !(body instanceof FormData) && !(body instanceof URLSearchParams) && !(body instanceof ArrayBuffer);
@@ -33,11 +35,12 @@ export default async function (
         body = JSON.stringify(body);
         if (!headers.has("content-type")) headers.set("content-type", "application/json");
     }
-    const req = new Request(abs, { method, headers, body: method === "GET" || method === "HEAD" ? undefined : body });
+    const req = opts.request ? new Request(abs, opts.request) : new Request(abs, { method, headers, body: method === "GET" || method === "HEAD" ? undefined : body });
 
     // Request ctx: inherits this env-ctx (so dispatch on a forked test ctx runs
     // against the test env), carries the session through the call chain.
     const rctx = makeRequestCtx(ctx, { kind: "dispatch", req, params: m?.params ?? {}, url: u, route: m?.path });
+    if (opts.legacyUi === true) (rctx.session as any).legacyUi = true;
     // Same as the server (http/$start.ts): a cookie renewed by middleware rides on the final response.
     const withSessionCookie = (res: Response) => {
         const extra = (rctx.session as any)?.setCookie;

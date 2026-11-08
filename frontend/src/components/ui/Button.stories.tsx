@@ -1,0 +1,11 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Plus } from 'lucide-react';
+import { Button } from './Button';
+import { IconButton } from './IconButton';
+const meta = { title: 'Основы/Button', component: Button, args: { children: 'Продолжить' } } satisfies Meta<typeof Button>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Primary: Story = { args: { variant: 'primary' } };
+export const Secondary: Story = {};
+export const Disabled: Story = { args: { disabled: true } };
+export const AllStates: Story = { render: () => <div className="component-gallery"><Button variant="primary">Создать</Button><Button>Отмена</Button><Button variant="ghost">Подробнее</Button><Button disabled>Недоступно</Button><IconButton label="Добавить"><Plus size={18} /></IconButton></div> };

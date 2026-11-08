@@ -1,0 +1,25 @@
+.queue-dock { position: relative; margin: 0 16px -1px; padding: 2px 0; border: 0; border-radius: 16px 16px 0 0; background: var(--surface); color: var(--text); overflow: hidden; }
+.queue-dock::after { content: ''; position: absolute; inset: 0; border: .5px solid var(--line); border-bottom: none; border-radius: inherit; pointer-events: none; }
+.queue-header { display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 4px 12px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.queue-header span { flex: 1; font-size: 13px; line-height: 24px; font-weight: 500; }
+.queue-list { list-style: none; padding: 0; margin: 0; max-height: 180px; overflow-y: auto; }
+.queue-row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 5px 4px 12px; box-sizing: border-box; }
+.queue-row + .queue-row { box-shadow: inset 0 1px var(--line); }
+.queue-lead { flex: none; color: var(--text-caption); }
+.queue-preview { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 20px; }
+.queue-actions { display: flex; align-items: center; flex: none; gap: 10px; }
+.queue-actions button { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.queue-actions svg { width: 14px; height: 14px; stroke-width: 1; }
+.queue-actions button:hover:not(:disabled), .queue-header:hover:not(:disabled) { background: var(--surface-raised); }
+.queue-actions button:active:not(:disabled) { background: var(--line); }
+.queue-actions button:disabled { opacity: .35; cursor: default; }
+.queue-header:disabled { cursor: default; }
+.queue-dock button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.queue-editor { flex: 1; min-width: 0; resize: vertical; max-height: 120px; min-height: 28px; padding: 3px 7px; border: 1px solid var(--accent); border-radius: 6px; background: var(--input-bg); color: var(--text); font: inherit; font-size: 13px; line-height: 20px; outline: none; }
+.queue-files { display: flex; flex: none; gap: 4px; min-width: 0; max-width: 55%; overflow: hidden; }
+.queue-file { display: inline-flex; flex: 0 1 180px; align-items: center; gap: 4px; min-width: 74px; height: 24px; padding: 0 6px; overflow: hidden; border: .5px solid var(--line); border-radius: 6px; background: var(--input-bg); box-sizing: border-box; }
+.queue-file-name { min-width: 0; overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.queue-file-size { flex: none; color: var(--text-caption); font-size: 10px; white-space: nowrap; }
+.queue-status { flex: none; font-size: 13px; line-height: 20px; color: var(--text-caption); }
+.queue-error { padding: 6px 12px; font-size: 12px; color: var(--text-secondary); }
+.queue-error button { color: inherit; background: transparent; border: 0; text-decoration: underline; cursor: pointer; }

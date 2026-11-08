@@ -1,0 +1,63 @@
+@import 'medeo-font/sans.css';
+@import 'medeo-font/mono.css';
+
+:root {
+  --font-sans: var(--font-medeo-sans);
+  --font-mono: var(--font-medeo-mono);
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px; --space-8: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+  --font-xs: 11px; --font-sm: 12px; --font-body: 13px; --font-lg: 15px; --font-title: 22px;
+  --control-height: 32px;
+  --toolbar-height: 52px;
+  --duration-feedback: 120ms;
+}
+/* Claude palette from dsh-claude-style/docs/STYLE.md. Status green remains semantic.
+   Muted UI labels use secondary ink for legibility; tertiary/caption are decorative. */
+:root, [data-theme='light'], [data-theme='system'] {
+  color-scheme: light;
+  --bg: #ffffff; --surface: #ffffff; --sidebar: #fafafa; --surface-raised: #ffffff;
+  --surface-overlay: #ffffff; --input-bg: #ffffff;
+  --user-bubble: #f4f2f3; --hover-solid: #f4f4f4;
+  --text: #161616; --text-secondary: #70686a; --text-muted: #70686a;
+  --text-tertiary: #91888a; --text-caption: #b2acad;
+  --line: #e9e9e9; --line-strong: #dedede; --hover: rgba(6, 6, 6, .08); --selected: rgba(6, 6, 6, .08);
+  --accent: #d97757; --accent-hover: #c46343; --accent-soft: #f6ded7; --on-accent: #ffffff;
+  --link: #bf6446; --link-hover: #a35035;
+  --success: #26713d; --success-soft: #e6f4e9; --tool-error: #ec1313; --tool-stopped: #dd8629;
+  --shadow: 0 4px 18px rgba(20, 20, 19, .1), 0 1px 3px rgba(20, 20, 19, .05);
+}
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #191919; --surface: #212121; --sidebar: #1f1f1f; --surface-raised: #282828;
+  --surface-overlay: #282828; --input-bg: #141414;
+  --user-bubble: rgba(255, 255, 255, .06); --hover-solid: #323232;
+  --text: #fdfdfd; --text-secondary: #beb6b8; --text-muted: #beb6b8;
+  --text-tertiary: #9c9395; --text-caption: #776f71;
+  --line: rgba(255, 255, 255, .09); --line-strong: rgba(255, 255, 255, .18); --hover: rgba(255, 255, 255, .08); --selected: rgba(255, 255, 255, .08);
+  --accent: #d97757; --accent-hover: #eb9170; --accent-soft: #48261b; --on-accent: #fbfbfb;
+  --link: #eaa088; --link-hover: #ffbea6;
+  --success: #8cdda2; --success-soft: #223c2c; --tool-error: #f25a5a; --tool-stopped: #dd8629;
+  --shadow: 0 4px 16px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .14);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']), [data-theme='system'] {
+    color-scheme: dark;
+    --bg: #191919; --surface: #212121; --sidebar: #1f1f1f; --surface-raised: #282828;
+    --surface-overlay: #282828; --input-bg: #141414;
+    --user-bubble: rgba(255, 255, 255, .06); --hover-solid: #323232;
+    --text: #fdfdfd; --text-secondary: #beb6b8; --text-muted: #beb6b8;
+    --text-tertiary: #9c9395; --text-caption: #776f71;
+    --line: rgba(255, 255, 255, .09); --line-strong: rgba(255, 255, 255, .18); --hover: rgba(255, 255, 255, .08); --selected: rgba(255, 255, 255, .08);
+    --accent: #d97757; --accent-hover: #eb9170; --accent-soft: #48261b; --on-accent: #fbfbfb;
+    --link: #eaa088; --link-hover: #ffbea6;
+    --success: #8cdda2; --success-soft: #223c2c; --tool-error: #f25a5a; --tool-stopped: #dd8629;
+    --shadow: 0 4px 16px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .14);
+  }
+}
+input, textarea, [contenteditable='true'] { caret-color: var(--accent); }
+@media (pointer: coarse) { :root { --control-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { :root { --duration-feedback: 0ms; } }
