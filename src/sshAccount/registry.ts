@@ -21,18 +21,16 @@ export default async function (
         account?: string;
     },
 ): Promise<Array<{ instance: string; provider: "codex" | "claude-code" | "kimi-coding"; account: string; status: "pending" | "connected" | "failed"; updatedAt: number }>> {
+    if (opts.action === 'remove') {
+        if (!opts.instance || !opts.provider || !opts.account) throw new Error('Invalid remote account');
+        await ctx.fns.sshProvider.remove({instance:opts.instance,provider:opts.provider,account:opts.account});
+        return [];
+    }
     return ctx.fns.codexTunnel.mutationRun({operation:'registry',instance:opts.instance,account:opts.account,provider:opts.provider,action:opts.action,work:async()=>{
     await ctx.fns.sshAccount.requireOwner({});
     const valid = (s: string) => /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(s);
     if (!['list','begin','connect','fail','remove'].includes(opts.action)) throw new Error('Invalid registry action');
     if (opts.instance && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(opts.instance)) throw new Error('Invalid instance name');
-    if (opts.action === 'remove') {
-     // The row is secret-free metadata, so deleting it never touches a credential.
-     // The credential itself lives on the host and is removed separately.
-     if (!opts.instance || !opts.account || !valid(opts.account) || !['codex','claude-code','kimi-coding'].includes(opts.provider ?? '')) throw new Error('Invalid remote account');
-     await ctx.fns.settings.remove({module:'sshAccount',scopeType:'global',key:[opts.instance,opts.provider,opts.account].join(':')});
-     return [];
-    }
     if (opts.action !== 'list') {
      if (!opts.instance || !opts.account || !valid(opts.account) || !['codex','claude-code','kimi-coding'].includes(opts.provider ?? '')) throw new Error('Invalid remote account');
      const value = {instance:opts.instance,provider:opts.provider,account:opts.account,status:opts.action === 'begin' ? 'pending' : opts.action === 'connect' ? 'connected' : 'failed',updatedAt:Date.now()};
@@ -42,7 +40,7 @@ export default async function (
     const accounts = rows.map((r: {value: string | object}) => typeof r.value === 'string' ? JSON.parse(r.value) : r.value).filter((r: {instance:string}) => !opts.instance || r.instance === opts.instance);
     for (const row of accounts) if (row.status === 'pending' && row.updatedAt < Date.now()-10000 && ![...(ctx.state.sshAccount?.flows?.values() ?? [])].some(f => f.instance===row.instance && f.provider===row.provider && f.account===row.account && f.status==='pending')) {
         row.status='failed'; row.updatedAt=Date.now();
-        await ctx.fns.settings.set({module:'sshAccount',scopeType:'global',key:[row.instance,row.provider,row.account].join(':'),value:row});
+        // Present expired pending flows as failed without mutating storage during a read.
     }
     return accounts;
     }});

@@ -18,7 +18,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const ssh = /^ssh\.([^.]+)\.([^.]+)$/.exec(opts.account);
     const users = await ctx.fns.llm.accountUsers({ provider: opts.provider, account: opts.account });
     const detail = ssh
-        ? `This removes the Hyper account entry on <code class="font-mono">${esc(ssh[1])}</code>. The credential itself stays on that host.`
+        ? `This removes the Hyper account entry on <code class="font-mono">${esc(ssh[1])}</code>. Imported local tokens are erased and this slot is blocked from reuse until explicit recovery. Remote CLI credentials stay on that host.`
         : `This deletes its encrypted managed token or isolated CLI credential directory.`;
     const usedBy = users.length
         ? `<p class="text-xs leading-5 text-subtle">Used by ${users.length} agent${users.length === 1 ? "" : "s"}: ${users.map((u) => `<code class="font-mono">${esc(u.title || u.id)}</code>`).join(", ")}. They will be archived; running or queued work must be stopped first.</p>`

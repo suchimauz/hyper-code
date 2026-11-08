@@ -13,8 +13,9 @@ import { rmSync } from "node:fs";
  * encrypted Postgres storage; named Codex credentials are removed with their
  * isolated CODEX_HOME; named Claude Code credentials are removed from the
  * account-specific macOS Keychain service and config directory; SSH accounts
- * drop only their secret-free registry row. Default external CLI accounts must
- * be removed by their owning CLI.
+ * atomically erase imported local tokens, retain a blocked tombstone, and drop
+ * their registry row. Remote CLI credentials stay on the host. Default external
+ * CLI accounts must be removed by their owning CLI.
  *
  * @param opts.provider Runtime credential provider.
  * @param opts.account Credential slot to remove, or ssh.<instance>.<account> for a registry account.
@@ -44,8 +45,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         if (failed.length) throw new Error(`cannot archive agent(s): ${failed.map((f) => `${f.id} (${f.error})`).join(", ")} — stop their work first`);
     }
 
-    // An ssh.<instance>.<account> slot owns only secret-free registry metadata;
-    // the credential itself remains on the host.
+    // SSH removal drains the account lease and tombstones imported local tokens;
+    // remote CLI credentials remain on the host.
     const ssh = /^ssh\.([^.]+)\.([^.]+)$/.exec(account);
     if (ssh) {
         const kind = provider as "codex" | "claude-code" | "kimi-coding";
