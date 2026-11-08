@@ -17,6 +17,10 @@ export type LoginFlow = {
         httpCode: number | null;
         stages: { phase: 'ssh-preflight' | 'cli-login' | 'credential-check' | 'login-status'; startedAt: number; endedAt: number | null; exitCode: number | null }[];
     };
+    /** Original pinned SSH invocation; never re-resolve a changed instance during callback delivery. */
+    callbackConnection?: {bin:string;args:string[];host:string};
+    /** Secret-free replay guard. Uncertain delivery requires a new login, not resubmission. */
+    callbackSubmission?: 'sending' | 'sent' | 'uncertain';
     expiresAt: number;
     process: Bun.Subprocess<"pipe", "pipe", "pipe"> | null;
 };

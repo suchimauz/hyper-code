@@ -21,6 +21,12 @@ An SSH instance runs subscription authentication and provider HTTP requests on a
 
 Remote routes use `ssh/<instance>:<provider>/<account>:<model>`, for example `ssh/eu:codex/work:gpt-5.4-mini`. They remain distinct from both local accounts and Hyper Node routes.
 
+### Claude browser callback on SSH
+
+For Claude Code, open the authorization page in the login popup. After consent, the browser may land on a localhost connection-error page: the callback listener is on the SSH server, not your computer. Copy the **full address** from that tab into the popup's protected **Browser callback URL** field and choose **Send callback**. Never paste it in chat. Then use **Refresh status**; connection is confirmed only after the remote CLI finishes and its credential/status checks pass, not by the callback HTTP response (even HTTP 403 can follow acceptance).
+
+Callbacks must match this pending flow's OAuth state and redirect port. Hyper forwards only to the remote `127.0.0.1` callback listener over the original pinned SSH connection, via private stdin, without redirects, proxy environment, response bodies or callback logging. The remote host needs `/usr/bin/curl` or `/bin/curl`. A callback is single-use; uncertain delivery requires cancelling and starting a new login, not resending. Attempts started before this callback support was loaded must also be restarted. Codex continues to use its device-code flow.
+
 ## Editing and removal
 
 Each instance card has **Edit connection** and **Remove instance**. Host, user and port are editable; the instance name is stable. Changing the destination preserves Hyper's client key, clears the host pin and marks associated provider accounts as needing reconnection. Verify the new destination before connecting again.

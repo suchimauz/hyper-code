@@ -1,9 +1,9 @@
 /**
- * Forward a remote login one-time code without echoing it
+ * Forward a remote login callback without echoing it
  *
- * Stream a browser code into the remote CLI and replace the popup with safe progress.
+ * Forward a verified callback privately over SSH and replace the popup with safe progress.
  * @param opts.id Opaque remote authorization identifier.
- * @param opts.code One-time browser code; never persisted.
+ * @param opts.code Full browser callback URL; never persisted.
  */
 export default async function (
     ctx: Context,
@@ -11,7 +11,7 @@ export default async function (
     opts: {
         /** Opaque remote authorization identifier. */
         id: string;
-        /** One-time browser code; never persisted. */
+        /** Full browser callback URL; never persisted. */
         code: string;
     },
 ): Promise<string> {

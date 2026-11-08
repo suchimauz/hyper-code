@@ -27,7 +27,7 @@ export default async function (
     for (const previous of flows.values()) if (previous.instance===opts.instance && previous.provider===opts.provider && previous.account===opts.account && previous.status==='pending') throw new Error('Authorization already running');
     for (const [key,value] of flows) if (value.expiresAt < Date.now() - 600000) flows.delete(key);
     const id = crypto.randomUUID();
-    const flow: types.sshAccount.LoginFlow = {id,...opts,status:'pending',verificationUri:null,userCode:null,error:null,expiresAt:Date.now()+600000,process:null};
+    const flow: types.sshAccount.LoginFlow = {id,...opts,status:'pending',verificationUri:null,userCode:null,error:null,expiresAt:Date.now()+600000,process:null,callbackConnection:connection};
     const diagnostics = flow.diagnostics = {startedAt:Date.now(),endedAt:null,exitCode:null,reason:null,httpCode:null,stages:[{phase:'ssh-preflight',startedAt:Date.now(),endedAt:null,exitCode:null}]} as NonNullable<types.sshAccount.LoginFlow['diagnostics']>;
     // The shell owns stdout; CLI output is routed exclusively to stderr. A per-flow
     // marker and exact grammar prevent provider output from becoming diagnostics.
@@ -37,16 +37,20 @@ export default async function (
     const script = [
      'set -eu', 'umask 077',
      `stage() { printf '${marker}:%s:%s\\n' "$1" "$2"; }`,
-     `finish() { rc=$?; stage exit "$rc"; }; trap finish EXIT`,
+     `finish() { rc=$?; if test -n "\${browser_reader:-}"; then kill "$browser_reader" 2>/dev/null || :; wait "$browser_reader" 2>/dev/null || :; fi; if test -n "\${browser_pipe:-}"; then rm -f "$browser_pipe"; fi; stage exit "$rc"; }; trap finish EXIT`,
      'PATH="$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"', 'cli=$(command -v '+cli+')',
      'root="$HOME/'+root+'"',
-     'for p in "$HOME/.hyper" "$HOME/.hyper/ssh-accounts" "$HOME/.hyper/ssh-accounts/'+opts.provider+'" "$root" "$root/.codex" "$root/.claude" "$root/no-browser" "$root/.codex/auth.json" "$root/.claude/.credentials.json"; do test ! -L "$p" || exit 1; done',
+     'for p in "$HOME/.hyper" "$HOME/.hyper/ssh-accounts" "$HOME/.hyper/ssh-accounts/'+opts.provider+'" "$root" "$root/.codex" "$root/.claude" "$root/no-browser" "$root/no-browser.url-pipe" "$root/.codex/auth.json" "$root/.claude/.credentials.json"; do test ! -L "$p" || exit 1; done',
      'mkdir -p "$root/.codex" "$root/.claude"',
      'chmod 700 "$root" "$root/.codex" "$root/.claude"',
      'helper="$root/no-browser"',
-     "printf '#!/bin/sh\\nexit 0\\n' > \"$helper\"", 'chmod 700 "$helper"',
+     // Browser launchers may discard helper stdout/stderr. A private FIFO carries
+     // its arguments directly to our stderr reader, without files containing URLs.
+     'browser_pipe="$helper.url-pipe"', 'rm -f "$browser_pipe"', 'mkfifo -m 600 "$browser_pipe"',
+     'exec 3<> "$browser_pipe"', 'cat <&3 >&2 &', 'browser_reader=$!',
+     `printf '%s\\n' '#!/bin/sh' 'printf "%s\\n" "$@" > "$0.url-pipe"' > "$helper"`, 'chmod 700 "$helper"',
      'export HOME="$root" CODEX_HOME="$root/.codex" CLAUDE_CONFIG_DIR="$root/.claude"',
-     'run_cli() { env -i HOME="$HOME" CODEX_HOME="$CODEX_HOME" CLAUDE_CONFIG_DIR="$CLAUDE_CONFIG_DIR" PATH="$PATH" TERM=dumb BROWSER="$helper" "$cli" "$@"; }',
+     'run_cli() { env -i HOME="$HOME" CODEX_HOME="$CODEX_HOME" CLAUDE_CONFIG_DIR="$CLAUDE_CONFIG_DIR" PATH="$PATH" TERM=dumb BROWSER="$helper" "$cli" "$@" 3>&-; }',
      'stage cli-login 0',
      opts.provider==='codex' ? 'run_cli login --device-auth >&2' : 'run_cli auth login --claudeai >&2',
      'stage credential-check 0',
@@ -89,7 +93,7 @@ export default async function (
             }
         }} finally {reader.releaseLock();}
     };
-    const consume = async (stream:ReadableStream<Uint8Array>) => { const reader=stream.getReader();const decoder=new TextDecoder();try {while(true){const part=await reader.read();if(part.done)break;tail=(tail+decoder.decode(part.value,{stream:true}).replace(/\x1b\[[0-9;]*[A-Za-z]/g,'')).slice(-8192); for(const candidate of tail.match(/https:\/\/[^\s<>"']+/g)??[]){try{const u=new URL(candidate);const allowed=opts.provider==='codex'?['auth.openai.com']:['claude.ai','platform.claude.com','console.anthropic.com'];if(allowed.includes(u.hostname)&&u.protocol==='https:'&&!u.username&&!u.password&&u.port==='') flow.verificationUri=u.href; }catch{ /* Invalid URL candidates are ignored. */ }} if (flow.status==='pending') { if (/certificate|CERT_HAS_EXPIRED|SSL|TLS/i.test(tail)) diagnostics.reason='tls';
+    const consume = async (stream:ReadableStream<Uint8Array>) => { const reader=stream.getReader();const decoder=new TextDecoder();try {while(true){const part=await reader.read();if(part.done)break;tail=(tail+decoder.decode(part.value,{stream:true})).replace(/\x1b\[[0-9;]*[A-Za-z]/g,'').slice(-8192); for(const candidate of tail.match(/https:\/\/[^\s<>"']+/g)??[]){try{const u=new URL(candidate);const allowed=opts.provider==='codex'?['auth.openai.com']:['claude.ai','claude.com','platform.claude.com','console.anthropic.com'];if(allowed.includes(u.hostname)&&u.protocol==='https:'&&!u.username&&!u.password&&u.port==='') flow.verificationUri=u.href; }catch{ /* Invalid URL candidates are ignored. */ }} if (flow.status==='pending') { if (/certificate|CERT_HAS_EXPIRED|SSL|TLS/i.test(tail)) diagnostics.reason='tls';
                 else if (/permission denied|EACCES|EPERM/i.test(tail)) diagnostics.reason='permission';
                 else if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|could not resolve|connection (?:refused|timed out|reset)/i.test(tail)) diagnostics.reason='network';
                 else {const http=tail.match(/\bHTTP(?:\/\d(?:\.\d)?)?\s+([45]\d{2})\b/i);if(http){diagnostics.reason='http';diagnostics.httpCode=Number(http[1]);}} }

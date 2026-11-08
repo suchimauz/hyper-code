@@ -2,7 +2,7 @@
  * Render local Kimi or remote subscription authorization progress using shared application form controls.
  *
  * Shows the selected server, allowlisted authorization link and public device code.
- * One-time codes are sent directly to the pending CLI; raw provider logs are never rendered.
+ * Callback URLs travel privately to the pending remote CLI; raw provider logs are never rendered.
  * @param opts.id Opaque login flow identifier returned by remote account authorization.
  */
 export default async function (ctx: Context, session: Session | null, opts: {
@@ -29,9 +29,10 @@ export default async function (ctx: Context, session: Session | null, opts: {
     if (flow.status === 'pending') {
         html += '<p class="text-xs leading-relaxed text-subtle">Complete the provider sign-in below. Credentials are saved only in the selected account slot on the selected machine.</p>';
         if (flow.verificationUri) html += `<div class="flex justify-center">${ui.button({ action: 'open-remote-authorization', label: 'Open authorization page', href: flow.verificationUri, tone: 'primary', attrs: { target: '_blank', rel: 'noopener noreferrer' } })}</div>`;
-        else html += '<p role="status" class="text-xs text-subtle">Waiting for the CLI to provide an authorization link. Refresh status in a moment.</p>';
+        else html += '<p role="status" class="text-xs text-subtle">Waiting for the CLI to provide an authorization link. Refresh status in a moment. If no link appears, cancel this attempt and start login again. A browser code is available only after opening the authorization page.</p>';
         if (flow.userCode) html += `<div class="rounded-lg bg-base-200 p-4 text-center"><p class="mb-2 text-2xs text-subtle">Device code</p><code class="select-all font-mono text-lg tracking-widest text-base-content">${esc(flow.userCode)}</code></div>`;
-        if (flow.provider === 'claude-code') html += `<form hx-popup="sshAccount.submitFromPopup" hx-popup-params="${params}" class="space-y-3"><label class="block space-y-1.5"><span class="text-xs font-medium text-base-content">One-time browser code</span>${ui.field({ name: 'code', type: 'password', maxlength: 4096, ariaLabel: 'One-time browser code', placeholder: 'Paste the code from the provider', class: 'w-full' })}</label><div class="flex justify-end">${ui.button({ action: 'submit-remote-login-code', label: 'Submit code', type: 'submit', tone: 'primary' })}</div></form>`;
+        if (flow.provider === 'claude-code' && flow.verificationUri && !flow.callbackSubmission) html += `<p class="text-xs leading-relaxed text-subtle">After signing in, the browser may show a localhost connection error. Copy the full address from that tab and paste it below, including code and state. This protected field sends it privately to the selected SSH server. Do not paste it in chat. Then refresh status; only the CLI can confirm login.</p><form autocomplete="off" hx-popup="sshAccount.submitFromPopup" hx-popup-params="${params}" class="space-y-3"><label class="block space-y-1.5"><span class="text-xs font-medium text-base-content">Browser callback URL</span>${ui.field({ name: 'code', type: 'password', maxlength: 8192, ariaLabel: 'Browser callback URL', placeholder: 'http://localhost:…/callback?…', class: 'w-full' })}</label><div class="flex justify-end">${ui.button({ action: 'submit-remote-login-code', label: 'Send callback', type: 'submit', tone: 'primary' })}</div></form>`;
+        if (flow.callbackSubmission) html += '<p role="status" class="text-xs leading-relaxed">Callback submitted. Refresh status to check the CLI result. If login does not finish, cancel and start again; do not resend the callback.</p>';
         html += `<div class="flex items-center justify-between gap-3 border-t border-base-300 pt-4"><form hx-popup="sshAccount.cancelFromPopup" hx-popup-params="${params}">${ui.button({ action: 'cancel-remote-login', label: 'Cancel', type: 'submit', tone: 'ghost' })}</form><form hx-popup="sshAccount.progressPopup" hx-popup-params="${params}">${ui.button({ action: 'refresh-remote-login', label: 'Refresh status', type: 'submit' })}</form></div>`;
     } else if (flow.status === 'connected') html += '<p class="text-xs leading-relaxed text-subtle">The account is connected. You can now choose its models from the model picker.</p>';
     html += '</div>';

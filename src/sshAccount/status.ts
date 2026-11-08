@@ -11,6 +11,6 @@ export default async function (
         /** Opaque identifier returned by startLogin. */
         id: string;
     },
-): Promise<{id:string;instance:string|null;provider:"codex"|"claude-code"|"kimi-coding";account:string;status:string;verificationUri:string|null;userCode:string|null;error:string|null;diagnostics?:types.sshAccount.LoginFlow['diagnostics']}>  {
-    await ctx.fns.sshAccount.requireOwner({}); const flow=ctx.state.sshAccount?.flows?.get(opts.id);if(!flow)throw new Error('Authorization ended or server restarted; start login again');return {id:flow.id,instance:flow.instance,provider:flow.provider,account:flow.account,status:flow.status,verificationUri:flow.verificationUri,userCode:flow.userCode,error:flow.error,...(flow.diagnostics?{diagnostics:structuredClone(flow.diagnostics)}:{})};
+): Promise<{id:string;instance:string|null;provider:"codex"|"claude-code"|"kimi-coding";account:string;status:string;verificationUri:string|null;userCode:string|null;error:string|null;callbackSubmission?:types.sshAccount.LoginFlow['callbackSubmission'];diagnostics?:types.sshAccount.LoginFlow['diagnostics']}>  {
+    await ctx.fns.sshAccount.requireOwner({}); const flow=ctx.state.sshAccount?.flows?.get(opts.id);if(!flow)throw new Error('Authorization ended or server restarted; start login again');return {id:flow.id,instance:flow.instance,provider:flow.provider,account:flow.account,status:flow.status,verificationUri:flow.verificationUri,userCode:flow.userCode,error:flow.error,...(flow.callbackSubmission?{callbackSubmission:flow.callbackSubmission}:{}),...(flow.diagnostics?{diagnostics:structuredClone(flow.diagnostics)}:{})};
 }

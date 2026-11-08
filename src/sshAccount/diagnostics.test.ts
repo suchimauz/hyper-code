@@ -9,7 +9,7 @@ for(const provider of ['codex','claude-code'] as const) for(const failure of ['l
  const exited=new Promise<number>(r=>resolve=r);
  const fake:any={stdout:new ReadableStream({start(c){out=c;}}),stderr:new ReadableStream({start(c){err=c;}}),stdin:{},exited,kill:()=>{}};
  const spawn=spyOn(Bun,'spawn').mockImplementation(((cmd:string[])=>{command=cmd[3]!;return fake;}) as any);
- const ctx:any={state:{},fns:{sshInstance:{connection:async()=>({bin:'ssh',args:[],host:'test'})},sshAccount:{requireOwner:async()=>{},registry:async()=>{}},procs:{events:{refresh:()=>{}},ui:{}},ui:{popupContent:({html}:any)=>html}}};
+ const ctx:any={state:{},fns:{codexTunnel:{mutationRun:({work}:any)=>work()},sshProvider:{completeLogin:async()=>{}},sshInstance:{connection:async()=>({bin:'ssh',args:[],host:'test'})},sshAccount:{requireOwner:async()=>{},registry:async()=>{}},procs:{events:{refresh:()=>{}},ui:{}},ui:{popupContent:({html}:any)=>html}}};
  ctx.fns.sshAccount.status=(o:any)=>status(ctx,null,o);
  const send=(c:ReadableStreamDefaultController<Uint8Array>,s:string)=>c.enqueue(new TextEncoder().encode(s));
  try {
