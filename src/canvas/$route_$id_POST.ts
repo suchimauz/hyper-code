@@ -34,7 +34,8 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     if (body.show && typeof body.show === "object") {
         const kind = String(body.show.kind ?? "");
         if (kind !== "file" && kind !== "url") return new Response("show: only file and url links open from the chat", { status: 400 });
-        const args = kind === "file" ? { path: String(body.show.args?.path ?? "") } : { url: String(body.show.args?.url ?? "") };
+        if (kind === "file" && body.show.args?.host !== undefined && (typeof body.show.args.host !== "string" || !body.show.args.host.trim())) return new Response("show: invalid file host", { status: 400 });
+        const args = kind === "file" ? { path: String(body.show.args?.path ?? ""), ...(body.show.args?.host !== undefined ? { host: body.show.args.host } : {}) } : { url: String(body.show.args?.url ?? "") };
         try { await ctx.fns.canvas.show({ agentId, kind, args }); }
         catch (error: any) { return new Response(String(error?.message ?? error), { status: 400 }); }
         body.open = true;
