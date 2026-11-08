@@ -2,6 +2,20 @@ import { describe, expect, test } from "bun:test";
 import route from "./$route_v1_agents_$id_events_GET";
 
 describe("GET /api/v1/agents/:id/events", () => {
+    test('projects actual batch choice event identities but never private forms or input HTML', async () => {
+        const events = [
+            { idx: 1096, messageIdx: 1026, ts: 1794102189919, type: 'input', inputId: 'inb5151a163e137ade', kind: 'choice', title: 'Question one', html: '<form>never expose</form>' },
+            { idx: 1097, messageIdx: 1026, ts: 1794102189920, type: 'input', inputId: 'inbc7a809ea1b342b6', kind: 'choice', html: '<form>never expose</form>' },
+            ...['secret', 'tbank-login', 'redmine-approval'].map((kind, i) => ({ idx: 1098 + i, ts: 1, type: 'input', inputId: 'private', kind, html: 'private form' })),
+        ];
+        const ctx: any = { state: {}, fns: { auth: { author: async () => null }, mentions: { parse: async () => [] }, procs: { db: { select: async ({ sql }: any) => sql.includes('SELECT 1') ? [{ exists: 1 }] : [{ run_state: 'idle', next_run_at: null }] } }, session: { getEvents: async () => events, getMaxEventIdx: async () => 1100 } } };
+        const response = await route(ctx, null, { req: new Request('http://local/api/v1/agents/ebo/events'), params: { id: 'ebo' } });
+        const body: any = await response.json();
+        expect(body.events).toHaveLength(2);
+        expect(body.events.map(({ inputId, kind, type, html, text, messageIdx }: any) => ({ inputId, kind, type, html, text, messageIdx }))).toEqual(events.slice(0, 2).map(event => ({ inputId: event.inputId, kind: 'choice', type: 'input', html: null, text: null, messageIdx: 1026 })));
+        expect(JSON.stringify(body)).not.toContain('never expose');
+        expect(JSON.stringify(body)).not.toContain('private');
+    });
     test("filters service events, returns mobile fields, and initially requests the newest page", async () => {
         let eventOpts: any;
         const ctx: any = { state: { agent: { ab: { scratchpad: { mobileStream: { text: "live", revision: 3, startedAt: 9 } } } } }, fns: {

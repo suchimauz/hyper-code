@@ -45,18 +45,24 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const agentId = String(opts.agentId ?? (await ctx.fns.agent.current({})).id);
     const suppliedSpec = { ...(opts.spec ?? {}) };
     delete suppliedSpec._agentWait;
+    delete suppliedSpec._choiceBatchId;
     const spec = { ...(kind.prepare ? await kind.prepare(ctx, { spec: suppliedSpec }) : suppliedSpec) };
     delete spec._agentWait;
+    delete spec._choiceBatchId;
     const wait = opts.waitForAnswer ?? kindName === 'choice';
     if (wait && !['choice', 'grid', 'confirm'].includes(kindName)) throw new Error('Durable wait supports only choice, grid and confirm');
     if (wait) spec._agentWait = true;
     const id = "in" + Bun.randomUUIDv7().replace(/[^a-zA-Z0-9]/g, "").slice(-16);
     const now = Date.now();
+    // Serialize membership changes with atomic choice batch submission.
+    await ctx.fns.procs.db.transaction({ fn: async () => {
+    await ctx.fns.procs.db.select({ sql: 'SELECT id FROM agents WHERE id=? FOR UPDATE', params: [agentId] });
     await ctx.fns.procs.db.run({
         sql: `INSERT INTO inputs (id, agent_id, kind, state, title, message, spec, created_at, updated_at)
               VALUES (?, ?, ?, 'open', ?, ?, ?::jsonb, ?, ?)`,
         params: [id, agentId, kindName, title, String(opts.message ?? ""), JSON.stringify(spec), now, now],
     });
+    } });
     // messageIdx anchors the card in the transcript order: views that page or
     // fold by message (the compact "fresh tail") keep events that carry one.
     const lastIdx = Number((await ctx.fns.procs.db.select({ sql: "SELECT COALESCE(MAX(idx), -1) AS i FROM messages WHERE agent_id = ?", params: [agentId] }))[0]?.i ?? -1);

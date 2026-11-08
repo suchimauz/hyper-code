@@ -1,5 +1,6 @@
 /**
  * Return a bounded transcript page, persistent mascot and live activity for native and web chat.
+ * Choice input events expose identity only for history lookup; private forms and input HTML are never projected.
  * turnStartedAt is the durable worker-claim time for the current running turn,
  * including provider/tool waits; queued or stopped turns have no clock.
  * @param opts.req HTTP request with optional after, before and limit query parameters.
@@ -98,8 +99,9 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     })).map((row: any) => Number(row.idx)) : []);
 
     const mobileEvents = events
-        .filter((event: any) => ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result"].includes(String(event.type)))
+        .filter((event: any) => (event.type === 'input' && event.kind === 'choice' && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result"].includes(String(event.type)))
         .map((event: any) => ({
+            ...(event.type === 'input' ? { inputId: event.inputId, kind: 'choice' } : {}),
             idx: Number(event.idx),
             // Transcript grouping follows durable message identity, never tool names.
             // UI-only command notices have no linked message and do not start turns.
@@ -114,9 +116,9 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
                 result: event.result ?? null, error: event.error ?? null,
             } : {}),
             isFinalReply: event.type === 'assistant' ? finalReplies.has(event.messageIdx) : undefined,
-            text: event.type === 'thinking' ? null : typeof event.text === "string" ? event.text : (typeof event.error === "string" ? event.error : null),
+            text: event.type === 'thinking' || event.type === 'input' ? null : typeof event.text === "string" ? event.text : (typeof event.error === "string" ? event.error : null),
             mentions: mentioned.get(Number(event.idx)) ?? [],
-            html: event.type === 'thinking' ? null : typeof event.html === "string" ? event.html : null,
+            html: event.type === 'thinking' || event.type === 'input' ? null : typeof event.html === "string" ? event.html : null,
             actor: typeof event.actor === 'string' ? event.actor : null,
             navigationEligible: event.type === 'user' && humanMessages.has(event.messageIdx)
                 && !String(event.actor || '').startsWith('agent:') && !event.agentMessage && !event.outgoingAgentMessage
