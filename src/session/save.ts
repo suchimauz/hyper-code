@@ -1,4 +1,4 @@
-/** Create or update the agent's settings and durable state, including scratchpad and plans. Never writes messages or events: use session.appendMessage/appendEvent for new history and session.replaceMessages/replaceEvents for explicit imports or replacements. Safe to call with a stale in-memory transcript. */
+/** Create or update the agent's settings and durable state, including scratchpad and plans. On first save, resolve the creator from the parent, signed-in user, or trusted bound worker's durable creator. Never changes durable ownership on update. Never writes messages or events: use session.appendMessage/appendEvent for new history and session.replaceMessages/replaceEvents for explicit imports or replacements. Safe to call with a stale in-memory transcript. */
 export default async function (ctx: Context, session: Session | null, opts: {
         /** Live agent instance to operate on. */
 agent: types.agent.Agent }): Promise<void> {
@@ -11,7 +11,19 @@ agent: types.agent.Agent }): Promise<void> {
         const parentOwner = agent.parentId
             ? ((await ctx.fns.procs.db.select({ sql: "SELECT created_by FROM agents WHERE id = ?", params: [agent.parentId] })) as any[])[0]?.created_by ?? null
             : null;
-        agent.createdBy = parentOwner ?? await ctx.fns.auth.actorId({});
+        let owner = parentOwner ?? await ctx.fns.auth.actorId({});
+        // A tool can create an independent chat without parentId. In a worker,
+        // inherit the invoking agent's durable creator, not an arbitrary live id.
+        const caller = session?.agent;
+        if (owner == null && session?.kind === 'agent' && !session.req
+            && caller?.id && session.agentId === caller.id && ctx.state.agent?.[caller.id] === caller) {
+            const rows = await ctx.fns.procs.db.select({
+                sql: 'SELECT created_by FROM agents WHERE id = ? AND archived_at IS NULL',
+                params: [caller.id],
+            });
+            owner = rows[0]?.created_by ?? null;
+        }
+        agent.createdBy = owner;
     }
     await ctx.fns.procs.db.run({
         sql: `
