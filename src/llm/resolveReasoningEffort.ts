@@ -14,7 +14,7 @@ export default async function (
         /** Agent reasoning preference. @default auto */
         effort?: types.llm.ReasoningEffort;
     },
-): Promise<{ requested: types.llm.ReasoningEffort; applied: Exclude<types.llm.ReasoningEffort, "auto">; mode: types.llm.ReasoningProfile["mode"]; downgraded: boolean; reason: string | null }> {
+): Promise<{ requested: types.llm.ReasoningEffort; applied: types.llm.ReasoningEffort; mode: types.llm.ReasoningProfile["mode"]; downgraded: boolean; reason: string | null }> {
     const allowed: types.llm.ReasoningEffort[] = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"];
     const requested = allowed.includes(opts.effort ?? "auto") ? (opts.effort ?? "auto") : "auto";
     const caps = await ctx.fns.llm.reasoningCapabilities({ model: opts.model });
@@ -22,7 +22,7 @@ export default async function (
     if (caps.supported.includes(requested)) return { requested, applied: requested as Exclude<types.llm.ReasoningEffort, "auto">, mode: caps.mode, downgraded: false, reason: null };
     const order: Array<Exclude<types.llm.ReasoningEffort, "auto">> = ["off", "minimal", "low", "medium", "high", "xhigh"];
     const start = order.indexOf(requested as any);
-    let applied: Exclude<types.llm.ReasoningEffort, "auto"> = caps.defaultEffort;
+    let applied: types.llm.ReasoningEffort = caps.defaultEffort;
     let found = false;
     for (let i = start; i >= 0; i--) if (caps.supported.includes(order[i]!)) { applied = order[i]!; found = true; break; }
     // Nothing at or below the request (e.g. "off" on a model that always reasons): take the lowest supported level above it.

@@ -17,7 +17,7 @@ export default async function (
         /** Current timestamp in milliseconds, for testing. */
         now?: number;
     },
-): Promise<{ id: string; requested: types.llm.ReasoningEffort; applied: Exclude<types.llm.ReasoningEffort, "auto">; downgraded: boolean }> {
+): Promise<{ id: string; requested: types.llm.ReasoningEffort; applied: types.llm.ReasoningEffort; downgraded: boolean }> {
     const allowed: types.llm.ReasoningEffort[] = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"];
     if (!allowed.includes(opts.effort)) throw new Error("invalid reasoning effort");
     const row = ((await ctx.fns.procs.db.select({ sql: "SELECT id, model, reasoning_effort FROM agents WHERE id = ? AND archived_at IS NULL", params: [opts.id] })) as any[])[0];

@@ -63,6 +63,11 @@ export default async function (
         body.thinking = { type: "enabled" };
         body.reasoning_effort = reasoning.applied === "xhigh" ? "max" : reasoning.applied;
     }
+    // Groq GPT-OSS has a bounded effort control; auto leaves the gateway default untouched.
+    if ((ep.upstream ?? ep.provider) === "groq" && /^openai\/gpt-oss-(20b|120b)$/.test(ep.modelId) && agent.reasoningEffort && agent.reasoningEffort !== "auto") {
+        const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort });
+        body.reasoning_effort = reasoning.applied;
+    }
     if (ep.provider === "opencode") Object.assign(body, await ctx.fns.llm.opencodeReasoningBody({ model: agent.model, modelId: ep.modelId, api: "openai", effort: agent.reasoningEffort }));
     // OpenAI-compatible providers do not consistently accept OpenAI's cache
     // extension. Groq currently rejects prompt_cache_key with HTTP 400.

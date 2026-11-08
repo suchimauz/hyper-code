@@ -84,6 +84,10 @@ export default async function (
     if (provider === "zai-coding" && /^glm-5\.3(?:-flashx?)?$/.test(modelId)) {
         return { supported: ["auto", "low", "high", "xhigh"], defaultEffort: "xhigh", mode: "openai-effort" };
     }
+    // GPT-OSS on Groq accepts exactly these levels (also used by llm.call).
+    if (provider === "groq" && /^openai\/gpt-oss-(20b|120b)$/.test(modelId)) {
+        return { supported: ["auto", "low", "medium", "high"], defaultEffort: "medium", mode: "openai-effort" };
+    }
     // gpt-6 family rejects effort "none"/"minimal": only low..max on the wire.
     if ((provider === "codex" || provider === "openai") && /^gpt-6/.test(modelId)) {
         return { supported: ["auto", "low", "medium", "high", "xhigh"], defaultEffort: "medium", mode: "openai-effort" };
