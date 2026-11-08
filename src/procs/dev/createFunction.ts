@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { mkdir, rename, rm, realpath } from "node:fs/promises";
 
-/** Creates a documented runtime function through a validated, type-checked pipeline. */
+/** Creates a documented runtime function with type checking; use activate:false to author offline without loading, generating declarations, or indexing it. */
 export default async function (
     ctx: Context,
     _session: Session | null,
@@ -22,18 +22,25 @@ export default async function (
         returnType: string;
         /** Function body without the outer function declaration. */
         body: string;
+        /** Emit a synchronous factory instead of an async procedure. @default false */
+        synchronous?: boolean;
+        /** Top-level external imports and local type aliases/interfaces only; no executable statements or project imports. @default "" */
+        prelude?: string;
         /** Permit replacing an existing function. @default false */
         overwrite?: boolean;
         /** Generate and type-check without writing. @default false */
         dryRun?: boolean;
         /** Update the durable retrieval index after loading. @default false */
         index?: boolean;
+        /** Set false to validate and write source without declarations, loading, or indexing, including rollback. Cannot combine with index:true. @default true */
+        activate?: boolean;
     },
 ): Promise<any> {
     const root = opts.root ?? "src";
     const module = String(opts.module ?? "").trim();
     const name = String(opts.name ?? "").trim();
     assertInput(module, name, opts);
+    if (opts.activate === false && opts.index) throw new TypeError("createFunction: activate:false cannot index");
     const project = ctx.fns.procs.project.projectRoot({});
     let rootDir = join(project, root);
     if (root !== "src" && root !== ".hyper") {
@@ -54,29 +61,36 @@ export default async function (
     const source = render(opts);
     const syntax = new Bun.Transpiler({ loader: "ts" }).scan(source);
     void syntax;
-    if (opts.dryRun) return { ok: true, name: `${module.replaceAll("/", ".")}.${name}`, path: rel, source, written: false };
-    if (await Bun.file(path).exists() && !opts.overwrite) throw new Error(`createFunction: ${rel} already exists; use edit for updates or pass overwrite explicitly`);
+    const staticValidation = await validateSource(source, opts);
+    if (opts.dryRun && opts.activate !== false) return { ok: true, name: `${module.replaceAll("/", ".")}.${name}`, path: rel, source, written: false };
+    if (!opts.dryRun && await Bun.file(path).exists() && !opts.overwrite) throw new Error(`createFunction: ${rel} already exists; use edit for updates or pass overwrite explicitly`);
     const previous = await Bun.file(path).exists() ? await Bun.file(path).text() : null;
     // Staging lives under host src so the host tsconfig also checks user-plugin functions.
     const temp = join(project, "src", ".authoring", module, `${name}.${crypto.randomUUID()}.ts`);
     await mkdir(dirname(temp), { recursive: true });
     await Bun.write(temp, source);
     const filter = temp.startsWith(project + "/") ? temp.slice(project.length + 1) : temp;
-    const preflight = await ctx.fns.procs.dev.typecheck({ filter });
-    if (!preflight.ok) { await rm(temp, { force: true }); throw new Error(`createFunction typecheck failed:\n${preflight.errors.join("\n")}`); }
-    await mkdir(dirname(path), { recursive: true });
+    let installed = false;
     try {
-        await rename(temp, path);
-        await ctx.fns.procs.dev.genTypes({});
+        const preflight = await ctx.fns.procs.dev.typecheck({ filter });
+        if (!preflight.ok) throw new Error(`createFunction typecheck failed:\n${preflight.errors.join("\n")}`);
         const runtimeName = `${module.replaceAll("/", ".")}.${name}`;
+        if (opts.dryRun) return { ok: true, name: runtimeName, path: rel, source, written: false, typecheck: preflight, validation: staticValidation };
+        await mkdir(dirname(path), { recursive: true });
+        await rename(temp, path);
+        installed = true;
+        if (opts.activate === false) return { ok: true, name: runtimeName, path: rel, created: previous == null, activated: false, typecheck: preflight, validation: staticValidation, index: null };
+        await ctx.fns.procs.dev.genTypes({});
         await ctx.fns.procs.repl.load({ name: runtimeName });
         const validation = await ctx.fns.runtime.docs.validate({ name: runtimeName, strict: true, typecheck: true });
         if (!validation.ok) throw new Error(`createFunction validation failed: ${JSON.stringify(validation.errors)}`);
         const index = opts.index ? await ctx.fns.runtime.docs.index({ localizationBatch: 1 }) : null;
         return { ok: true, name: runtimeName, path: rel, created: previous == null, typecheck: preflight, validation, index };
     } catch (error) {
-        if (previous == null) await rm(path, { force: true }); else await Bun.write(path, previous);
-        await ctx.fns.procs.dev.genTypes({});
+        if (installed) {
+            if (previous == null) await rm(path, { force: true }); else await Bun.write(path, previous);
+            if (opts.activate !== false) await ctx.fns.procs.dev.genTypes({});
+        }
         throw error;
     } finally { await rm(temp, { force: true }); }
 }
@@ -101,5 +115,40 @@ function render(opts: any): string {
     const fields = opts.params.map((p: any) => `        /** ${p.description}${p.default !== undefined ? ` @default ${p.default}` : ""}${p.minimum !== undefined ? ` @minimum ${p.minimum}` : ""}${p.maximum !== undefined ? ` @maximum ${p.maximum}` : ""} */\n        ${p.name}${p.required ? "" : "?"}: ${p.type};`).join("\n");
     const optsType = fields ? `{\n${fields}\n    }` : "{}";
     const body = String(opts.body).trim().split("\n").map((line: string) => `    ${line}`).join("\n");
-    return `/**\n * ${String(opts.summary).trim()}\n *\n * ${String(opts.description).trim()}\n${tags.join("\n")}${tags.length ? "\n" : ""} */\nexport default async function (\n    ctx: Context,\n    session: Session | null,\n    opts: ${optsType},\n): ${String(opts.returnType).trim()} {\n${body}\n}\n`;
+    return `${opts.prelude ? String(opts.prelude).trim() + '\n' : ''}/**\n * ${String(opts.summary).trim()}\n *\n * ${String(opts.description).trim()}\n${tags.join("\n")}${tags.length ? "\n" : ""} */\nexport default ${opts.synchronous ? '' : 'async '}function (\n    ctx: Context,\n    session: Session | null,\n    opts: ${optsType},\n): ${String(opts.returnType).trim()} {\n${body}\n}\n`;
+}
+
+// Parse source without importing it or consulting the live registry. The loader's
+// reflector is private and binds functions; it must not run in offline authoring.
+async function validateSource(source: string, opts: any): Promise<{ ok: true; mode: "static"; parameters: number }> {
+    const ts = await import("typescript");
+    const sf = ts.createSourceFile("authored.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const diagnostics = (sf as typeof sf & { parseDiagnostics: readonly import("typescript").Diagnostic[] }).parseDiagnostics;
+    if (diagnostics.length) throw new TypeError(`createFunction static syntax: ${diagnostics.map(d => ts.flattenDiagnosticMessageText(d.messageText, " ")).join("; ")}`);
+    const decl = sf.statements[sf.statements.length - 1];
+    for (const statement of sf.statements.slice(0, -1)) {
+        if (ts.isImportDeclaration(statement)) {
+            if (!ts.isStringLiteral(statement.moduleSpecifier)) throw new TypeError('createFunction prelude: literal external import required');
+            const spec = statement.moduleSpecifier.text;
+            if (!/^(node:|bun:|bun$|@?[A-Za-z0-9][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_.-]+)*)$/.test(spec) && !/^(node|bun):[A-Za-z0-9_/-]+$/.test(spec)) throw new TypeError('createFunction prelude: external imports only');
+            if (spec.split('/').includes('..') || spec.startsWith('src/') || spec.startsWith('.')) throw new TypeError('createFunction prelude: project imports forbidden');
+        } else if (!ts.isTypeAliasDeclaration(statement) && !ts.isInterfaceDeclaration(statement)) {
+            throw new TypeError('createFunction prelude: only imports and local types are supported');
+        }
+        if (statement.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) throw new TypeError('createFunction prelude: exported declarations forbidden');
+    }
+    if (!decl || !ts.isFunctionDeclaration(decl) || !decl.modifiers?.some(m => m.kind === ts.SyntaxKind.DefaultKeyword) || decl.parameters.length !== 3 || !decl.type) throw new TypeError("createFunction static metadata: expected one default function with three parameters and a return type");
+    const docs = (decl as typeof decl & { jsDoc?: readonly import("typescript").JSDoc[] }).jsDoc;
+    const doc = docs?.map(d => typeof d.comment === "string" ? d.comment : "").join("\n") ?? "";
+    if (!doc.includes(String(opts.summary).trim()) || !doc.includes(String(opts.description).trim())) throw new TypeError("createFunction static metadata: missing capability documentation");
+    const type = decl.parameters[2]?.type;
+    if (!type || !ts.isTypeLiteralNode(type) || type.members.length !== opts.params.length) throw new TypeError("createFunction static metadata: options do not match declarations");
+    for (let i = 0; i < type.members.length; i++) {
+        const member = type.members[i];
+        const param = opts.params[i];
+        if (!member || !ts.isPropertySignature(member) || member.name.getText(sf) !== param.name || !member.type || !!member.questionToken === param.required) throw new TypeError(`createFunction static metadata: invalid parameter ${param.name}`);
+        const text = member.getFullText(sf);
+        if (!text.includes(`/** ${param.description}`) || /^(the )?.+ value used by the operation\.?$/i.test(param.description.trim())) throw new TypeError(`createFunction static metadata: parameter ${param.name} needs meaningful documentation`);
+    }
+    return { ok: true, mode: "static", parameters: type.members.length };
 }

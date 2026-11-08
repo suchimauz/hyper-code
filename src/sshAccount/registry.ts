@@ -21,6 +21,7 @@ export default async function (
         account?: string;
     },
 ): Promise<Array<{ instance: string; provider: "codex" | "claude-code" | "kimi-coding"; account: string; status: "pending" | "connected" | "failed"; updatedAt: number }>> {
+    return ctx.fns.codexTunnel.mutationRun({operation:'registry',instance:opts.instance,account:opts.account,provider:opts.provider,action:opts.action,work:async()=>{
     await ctx.fns.sshAccount.requireOwner({});
     const valid = (s: string) => /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(s);
     if (!['list','begin','connect','fail','remove'].includes(opts.action)) throw new Error('Invalid registry action');
@@ -44,4 +45,5 @@ export default async function (
         await ctx.fns.settings.set({module:'sshAccount',scopeType:'global',key:[row.instance,row.provider,row.account].join(':'),value:row});
     }
     return accounts;
+    }});
 }

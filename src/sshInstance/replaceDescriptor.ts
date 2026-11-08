@@ -15,6 +15,7 @@ export default async function (
         next: types.sshInstance.Instance | null;
     },
 ): Promise<types.sshInstance.Instance | null> {
+    return ctx.fns.codexTunnel.mutationRun({operation:'descriptor',instance:opts.previous.name,work:async()=>{
     await ctx.fns.sshInstance.authorize({});
     const pending = () => [...(ctx.state.sshAccount?.flows?.values() ?? [])].some(f => f.instance === opts.previous.name && f.status === 'pending');
     if (pending()) throw new Error('Finish or cancel the pending login before changing this instance');
@@ -62,4 +63,5 @@ export default async function (
     } finally {
         if (staged && !committed) await fs.rm(staged,{recursive:true,force:true});
     }
+    }});
 }
