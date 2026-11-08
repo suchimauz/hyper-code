@@ -7,7 +7,7 @@ describe("GET /api/v1/agents/:id/events", () => {
         const ctx: any = { state: { agent: { ab: { scratchpad: { mobileStream: { text: "live", revision: 3, startedAt: 9 } } } } }, fns: {
             auth: { author: async () => null },
             mentions: { parse: async ({ text }: any) => text.includes("@anna") ? ["anna"] : [] },
-            procs: { db: { select: async ({ sql }: any) => sql.includes("SELECT 1") ? [{ exists: 1 }] : [{ run_state: "running", next_run_at: null, last_error: null }] } },
+            procs: { db: { select: async ({ sql }: any) => sql.includes("SELECT 1") ? [{ exists: 1 }] : [{ mascot: "deepy", run_state: "running", next_run_at: null, last_error: null }] } },
             session: {
                 getEvents: async (opts: any) => { eventOpts = opts; return [{ idx: 1, ts: 10, type: "wake_up", reason: "x" }, { idx: 2, ts: 11, type: "assistant", text: "hello @anna", usage: { tokens: 1 } }]; },
                 getMaxEventIdx: async () => 2,
@@ -15,7 +15,7 @@ describe("GET /api/v1/agents/:id/events", () => {
         } };
         const response = await route(ctx, null, { req: new Request("http://localhost/api/v1/agents/ab/events?limit=10"), params: { id: "ab" } });
         expect(eventOpts).toMatchObject({ id: "ab", beforeIdx: 3, limit: 10 });
-        expect(await response.json()).toMatchObject({ version: 1, agentId: "ab", nextAfter: 3, isRunning: true, partial: { text: "live", revision: 3, startedAt: 9 }, events: [{ idx: 2, type: "assistant", text: "hello @anna", mentions: ["anna"] }] });
+        expect(await response.json()).toMatchObject({ version: 1, agentId: "ab", mascot: "deepy", nextAfter: 3, isRunning: true, partial: { text: "live", revision: 3, startedAt: 9 }, events: [{ idx: 2, type: "assistant", text: "hello @anna", mentions: ["anna"] }] });
     });
 
     test("includes resolved authors for multiuser messages", async () => {

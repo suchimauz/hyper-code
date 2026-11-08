@@ -1,5 +1,5 @@
 /**
- * Return a bounded transcript page and live activity for native and web chat.
+ * Return a bounded transcript page, persistent mascot and live activity for native and web chat.
  * turnStartedAt is the durable worker-claim time for the current running turn,
  * including provider/tool waits; queued or stopped turns have no clock.
  * @param opts.req HTTP request with optional after, before and limit query parameters.
@@ -25,7 +25,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         : afterRaw != null
             ? await ctx.fns.session.getEvents({ id, fromIdx: Math.max(0, Number(afterRaw) || 0), limit })
             : await ctx.fns.session.getEvents({ id, beforeIdx: maxIdx + 1, limit });
-    const status = ((await ctx.fns.procs.db.select({ sql: "SELECT run_state, run_started_at, next_run_at, last_error, archived_at FROM agents WHERE id = ?", params: [id] })) as any[])[0];
+    const status = ((await ctx.fns.procs.db.select({ sql: "SELECT mascot, run_state, run_started_at, next_run_at, last_error, archived_at FROM agents WHERE id = ?", params: [id] })) as any[])[0];
     const isRunning = status?.run_state === "running" || status?.run_state === "claimed" || status?.next_run_at != null;
 
     const toolPreview = (name: string, args: any): string => {
@@ -187,6 +187,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         runs,
         version: 1,
         agentId: id,
+        mascot: status.mascot as 'crab' | 'deepy' | 'whalegirl' | 'desksprite' | 'bitty' | 'tmuxai' | 'planet' | 'rainbow-terminal-cat',
         events: mobileEvents,
         activeTools: (ctx.fns.tools?.runs?.({ agentId: id }) ?? []).map(run => ({
             id: run.id, name: run.name, subject: run.subject.slice(0, 500), startedAt: run.startedAt,
