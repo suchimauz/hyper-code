@@ -142,6 +142,14 @@ export default function (
         };
     }
 
+    // Legacy SSH provider dispatch reports transport loss without structured metadata.
+    // Keep it on the same retry policy; "no fallback" forbids provider switching,
+    // not another request to the selected provider.
+    if (body.trim() === "SSH provider request failed; no fallback") {
+        return { kind: "transient", code: "SSH_TRANSPORT", provider, account, retryable: true,
+            message: body.trim(), raw: body.slice(0, 2000) };
+    }
+
     // A completed provider stream without content is safe to retry.
     if (/empty[_ ]response|empty content|no (?:response|content|output)/i.test(code + " " + body)) {
         return { kind: "transient", code: "EMPTY_RESPONSE", provider, account, retryable: true,

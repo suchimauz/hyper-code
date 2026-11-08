@@ -18,6 +18,21 @@ const CODEX_LIMIT = JSON.stringify({
 });
 
 describe("llm.classifyError", () => {
+    test("SSH provider no-fallback failure retries the selected provider", () => {
+        for (const provider of ["codex", "anthropic", "openai", "claude-code", "custom-provider"]) {
+            const info = call({ provider, body: "SSH provider request failed; no fallback" });
+            expect(info.code).toBe("SSH_TRANSPORT");
+            expect(info.kind).toBe("transient");
+            expect(info.retryable).toBe(true);
+            expect(info.provider).toBe(provider);
+        }
+    });
+
+    test("explicit auth status still wins over SSH transport text", () => {
+        const info = call({ provider: "codex", status: 401, body: "SSH provider request failed; no fallback" });
+        expect(info.code).toBe("AUTH");
+        expect(info.retryable).toBe(false);
+    });
     test("codex usage limit → park, not retry, with reset time", () => {
         const info = call({ provider: "codex", kind: "subscription", status: 429, body: CODEX_LIMIT });
         expect(info.kind).toBe("usage_limit");
