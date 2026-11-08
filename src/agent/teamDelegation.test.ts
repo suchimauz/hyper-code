@@ -162,11 +162,14 @@ describe("team delegation", () => {
         await stopMember(ctx, null, { agent: parent, member: child.id });
         expect(child.scratchpad.delegation.status).toBe("blocked");
         expect(child.scratchpad.plan.pausedAt).not.toBeNull();
+        // A durable stop fence must be cleared as well as the Team status.
+        await ctx.fns.procs.db.run({ sql: "UPDATE agents SET stopped_at = ? WHERE id = ?", params: [Date.now(), child.id] });
         await retryMember(ctx, null, { agent: parent, member: child.id });
         const reloaded = await ctx.fns.session.load({ id: child.id });
         expect(reloaded!.scratchpad.delegation.status).toBe("working");
         expect(reloaded!.scratchpad.plan.pausedAt).toBeNull();
-        const row = (await ctx.fns.procs.db.select({ sql: "SELECT next_run_at FROM agents WHERE id = ?", params: [child.id] }) as any[])[0];
+        const row = (await ctx.fns.procs.db.select({ sql: "SELECT next_run_at, stopped_at FROM agents WHERE id = ?", params: [child.id] }) as any[])[0];
+        expect(row.stopped_at).toBeNull();
         expect(Number(row.next_run_at)).toBeGreaterThan(0);
     });
 

@@ -1,7 +1,7 @@
 /**
  * Resume a blocked or failed delegated child through the durable worker queue
  *
- * Validates direct team ownership, resumes the child plan timer, changes blocked or failed delegation status back to working, appends a focused retry instruction, and schedules the child durably. Use from Team after fixing the cause of a delegated failure or stop.
+ * Validates direct team ownership, resumes the child plan timer, changes blocked or failed delegation status back to working, appends a focused retry instruction, clears the durable stop fence, and schedules the child durably. Use from Team after fixing the cause of a delegated failure or stop.
  * @param opts.agent Parent agent that owns the delegated child.
  * @param opts.member Blocked or failed direct child agent ID to retry.
  */
@@ -30,7 +30,7 @@ export default async function (
     } });
     const child = (ctx.state as any).agent?.[member]; if (child) child.scratchpad = updated.scratchpad;
     await ctx.fns.session.appendUserMessage({ id: member, text: "Parent requested a retry. Resume the active plan task, address the previous stop or failure, and complete the remaining plan." });
-    await ctx.fns.procs.db.run({ sql: "UPDATE agents SET next_run_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND run_state = 'idle' AND archived_at IS NULL", params: [now, now, member] });
+    await ctx.fns.procs.db.run({ sql: "UPDATE agents SET stopped_at = NULL, next_run_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND run_state = 'idle' AND archived_at IS NULL", params: [now, now, member] });
     ctx.fns.agent.wakeWorker({});
     ctx.fns.events.refreshAgentMeta({ agentId: opts.agent.id, section: "team", reason: "team-retry" });
     return { retried: true, member };
