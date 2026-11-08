@@ -50,7 +50,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     const toolSummary = (name: string, args: Record<string, unknown> | null): string => {
         const value = args && typeof args === 'object' ? args : {};
         const kind = name.split('.').pop() || name;
-        const firstLine = (text: string) => text.split(/\r?\n/, 1)[0];
+        const firstLine = (text: string) => text.split(/\r?\n/, 1)[0] ?? '';
         const search = ['grep', 'find', 'glob'].includes(kind);
         if (search && Array.isArray(value.queries)) {
             const queries = value.queries.filter((item): item is string => typeof item === 'string' && item.length > 0);
@@ -141,6 +141,11 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
                 ? toolPreview(String(event.name || "Tool"), event.args)
                 : (event.type !== 'thinking' && typeof event.text === "string" ? event.text.slice(0, 180) : null),
             isError: event.isError === true,
+            ...(event.type === 'tool_call' || event.type === 'tool_result' ? {
+                durationMs: typeof event.durationMs === 'number' && Number.isFinite(event.durationMs) && event.durationMs >= 0 ? event.durationMs : null,
+                // tools.call registers a deadline only from the tool's explicit seconds argument.
+                timeoutMs: typeof event.args?.timeout === 'number' && Number.isFinite(event.args.timeout) && event.args.timeout > 0 ? event.args.timeout * 1000 : null,
+            } : {}),
             ...(event.type === 'thinking' ? {
                 publicSummary: typeof event.publicSummary === 'string' ? event.publicSummary.slice(0, 40000) : null,
                 durationMs: typeof event.durationMs === 'number' ? event.durationMs : null,
@@ -191,6 +196,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         events: mobileEvents,
         activeTools: (ctx.fns.tools?.runs?.({ agentId: id }) ?? []).map(run => ({
             id: run.id, name: run.name, subject: run.subject.slice(0, 500), startedAt: run.startedAt,
+            timeoutMs: run.timeoutMs,
             state: run.aborted ? 'stopping' : 'running', tail: run.tail.slice(-12000),
         })),
         nextAfter: maxIdx + 1,
