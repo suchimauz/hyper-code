@@ -1,6 +1,8 @@
 /** Stream OpenAI-compatible chat completions, accepting SSE or a gateway JSON completion and preserving reported model metadata. */
 /**
  * Stream an agent request through an OpenAI-compatible endpoint.
+ * OneAPI requests carry the stable agent session ID in X-Session-Affinity,
+ * including follow-up tool turns; other providers do not receive this header.
  * OneAPI Qwen requests explicitly allow 8192 output tokens to avoid the observed
  * 2048-token gateway default truncating tool arguments; other routes are unchanged.
  * @param opts.agent Agent associated with the operation.
@@ -80,6 +82,7 @@ export default async function (
     const res = await transport({ url: ep.url, ...(ep.provider === "opencode" ? { sessionId: agent.id } : {}), init: {
         method: "POST",
         headers,
+    if ((ep.upstream ?? ep.provider) === "oneapi" && agent.id) headers["X-Session-Affinity"] = agent.id;
         body: JSON.stringify(body),
         signal: opts.signal,
     } });

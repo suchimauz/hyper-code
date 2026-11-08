@@ -172,3 +172,25 @@ test("preserves truncated SSE arguments and finish reason without executing a to
     expect(r.toolCalls).toEqual([{ id: "cut", name: "write", args: { __unparsed: '{"path":' } }]);
     expect(r.usage.completion_tokens).toBe(2048);
 });
+
+test("OneAPI affinity is stable per session and absent for other providers", async () => {
+    for (const endpoint of [{ provider: "oneapi" }, { provider: "ssh", upstream: "oneapi" }, { provider: "openrouter" }]) {
+        const seen: Array<string | null> = [];
+        const ctx: any = { fns: {
+            agent: { buildLlmRequest: async () => ({ system: "", messages: [] }), wireTools: () => [] },
+            llm: {
+                resolveEndpoint: async () => ({ ...endpoint, modelId: "test", url: "https://mock.invalid" }),
+                toOpenAIMessages: () => [],
+                connectFetch: async (o: any) => {
+                    seen.push(new Headers(o.init.headers).get("X-Session-Affinity"));
+                    return Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+                },
+            },
+        } };
+        for (const id of ["session-a", "session-a", "session-b"]) {
+            await stream(ctx, null, { agent: { id, model: "test" } as any });
+        }
+        expect(seen).toEqual(endpoint.provider === "openrouter" ? [null, null, null] : ["session-a", "session-a", "session-b"]);
+    }
+});
+
