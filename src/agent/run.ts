@@ -47,6 +47,7 @@ export default async function (
     },
 ) {
     const { agent, userText } = opts;
+    const inputWaitSince = Date.now();
     const agentCtx: any = Object.create(ctx);
     agentCtx.session = ctx.fns.session.forAgent({ agent });
     // Derived context flows through provider adapters without sharing mutable agent state.
@@ -313,6 +314,9 @@ export default async function (
     const planAttempts: Record<string, number> = {};
     let totalPlanInjections = 0;
     while (true) {
+        if (await ctx.fns.input.isWaiting({ agentId: agent.id, since: inputWaitSince })) {
+            return Object.assign(goalReturn, { text: '', usage: null, consumedUserIdx, inputWaiting: true });
+        }
         if (nativeHandoffFailed) throw new Error('Native Goal accounting handoff failed; explicit retry required');
         if (goalOwnerLease) {
             await ctx.fns.goal.ownerBarrier({action:'release',agentId:agent.id,runToken:goalOwnerLease.runToken,lease:goalOwnerLease});
@@ -744,7 +748,10 @@ export default async function (
                     }) as Promise<Awaited<ReturnType<typeof ctx.fns.tools.call>>>
                     : ctx.fns.tools.call({ name: call.name, args: call.args, agent });
             };
-            const r = accountingBlocked
+            const inputBlocked = await ctx.fns.input.isWaiting({ agentId: agent.id, since: inputWaitSince });
+            const r = inputBlocked
+                ? { handlerExecuted: false, isError: true, output: 'Not executed: this turn opened a blocking question. Wait for its answer before requesting further work.' }
+                : accountingBlocked
                 ? { handlerExecuted: false, isError: true, output: goalBoundarySummary }
                 : goalRun
                     ? await ctx.fns.goal.delegationScope({ action: 'with', binding: goalRun.binding,
@@ -787,6 +794,9 @@ export default async function (
         await ctx.fns.session.syncAgentState({ agent });
         await assertRunActive();
 
+        if (await ctx.fns.input.isWaiting({ agentId: agent.id, since: inputWaitSince })) {
+            return Object.assign(goalReturn, { text: '', usage: null, consumedUserIdx, inputWaiting: true });
+        }
         if (!terminal && (nativeHandoffFailed || nativeMutationStopped || (goalRun && (goalResult?.kind !== 'committed' || goalResult.status !== 'active')))) {
             // Temporary fail-closed integration, not Codex soft-budget wrap-up parity.
             terminal = { type: 'html', text: goalBoundarySummary, html: `<p>${goalBoundarySummary}</p>` };

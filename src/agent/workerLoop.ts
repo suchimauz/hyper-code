@@ -658,7 +658,7 @@ async function workerPass(ctx: Context, inflight: Set<Promise<unknown>>): Promis
             // the soonest scheduled `next_run_at` is due.
             const next = ((await ctx.fns.procs.db.select({
                 sql: `SELECT LEAST(
-                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
+                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL AND NOT EXISTS (SELECT 1 FROM inputs i WHERE i.agent_id = agents.id AND i.spec->>'_agentWait' = 'true' AND i.state IN ('open','processing'))), ?),
                         COALESCE((SELECT MIN(wake_at) FROM agents WHERE wake_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
                         COALESCE((SELECT MIN(next_check_at) FROM agent_watches w JOIN agents a ON a.id=w.agent_id WHERE w.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?),
                         COALESCE((SELECT MIN(next_at) FROM agent_triggers t JOIN agents a ON a.id=t.agent_id WHERE t.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?)
@@ -675,7 +675,7 @@ async function workerPass(ctx: Context, inflight: Set<Promise<unknown>>): Promis
             // MAX_IDLE_MS sleep that accidentally serialises agents.
             const next = ((await ctx.fns.procs.db.select({
                 sql: `SELECT LEAST(
-                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
+                        COALESCE((SELECT MIN(next_run_at) FROM agents WHERE run_state = ? AND next_run_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL AND NOT EXISTS (SELECT 1 FROM inputs i WHERE i.agent_id = agents.id AND i.spec->>'_agentWait' = 'true' AND i.state IN ('open','processing'))), ?),
                         COALESCE((SELECT MIN(wake_at) FROM agents WHERE wake_at IS NOT NULL AND archived_at IS NULL AND stopped_at IS NULL), ?),
                         COALESCE((SELECT MIN(next_check_at) FROM agent_watches w JOIN agents a ON a.id=w.agent_id WHERE w.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?),
                         COALESCE((SELECT MIN(next_at) FROM agent_triggers t JOIN agents a ON a.id=t.agent_id WHERE t.status = 'active' AND a.stopped_at IS NULL AND a.archived_at IS NULL), ?)

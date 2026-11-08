@@ -47,10 +47,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 
     if (opts.cancel) {
         const reason = String(opts.reason ?? "").trim() || null;
-        await ctx.fns.procs.db.transaction({ fn: async () => {
-            await finish(ctx, input, "cancelled", null, reason, actor);
-            await deliver(ctx, input, "cancelled", reason ? `cancelled: ${reason}` : "cancelled by the person", null, actor);
-        } });
+        await deliver(ctx, input, "cancelled", reason ? `cancelled: ${reason}` : "cancelled by the person", null, actor, reason);
         return { state: "cancelled" };
     }
 
@@ -64,10 +61,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         await ctx.fns.procs.db.run({ sql: "UPDATE inputs SET state = 'open', updated_at = ? WHERE id = ?", params: [Date.now(), id] });
         return { state: "open", error: String(error?.message ?? error) };
     }
-    await ctx.fns.procs.db.transaction({ fn: async () => {
-        await finish(ctx, input, "submitted", outcome.result, null, actor);
-        await deliver(ctx, input, "submitted", outcome.summary, outcome.result, actor);
-    } });
+    await deliver(ctx, input, "submitted", outcome.summary, outcome.result, actor);
     return { state: "submitted" };
 }
 
@@ -81,7 +75,7 @@ async function finish(ctx: Context, input: types.input.Row, state: string, resul
 // The answer is a user turn of its own type: it wakes the agent like a typed
 // message, but the composer-only machinery (function RAG, mentions) skips it.
 // No transcript bubble — the input card itself now shows the answer.
-async function deliver(ctx: Context, input: types.input.Row, state: string, summary: string, result: Record<string, any> | null, actor: string | null) {
+async function deliver(ctx: Context, input: types.input.Row, state: string, summary: string, result: Record<string, any> | null, actor: string | null, reason: string | null = null) {
     const attr = (v: string) => v.replace(/[&"<>]/g, ch => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" }[ch]!));
     const content = `<input-result id="${attr(input.id)}" kind="${attr(input.kind)}" state="${state}" title="${attr(input.title)}">\n`
         + summary + (result ? `\n${JSON.stringify(result)}` : "") + `\n</input-result>`;
@@ -90,6 +84,7 @@ async function deliver(ctx: Context, input: types.input.Row, state: string, summ
     if (actor) message.author = actor;
     await ctx.fns.procs.db.transaction({ fn: async () => {
         await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [input.agentId] });
+        await finish(ctx, input, state, result, reason, actor);
         // Agent withdrawal is not a human instruction to resume work.
         const [gate] = await ctx.fns.procs.db.select({ sql: "SELECT spec->>'_agentWait' = 'true' AS blocking FROM inputs WHERE id = ?", params: [input.id] });
         // Answering a blocking question is not permission to undo a later manual Stop.
