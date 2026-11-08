@@ -4,7 +4,7 @@
  * measurements remain explicitly unknown. Generic quota is shown with an explicit unknown-period label.
  * Keeps provider reset timestamps in the tooltip, localized by the browser.
  * Returns empty markup when there are no connections. Uses shared severity thresholds.
- * @param opts.entries Connection snapshots from llms.usageData.
+ * @param opts.entries Connection snapshots from llms.quotaData.
  * @param opts.now Current epoch milliseconds for expiry checks; defaults to Date.now().
  */
 export default function (
@@ -72,28 +72,32 @@ export default function (
         const parked = entry.parkedAgents > 0;
         const budget = entry.provider === "opencode" && entry.planType !== "Go subscription";
         const thresholds = entry.thresholds ?? opts.thresholds ?? { warnAt: 30, criticalAt: 60, alertAt: 75 };
-        // Most providers normalize named periods to semantic slots. Codex slots
-        // are ordered by the upstream response, not by duration: primary may be
-        // weekly. Never infer five hours (or a week) from an unlabelled Codex slot.
+        // Slots are provider response order, not periods. Only measured duration
+        // identifies a period; missing durations remain explicitly unknown.
         const windows = Object.entries(entry.windows ?? {}).filter((entry): entry is [string, types.llm.UsageWindow] => entry[1] != null);
-        const measured = (slot: string, minutes: number) => {
+        const measured = (minutes: number) => {
             if (unavailable || budget) return undefined;
-            return windows.find(([key, w]) => {
+            return windows.find(([, w]) => {
                 const duration = w.windowMinutes;
-                const matches = duration == null ? entry.provider !== "codex" && key === slot : minutes === 43200
+                const matches = duration == null ? false : minutes === 43200
                     ? duration >= 40320 && duration <= 44640 : duration === minutes;
                 return matches && Number.isFinite(w.usedPercent) && (!w.resetsAt || w.resetsAt > now);
             })?.[1];
         };
         const periods = [
-            { key: "5h", label: "5 ч", detail: "5h", window: measured("primary", 300) },
-            { key: "weekly", label: "Неделя", detail: "Weekly", window: measured("secondary", 10080) },
-            { key: "monthly", label: "Месяц", detail: "Monthly", window: measured("tertiary", 43200) },
+            { key: "5h", label: "5 ч", detail: "5h", window: measured(300) },
+            { key: "weekly", label: "Неделя", detail: "Weekly", window: measured(10080) },
+            { key: "monthly", label: "Месяц", detail: "Monthly", window: measured(43200) },
         ];
         const ruStamp = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
         const rows = periods.map(p => {
             const percent = p.window ? Math.max(0, Math.min(100, p.window.usedPercent)) : null;
-            const tone = unavailable || stale ? "text-faint" : toneClass(percent, thresholds);
+            const canonicalTone = p.window && "tone" in p.window ? p.window.tone : undefined;
+            const tone = unavailable || stale || percent == null ? "text-faint"
+                : canonicalTone === "neutral" ? "text-success"
+                : canonicalTone === "warning" ? "text-warning"
+                : canonicalTone === "critical" ? "text-critical"
+                : canonicalTone === "error" ? "text-error" : toneClass(percent, thresholds);
             const used = percent == null ? "no data" : `${Math.round(percent)}% used${stale ? " (last known)" : ""}`;
             const reset = p.window?.resetsAt;
             const stamp = reset && Number.isFinite(reset) ? `${ruStamp.format(new Date(reset))} UTC` : null;
@@ -107,7 +111,7 @@ export default function (
             budget ? entry.memberBudgetText ?? "Monthly member budget unavailable" : "",
         ].filter(Boolean);
         // Keep an unclassified quota accessible, without inventing its duration.
-        if (!budget && !unavailable && !rows.some(r => r.window) && (!windows.length || windows.some(([, w]) => (w.windowMinutes == null ? entry.provider === "codex" : ![300, 10080].includes(w.windowMinutes) && !(w.windowMinutes >= 40320 && w.windowMinutes <= 44640)) && (!w.resetsAt || w.resetsAt > now))) && entry.usedPercent != null && Number.isFinite(entry.usedPercent)) {
+        if (!budget && !unavailable && !rows.some(r => r.window) && (!windows.length || windows.some(([, w]) => (w.windowMinutes == null ? true : ![300, 10080].includes(w.windowMinutes) && !(w.windowMinutes >= 40320 && w.windowMinutes <= 44640)) && (!w.resetsAt || w.resetsAt > now))) && entry.usedPercent != null && Number.isFinite(entry.usedPercent)) {
             status.push(`Quota ${Math.round(Math.max(0, Math.min(100, entry.usedPercent)))}% used${stale ? " (last known)" : ""} · период неизвестен`);
         }
         if (gateway) {

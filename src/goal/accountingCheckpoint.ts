@@ -12,8 +12,8 @@
  * @param opts.checkpointId Stable checkpoint retry key.
  * @param opts.sequence Strictly increasing source sequence; serialize through commit.
  * @param opts.clockEpoch Process monotonic clock epoch.
- * @param opts.current Exact cumulative decimal i64 source counters.
- * @param opts.quality Unknown usage blocks before SQL.
+ * @param opts.current Reported-only cumulative decimal i64 counters; quality and evidence describe missing observations.
+ * @param opts.quality Evidence quality; partial or unknown observations do not block soft accounting.
  * @param opts.boundaryGoalId Goal captured at activation/delegation boundary.
  * @param opts.boundaryRootAgentId Explicit root subscription, not lineage.
  * @param opts.nowMs Monotonic capture timestamp.
@@ -41,14 +41,16 @@ export default async function (ctx: Context, session: Session | null, opts: {
     sequence: number;
     /** Process monotonic clock epoch. */
     clockEpoch: string;
-    /** Exact cumulative decimal i64 source counters. */
+    /** Reported-only cumulative decimal i64 counters; quality and evidence describe missing observations. */
     current: {
         input: string;
         cached: string;
         output: string;
     };
-    /** Unknown usage blocks before SQL. */
-    quality: 'exact' | 'unknown' | 'unsupported';
+    /** Evidence quality; partial or unknown observations do not block soft accounting. */
+    quality: 'exact' | 'partial' | 'unknown' | 'unsupported';
+    /** Immutable request evidence for reported-only counters, including missing fields. */
+    usageEvidence?: Readonly<Record<string,types.goal.UsageNormalized>>;
     /** Goal captured at activation/delegation boundary. */
     boundaryGoalId: string;
     /** Explicit root subscription, not lineage. */
@@ -65,6 +67,6 @@ export default async function (ctx: Context, session: Session | null, opts: {
     };
 }): Promise<types.goal.AccountingResult> {
     if (!await ctx.fns.goal.enabled({})) throw new Error('Goal feature disabled');
-    if (opts.quality !== 'exact') throw new Error('Goal usage unknown or unsupported: checkpoint blocked');
+    if (!['exact','partial','unknown','unsupported'].includes(opts.quality)) throw new Error('Invalid usage quality');
     return await ctx.fns.procs.db.transaction({ fn: async () => await ctx.fns.goal.accountingCheckpointTx({ ...opts }) }) as types.goal.AccountingResult;
 }

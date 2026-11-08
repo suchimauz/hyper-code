@@ -1,6 +1,7 @@
 /**
  * Return a bounded transcript page, persistent mascot and live activity for native and web chat.
  * Choice input events expose identity only for history lookup; private forms and input HTML are never projected.
+ * Retry rows expose safe failure metadata and their latest durable lifecycle state, including markers outside this page.
  * turnStartedAt is the durable worker-claim time for the current running turn,
  * including provider/tool waits; queued or stopped turns have no clock.
  * @param opts.req HTTP request with optional after, before and limit query parameters.
@@ -98,10 +99,39 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         params: [id, `{${assistantIds.join(',')}}`],
     })).map((row: any) => Number(row.idx)) : []);
 
+    // Lifecycle markers are not transcript rows. Resolve them beyond the page so
+    // older history does not show an already-started or cancelled retry as pending.
+    const retryIds = [...new Set(events.filter(event => event.type === 'llm_retry' && typeof event.retryId === 'string').map(event => event.retryId as string))];
+    const retryStates = new Map<string, 'started' | 'cancelled'>();
+    if (retryIds.length) {
+        const markers = await ctx.fns.procs.db.select({
+            sql: `SELECT payload FROM events WHERE agent_id = ? AND payload::jsonb->>'type' IN ('llm_retry_started', 'llm_retry_cancelled') AND payload::jsonb->>'retryId' IN (${retryIds.map(() => '?').join(',')}) ORDER BY idx ASC`,
+            params: [id, ...retryIds],
+        });
+        for (const row of markers) {
+            const marker = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+            if (marker?.type === 'llm_retry_started' || marker?.type === 'llm_retry_cancelled') {
+                retryStates.set(JSON.stringify([marker.retryId, marker.retry]), marker.type === 'llm_retry_started' ? 'started' : 'cancelled');
+            }
+        }
+    }
+
     const mobileEvents = events
-        .filter((event: any) => (event.type === 'input' && event.kind === 'choice' && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result"].includes(String(event.type)))
+        .filter((event: any) => (event.type === 'input' && event.kind === 'choice' && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result", "llm_retry"].includes(String(event.type)))
         .map((event: any) => ({
             ...(event.type === 'input' ? { inputId: event.inputId, kind: 'choice' } : {}),
+            ...(event.type === 'llm_retry' ? {
+                retryId: typeof event.retryId === 'string' ? event.retryId : null,
+                retry: typeof event.retry === 'number' ? event.retry : null,
+                maxRetries: typeof event.maxRetries === 'number' ? event.maxRetries : null,
+                retryMode: typeof event.mode === 'string' ? event.mode : null,
+                delayMs: typeof event.delayMs === 'number' ? event.delayMs : null,
+                failureCode: typeof event.failure?.code === 'string' ? event.failure.code : null,
+                failureMessage: typeof event.failure?.message === 'string' ? event.failure.message : null,
+                failureStatus: typeof event.failure?.status === 'number' ? event.failure.status : null,
+                provider: typeof event.provider === 'string' ? event.provider : null,
+                retryState: retryStates.get(JSON.stringify([event.retryId, event.retry])) ?? 'scheduled',
+            } : {}),
             idx: Number(event.idx),
             // Transcript grouping follows durable message identity, never tool names.
             // UI-only command notices have no linked message and do not start turns.
@@ -167,6 +197,35 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
                 size: attachment.size == null ? null : Number(attachment.size),
             })) : [],
         }));
+
+    // Goal lifecycle lives in its own audit table. Project each transition next to
+    // the last event written before it so the transcript shows start/pause/resume
+    // inside the same work group as tools. Fractional idx keeps durable idx intact.
+    if (events.length) {
+        const first = events[0], last = events[events.length - 1];
+        const lower = Number(first.idx) > 0 ? Number(first.ts) : -1;
+        const next = Number(last.idx) < maxIdx ? ((await ctx.fns.procs.db.select({ sql: 'SELECT ts FROM events WHERE agent_id = ? AND idx > ? ORDER BY idx ASC LIMIT 1', params: [id, Number(last.idx)] })) as any[])[0] : null;
+        const upper = next && Number.isFinite(Number(next.ts)) ? Number(next.ts) : Number.MAX_SAFE_INTEGER;
+        const rows = await ctx.fns.procs.db.select({
+            sql: 'SELECT t.id, t.origin, t.before_status, t.after_status, t.created_at, g.objective FROM goal_transition_events t LEFT JOIN agent_goals g ON g.agent_id = t.agent_id AND g.goal_id = t.goal_id WHERE t.agent_id = ? AND t.created_at >= ? AND t.created_at < ? ORDER BY t.created_at ASC, t.id ASC LIMIT 200',
+            params: [id, lower, upper],
+        }).catch(() => [] as any[]) as any[]; // goal schema absent or disabled: transcript still renders
+        const offsets = new Map<number, number>();
+        for (const row of rows) {
+            const at = Number(row.created_at);
+            if (!Number.isFinite(at) || row.before_status === row.after_status) continue;
+            const anchor = [...events].reverse().find((event: any) => Number(event.ts) <= at);
+            const base = anchor ? Number(anchor.idx) : Number(first.idx) - 1;
+            const n = (offsets.get(base) ?? 0) + 1;
+            offsets.set(base, n);
+            mobileEvents.push({
+                idx: base + n / 1000, messageIdx: null, ts: at, type: 'goal_transition', text: typeof row.objective === 'string' ? row.objective : null,
+                goalStatus: row.after_status ?? null, goalBeforeStatus: row.before_status ?? null, goalOrigin: String(row.origin ?? ''),
+                mentions: [], html: null, actor: null, navigationEligible: false, author: null, peerAuthor: null, agentMessage: null, outgoingAgentMessage: null, name: null, attachments: [],
+            } as any);
+        }
+        mobileEvents.sort((a: any, b: any) => a.idx - b.idx);
+    }
 
     const liveAgent = (ctx.state as any).agent?.[id];
     const stream = liveAgent?.scratchpad?.mobileStream;

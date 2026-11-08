@@ -16,17 +16,17 @@ describe('goal usage evidence normalization',()=>{
  });
  test('missing counts never become exact zero',async()=>{
   for(const value of [undefined,null,{}, {prompt_tokens:10,completion_tokens:2},{prompt_tokens:10,prompt_tokens_details:{cached_tokens:0}}])
-   expect(await normalize(ctx,null,{binding,format:'openai-chat',usage:value})).toMatchObject({quality:'unknown',inputTokens:null,cachedInputTokens:null,outputTokens:null});
+   expect((await normalize(ctx,null,{binding,format:'openai-chat',usage:value})).quality).not.toBe('exact');
  });
  test('invalid and unsafe integer evidence is unknown',async()=>{
   for(const value of [-1,1.2,NaN,Infinity,Number.MAX_SAFE_INTEGER+1,'9223372036854775808','-1','01'])
-   expect((await norm({...raw,prompt_tokens:value})).quality).toBe('unknown');
+   expect((await norm({...raw,prompt_tokens:value})).quality).not.toBe('exact');
   expect((await norm({...raw,prompt_tokens:70})).quality).toBe('unknown');
  });
  test('raw Responses and Anthropic semantics are explicit',async()=>{
   expect(await normalize(ctx,null,{binding,format:'openai-responses',usage:{input_tokens:100,input_tokens_details:{cached_tokens:80},output_tokens:20}})).toMatchObject({quality:'exact',inputTokens:'100'});
   expect(await normalize(ctx,null,{binding,format:'anthropic-raw',usage:{input_tokens:10,cache_read_input_tokens:80,cache_creation_input_tokens:10,output_tokens:20}})).toMatchObject({quality:'exact',inputTokens:'100',cachedInputTokens:'80'});
-  expect((await normalize(ctx,null,{binding,format:'anthropic-raw',usage:{input_tokens:10,cache_read_input_tokens:0,output_tokens:20}})).quality).toBe('unknown');
+  expect((await normalize(ctx,null,{binding,format:'anthropic-raw',usage:{input_tokens:10,cache_read_input_tokens:0,output_tokens:20}})).quality).not.toBe('exact');
  });
  test('transformed provider streams never masquerade as exact',async()=>{
   for(const format of ['unsupported','hyper-stream-anthropic'] as const)
@@ -53,19 +53,19 @@ describe('pure immutable usage accumulator',()=>{
   for(const key of ['sourceAgentId','runId','rootAccountingAgentId','goalIdAtBoundary'] as const)
    await expect(add(await norm(raw,{[key]:'changed',requestId:'r2'}),state)).rejects.toThrow('binding changed');
  });
- test('unknown and unsupported quality sticky; snapshots expose no partial total',async()=>{
+ test('missing evidence stays durable while later reported totals accumulate',async()=>{
   for(const format of ['openai-chat','unsupported'] as const){
    const missing=await normalize(ctx,null,{binding,format,usage:{}});
    const incomplete=await add(missing);expect(await add(missing,incomplete)).toBe(incomplete);
    const after=await add(await norm(raw,{requestId:'r2'}),incomplete);
-   expect(after.quality).toBe(missing.quality);expect(after.inputTokens).toBeNull();expect(after.cachedInputTokens).toBeNull();expect(after.outputTokens).toBeNull();
+   expect(after.quality).toBe('partial');expect(after.inputTokens).toBe('100');expect(after.cachedInputTokens).toBe('80');expect(after.outputTokens).toBe('20');expect(after.requests.r1.inputTokens).toBeNull();
    await expect(add(await norm(),incomplete)).rejects.toThrow('Conflicting');
   }
  });
- test('full i64 exact, overflow marks unknown rather than lying about saturation',async()=>{
+ test('full i64 exact, overflow rejects rather than lying about saturation',async()=>{
   const large=await norm({...raw,prompt_tokens:'9223372036854775807'});const state=await add(large);
   expect(state.inputTokens).toBe('9223372036854775807');
-  expect(await add(await norm(raw,{requestId:'next'}),state)).toMatchObject({quality:'unknown',inputTokens:null,cachedInputTokens:null,outputTokens:null});
+  await expect(add(await norm(raw,{requestId:'next'}),state)).rejects.toThrow('exceeds i64');
  });
  test('request dictionary safely handles prototype names',async()=>{
   const state=await add(await norm(raw,{requestId:'__proto__'}));

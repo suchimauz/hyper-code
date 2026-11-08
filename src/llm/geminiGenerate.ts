@@ -59,7 +59,7 @@ export default async function (
      if(typeof value.modelVersion === 'string') responseModel=value.modelVersion;
      if(value.usageMetadata) {
       const u=value.usageMetadata;
-      usage={...u,prompt_tokens:u.promptTokenCount ?? 0,completion_tokens:u.candidatesTokenCount ?? 0,total_tokens:u.totalTokenCount ?? 0};
+      usage={...u,prompt_tokens:u.promptTokenCount,completion_tokens:u.candidatesTokenCount,total_tokens:u.totalTokenCount,cache_read_tokens:u.cachedContentTokenCount};
      }
      if(value.candidates === undefined) {
       if(!value.usageMetadata && !value.modelVersion) throw new Error('Gemini missing candidates');

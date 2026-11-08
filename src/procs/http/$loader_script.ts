@@ -8,11 +8,15 @@
 export default async function (ctx: Context, _session: Session | null, opts: { entries: any[] }): Promise<void> {
     const routes = (ctx.state.procs.http.routes ??= {});
     for (const entry of opts.entries) {
-        (routes[entry.routePath] ??= {}).GET = async () => {
+        (routes[entry.routePath] ??= {}).GET = async (_rctx: Context, _session: Session | null, req?: { req?: Request }) => {
             const built = await buildScript(entry.abs, entry.fileName, ctx.fns.procs.project.runtimeDir({}));
-            return new Response(Bun.file(built), {
-                headers: { "content-type": contentTypeFor(entry.routePath), "cache-control": "public, max-age=0, must-revalidate" },
-            });
+            // Revalidation stays (max-age=0), but an unchanged bundle answers 304 instead of the whole file.
+            const file = Bun.file(built);
+            // Content hash: the bundle is rewritten on every request, so its mtime always changes.
+            const etag = `"${Bun.hash(await file.arrayBuffer()).toString(36)}"`;
+            const headers = { "content-type": contentTypeFor(entry.routePath), "cache-control": "public, max-age=0, must-revalidate", etag };
+            if (req?.req?.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
+            return new Response(file, { headers });
         };
         ctx.fns.procs.log.debug({ event: "load.script", msg: entry.routePath, from: `${entry.root}/${entry.rel}` });
     }

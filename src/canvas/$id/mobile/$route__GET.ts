@@ -9,6 +9,8 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     return {
         currentId: agentId,
         title: "Canvas",
+        // Embedded beside the React chat: the chat, navigation and quota scripts would only slow the frame down.
+        lean: new URL(opts.req.url).searchParams.get("embed") === "1",
         headExtra: `<style>
           #main { overflow:hidden !important; padding:0 !important; }
           [data-mobile-canvas] > .canvas-panel { display:flex !important; margin:0 !important; border:0 !important; border-radius:0 !important; }

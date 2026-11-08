@@ -22,22 +22,22 @@ test('escapes connection and account headings',()=>{
  expect(html).toContain('Hyper node &lt;bad&gt;');expect(html).not.toContain('<bad>');expect(html).toContain('&lt;account&gt;');
 });
 test('shows three simultaneous periods with thresholds, accessible reset details and real logos',()=>{
- const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:20,resetsAt},secondary:{usedPercent:40,resetsAt},tertiary:{usedPercent:85,resetsAt}}}],now});
+ const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:20,windowMinutes:300,resetsAt},secondary:{usedPercent:40,windowMinutes:10080,resetsAt},tertiary:{usedPercent:85,windowMinutes:43200,resetsAt}}}],now});
  for(const key of ['5h','weekly','monthly']) expect(html).toContain(`data-quota-window="${key}"`);
  expect(html).toContain('class="text-success" aria-label="20% использовано">20');expect(html).toContain('class="text-warning" aria-label="40% использовано">40');expect(html).toContain('class="text-error" aria-label="85% использовано">85');
  expect(html).toContain('class="quota-tip" popover="auto"');expect(html).toContain('data-logo="claude-code:"');
  expect(html).toContain(new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}).format(new Date(resetsAt))+' UTC');
 });
 test('missing or expired windows stay unknown; Kimi never invents weekly quota',()=>{
- const html=dial(ctx,null,{entries:[{...base,provider:'kimi-coding',windows:{primary:{usedPercent:20,resetsAt:now-1},tertiary:{usedPercent:50,resetsAt}}}],now});
+ const html=dial(ctx,null,{entries:[{...base,provider:'kimi-coding',windows:{primary:{usedPercent:20,windowMinutes:300,resetsAt:now-1},tertiary:{usedPercent:50,windowMinutes:43200,resetsAt}}}],now});
  expect(html).toContain('Monthly</span><span>50% used');expect(html).toContain('Weekly</span><span>no data');expect(html).toContain('5h</span><span>no data');expect((html.match(/Нет данных/g)||[]).length).toBe(2);
 });
 test('all expired semantic windows do not resurrect aggregate quota as generic',()=>{
- const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:20,resetsAt:now-1}}}],now});
+ const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:20,windowMinutes:300,resetsAt:now-1}}}],now});
  expect(html).not.toContain('quota-matrix-unknown');expect(html).not.toContain('20% used');expect((html.match(/Нет данных/g)||[]).length).toBe(3);
 });
 test('undefined optional window slots remain missing instead of throwing',()=>{
- const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:17,resetsAt},secondary:undefined,tertiary:undefined}}],now});
+ const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:17,windowMinutes:300,resetsAt},secondary:undefined,tertiary:undefined}}],now});
  expect(html).toContain('5h</span><span>17% used');expect(html).toContain('Weekly</span><span>no data');expect(html).toContain('Monthly</span><span>no data');
 });
 test('long gateway diagnostics stay accessible without expanding narrow columns',()=>{
@@ -51,7 +51,7 @@ test('generic and non-five-hour measurements never become five-hour percentages'
  expect((html.match(/Нет данных/g)||[]).length).toBe(3);expect(html).toContain('14% used · период неизвестен');expect(html).not.toContain('5h</span><span>14%');
 });
 test('stale, unavailable, parked, errors and PAYG budget are preserved',()=>{
- const entry={...base,windows:{primary:{usedPercent:85,resetsAt}}};
+ const entry={...base,windows:{primary:{usedPercent:85,windowMinutes:300,resetsAt}}};
  expect(dial(ctx,null,{entries:[{...entry,quotaStatus:'stale'}],now})).toContain('85% used (last known)');
  const unavailable=dial(ctx,null,{entries:[{...entry,quotaStatus:'unavailable',parkedAgents:2,tone:'error'}],now});
  expect(unavailable).toContain('quota unavailable — usage unknown');expect(unavailable).not.toContain('85% used');expect(unavailable).toContain('2 agent(s) parked');expect(unavailable).not.toContain('Высокое использование квоты');
@@ -78,11 +78,11 @@ test('explicit upstream Codex durations remain authoritative when both are provi
  expect(html).toContain('5h</span><span>19% used');expect(html).toContain('Weekly</span><span>40% used');
 });
 test('reset timestamps appear only in quota tooltip and unknown resets are not invented',()=>{
- const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:19,resetsAt},secondary:{usedPercent:40,resetsAt:now-1}}}],now});
+ const html=dial(ctx,null,{entries:[{...base,windows:{primary:{usedPercent:19,windowMinutes:300,resetsAt},secondary:{usedPercent:40,windowMinutes:10080,resetsAt:now-1}}}],now});
  const [visible,tooltip]=html.split('<span class="quota-tip"');
  expect(visible).not.toContain('<time');expect(visible).not.toContain('quota-matrix-reset');expect(visible).not.toContain('quota-matrix-caption');
  expect(tooltip).toContain(`datetime="${new Date(resetsAt).toISOString()}" data-quota-reset-detail`);
- const unavailable=dial(ctx,null,{entries:[{...base,quotaStatus:'unavailable',resetsAt,windows:{primary:{usedPercent:19,resetsAt}}}],now});
+ const unavailable=dial(ctx,null,{entries:[{...base,quotaStatus:'unavailable',resetsAt,windows:{primary:{usedPercent:19,windowMinutes:300,resetsAt}}}],now});
  expect(unavailable).not.toContain('<time');
 });
 
@@ -112,4 +112,32 @@ test('gateway uses health symbols instead of fabricated quota cells',()=>{
   expect(html).toContain('quota-tip');
   expect(html).toContain('quota not measured');
  }
+});
+
+test('canonical per-window tone wins over shared threshold fallback',()=>{
+ const primary={usedPercent:20,windowMinutes:300,resetsAt,tone:'error' as const};
+ const html=dial(ctx,null,{entries:[{...base,thresholds:{warnAt:10,criticalAt:30,alertAt:90},windows:{primary,secondary:{usedPercent:40,windowMinutes:10080,resetsAt}}}],now});
+ expect(html).toContain('class="text-error" aria-label="20% использовано">20');
+ expect(html).toContain('class="text-critical" aria-label="40% использовано">40');
+ const stale=dial(ctx,null,{entries:[{...base,quotaStatus:'stale',windows:{primary}}],now});
+ expect(stale).toContain('class="text-faint" aria-label="20% использовано">20');
+});
+test('every provider classifies windows by duration rather than slot',()=>{
+ for(const provider of ['claude-code','kimi-coding','codex']) {
+  const html=dial(ctx,null,{entries:[{...base,provider,windows:{primary:{usedPercent:20,windowMinutes:10080,resetsAt},secondary:{usedPercent:40,windowMinutes:300,resetsAt}}}],now});
+  expect(html).toContain('Weekly</span><span>20% used');expect(html).toContain('5h</span><span>40% used');
+  const unknown=dial(ctx,null,{entries:[{...base,provider,windows:{primary:{usedPercent:20,resetsAt}}}],now});
+  expect(unknown).toContain('20% used · период неизвестен');expect(unknown).toContain('5h</span><span>no data');
+ }
+});
+
+test('desktop and mobile quota routes use the canonical quota source',async()=>{
+ const {default:desktop}=await import('../llms/$route_usage_GET');
+ const {default:mobile}=await import('../llms/$route_mobileUsage_GET');
+ let reads=0;
+ const entries=[base];const gateway={status:'available',models:[]};
+ const routeCtx:any={fns:{llms:{quotaData:async()=>{reads++;return {updatedAt:now,accounts:[],entries,gateway};}},ui:{live:({html}:any)=>html,usageDial:({entries:actual,gateway:gate}:any)=>{expect(actual).toBe(entries);expect(gate).toBe(gateway);return 'quota';},modelLogo:()=>'<svg></svg>'}}};
+ expect(await (await desktop(routeCtx,null,{})).text()).toBe('quota');
+ const response=await mobile(routeCtx,null,{req:new Request('http://localhost/llms/mobileUsage')});
+ const body=await response.json();expect(body.entries[0].provider).toBe(base.provider);expect(body.gateway.status).toBe('available');expect(reads).toBe(2);
 });

@@ -60,10 +60,9 @@ export default async function (
         // A window whose reset has passed is stale: the quota rolled over and
         // nothing has reported the new figure yet. Better to show nothing than
         // a number we know to be wrong.
-        const fresh = (w?: types.llm.UsageWindow) => (w && (!w.resetsAt || w.resetsAt > now) ? w : undefined);
-        const primary = fresh(snapshot.windows?.primary);
-        const secondary = fresh(snapshot.windows?.secondary);
-        const tertiary = fresh(snapshot.windows?.tertiary);
+        // Provider slots are not periods: Codex can report a weekly primary.
+        // Keep the measured duration on every window, including unknown periods.
+        const { primary, secondary, tertiary } = ctx.fns.llm.normalizeQuotaWindows({ windows: snapshot.windows, now });
         const worst = [primary, secondary, tertiary]
             .filter(Boolean)
             .sort((a, b) => (b!.usedPercent ?? 0) - (a!.usedPercent ?? 0))[0];

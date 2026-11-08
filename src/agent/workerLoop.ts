@@ -326,15 +326,9 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
         clearInterval(heartbeatTimer);
         const ts = Date.now();
         const advanceCursor = !aborted && !errorText;
-        // Existing retry budget is process-local: a server restart resets it.
-        // The scheduled retry itself is durable and token-fenced below.
-        const retries: Record<string, number> = ((ctx.state as any).agentRunRetries ??= {});
-        const transient = transportFailure
-            ? transportFailure.phase === 'before_dispatch' && transportFailure.retryable === true
-            : failure ? failure.retryable
-            : !!errorText && /stalled|429|(?:^|\D)5\d\d(?:\D|$)|connection (?:was )?closed|ConnectionRefused|network|ETIMEDOUT|ECONNRESET|timed? ?out/i.test(errorText);
-        const retry = (!goalAuthority || !!finalReceipt) && !delegationBlocked && !aborted && !!errorText && failure?.kind !== 'usage_limit' && transient && (retries[agentId] ?? 0) < 1;
-        const retryAt = retry ? ts + (transportFailure ? 10_000 : Math.max(1_000, Number(failure?.retryAfterMs ?? 10_000))) : null;
+        // Model retries belong to run's per-request durable policy.
+        const retry = false;
+        const retryAt: number | null = null;
 
         // ONE atomic finalize — the read-compute-write it replaces had a race:
         // a POST landing between "read afterIdx" and "UPDATE … next_run_at=NULL"
@@ -465,31 +459,15 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
             return;
         }
 
-        // One automatic retry for TRANSIENT failures (stalled stream, 5xx,
-        // dropped connection): reschedule once with a short backoff. Anything
-        // else — and a second failure in a row — stays manual (statusbar badge).
-        //
-        // A spent subscription window is never transient: retrying it costs a
-        // round-trip per agent and cannot succeed before the quota resets. Such
-        // a failure parks the whole credential group instead, with a durable
-        // wake-up at the reset moment (see agent.parkOnUsageLimit).
-        if (retry) {
-            retries[agentId] = (retries[agentId] ?? 0) + 1;
-            if (transportFailure) {
-                try { await ctx.fns.session.appendErrorEvent({ id: agentId, error: 'SSH connection failed before dispatch; one safe retry scheduled in 10 seconds.', ts }); }
-                catch { ctx.fns.procs.log.warn({ event: 'agent.ssh-retry.status-failed', agentId }); }
-            }
-        }
+        // Model retries are exhausted here. Subscription exhaustion instead parks
+        // the credential group until its reset time.
         if (failure?.kind === 'usage_limit') {
-            delete retries[agentId];
             try {
                 await ctx.fns.agent.parkOnUsageLimit({ info: failure, originAgentId: agentId });
             } catch (error: any) {
                 console.error(`parking after usage limit failed for ${agentId}:`, error?.message ?? error);
                 try { await ctx.fns.session.appendErrorEvent({ id: agentId, error: errorText ?? 'usage limit', ts: Date.now() }); } catch {}
             }
-        } else {
-            if (!errorText) delete retries[agentId];
         }
 
         // A stable delivery key makes terminal child failure replay idempotent.
@@ -508,7 +486,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
                     : transportFailure.phase === 'permanent'
                     ? 'SSH transport rejected the request (configuration/authentication). Fix the connection and continue manually.'
                     : transportFailure.retryable
-                    ? 'SSH connection failed before dispatch and the one safe retry is exhausted. Manual continuation is required.'
+                    ? 'SSH connection failed before dispatch and the retry policy is exhausted. Manual continuation is required.'
                     : 'SSH connection failed before dispatch and was classified nonretryable. Manual continuation is required.';
                 try {
                     await ctx.fns.session.deliverInbound({ id: agent.parentId, delivery: {

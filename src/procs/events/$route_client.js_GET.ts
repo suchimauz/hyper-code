@@ -13,17 +13,16 @@ const PATH = resolve(import.meta.dir, "client.js");
 
 /**
  * Handle the GET request for the events route.
- * @param _opts.req The incoming HTTP request.
+ * @param opts.req The incoming HTTP request; its If-None-Match is answered with 304 when the client is unchanged.
  */
-export default async function (ctx: Context, _session: Session, _opts: { req: Request }) {
+export default async function (ctx: Context, _session: Session, opts: { req: Request }) {
     const file = Bun.file(PATH);
     const body = ctx.env.NODE_ENV === "production" || !(await file.exists())
         ? (clientJs as unknown as string)
         : await file.text();
-    return new Response(body, {
-        headers: {
-            "content-type": "application/javascript; charset=utf-8",
-            "cache-control": "no-cache",
-        },
-    });
+    // no-cache revalidates every load; an unchanged client answers 304 instead of the whole script.
+    const etag = `"${Bun.hash(body).toString(36)}"`;
+    const headers = { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", etag };
+    if (opts?.req?.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
+    return new Response(body, { headers });
 }

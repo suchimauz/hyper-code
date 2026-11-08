@@ -12,8 +12,8 @@
  * @param opts.checkpointId Stable checkpoint retry key.
  * @param opts.sequence Strictly increasing source sequence; serialize through commit.
  * @param opts.clockEpoch Process monotonic clock epoch.
- * @param opts.current Exact cumulative decimal i64 source counters.
- * @param opts.quality Unknown usage blocks before SQL.
+ * @param opts.current Reported-only cumulative decimal i64 counters; quality and evidence describe missing observations.
+ * @param opts.quality Evidence quality; partial or unknown observations do not block soft accounting.
  * @param opts.boundaryGoalId Goal captured at activation/delegation boundary.
  * @param opts.boundaryRootAgentId Explicit root subscription, not lineage.
  * @param opts.nowMs Monotonic capture timestamp.
@@ -44,14 +44,16 @@ export default async function (
         sequence: number;
         /** Process monotonic clock epoch. */
         clockEpoch: string;
-        /** Exact cumulative decimal i64 source counters. */
+        /** Reported-only cumulative decimal i64 counters; quality and evidence describe missing observations. */
         current: {
         input: string;
         cached: string;
         output: string;
     };
-        /** Unknown usage blocks before SQL. */
-        quality: 'exact' | 'unknown' | 'unsupported';
+        /** Evidence quality; partial or unknown observations do not block soft accounting. */
+        quality: 'exact' | 'partial' | 'unknown' | 'unsupported';
+    /** Immutable request evidence for reported-only counters, including missing fields. */
+    usageEvidence?: Readonly<Record<string,types.goal.UsageNormalized>>;
         /** Goal captured at activation/delegation boundary. */
         boundaryGoalId: string;
         /** Explicit root subscription, not lineage. */
@@ -72,8 +74,7 @@ export default async function (
     
         if (!await ctx.fns.goal.enabled({}))
             throw new Error('Goal feature disabled');
-        if (opts.quality !== 'exact')
-            throw new Error('Goal usage unknown or unsupported: checkpoint blocked');
+        if (!['exact','partial','unknown','unsupported'].includes(opts.quality)) throw new Error('Invalid usage quality');
         if (opts.boundaryGoalId !== opts.goalId || opts.boundaryRootAgentId !== opts.agentId)
             throw new Error('Goal attribution boundary mismatch');
         if (!opts.runToken || !opts.runId || !opts.sourceAgentId || !opts.checkpointId || !opts.clockEpoch || !Number.isSafeInteger(opts.sequence) || opts.sequence < 0)
@@ -104,7 +105,7 @@ export default async function (
                     throw new Error('Goal conflict: identity changed');
                 if (duplicates[0]) {
                     const saved = duplicates[0];
-                    if (saved.snapshot.sequence !== opts.sequence || (['input', 'cached', 'output'] as const).some(key => saved.snapshot.current[key] !== opts.current[key]) || saved.snapshot.nowMs !== opts.nowMs || saved.snapshot.clockEpoch !== opts.clockEpoch || saved.snapshot.authority?.capabilityId !== authority?.capabilityId)
+                    if ((saved.snapshot.quality ?? 'exact') !== opts.quality || JSON.stringify(saved.snapshot.usageEvidence ?? {}) !== JSON.stringify(opts.usageEvidence ?? {}) || saved.snapshot.sequence !== opts.sequence || (['input', 'cached', 'output'] as const).some(key => saved.snapshot.current[key] !== opts.current[key]) || saved.snapshot.nowMs !== opts.nowMs || saved.snapshot.clockEpoch !== opts.clockEpoch || saved.snapshot.authority?.capabilityId !== authority?.capabilityId)
                         throw new Error('Checkpoint key reused with different snapshot');
                     return { ...saved.result, duplicate: true, budgetTransition: false };
                 }
@@ -152,7 +153,7 @@ export default async function (
                 if (rootSource) {
                     await ctx.fns.procs.db.run({ sql: 'INSERT INTO goal_elapsed_carry(agent_id,goal_id,clock_epoch,remainder_ms) VALUES (?,?::uuid,?,?) ON CONFLICT(agent_id) DO UPDATE SET goal_id=EXCLUDED.goal_id,clock_epoch=EXCLUDED.clock_epoch,remainder_ms=EXCLUDED.remainder_ms', params: [opts.agentId,opts.goalId,opts.clockEpoch,opts.nowMs-elapsed.baselineMs] });
                 }
-                const snapshot: types.goal.AccountingSnapshot = { ...(authority ? {authority:Object.freeze({...authority})}:{}), current: { ...opts.current }, sequence: opts.sequence, clockEpoch: opts.clockEpoch, nowMs: opts.nowMs, baselineMs: elapsed.baselineMs };
+                const snapshot: types.goal.AccountingSnapshot = { ...(authority ? {authority:Object.freeze({...authority})}:{}), quality: opts.quality, usageEvidence: opts.usageEvidence, current: { ...opts.current }, sequence: opts.sequence, clockEpoch: opts.clockEpoch, nowMs: opts.nowMs, baselineMs: elapsed.baselineMs };
                 await ctx.fns.procs.db.run({ sql: 'INSERT INTO goal_usage_checkpoints(agent_id,goal_id,source_agent_id,run_id,checkpoint_id,sequence,snapshot,result) VALUES (?,?::uuid,?,?,?,?,?::jsonb,?::jsonb)', params: [...scope, opts.checkpointId, opts.sequence, JSON.stringify(snapshot), JSON.stringify(result)] });
                 return result;
 }

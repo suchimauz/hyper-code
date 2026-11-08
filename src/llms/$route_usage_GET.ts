@@ -3,7 +3,7 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     /** Incoming HTTP request. */
     req?: Request;
 }) {
-    const { entries, gateway } = await ctx.fns.llms.usageData({ includeConnected: true });
+    const { entries, gateway } = await ctx.fns.llms.quotaData({});
     const html = ctx.fns.ui.live({
         id: "llm-usage",
         url: "/llms/usage",

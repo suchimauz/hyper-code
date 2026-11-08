@@ -13,6 +13,8 @@ export type FailureInfo = {
      * overflow    — request exceeds the context window, needs compaction.
      * fatal       — nothing to retry; surface the message.
      */
+    /** Stable machine code; never infer retry eligibility from display messages. */
+    code: "RATE_LIMIT" | "SERVER" | "TIMEOUT" | "TRANSPORT" | "EMPTY_RESPONSE" | "SSH_TRANSPORT" | "AUTH" | "QUOTA" | "USAGE_LIMIT" | "OVERFLOW" | "SSH_PERMANENT" | "FATAL";
     kind: "usage_limit" | "rate_limit" | "transient" | "auth" | "overflow" | "fatal";
     /** Provider name, e.g. "codex". */
     provider: string;

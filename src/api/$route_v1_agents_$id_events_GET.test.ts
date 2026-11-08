@@ -56,4 +56,55 @@ describe("GET /api/v1/agents/:id/events", () => {
         expect(body.events[3]).toMatchObject({status:'completed',result:{status:'not_needed'},messageIdx:null});
     });
 
+    test('projects retry metadata and resolves lifecycle markers across pagination without exposing marker rows', async () => {
+        const retry = (idx: number, retryId: string, attempt: number, maxRetries: number | null) => ({
+            idx, ts: idx * 10, type: 'llm_retry', retryId, retry: attempt, maxRetries,
+            mode: maxRetries === null ? 'always' : 'bounded', delayMs: 2500, provider: 'openai',
+            failure: { code: 'rate_limit', message: 'Please retry', status: 429, privateDetail: 'hidden' },
+        });
+        const markers = [
+            { type: 'llm_retry_started', retryId: 'started', retry: 2 },
+            { type: 'llm_retry_started', retryId: 'cancelled', retry: 3 },
+            { type: 'llm_retry_cancelled', retryId: 'cancelled', retry: 3 },
+            { type: 'llm_retry_cancelled', retryId: 'scheduled', retry: 99 },
+        ];
+        let query: any;
+        const events = [retry(1, 'scheduled', 1, null), retry(2, 'started', 2, 5), retry(3, 'cancelled', 3, 5),
+            { idx: 4, ts: 40, ...markers[0] }, { idx: 5, ts: 50, ...markers[2] }];
+        const ctx: any = { state: {}, fns: {
+            auth: { author: async () => null }, mentions: { parse: async () => [] },
+            procs: { db: { select: async (opts: any) => {
+                if (opts.sql.includes('SELECT payload FROM events')) {
+                    query = opts;
+                    return markers.map((payload, idx) => ({ payload: idx % 2 ? payload : JSON.stringify(payload) }));
+                }
+                return opts.sql.includes('SELECT 1') ? [{ exists: 1 }] : [{ run_state: 'idle', next_run_at: null }];
+            } } }, session: { getEvents: async () => events, getMaxEventIdx: async () => 100 },
+        } };
+        const response = await route(ctx, null, { req: new Request('http://local/api/v1/agents/ab/events?before=6'), params: { id: 'ab' } });
+        const body: any = await response.json();
+        expect(body.events).toHaveLength(3);
+        expect(body.events.map((event: any) => event.retryState)).toEqual(['scheduled', 'started', 'cancelled']);
+        expect(body.events[0]).toMatchObject({ retryId: 'scheduled', retry: 1, maxRetries: null, retryMode: 'always', delayMs: 2500,
+            failureCode: 'rate_limit', failureMessage: 'Please retry', failureStatus: 429, provider: 'openai' });
+        expect(body.events[1]).toMatchObject({ maxRetries: 5, retryMode: 'bounded' });
+        expect(query.params).toEqual(['ab', 'scheduled', 'started', 'cancelled']);
+        expect(query.sql).not.toContain('idx <');
+        expect(JSON.stringify(body.events)).not.toContain('privateDetail');
+        expect(JSON.stringify(body.events)).not.toContain('llm_retry_started');
+    });
+
+    test('keeps absent retry failure status nullable and hides marker-only pages', async () => {
+        let events: any[] = [{ idx: 1, ts: 1, type: 'llm_retry', retryId: 'one', retry: 1, mode: 'always', maxRetries: null,
+            failure: { code: 'network', message: 'Unavailable' } }];
+        const ctx: any = { state: {}, fns: { auth: { author: async () => null }, mentions: { parse: async () => [] },
+            procs: { db: { select: async ({ sql }: any) => sql.includes('SELECT payload') ? [] : sql.includes('SELECT 1') ? [{ exists: 1 }] : [{ run_state: 'idle' }] } },
+            session: { getEvents: async () => events, getMaxEventIdx: async () => 2 } } };
+        const opts = { req: new Request('http://local/api/v1/agents/ab/events?after=1'), params: { id: 'ab' } };
+        const scheduledBody: any = await (await route(ctx, null, opts)).json();
+        expect(scheduledBody.events[0]).toMatchObject({ failureStatus: null, retryState: 'scheduled' });
+        events = [{ idx: 2, ts: 2, type: 'llm_retry_cancelled', retryId: 'one', retry: 1 }];
+        expect(await (await route(ctx, null, opts)).json()).toMatchObject({ events: [], nextAfter: 3 });
+    });
+
 });

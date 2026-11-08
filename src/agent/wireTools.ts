@@ -13,5 +13,7 @@ export default function (
         /** Api used by the operation. */
     api: string },
 ): any[] {
+    // Run-owned completion receipts are prose-only, irrespective of agent tool settings.
+    if ((ctx as Context & { goalCompletionReport?: boolean }).goalCompletionReport) return [];
     return ctx.fns.tools.schemas({ api: opts.api, only: opts.agent.tools });
 }

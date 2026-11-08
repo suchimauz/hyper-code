@@ -1,7 +1,7 @@
 /**
  * Serialize normalized request usage into an ephemeral run accumulator
  *
- * Internal run hook called once for every request, including missing usage. Uses request IDs for deduplication; unknown or unsupported usage permanently blocks automatic continuation for this binding. Does not perform SQL.
+ * Internal run hook called once for every request, including missing usage. Uses request IDs for deduplication; missing usage retains partial provenance without blocking automatic continuation. Does not perform SQL.
  * @param opts.state Ephemeral state from runBindingCapture, never a fork clone.
  * @param opts.provider Actual provider identifier captured before request.
  * @param opts.requestId Stable unique request ID; reuse only for the same response.
@@ -19,7 +19,7 @@ export default async function (
         /** Stable unique request ID; reuse only for the same response. */
         requestId: string;
         /** Verified provenance-preserving usage format. */
-        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "hyper-stream-anthropic" | "unsupported";
+        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "hyper-stream-anthropic" | "common-stream" | "unsupported";
         /** Raw provider usage; undefined is intentionally recorded as unknown. */
         usage: unknown;
     },
@@ -33,7 +33,6 @@ export default async function (
       const b=s.binding;
       const usage=await ctx.fns.goal.usageNormalize({binding:{provider:opts.provider,requestId:opts.requestId,sourceAgentId:b.sourceAgentId,runId:b.runId,rootAccountingAgentId:b.rootAgentId,goalIdAtBoundary:b.goalId},format:opts.format,usage:opts.usage});
       s.usage=await ctx.fns.goal.usageAccumulate({state:s.usage,usage});
-      if(s.usage.quality!=='exact') {s.blocked='Usage is '+s.usage.quality;return {kind:'blocked',reason:s.blocked,allowContinuation:false};}
       return {kind:'recorded',allowContinuation:false};
      } catch(error) {s.blocked=String(error);return {kind:'blocked',reason:s.blocked,allowContinuation:false};} finally {s.pendingRequests.delete(opts.requestId);}
     });

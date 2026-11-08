@@ -8,12 +8,14 @@
  * @param opts.title Page title prefix; omitted titles use hyper-code2.
  * @param opts.main Trusted rendered HTML for the main page surface.
  * @param opts.headExtra Trusted additional document-head markup; omitted by default.
+ * @param opts.lean Load only the live-update, control and RPC scripts; use for embedded surfaces (Canvas) that host no chat. @default false
  */
 export default async function (ctx: Context, session: Session | null, opts: {
         /** Identifier of the currently selected agent. */ currentId?: string;
         /** Page title. */ title?: string;
         /** Rendered main-page HTML. */ main: string;
-        /** Additional HTML to include in the document head. */ headExtra?: string }): Promise<string> {
+        /** Additional HTML to include in the document head. */ headExtra?: string;
+        /** Skip chat, navigation and quota scripts; only live updates, control and RPC load. @default false */ lean?: boolean }): Promise<string> {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
 
     // currentId only identifies the active agent to browser-side chat behavior.
@@ -53,6 +55,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
 <link rel="stylesheet" href="/ui/vendor/phosphor.css">
 <link rel="stylesheet" href="/ui/vendor/medeo.css">
 <style>
+${opts.lean ? "" : `
 /* Consecutive calls form one quiet disclosure; named rows retain lazy details. */
 .tool-tray { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; max-width: 100%; overflow: hidden; margin-block: .75rem; border: 1px solid var(--color-ui-border); border-radius: .75rem; background: var(--color-base-100); }
 .tool-tray::-webkit-scrollbar { display: none; }
@@ -261,6 +264,7 @@ body[data-presentation="sidebar"] [data-mobile-inspector-open] { display: none !
   -webkit-backdrop-filter: blur(12px) saturate(115%);
 }
 #chat-panel { position: relative; container: chat / inline-size; }
+`}
 /* Canvas (src/canvas): hidden until the agent page carries data-canvas-open. Then the canvas takes the
  * free space on the left, the chat becomes a --chat-w column on the right and the inspector is forced to
  * its strip (its toggle peeks it open via data-canvas-meta-open without changing the saved state). */
@@ -299,6 +303,7 @@ body[data-presentation="sidebar"] [data-mobile-inspector-open] { display: none !
  .canvas-panel [data-canvas-history] > div { max-width:calc(100vw - 16px); }
  .canvas-panel [data-canvas-reopen] { min-height:44px; }
 }
+${opts.lean ? "" : `
 
 /* The chat header adapts to the CHAT column, not the window: with the Meta
  * panel open a 1000px window leaves the chat ~420px, and the full action row
@@ -1043,9 +1048,11 @@ body[data-presentation="sidebar"] #mobile-nav-button,
 body[data-presentation="sidebar"] #nav-overlay,
 body[data-presentation="sidebar"] [data-page="agent"] > aside[id^="agent-meta-"] { display: none !important; }
 body[data-presentation="sidebar"] #chat-panel > header { padding-left: .55rem !important; }
+`}
 </style>
 
 <style>
+${opts.lean ? "" : `
   #main { position: relative; }
   /* Keep the old layout in place. Only the fixed veil participates in loading. */
   #main[data-navigation-pending] > [data-navigation-obscured] { pointer-events: none; }
@@ -1088,6 +1095,7 @@ body[data-presentation="sidebar"] #chat-panel > header { padding-left: .55rem !i
   #app-popup[data-popup-kind="file-preview"] > div { height: 100%; max-height: 100% !important; }
   #app-popup[data-popup-kind="file-preview"] .app-popup-body { overflow: hidden !important; padding: 0 !important; }
 
+`}
 </style>
 ${((ctx.state as any).procs?.styles ?? []).map((st: any) => `<link rel="stylesheet" href="${esc(st.href)}">`).join("\n")}
 ${opts.headExtra ?? ""}
@@ -1096,7 +1104,7 @@ ${opts.headExtra ?? ""}
 <script src="/ui/control.js" defer></script>
 <script src="/ui/hotkeys.js" defer></script>
 <script src="/ui/rpc.js?v=6" defer></script>
-<script src="/ui/pressFeedback.js" defer></script>
+${opts.lean ? "" : `<script src="/ui/pressFeedback.js" defer></script>
 <script src="/ui/navigationPreload.js" defer></script>
 <script src="/agent/chat.js" defer></script>
 <script src="/ui/dictation.js" defer></script>
@@ -1114,8 +1122,9 @@ ${opts.headExtra ?? ""}
 <script src="/screen/client.js" defer></script>
 <script src="/ui/wake-timer.js" defer></script>
 <script src="/ui/spin-sync.js" defer></script>
-<script src="/ui/tool-timer.js" defer></script>
-${hideNavigation ? "" : '<script src="/projects/reorder.js" defer></script><script src="/projects/navigation.js" defer></script>'}
+<script src="/ui/tool-timer.js" defer></script>`}
+${hideNavigation || opts.lean ? "" : '<script src="/projects/reorder.js" defer></script><script src="/projects/navigation.js" defer></script>'}
+${opts.lean ? "" : `
 <style>
 /* Quota ring hover card: the name, the limits and the reset moment — nothing else.
    It lives in the top layer (Popover API): the dock's backdrop-filter creates a
@@ -1289,6 +1298,7 @@ ${hideNavigation ? "" : '<script src="/projects/reorder.js" defer></script><scri
   #chat-panel .tool.tool-tucked:hover, #mobile-nav-button:active { transform: none; }
 }
 </style>
+`}
 </head>
 <body class="bg-base-200 text-base-content text-sm h-screen${embedded ? " overflow-hidden" : ""}"${currentId ? ` data-agent-id="${esc(currentId)}"` : ""}${sidebar ? ' data-presentation="sidebar"' : ""}>
 <div id="frame" class="relative flex h-screen">

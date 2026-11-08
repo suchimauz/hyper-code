@@ -48,7 +48,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
             } catch (error) { checkpointFailed = true; throw error; }
         }
         const row = (await ctx.fns.procs.db.select({
-            sql: 'SELECT scratchpad FROM agents WHERE id = ? FOR UPDATE', params: [agent.id],
+            sql: 'SELECT scratchpad, llm_retry_pending FROM agents WHERE id = ? FOR UPDATE', params: [agent.id],
         }))[0];
         if (!row) return null;
         // Drain happened before this owner lock. Flush before pause and revocation.
@@ -75,8 +75,16 @@ export default async function (ctx: Context, _session: Session | null, opts: {
             plan.pausedAt = now;
             plan.updatedAt = now;
         }
+        if (row.llm_retry_pending) {
+            await ctx.fns.session.appendEvent({ id: agent.id, event: {
+                type: 'llm_retry_cancelled',
+                retryId: row.llm_retry_pending.retryId,
+                retry: row.llm_retry_pending.retry,
+            } });
+        }
         await ctx.fns.procs.db.run({
             sql: `UPDATE agents SET stopped_at = ?, scratchpad = ?, run_state = 'idle',
+                llm_retry_pending = NULL, llm_retry_attempt = 0,
                 run_started_at = NULL, run_heartbeat_at = NULL, run_token = NULL,
                 next_run_at = ${clearQueue ? 'NULL' : 'next_run_at'}, last_error = ?, updated_at = ? WHERE id = ?`,
             params: [now, JSON.stringify(scratchpad), baselineMessage + diagnostic, now, agent.id],

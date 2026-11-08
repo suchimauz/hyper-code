@@ -8,6 +8,7 @@ function harness(turns:any[],status='active'){
  const noop=async()=>{};
  let idx=0;
  const ctx:any={state:{},fns:{
+ input:{isWaiting:async()=>false},
  planning:{read:async({agentId}:any)=>({version:1,agentId,mode:'execute',revision:0,scope:'session',advisory:true,runningPolicy:'reject',pending:null,proposal:null})},
  session:{forAgent:()=>({}),appendUserMessage:noop,appendMessage:async({message}:any)=>{messages.push(message);return {idx:idx++}},syncAgentState:noop,updateMessageContent:noop,appendAssistantEvent:async()=>({idx:idx++}),appendToolCallEvent:noop,recordContextUsage:noop,appendErrorEvent:noop},
  agent:{recordRunLifecycle:noop,statusLineForTurn:async()=>'',autoCompactIfNeeded:async()=>({status:'not_needed'}),stashResult:async({output}:any)=>({content:output}),sanitizeHtmlBody:({html}:any)=>html},
@@ -15,7 +16,7 @@ function harness(turns:any[],status='active'){
  goal:{ownerBarrier:(o:any)=>barrier(ctx,null,o),delegationScope:async({fn}:any)=>fn(),forkRelease:async(o:any)=>{expect(calls[0][0]).toBe('capture');expect(o.baselineAvailable).toBe(true);expect(o.goalId).toBe(state.binding.goalId);return false;},runBindingCapture:async(o:any)=>{calls.push(['capture',o]);return {kind:'bound',state}},runStopRegistry:noop,runUsageRecord:async(o:any)=>{calls.push(['usage',o]);state.pendingRequests.delete(o.requestId);if(o.format==='unsupported')state.blocked=true;return {kind:'recorded'}},runCheckpointFlush:async()=>{calls.push(['flush']);return state.blocked?{kind:'blocked',allowContinuation:false}:{kind:'committed',checkpointId:'receipt-'+calls.filter(c=>c[0]==='flush').length,sequence:calls.filter(c=>c[0]==='flush').length,revision:7,budgetTransition:status==='budget_limited',status,allowContinuation:status==='active'}},budgetSteer:async()=>{calls.push(['steer'])}},
  llm:{resolveEndpoint:async()=>({provider:'openai',api:'openai'}),stream:async()=>{expect(state.pendingRequests.size).toBe(1);const t=turns.shift();if(t instanceof Error)throw t;return t}},markdown:{render:async({source}:any)=>source},tools:{call:async({name}:any)=>({handlerExecuted:true,output:'ok',...(name==='respondHtml'?{terminal:{type:'html',text:'final',html:'<p>final</p>'}}:{})})
  }}};
- return {calls,agent,state,ctx,execute:(extra:any={})=>run(ctx,null,{agent,userText:'question',...extra})};
+ return {calls,messages,agent,state,ctx,execute:(extra:any={})=>run(ctx,null,{agent,userText:'question',...extra})};
 }
 test('ordinary final checkpoints but cannot continue without native goal tool',async()=>{const h=harness([{text:'answer',usage:{prompt_tokens:4}}]);const result=await h.execute();expect(result.goalContinuation).toBeUndefined();expect(h.calls.map(c=>c[0])).toEqual(['capture','usage','flush','flush']);expect(h.calls[1][1].format).toBe('openai-chat');});
 test('terminal HTML includes pre-tool and final checkpoints without budget steering',async()=>{const h=harness([{toolCalls:[{id:'t',name:'respondHtml',args:{}}],usage:{}}]);const result=await h.execute();expect(result.terminal).toBe(true);expect(result.goalContinuation).toBeUndefined();expect(h.calls.filter(c=>c[0]==='flush').length).toBe(3);expect(h.calls.some(c=>c[0]==='steer')).toBe(false);});
@@ -125,4 +126,39 @@ for(const provider of ['xai','hyper'])test(`bound ${provider} xai adapter fails 
  const h=harness([]);let dispatches=0;h.ctx.fns.llm.resolveEndpoint=async()=>({provider,upstream:'xai',api:'openai'});
  h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'bad'}};
  await expect(h.execute()).rejects.toThrow('exact supported transport');expect(dispatches).toBe(0);
+});
+
+for (const rogueTools of [false,true]) test(`successful native completion permits one report only (rogue tools=${rogueTools})`,async()=>{
+ const h=harness([{toolCalls:[{id:'done',name:'update_goal',args:{}},{id:'later',name:'bash',args:{}}],usage:{}},{text:'Completed the requested fix.',usage:{},...(rogueTools?{toolCalls:[{id:'rogue',name:'bash',args:{}}]}:{})}]);
+ h.agent.currentJobId='token';
+ h.ctx.fns.goal.read=async()=>({enabled:true,goal:{goalId:'g',status:'active',revision:1}});
+ let completed=false;const executed:string[]=[];
+ h.ctx.fns.goal.read=async()=>({enabled:true,goal:{goalId:'g',status:completed?'complete':'active',revision:1,tokenBudget:null,tokensUsed:10}});
+ h.ctx.fns.goal.toolScope=async(o:any)=>{const result=await o.fn();completed=true;await o.onMutation({goalId:'g',status:'complete',revision:8});return result;};
+ h.ctx.fns.tools.call=async({name}:any)=>{executed.push(name);return {handlerExecuted:true,output:'Goal complete'};};
+ const flush=h.ctx.fns.goal.runCheckpointFlush;
+ h.ctx.fns.goal.runCheckpointFlush=async()=>({...await flush(),status:completed?'complete':'active',allowContinuation:!completed});
+ const result=await h.execute();
+ expect(executed).toEqual(['update_goal']);expect(h.calls.filter(c=>c[0]==='usage')).toHaveLength(2);
+ expect(result.text).toBe('Completed the requested fix.');expect(result.goalContinuation).toBeUndefined();
+ expect(h.messages.filter(m=>m.role==='assistant' && m.content)).toEqual([expect.objectContaining({content:'Completed the requested fix.'})]);
+});
+for(const status of ['paused','blocked','budget_limited']) test(`${status} stops without tools, continuation or duplicate boundary prose`,async()=>{
+ const h=harness([{text:'should not be delivered',toolCalls:[{id:'work',name:'bash',args:{}}],usage:{}}],status);
+ let tools=0;h.ctx.fns.tools.call=async()=>{tools++;};const result=await h.execute();
+ expect(tools).toBe(0);expect(result.text).toBe('');expect(result.goalContinuation).toBeUndefined();expect(h.messages).toHaveLength(0);
+});
+test('accounting failure remains observable and fail closed',async()=>{
+ const h=harness([{toolCalls:[{id:'work',name:'bash',args:{}}],usage:{}}]);let tools=0;const errors:string[]=[];
+ h.ctx.fns.goal.runCheckpointFlush=async()=>({kind:'blocked',allowContinuation:false});
+ h.ctx.fns.tools.call=async()=>{tools++;};h.ctx.fns.session.appendErrorEvent=async({error}:any)=>{errors.push(error);};
+ const result=await h.execute();expect(tools).toBe(0);expect(errors).toHaveLength(1);expect(result.text).toContain('accounting');expect(result.goalContinuation).toBeUndefined();
+});
+for(const mode of ['budget','accounting','report-error']) test(`completion receipt does not bypass ${mode}`,async()=>{
+ const h=harness([{toolCalls:[{id:'done',name:'update_goal',args:{}}],usage:{}},new Error('receipt failed')]);h.agent.currentJobId='token';let completed=false;
+ h.ctx.fns.goal.read=async()=>({enabled:true,goal:{goalId:'g',status:completed?'complete':'active',revision:1,tokenBudget:mode==='budget'?10:null,tokensUsed:10}});
+ h.ctx.fns.goal.toolScope=async(o:any)=>{const r=await o.fn();completed=true;await o.onMutation({goalId:'g',status:'complete',revision:8});return r;};
+ const flush=h.ctx.fns.goal.runCheckpointFlush;h.ctx.fns.goal.runCheckpointFlush=async()=>completed&&mode==='accounting'?{kind:'blocked',allowContinuation:false}:{...await flush(),status:completed?'complete':'active',allowContinuation:!completed};
+ if(mode==='report-error')await expect(h.execute()).rejects.toThrow('receipt failed');else {const result=await h.execute();expect(result.goalContinuation).toBeUndefined();}
+ expect(h.calls.filter(c=>c[0]==='usage')).toHaveLength(mode==='report-error'?2:1);
 });

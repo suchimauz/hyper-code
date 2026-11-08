@@ -22,7 +22,7 @@ export default async function (
     text: string;
     thinking: string;
     finishReason: string | null;
-    usage: { prompt_tokens: number; completion_tokens: number };
+    usage: { prompt_tokens?: number; completion_tokens?: number };
     toolCalls: { id: string; name: string; args: any }[];
 }> {
     const { agent } = opts;
@@ -72,50 +72,23 @@ export default async function (
     };
     const bodyJson = JSON.stringify(body);
     const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
-    const MAX_RETRIES = 3;
-    let res: Response | null = null;
-    let lastErr: any = null;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // Exactly one provider request: retries and their durable events belong to agent.run.
     if ((ctx as Context & { goalRequestContext?: { authority?: types.goal.DelegationAuthority } }).goalRequestContext?.authority) await ctx.fns.goal.requestAuthorize({});
-        if (opts.signal?.aborted) throw new Error("aborted");
-        try {
-            res = ep.provider === "opencode" ? await ctx.fns.llm.opencodeFetch({ url: ep.url, sessionId: agent.id, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : ssh ? await ctx.fns.sshAccount.fetch({ ssh, url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } });
-            if (res.ok) {
-                await ctx.fns.llm.accountAuthHealth({ action: "clear", provider: ep.provider, account: ep.account });
-                break;
-            }
-            if (ep.provider === "opencode") throw new Error(`opencode ${res.status}`);
-            if (res.status === 401) await ctx.fns.llm.accountAuthHealth({ action: "mark", provider: ep.provider, account: ep.account });
-            const errText = await res.text();
-            // A spent subscription window is NOT retryable: no number of
-            // attempts brings the quota back before resets_at, and every one of
-            // them costs a round-trip per agent. classifyError carries the
-            // reset moment so the caller can park instead of hammering.
-            const info = ctx.fns.llm.classifyError({
-                provider: ep.provider, account: ep.quotaAccount ?? ep.account, kind: ep.kind,
-                status: res.status, body: errText, headers: res.headers,
-            });
-            lastErr = failure(info);
-            if (attempt >= MAX_RETRIES || !info.retryable) throw lastErr;
-        } catch (e: any) {
-            lastErr = e;
-            if (ep.ssh) throw e; // SSH replay policy belongs to the worker, never nested retries.
-            if (e?.message === "aborted") throw e;
-            if (e?.failure && !e.failure.retryable) throw e;
-            if (attempt >= MAX_RETRIES) throw e;
-            if (res && !isRetryable(res.status, e?.message ?? "")) throw e;
-        }
-        const delay = 1000 * 2 ** attempt; // 1s, 2s, 4s
-        console.warn(`[codex] attempt ${attempt + 1}/${MAX_RETRIES + 1} failed (${lastErr?.message?.slice(0, 120)}); retrying in ${delay}ms`);
-        await Bun.sleep(delay);
+    opts.signal?.throwIfAborted();
+    const res = ep.provider === "opencode" ? await ctx.fns.llm.opencodeFetch({ url: ep.url, sessionId: agent.id, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : ssh ? await ctx.fns.sshAccount.fetch({ ssh, url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } });
+    if (!res.ok) {
+        if (res.status === 401) await ctx.fns.llm.accountAuthHealth({ action: "mark", provider: ep.provider, account: ep.account });
+        const info = ctx.fns.llm.classifyError({ provider: ep.provider, account: ep.quotaAccount ?? ep.account, kind: ep.kind,
+            status: res.status, body: await res.text(), headers: res.headers });
+        throw failure(info);
     }
-    if (!res?.ok) throw lastErr ?? new Error("codex: failed after retries");
+    await ctx.fns.llm.accountAuthHealth({ action: "clear", provider: ep.provider, account: ep.account });
     if (!res.body) throw new Error("empty response body");
 
     let text = "";
     let thinking = "";
     let finishReason: string | null = null;
-    const usage = { prompt_tokens: 0, completion_tokens: 0 };
+    const usage: { prompt_tokens?: number; completion_tokens?: number } = {};
     // The Responses API announces a call as an output ITEM and finishes it with
     // response.output_item.done — the arguments are complete there, so the
     // *.delta events only matter for showing progress.
@@ -146,9 +119,9 @@ export default async function (
             rateLimits = ev.response?.rate_limits ?? ev.rate_limits ?? rateLimits;
             const u = ev.response?.usage;
             if (u) {
-                usage.prompt_tokens = u.input_tokens ?? 0;
-                usage.completion_tokens = u.output_tokens ?? 0;
-                (usage as any).cache_read_tokens = u.input_tokens_details?.cached_tokens ?? 0;
+                usage.prompt_tokens = u.input_tokens;
+                usage.completion_tokens = u.output_tokens;
+                (usage as any).cache_read_tokens = u.input_tokens_details?.cached_tokens;
             }
             finishReason = mapStop(ev.response?.status);
             const stop = ev.response?.incomplete_details?.reason;

@@ -155,4 +155,15 @@ describe("ui.layout", () => {
         expect(html).toContain("dialog.close()");
     });
 
+    test("lean embed drops chat chrome scripts and styles but keeps what the canvas shell needs", async () => {
+        const ctx: any = await mkTestCtx();
+        const session: any = { url: new URL("http://localhost/canvas/a/mobile?embed=1"), req: new Request("http://localhost/canvas/a/mobile?embed=1") };
+        const full = await ctx.state.registry.ui.layout(ctx, session, { main: "<p>c</p>", title: "c" });
+        const lean = await ctx.state.registry.ui.layout(ctx, session, { main: "<p>c</p>", title: "c", lean: true });
+        expect(lean.length).toBeLessThan(full.length / 3);
+        for (const src of ["/procs/ui/htmx.js", "/procs/events/client.js", "/canvas/canvas.js"]) expect(lean).toContain(src);
+        expect(lean).toContain("/* Canvas (src/canvas)");
+        expect(lean).not.toContain("/ui/tool-timer.js");
+        expect(lean).not.toContain("Quota ring hover card");
+    });
 });

@@ -195,7 +195,7 @@ export default async function (
     };
     let thinking = "";
     let finishReason: string | null = null;
-    let usage: any = { prompt_tokens: 0, completion_tokens: 0 };
+    let usage: any = {};
     // A tool_use block opens with its id and name, then its input arrives as a
     // JSON string across input_json_delta events, keyed by content-block index.
     const slots = new Map<number, { id: string; name: string; buf: string }>();
@@ -217,9 +217,9 @@ export default async function (
         if (type === "message_start") {
             const u = msg.message?.usage;
             if (u) {
-                usage.prompt_tokens = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
-                usage.cache_read_tokens = u.cache_read_input_tokens ?? 0;
-                usage.cache_write_tokens = u.cache_creation_input_tokens ?? 0;
+                usage.prompt_tokens = u.input_tokens == null ? undefined : u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+                usage.cache_read_tokens = u.cache_read_input_tokens;
+                usage.cache_write_tokens = u.cache_creation_input_tokens;
             }
         } else if (type === "content_block_start") {
             const block = msg.content_block ?? {};
@@ -246,9 +246,9 @@ export default async function (
             // is the authoritative one, so it replaces the earlier total.
             const u = msg.usage;
             if (u && (u.input_tokens != null || u.cache_read_input_tokens != null || u.cache_creation_input_tokens != null)) {
-                usage.prompt_tokens = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
-                usage.cache_read_tokens = u.cache_read_input_tokens ?? 0;
-                usage.cache_write_tokens = u.cache_creation_input_tokens ?? 0;
+                usage.prompt_tokens = u.input_tokens == null ? undefined : u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+                usage.cache_read_tokens = u.cache_read_input_tokens;
+                usage.cache_write_tokens = u.cache_creation_input_tokens;
             }
         }
     }

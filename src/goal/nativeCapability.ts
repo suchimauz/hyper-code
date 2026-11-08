@@ -1,7 +1,7 @@
 /**
  * Check installed native goal tools on the owner effective wire surface
  *
- * Fail closed before autonomous goal scheduling. Reserved contract uses empty get_goal and update_goal with status complete, paused or blocked only; identity, revision and run token are injected by the trusted wrapper. Loaded handlers, schema validation, owner narrowing and supported native endpoint are required. Does not grant authority from lineage or client flags.
+ * Fail closed before autonomous goal scheduling. Reserved contract uses empty get_goal and update_goal with status complete, paused or blocked only; identity, revision and run token are injected by the trusted wrapper. Loaded handlers, schema validation and owner narrowing are required. All model providers and transports use the shared trusted tool dispatch and usage-accounting lifecycle; capability is determined by the effective tool surface, not provider identity. Does not grant authority from lineage or client flags.
  * @param opts.agentId Exact owner whose live model and tool allowlist are inspected.
  */
 export default async function (
@@ -29,8 +29,10 @@ export default async function (
     selected.push(tool);
     }
     const ep=await ctx.fns.llm.resolveEndpoint({model:owner.model});
-    if(ep.ssh||ep.api!=='openai'||['codex','claude-code','hyper','xai'].includes(ep.provider))return fail('native_transport_unavailable');
-    const wire=ctx.fns.agent.wireTools({agent:owner,api:ep.api});
+    // Match llm.stream's effective dialect: xAI uses Responses even through
+    // Hyper, while Gemini converts the OpenAI declarations to native tools.
+    const api=ep.api==='gemini'?'openai':ep.api==='anthropic'?'anthropic':(ep.provider==='hyper'?ep.upstream:ep.provider)==='xai'?'responses':ep.api;
+    const wire=ctx.fns.agent.wireTools({agent:owner,api});
     for(const tool of selected){const declaration=wire.find(t=>(t.function?.name??t.name)===tool.wireName);if(!declaration||canonical(declaration.function?.parameters??declaration.parameters??declaration.input_schema)!==canonical(tool.parameters))return fail('native_goal_tools_filtered');}
-    return {available:true,reason:'available',fingerprint:String(Bun.hash(canonical({model:owner.model,api:ep.api,tools:selected.map(t=>({key:t.key,fn:t.fn,wireName:t.wireName,parameters:t.parameters}))})))};
+    return {available:true,reason:'available',fingerprint:String(Bun.hash(canonical({model:owner.model,api,tools:selected.map(t=>({key:t.key,fn:t.fn,wireName:t.wireName,parameters:t.parameters}))})))};
 }

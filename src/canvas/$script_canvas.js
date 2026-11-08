@@ -223,6 +223,9 @@
         if (tab && root.contains(tab) && !event.target.closest('[data-canvas-close-item]')) {
             event.preventDefault();
             if (tab.hasAttribute('aria-current')) return;
+            // Mark the tab at once; the panel swap that follows the server answer replaces the strip anyway.
+            for (const other of root.querySelectorAll('[data-canvas-tab][aria-current]')) other.removeAttribute('aria-current');
+            tab.setAttribute('aria-current', 'true');
             tabAction(root, { activeItemId: Number(tab.getAttribute('data-canvas-tab')) });
             return;
         }
@@ -337,6 +340,17 @@
                 apply(root, state);
                 if (state.rev && state.rev !== shownRev(root)) refreshPanel(root);
             }).catch(() => {});
+    };
+    // An embedding host (the React chat) rebinds this page to another agent without reloading the frame:
+    // the root follows the new agent and the whole panel is drawn again from its /panel.
+    window.hyperCanvas = {
+        setAgent: id => {
+            const root = page();
+            if (!root || !id || agentOf(root) === id) return false;
+            root.setAttribute('data-canvas-agent', id);
+            refreshPanel(root, true);
+            return true;
+        },
     };
     window.hyperLive.subscribe({
         name: 'canvas',

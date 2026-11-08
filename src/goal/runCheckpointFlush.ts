@@ -25,9 +25,9 @@ export default async function (
       const attempts=opts.maxAttempts??3;
       if(!Number.isInteger(attempts)||attempts<1||attempts>5) throw new Error('maxAttempts must be 1..5');
       const b=s.binding,u=s.usage;
-      if(u && (u.quality!=='exact'||u.inputTokens===null||u.cachedInputTokens===null||u.outputTokens===null)) throw new Error('Incomplete usage blocks accounting');
+      if(u && (u.inputTokens===null||u.cachedInputTokens===null||u.outputTokens===null)) throw new Error('Incomplete usage blocks accounting');
       // No requests recorded is exactly zero, not a missing provider response. Every request must call runUsageRecord.
-      const snapshot=Object.freeze({...(b.authority?{authority:b.authority}:{}),agentId:b.rootAgentId,goalId:b.goalId,runToken:b.runToken,sourceAgentId:b.sourceAgentId,runId:b.runId,checkpointId:crypto.randomUUID(),sequence:s.sequence+1,clockEpoch:b.clockEpoch,current:Object.freeze({input:u?.inputTokens??'0',cached:u?.cachedInputTokens??'0',output:u?.outputTokens??'0'}),quality:'exact' as const,boundaryGoalId:b.goalId,boundaryRootAgentId:b.rootAgentId,nowMs:performance.now(),initialNowMs:b.initialNowMs,initialBaseline:Object.freeze({input:'0',cached:'0',output:'0'})});
+      const snapshot=Object.freeze({...(b.authority?{authority:b.authority}:{}),agentId:b.rootAgentId,goalId:b.goalId,runToken:b.runToken,sourceAgentId:b.sourceAgentId,runId:b.runId,checkpointId:crypto.randomUUID(),sequence:s.sequence+1,clockEpoch:b.clockEpoch,current:Object.freeze({input:u?.inputTokens??'0',cached:u?.cachedInputTokens??'0',output:u?.outputTokens??'0'}),quality:u?.quality ?? 'exact',usageEvidence:u?.requests ?? {},boundaryGoalId:b.goalId,boundaryRootAgentId:b.rootAgentId,nowMs:performance.now(),initialNowMs:b.initialNowMs,initialBaseline:Object.freeze({input:'0',cached:'0',output:'0'})});
       for(let attempt=0;attempt<attempts;attempt++) {
        try {
         const result=await ctx.fns.goal.accountingCheckpoint({...snapshot,expectedRevision:s.revision});

@@ -133,6 +133,10 @@ export default async function (
     // base64 while retaining native image/PDF input where supported.
     const messages = await ctx.fns.attachments.resolveContent({ messages: [...bootstrap, ...attributed.messages] });
 
+    if ((ctx as Context & { goalCompletionReport?: boolean }).goalCompletionReport) {
+        messages.push({ role: 'user', content: 'The goal is successfully complete. Give the final user-facing report now, using only existing results. Do not perform more work, call tools, or propose autonomous continuation. Include final token usage when a token budget was requested.' });
+    }
+
     // Check for large tool call arguments before sending to LLM.
     // If a write/edit call has content > 100 KB, block it and instruct model.
     const LARGE_CONTENT_THRESHOLD = 100_000; // bytes

@@ -71,6 +71,7 @@ export default function (
         const planType = typeof err?.plan_type === "string" ? err.plan_type : undefined;
         return {
             kind: "usage_limit",
+            code: "USAGE_LIMIT",
             provider,
             account,
             planType,
@@ -85,9 +86,10 @@ export default function (
     // ---- pay-per-token account with no money left ------------------------
     // Retrying cannot help and the server never says when, so this is fatal
     // rather than a rate limit: the user has to top up or switch provider.
-    if (/insufficient_quota|billing_hard_limit_reached|billing_not_active/i.test(code + " " + serverMessage)) {
+    if (/insufficient_quota|billing_hard_limit_reached|billing_not_active/i.test(code + " " + serverMessage + " " + body)) {
         return {
             kind: "fatal",
+            code: "QUOTA",
             provider,
             account,
             status: status || undefined,
@@ -101,10 +103,11 @@ export default function (
     if (status === 429 || /rate.?limit/i.test(code + " " + serverMessage)) {
         return {
             kind: "rate_limit",
+            code: "RATE_LIMIT",
             provider,
             account,
             status: status || undefined,
-            retryAfterMs: retryAfterMs ?? 5_000,
+            retryAfterMs: retryAfterMs ?? undefined,
             retryable: true,
             message: `${provider}: rate limited (429) — retry in ${Math.round((retryAfterMs ?? 5_000) / 1000)}s`,
             raw: body.slice(0, 2000),
@@ -115,6 +118,7 @@ export default function (
     if (status === 401 || status === 403 || /invalid_api_key|authentication_error|unauthorized/i.test(code)) {
         return {
             kind: "auth",
+            code: "AUTH",
             provider,
             account,
             status: status || undefined,
@@ -128,6 +132,7 @@ export default function (
     if (status === 413 || /context_length_exceeded|request_too_large|prompt is too long|exceeds the context window|exceeded model token limit/i.test(code + " " + serverMessage + " " + body)) {
         return {
             kind: "overflow",
+            code: "OVERFLOW",
             provider,
             account,
             status: status || undefined,
@@ -137,15 +142,22 @@ export default function (
         };
     }
 
+    // A completed provider stream without content is safe to retry.
+    if (/empty[_ ]response|empty content|no (?:response|content|output)/i.test(code + " " + body)) {
+        return { kind: "transient", code: "EMPTY_RESPONSE", provider, account, retryable: true,
+            message: `${provider}: empty response`, raw: body.slice(0, 2000) };
+    }
+
     // ---- transport / server ----------------------------------------------
     if ((status >= 500 && status <= 599) || status === 408
-        || /upstream\s+connect|connection\s+(?:was\s+)?(?:reset|termination|refused|closed)|service\s+unavailable|overloaded|stalled|ETIMEDOUT|ECONNRESET|timed? ?out|network/i.test(body + " " + serverMessage)) {
+        || /upstream\s+connect|connection\s+(?:was\s+)?(?:reset|termination|refused|closed)|service\s+unavailable|overloaded|stalled|ETIMEDOUT|ECONNRESET|timed? ?out|network|fetch failed|ECONNREFUSED|EPIPE|socket/i.test(body + " " + serverMessage)) {
         return {
             kind: "transient",
+            code: status === 408 || /ETIMEDOUT|timed? ?out|stalled/i.test(body) ? "TIMEOUT" : status >= 500 ? "SERVER" : "TRANSPORT",
             provider,
             account,
             status: status || undefined,
-            retryAfterMs: retryAfterMs ?? 1_000,
+            retryAfterMs: retryAfterMs ?? undefined,
             retryable: true,
             message: `${provider}: temporary failure${status ? ` (${status})` : ""} — retry`,
             raw: body.slice(0, 2000),
@@ -154,6 +166,7 @@ export default function (
 
     return {
         kind: "fatal",
+        code: "FATAL",
         provider,
         account,
         status: status || undefined,
@@ -170,7 +183,7 @@ function headerReader(headers: Headers | Record<string, string> | null | undefin
         if (!headers) return null;
         if (typeof (headers as Headers).get === "function") return (headers as Headers).get(name);
         const bag = headers as Record<string, string>;
-        return bag[name] ?? bag[name.toLowerCase()] ?? null;
+        return bag[name] ?? bag[name.toLowerCase()] ?? Object.entries(bag).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1] ?? null;
     };
 }
 

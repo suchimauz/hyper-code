@@ -1,9 +1,9 @@
 /**
  * Normalize provider request usage without inventing missing counts
  *
- * Use on raw per-request usage with attribution captured before dispatch. Complete OpenAI chat/Responses and Anthropic raw counts are accepted; transformed stream payloads with erased presence provenance must use unsupported. No DB or provider calls.
+ * Use on raw per-request usage with attribution captured before dispatch. Accept raw OpenAI chat/Responses, Anthropic raw, or common stream counts. Missing components remain null and partial; legacy streams with erased provenance remain unsupported. No DB or provider calls.
  * @param opts.binding Immutable request and source attribution captured before dispatch; explicit nullable goal identity.
- * @param opts.format Verified wire format. Use unsupported when transformations erase field-presence provenance.
+ * @param opts.format Wire or common-stream format; use unsupported only for legacy erased provenance.
  * @param opts.usage One raw provider usage object, never context usage or cumulative session totals.
  */
 export default async function (
@@ -12,8 +12,8 @@ export default async function (
     opts: {
         /** Immutable request and source attribution captured before dispatch; explicit nullable goal identity. */
         binding: types.goal.UsageBinding;
-        /** Verified wire format. Use unsupported when transformations erase field-presence provenance. */
-        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "hyper-stream-anthropic" | "unsupported";
+        /** Wire or common-stream format; use unsupported only for legacy erased provenance. */
+        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "hyper-stream-anthropic" | "common-stream" | "unsupported";
         /** One raw provider usage object, never context usage or cumulative session totals. */
         usage: unknown;
     },
@@ -37,6 +37,8 @@ export default async function (
     let input: bigint | null = null, cached: bigint | null = null, output: bigint | null = null;
     if (opts.format === 'openai-chat') {
      input=count(u.prompt_tokens); cached=count(obj(u.prompt_tokens_details).cached_tokens); output=count(u.completion_tokens);
+    } else if (opts.format === 'common-stream') {
+     input=count(u.prompt_tokens ?? u.input_tokens); cached=count(obj(u.prompt_tokens_details).cached_tokens ?? u.cache_read_tokens ?? obj(u.input_tokens_details).cached_tokens); output=count(u.completion_tokens ?? u.output_tokens);
     } else if (opts.format === 'openai-responses') {
      input=count(u.input_tokens); cached=count(obj(u.input_tokens_details).cached_tokens); output=count(u.output_tokens);
     } else if (opts.format === 'anthropic-raw') {
@@ -44,7 +46,8 @@ export default async function (
      cached=count(u.cache_read_input_tokens); output=count(u.output_tokens);
      if (uncached !== null && write !== null && cached !== null) input=uncached+write+cached;
     } else return fail('unsupported','Unrecognized usage format');
-    if (input === null || cached === null || output === null) return fail('unknown','Missing or invalid nonnegative integer usage component');
+    if (input !== null && (input > max || cached !== null && cached > input) || output !== null && output > max) return fail('unknown','Usage violates inclusive-input or signed i64 bounds');
+    if (input === null || cached === null || output === null) return Object.freeze({...identity,quality: input !== null || output !== null ? 'partial' : 'unknown',reason:'Missing or invalid nonnegative integer usage component',inputTokens:input === null ? null : String(input),cachedInputTokens:cached === null ? null : String(cached),outputTokens:output === null ? null : String(output)});
     if (input > max || cached > input || output > max) return fail('unknown','Usage violates inclusive-input or signed i64 bounds');
     return Object.freeze({...identity,quality:'exact',reason:null,inputTokens:String(input),cachedInputTokens:String(cached),outputTokens:String(output)});
 }

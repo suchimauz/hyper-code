@@ -1,10 +1,10 @@
-/** Pure run/goal-bound ledger. Counts are all null once incomplete or overflowed; requests retain deduplication evidence. */
+/** Pure run/goal-bound ledger. Counters sum reported components only; partial quality and request evidence preserve missing observations. */
 export type UsageAccumulator = Readonly<{
     sourceAgentId: string;
     runId: string;
     rootAccountingAgentId: string;
     goalIdAtBoundary: string | null;
-    quality: 'exact' | 'unknown' | 'unsupported';
+    quality: 'exact' | 'partial' | 'unknown' | 'unsupported';
     inputTokens: string | null;
     cachedInputTokens: string | null;
     outputTokens: string | null;

@@ -13,8 +13,8 @@
  * durable assistant index; failed, aborted and observer turns do not launch it.
  * Refuses durably stopped agents, fences awaited work against Stop/replacement,
  * and passes an immutable runSignal to cooperative tools. Cannot preempt arbitrary JS.
- * Retries an interrupted SSH inference once per run after 10 seconds, before persisting
- * or executing its partial response. Persists observed event-index run boundaries and
+ * Retries classified model failures with the durable configurable common policy, before
+ * persisting or executing partial responses. Persists observed event-index run boundaries and
  * final answer identity for grouping without guessing historical execution boundaries.
  * Refreshes the durable transcript and honors Stop,
  * replacement and new input; provider auth/quota failures are not inference retries.
@@ -41,7 +41,7 @@ export default async function (
         /** Trusted worker-consumed descendant capability; a non-bound capture forbids execution. */
         goalAuthority?: types.goal.DelegationAuthority;
         /** Internal synchronous worker hook for immutable root-local identity at first provider execution; not model input. */
-        /** Trusted synchronous final receipt hook; absent for pending, blocked or unknown usage. */
+        /** Trusted synchronous final receipt hook; absent for pending or blocked accounting. */
         onGoalFinalCheckpoint?: (proof: Readonly<{ sourceAgentId: string; sourceRunToken: string; goalId: string; capabilityId?: string; checkpointId: string; sequence: number; drained: true }>) => void;
         onGoalBinding?: (binding: Readonly<{ goalId: string; runToken: string }>) => void;
     },
@@ -95,6 +95,8 @@ export default async function (
     let goalCompleted = false;
     let goalBindingReported = false;
     let nativeMutationStopped = false;
+    // One prose-only receipt after our own successful completion, never task continuation.
+    let completionReport = false;
     let nativeHandoffFailed = false;
     let lifecycleStatus: 'completed' | 'stopped' | 'error' = 'completed';
     let finalAnswerIdx: number | null = null;
@@ -307,7 +309,6 @@ export default async function (
     const MAX_MALFORMED_RESPONSES = 3;
     let consecutiveMalformedResponses = 0;
     // Shared across all model/tool cycles in this run; successful cycles do not reset it.
-    let sshInferenceRetries = 0;
     let goalIterations = 0;
     let lastGoalFeedback = "";
     const goalDeadline = Date.now() + 5 * 60_000;
@@ -392,7 +393,7 @@ export default async function (
         let streamed: any;
         const goalRequestId = crypto.randomUUID();
         let goalProvider = 'unsupported';
-        let goalFormat: 'openai-chat' | 'unsupported' = 'unsupported';
+        const goalFormat = 'common-stream' as const;
         const thinkingSpans: { startedAt: number; endedAt: number; summary: string }[] = [];
         let thinkingStart: number | null = null;
         const closeThinking = () => {
@@ -424,10 +425,7 @@ export default async function (
             if (goalRun) {
                 const endpoint = await ctx.fns.llm.resolveEndpoint({ model: agent.model });
                 goalProvider = endpoint.provider;
-                // Match llm.stream dispatch; transformed adapters have no exact provenance.
-                const provider = endpoint.provider === 'hyper' ? endpoint.upstream : endpoint.provider;
-                if (endpoint.api === 'openai' && provider !== 'xai') goalFormat = 'openai-chat';
-                else throw new Error('Goal accounting requires an exact supported transport; no provider request dispatched');
+
             }
             if (goalRun?.sealed) throw new DOMException('Run accounting sealed for Stop', 'AbortError');
             goalRun?.pendingRequests.add(goalRequestId);
@@ -438,7 +436,10 @@ export default async function (
                 goalBindingReported = true;
                 opts.onGoalBinding?.(Object.freeze({ goalId: goalRun.binding.goalId, runToken: goalRun.binding.runToken }));
             }
+            await ctx.fns.agent.retryWait({ agentId: agent.id, runToken: runToken ?? null, signal: ac.signal });
+            await assertRunActive();
             streamed = await ctx.fns.llm.stream({ agent, signal: sampling.signal, onEvent });
+            await ctx.fns.procs.db.run({ sql: 'UPDATE agents SET llm_retry_attempt = 0, llm_retry_pending = NULL WHERE id = ? AND stopped_at IS NULL AND (?::text IS NULL OR run_token = ?)', params: [agent.id, runToken ?? null, runToken ?? null] });
             if (goalRun) goalResult = await ctx.fns.goal.runUsageRecord({ state: goalRun, provider: goalProvider, requestId: goalRequestId, format: goalFormat, usage: streamed.usage });
         } catch (error: any) {
             if (goalRun) goalResult = await ctx.fns.goal.runUsageRecord({ state: goalRun, provider: goalProvider, requestId: goalRequestId, format: 'unsupported', usage: undefined });
@@ -450,29 +451,26 @@ export default async function (
                 // Nothing from the interrupted partial response is persisted.
                 // The next loop refreshes the durable transcript and includes
                 // every user message that arrived while sampling.
+                if (completionReport) throw error;
                 continue;
             }
-            const transport = error?.transportFailure;
-            if (transport?.kind === 'ssh_transport' && transport.phase === 'ambiguous'
-                && !error.failure && !sampling.signal.aborted && sshInferenceRetries < 1) {
+            if (!sampling.signal.aborted && error?.name !== 'AbortError') {
                 await assertRunActive();
-                sshInferenceRetries++;
-                // Only llm.stream failed: no calls from this partial response have been
-                // persisted or executed. Previous tool results stay in the transcript.
-                // retryable:false still forbids low-level transport replay; this is one
-                // new model request at the owned agent boundary, not a tool/run restart.
-                await ctx.fns.session.appendErrorEvent({ id: agent.id,
-                    error: 'SSH inference interrupted; one automatic model retry in 10 seconds. Completed tool results are preserved.' });
-                await assertRunActive();
-                try {
-                    const timers = await import('node:timers/promises');
-                    await timers.setTimeout(10_000, undefined, { signal: sampling.signal });
-                } catch (waitError) {
-                    if (!(sampling.signal.aborted && sampling.signal.reason === 'new_user_input' && !ac.signal.aborted)) throw waitError;
+                const provider = (await ctx.fns.llm.resolveEndpoint({ model: agent.model })).provider;
+                const transport = error?.transportFailure;
+                const classified = error?.failure ?? ctx.fns.llm.classifyError({ provider, body: String(error?.message ?? error) });
+                const failure: types.llm.FailureInfo = transport?.kind === 'ssh_transport'
+                    ? { ...classified, kind: transport.phase === 'permanent' ? 'fatal' : 'transient',
+                        code: transport.phase === 'permanent' ? 'SSH_PERMANENT' : 'SSH_TRANSPORT',
+                        retryable: transport.phase !== 'permanent', message: String(error?.message ?? error), provider }
+                    : classified;
+                if (await ctx.fns.agent.retrySchedule({ agentId: agent.id, runToken: runToken ?? null, failure, signal: ac.signal })) {
+                    // A failed sample is not a completed tool cycle: always mode
+                    // must not silently inherit the tool-loop retry count limit.
+                    turns--;
+                    // Replay model sampling only; completed tools/results remain durable.
+                    continue;
                 }
-                await assertRunActive();
-                // The outer loop refreshes input/results and installs a fresh sampling signal.
-                continue;
             }
             throw error;
         } finally {
@@ -515,7 +513,13 @@ export default async function (
             if (goalResult.kind !== 'committed' || goalResult.status !== 'active') {
                 toolCalls = [];
                 finishReason = 'stop';
-                prose = goalBoundarySummary;
+                if (goalResult.kind !== 'committed') {
+                    await ctx.fns.session.appendErrorEvent({ id: agent.id, error: goalBoundarySummary });
+                    prose = goalBoundarySummary;
+                } else if (!(completionReport && goalResult.status === 'complete')) {
+                    clearStream();
+                    return Object.assign(goalReturn, { text: '', usage, consumedUserIdx });
+                }
             }
         }
         delete agent.scratchpad.activeGoalFeedback;
@@ -798,8 +802,28 @@ export default async function (
             return Object.assign(goalReturn, { text: '', usage: null, consumedUserIdx, inputWaiting: true });
         }
         if (!terminal && (nativeHandoffFailed || nativeMutationStopped || (goalRun && (goalResult?.kind !== 'committed' || goalResult.status !== 'active')))) {
-            // Temporary fail-closed integration, not Codex soft-budget wrap-up parity.
-            terminal = { type: 'html', text: goalBoundarySummary, html: `<p>${goalBoundarySummary}</p>` };
+            if (!nativeHandoffFailed && nativeMutationStopped && nativeSnapshot?.status === 'complete'
+                && goalResult?.kind === 'committed' && goalResult.status === 'complete' && !completionReport) {
+                const completedGoal = await ctx.fns.goal.read({ agentId: agent.id });
+                await assertRunActive();
+                if (!completedGoal.enabled || !completedGoal.goal || completedGoal.goal.goalId !== nativeSnapshot.goalId) {
+                    throw new Error('Completed Goal report accounting snapshot unavailable');
+                }
+                if (completedGoal.goal.status !== 'complete'
+                    || (completedGoal.goal.tokenBudget !== null && completedGoal.goal.tokensUsed >= completedGoal.goal.tokenBudget)) {
+                    return Object.assign(goalReturn, { text: '', usage, consumedUserIdx });
+                }
+                completionReport = true;
+                agentCtx.goalCompletionReport = true;
+                continue;
+            }
+            if (nativeHandoffFailed || goalResult?.kind !== 'committed') {
+                await ctx.fns.session.appendErrorEvent({ id: agent.id, error: goalBoundarySummary });
+                terminal = { type: 'html', text: goalBoundarySummary, html: `<p>${goalBoundarySummary}</p>` };
+            } else {
+                // Durable goal status already explains a deliberate stop; no duplicate chat bubble.
+                return Object.assign(goalReturn, { text: '', usage, consumedUserIdx });
+            }
         }
         if (terminal) {
             await assertRunActive();
