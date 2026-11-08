@@ -29,6 +29,24 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     /** Who answered: a user id, or `agent:<id>` when an agent withdraws it. */
     actor?: string | null;
 }): Promise<{ state: string; error?: string }> {
+    const [gate] = await ctx.fns.procs.db.select({ sql: "SELECT agent_id, spec->>'_agentWait' = 'true' AS blocking FROM inputs WHERE id = ?", params: [String(opts.id ?? '')] });
+    if (gate?.blocking === true) {
+        // Ordinary question handlers have no external side effects. Keep their claim,
+        // validation and delivery in one transaction: process death rolls back to open.
+        const result = await ctx.fns.procs.db.transaction({ fn: async () => {
+            await ctx.fns.procs.db.select({ sql: 'SELECT id FROM agents WHERE id = ? FOR UPDATE', params: [gate.agent_id] });
+            return await submitInput(ctx, opts, true);
+        } });
+        const live = (ctx.state as any).agent?.[gate.agent_id];
+        if (live) await ctx.fns.session.syncAgentState({ agent: live });
+        ctx.fns.procs.events.refresh({ topic: `agent:${gate.agent_id}`, reason: 'input' });
+        ctx.fns.agent.wakeWorker({});
+        return result as { state: string; error?: string };
+    }
+    return await submitInput(ctx, opts, false);
+}
+
+async function submitInput(ctx: Context, opts: { id: string; values?: Record<string, string | string[]>; cancel?: boolean; reason?: string; actor?: string | null }, atomic: boolean): Promise<{ state: string; error?: string }> {
     const id = String(opts.id ?? "");
     // This kind has a separate exact-plan browser transition; generic calls may neither approve nor cancel it.
     const existingInput = await ctx.fns.input.get({ id });
@@ -47,7 +65,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 
     if (opts.cancel) {
         const reason = String(opts.reason ?? "").trim() || null;
-        await deliver(ctx, input, "cancelled", reason ? `cancelled: ${reason}` : "cancelled by the person", null, actor, reason);
+        await deliver(ctx, input, "cancelled", reason ? `cancelled: ${reason}` : "cancelled by the person", null, actor, reason, atomic);
         return { state: "cancelled" };
     }
 
@@ -61,7 +79,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         await ctx.fns.procs.db.run({ sql: "UPDATE inputs SET state = 'open', updated_at = ? WHERE id = ?", params: [Date.now(), id] });
         return { state: "open", error: String(error?.message ?? error) };
     }
-    await deliver(ctx, input, "submitted", outcome.summary, outcome.result, actor);
+    await deliver(ctx, input, "submitted", outcome.summary, outcome.result, actor, null, atomic);
     return { state: "submitted" };
 }
 
@@ -75,14 +93,14 @@ async function finish(ctx: Context, input: types.input.Row, state: string, resul
 // The answer is a user turn of its own type: it wakes the agent like a typed
 // message, but the composer-only machinery (function RAG, mentions) skips it.
 // No transcript bubble — the input card itself now shows the answer.
-async function deliver(ctx: Context, input: types.input.Row, state: string, summary: string, result: Record<string, any> | null, actor: string | null, reason: string | null = null) {
+async function deliver(ctx: Context, input: types.input.Row, state: string, summary: string, result: Record<string, any> | null, actor: string | null, reason: string | null = null, atomic = false) {
     const attr = (v: string) => v.replace(/[&"<>]/g, ch => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" }[ch]!));
     const content = `<input-result id="${attr(input.id)}" kind="${attr(input.kind)}" state="${state}" title="${attr(input.title)}">\n`
         + summary + (result ? `\n${JSON.stringify(result)}` : "") + `\n</input-result>`;
     const now = Date.now();
     const message: any = { role: "user", content, message_type: "input" };
     if (actor) message.author = actor;
-    await ctx.fns.procs.db.transaction({ fn: async () => {
+    const persist = async () => {
         await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [input.agentId] });
         await finish(ctx, input, state, result, reason, actor);
         // Agent withdrawal is not a human instruction to resume work.
@@ -104,7 +122,10 @@ async function deliver(ctx: Context, input: types.input.Row, state: string, summ
                 : "UPDATE agents SET next_run_at = GREATEST(COALESCE(next_run_at, 0), ?), updated_at = ? WHERE id = ? AND archived_at IS NULL AND stopped_at IS NULL",
             params: [now, now, input.agentId],
         });
-    } });
+    };
+    if (atomic) await persist();
+    else await ctx.fns.procs.db.transaction({ fn: persist });
+    if (atomic) return; // Publish only after the enclosing claim transaction commits.
     const live = (ctx.state as any).agent?.[input.agentId];
     if (live) await ctx.fns.session.syncAgentState({ agent: live });
     ctx.fns.procs.events.refresh({ topic: `agent:${input.agentId}`, reason: "input" });
