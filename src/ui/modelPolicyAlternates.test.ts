@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import parkedCard from './parkedCard';
 import metaHtml from './agentMetaSectionHtml';
 import newForm from '../agent/newForm';
-import mobileOptions from '../api/$route_mobile_v1_new-agent-options_GET';
+import mobileOptions from '../api/$route_v1_new-agent-options_GET';
 import button from '../procs/ui/button';
 import escape from '../procs/ui/escape';
 import attr from '../procs/ui/attr';

@@ -12,7 +12,7 @@ test("sign-in gate redirects HTML and rejects JSON", async () => {
     const html = await middleware(ctx, null, { req: new Request("https://hyper.example/agent/ab", { headers: { accept: "text/html" } }) });
     expect(html?.status).toBe(303);
     expect(html?.headers.get("location")).toBe("/auth/login?next=%2Fagent%2Fab");
-    const api = await middleware(ctx, null, { req: new Request("https://hyper.example/api/mobile/v1/agents", { headers: { accept: "application/json" } }) });
+    const api = await middleware(ctx, null, { req: new Request("https://hyper.example/api/v1/agents", { headers: { accept: "application/json" } }) });
     expect(api?.status).toBe(401);
 });
 
@@ -36,6 +36,6 @@ test("signed-in user is attached to the session", async () => {
 });
 
 test("authenticated cross-origin writes are rejected", async () => {
-    const response = await middleware(context({ user: nik, required: true }), null, { req: new Request("https://hyper.example/api/mobile/v1/agents/ab/stop", { method: "POST", headers: { origin: "https://evil.example", host: "hyper.example" } }) });
+    const response = await middleware(context({ user: nik, required: true }), null, { req: new Request("https://hyper.example/api/v1/agents/ab/stop", { method: "POST", headers: { origin: "https://evil.example", host: "hyper.example" } }) });
     expect(response?.status).toBe(403);
 });

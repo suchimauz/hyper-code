@@ -4,7 +4,7 @@
 
 ## Что реализовано
 
-- `browser-extension/` рядом с `mobile/`: unpacked Manifest V3, native side panel, settings/pairing, per-tab identity, iframe существующего Hyper UI. Без отдельного чата и сборки.
+- `browser-extension/` в корне проекта: unpacked Manifest V3, native side panel, settings/pairing, per-tab identity, iframe существующего Hyper UI. Без отдельного чата и сборки.
 - `src/sidebar/`: narrow loopback API, hashed bearer credentials, explicit approval в обычном authenticated Hyper UI, durable Postgres bindings, live target/process/context validation, close/revoke.
 - `src/ui/layout.ts`: `presentation=sidebar`, скрывает навигацию/Meta, сохраняет chat, popup и secure input.
 - `plugins/browser/src/cdp/` и browser wrappers: привязанный agent context, fail-closed guard, reconnect только прежнего target, без автоматического повторения команды.

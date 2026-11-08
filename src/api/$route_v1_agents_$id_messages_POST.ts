@@ -1,0 +1,85 @@
+/** Appends a native mobile user message with optional photo/file attachments and schedules the agent. */
+export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
+    const id = opts.params.id!;
+    const archivedRow = (await ctx.fns.procs.db.select({ sql: "SELECT archived_at FROM agents WHERE id = ?", params: [id] }))[0];
+    if (!archivedRow) return Response.json({ error: "not_found", message: "Agent not found" }, { status: 404 });
+    if (archivedRow.archived_at != null) return Response.json({ error: "archived", message: "Restore this archived chat before sending messages" }, { status: 409 });
+    let agent = (ctx.state as any).agent?.[id];
+    if (!agent) { agent = await ctx.fns.session.load({ id }); if (agent) { (ctx.state as any).agent ??= {}; (ctx.state as any).agent[id] = agent; } }
+    if (!agent) return Response.json({ error: "not_found", message: "Agent not found" }, { status: 404 });
+
+    const contentType = opts.req.headers.get("content-type") ?? "";
+    let text = "", debounceMs = 100;
+    let files: File[] = [];
+    if (contentType.startsWith("multipart/form-data")) {
+        const form = await opts.req.formData();
+        text = String(form.get("text") ?? "").trim();
+        debounceMs = Number(form.get("debounceMs") ?? 100) || 0;
+        files = form.getAll("files").flatMap(value => {
+            const file = value as File;
+            return typeof file?.arrayBuffer === "function" && Number(file.size) > 0 ? [file] : [];
+        });
+    } else {
+        let body: any;
+        try { body = await opts.req.json(); } catch { return Response.json({ error: "invalid_json", message: "Expected JSON or multipart form data" }, { status: 400 }); }
+        text = typeof body?.text === "string" ? body.text.trim() : "";
+        debounceMs = Number(body?.debounceMs ?? 100) || 0;
+    }
+    if (!text && files.length === 0) return Response.json({ error: "empty_message", message: "Message text or an attachment is required" }, { status: 400 });
+    try {
+        if (text.startsWith('/') && await ctx.fns.commands.parse({ text })) {
+            if (files.length) return Response.json({ error: 'command_attachments' }, { status: 400 });
+            await ctx.fns.projects.principal({});
+            const result = await ctx.fns.commands.dispatch({ agentId: id, text, requestId: opts.req.headers.get('idempotency-key') || Bun.randomUUIDv7() });
+            return Response.json(result, { status: result.status === 'running' ? 202 : 200 });
+        }
+    } catch (error) {
+        const e = error as Error & {status?: number; code?: string};
+        return Response.json({error:e.code ?? 'invalid_command',message:e.message},{status:e.status ?? 400});
+    }
+    if (text.length > 200_000) return Response.json({ error: "message_too_large", message: "Message is too large" }, { status: 413 });
+    if (files.length > 10) return Response.json({ error: "too_many_files", message: "At most 10 attachments are allowed" }, { status: 413 });
+    if (files.some(file => file.size > 40 * 1024 * 1024)) return Response.json({ error: "file_too_large", message: "Each attachment must be at most 40 MB" }, { status: 413 });
+    if (files.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) return Response.json({ error: "attachments_too_large", message: "Attachments must total at most 80 MB" }, { status: 413 });
+
+    let uploads: Awaited<ReturnType<typeof ctx.fns.attachments.saveUploads>> = [];
+    const ts = Date.now();
+    const sendAt = ts + Math.min(30_000, Math.max(0, debounceMs));
+    const accepted = await ctx.fns.procs.db.transaction({ fn: async () => {
+    // Serialize acceptance against both Stop and Archive before writing uploads.
+    const locked = (await ctx.fns.procs.db.select({ sql: "SELECT id, archived_at FROM agents WHERE id=? FOR UPDATE", params: [id] }))[0];
+    if (!locked) return Response.json({ error: "not_found", message: "Agent not found" }, { status: 404 });
+    if (locked.archived_at != null) return Response.json({ error: "archived", message: "Restore this archived chat before sending messages" }, { status: 409 });
+    try { uploads = await ctx.fns.attachments.saveUploads({ agentId: id, files }); }
+    catch (error: any) { return Response.json({ error: "attachment_failed", message: String(error?.message ?? error) }, { status: 400 }); }
+    const content: types.tools.Content[] = [];
+    if (text) content.push({ type: "text", text });
+    content.push(...uploads.map(upload => upload.ref));
+    await ctx.fns.session.mutateScratchpad({ id, mutate: (scratchpad: Record<string, any>, now: number) => {
+        const plan = scratchpad.plan;
+        if (!plan?.pausedAt) return;
+        plan.pausedAt = null;
+        plan.updatedAt = now;
+        const active = Array.isArray(plan.tasks) ? plan.tasks.find((task: any) => task.status === 'active') : null;
+        if (active && !active.activeSince) active.activeSince = now;
+    } });
+    const appended = await ctx.fns.session.appendMessage({ id, message: { role: "user", content: uploads.length ? content : text }, ts });
+    if (uploads.length) await ctx.fns.attachments.commitUploads({ agentId: id, messageIdx: appended.idx, uploads });
+    const event: any = { type: "user", text, attachments: uploads.map(upload => upload.meta), messageIdx: appended.idx, ts };
+    event.actor = await ctx.fns.auth.actorId({ agentId: id }) ?? undefined;
+    event.html = await ctx.fns.agent.renderEventHtml({ event, agentId: id });
+    const eventIdx = await ctx.fns.session.appendEvent({ id, event, ts });
+    await ctx.fns.procs.db.run({ sql: "UPDATE agents SET stopped_at=NULL, last_error=NULL, next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=?", params: [sendAt, ts, id] });
+    return { appended, eventIdx };
+    } }) as Response | { appended: { idx: number }; eventIdx: { idx: number } };
+    if (accepted instanceof Response) return accepted;
+    const { appended, eventIdx } = accepted;
+    await ctx.fns.session.syncAgentState({ agent });
+
+
+    // Keep goal observation off the critical response path and separate from
+    // the main agent's execution state.
+    if (text && agent.scratchpad?.goalTrackingEnabled === true && ctx.fns.agent.updateGoalSidecar) void ctx.fns.agent.updateGoalSidecar({ agent, messageIdx: appended.idx, userMessage: text }).catch(() => undefined);
+    ctx.fns.agent.wakeWorker({});
+    return Response.json({ version: 1, ok: true, messageIdx: appended.idx, eventIdx: eventIdx.idx, sendAt, attachments: uploads.map(upload => upload.meta) }, { status: 202 });
+}

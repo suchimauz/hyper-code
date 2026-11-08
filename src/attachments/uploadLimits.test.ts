@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import saveUploads from './saveUploads';
-import mobileMessage from '../api/$route_mobile_v1_agents_$id_messages_POST';
+import mobileMessage from '../api/$route_v1_agents_$id_messages_POST';
 
 const MB = 1024 * 1024;
 function file(size: number) {
@@ -34,7 +34,7 @@ for (const [sizes, expected] of [
     [Array(11).fill(1), 'too_many_files'],
 ] as [number[], string][]) {
     test(`mobile ingress rejects ${expected} before storage`, async () => {
-        const req = new Request('http://localhost/api/mobile/v1/agents/test/messages', { method: 'POST', headers: { 'content-type': 'multipart/form-data' } });
+        const req = new Request('http://localhost/api/v1/agents/test/messages', { method: 'POST', headers: { 'content-type': 'multipart/form-data' } });
         req.formData = async () => ({ get: () => null, getAll: () => sizes.map(file) }) as any;
         const ctx: any = { state: { agent: { test: { id: 'test' } } } };
         const response = await mobileMessage(ctx, null, { req, params: { id: 'test' } });

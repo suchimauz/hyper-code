@@ -1,6 +1,6 @@
 # Hyper Sidebar — unpacked MV3 prototype
 
-Existing Hyper `/agent/:id?presentation=sidebar` UI inside a Chrome side panel. No replacement chat, streaming client, injected content script, remote privileged script, or debugger attachment. Root directory intentionally lives beside `mobile/`.
+Existing Hyper `/agent/:id?presentation=sidebar` UI inside a Chrome side panel. No replacement chat, streaming client, injected content script, remote privileged script, or debugger attachment. The extension lives in the root-level `browser-extension/` directory.
 
 Live native-panel, duplicate-tab isolation, iframe message/action, navigation and CDP reconnect checks passed. See [implementation and browser test report](../docs/research/browser-sidebar-live-test.md) for evidence, 61 passing tests, and remaining limitations.
 

@@ -44,7 +44,7 @@ test("nav items excludes undeclared GET pages, assets and parameterized routes",
         "/gaps": { GET: Object.assign(async () => {}, { from: "flow/gaps/$route__GET.ts" }) },
         "/ui/app.js": { GET: async () => {} },
         "/agent/:id": { GET: async () => {} },
-        "/api/mobile/v1/news": { GET: async () => {} },
+        "/api/v1/news": { GET: async () => {} },
     };
     ctx.fns.plugins.list = () => [];
     ctx.fns.session.list = async () => [];
@@ -52,7 +52,7 @@ test("nav items excludes undeclared GET pages, assets and parameterized routes",
     expect(result.map(item => item.href)).not.toContain("/gaps");
     expect(result.map(item => item.href)).not.toContain("/ui/app.js");
     expect(result.map(item => item.href)).not.toContain("/agent/:id");
-    expect(result.map(item => item.href)).not.toContain("/api/mobile/v1/news");
+    expect(result.map(item => item.href)).not.toContain("/api/v1/news");
     await ctx.fns.procs.db.close?.({});
 });
 

@@ -1,6 +1,6 @@
 # Password authentication
 
-Hyper can require one shared password before exposing the UI and `/api/mobile/v1` through an HTTPS tunnel. Authentication is disabled when no password is configured, preserving local development behavior.
+Hyper can require one shared password before exposing the UI and `/api/v1` through an HTTPS tunnel. Authentication is disabled when no password is configured, preserving local development behavior.
 
 ## Configure
 
