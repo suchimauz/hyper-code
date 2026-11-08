@@ -76,6 +76,7 @@ export default async function (
     let res: Response | null = null;
     let lastErr: any = null;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if ((ctx as Context & { goalRequestContext?: { authority?: types.goal.DelegationAuthority } }).goalRequestContext?.authority) await ctx.fns.goal.requestAuthorize({});
         if (opts.signal?.aborted) throw new Error("aborted");
         try {
             res = ep.provider === "opencode" ? await ctx.fns.llm.opencodeFetch({ url: ep.url, sessionId: agent.id, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : ssh ? await ctx.fns.sshAccount.fetch({ ssh, url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } }) : await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers, body: bodyJson, signal: opts.signal } });
@@ -136,7 +137,7 @@ export default async function (
             opts.onEvent?.({ type: "text_delta", delta: ev.delta });
         } else if (t === "response.reasoning_summary_text.delta" && typeof ev.delta === "string") {
             thinking += ev.delta;
-            opts.onEvent?.({ type: "thinking_delta", delta: ev.delta });
+            opts.onEvent?.({ type: "thinking_delta", delta: ev.delta, visibility: "public_summary" });
         } else if (t === "response.function_call_arguments.delta" && typeof ev.delta === "string") {
             opts.onEvent?.({ type: "tool_args_delta", delta: ev.delta, id: ev.item_id });
         } else if (t === "response.output_item.done" && ev.item?.type === "function_call") {

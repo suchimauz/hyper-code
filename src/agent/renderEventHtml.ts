@@ -290,6 +290,16 @@ function appendTime(html: string, ts: any, tone: 'dark' | 'light', suffix = ''):
         return eventCard({ title: 'Сигнал с canvas', subtitle: String(ev.title ?? 'Вкладка'), icon: 'square-half', tone: 'neutral', body: esc(String(ev.text ?? "")), details: data ? `<pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-ui-border bg-base-100 p-2 font-mono text-3xs leading-4 text-muted">${esc(data)}</pre>` : undefined });
     }
 
+    if (ev.type === 'command_invocation') {
+        return `<div class="chat-message chat-message--command"><code class="font-mono text-warning">/${esc(String(ev.commandName ?? 'command'))}</code>${ev.argsText ? ' ' + esc(String(ev.argsText)) : ''}</div>`;
+    }
+    if (ev.type === 'command_result') {
+        return `<details class="rounded-md border border-ui-border p-2"><summary><code class="font-mono text-warning">/${esc(String(ev.commandName ?? 'command'))}</code> · ${esc(String(ev.status ?? 'completed'))}</summary><div class="mt-2 whitespace-pre-wrap">${esc(String(ev.text ?? ''))}</div></details>`;
+    }
+    if (ev.type === 'planning_mode' || ev.type === 'planning_proposal') {
+        return eventCard({ title: 'Planning', icon: 'list-checks', tone: 'info', body: esc(String(ev.text ?? 'Planning state changed')) });
+    }
+
     if (ev.type === "plan_activation") {
         return eventCard({ title: 'Начат шаг', subtitle: String(ev.title ?? ev.taskId ?? 'Задача'), icon: 'list-checks', tone: 'info', body: `<div class="font-medium text-muted">${esc(ev.title ?? ev.taskId ?? "Task")}</div>${ev.instructions ? `<div class="mt-1 whitespace-pre-wrap">${esc(ev.instructions)}</div>` : ""}` });
     }

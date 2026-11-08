@@ -10,13 +10,14 @@ function harness() {
     let calls = 0;
     const append = async ({ message }: any) => { const row = { ...message, idx: rows.length }; rows.push(row); return row; };
     const ctx: any = { fns: {
+        goal: { delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) },
         procs: { events: { emit: () => {} }, db: { select: async () => [{ stopped_at: stopped ? 1 : null, i: 0 }] } },
         session: { forAgent: () => null, appendMessage: append,
             appendUserMessage: ({ text }: any) => append({ message: { role: 'user', content: text } }),
             syncAgentState: async () => { agent.messages = rows.slice(); },
-            appendToolCallEvent: noop, appendAssistantEvent: noop, recordContextUsage: noop,
+            appendToolCallEvent: noop, appendAssistantEvent: async () => ({idx: 0}), recordContextUsage: noop,
             updateMessageContent: async ({ idx, content }: any) => { rows[idx].content = content; } },
-        agent: { statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({ status: 'not_needed' }),
+        agent: { recordRunLifecycle: async () => {}, statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({ status: 'not_needed' }),
             stashResult: async ({ output }: any) => ({ content: output }) },
         llm: { stream: async () => ({ toolCalls: [{ id: 'a', name: 'one' }, { id: 'b', name: 'two' }] }) },
         tools: { call: async () => { calls++; return { output: 'ok' }; } },

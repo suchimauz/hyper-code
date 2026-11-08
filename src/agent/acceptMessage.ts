@@ -3,6 +3,7 @@
  *
  * Shared existing chat HTTP submission pipeline; callers must authenticate and resolve the durable agent before calling.
  * A newly accepted human turn resumes a paused plan atomically with enqueueing. Duplicate retries do not resume it.
+ * Archived chats return 409 before body processing; a row-lock recheck prevents concurrent archive from accepting uploads or a turn.
  * @param opts.req Text or multipart chat request.
  * @param opts.params Route values containing the existing agent id.
  */
@@ -14,10 +15,15 @@ export default async function (
         req: Request;
         /** Route values containing the existing agent id. */
         params: Record<string, string>;
+        /** Internal queue promotion fence; never populated from request input. */
+        queue?: { id: string; version: number; runToken?: string };
     },
 ): Promise<Response> {
     const req = opts.req;
         const id = opts.params.id!;
+        const archivedRow = (await ctx.fns.procs.db.select({ sql: 'SELECT archived_at FROM agents WHERE id=?', params: [id] }))[0];
+        if (!archivedRow) return Response.json({ error: 'not_found' }, { status: 404 });
+        if (archivedRow.archived_at != null) return Response.json({ error: 'archived', message: 'Restore this archived chat before sending messages' }, { status: 409 });
         let agent = (ctx.state as any).agent?.[id];
         if (!agent) {
             agent = (await ctx.fns.session.load({ id })) ?? null;
@@ -41,6 +47,23 @@ export default async function (
             files = [...form.getAll("files"), ...form.getAll("file")].filter(value => value instanceof File && value.size > 0) as File[];
         } else text = (await req.text()).trim();
         if (!text && files.length === 0) return Response.json({ error: "empty input" }, { status: 400 });
+        // Commands are control-plane input: toggles never enter the transcript or schedule inference.
+        try {
+            const command = text.startsWith('/') ? await ctx.fns.commands.parse({ text }) : null;
+            if (command) {
+                if (files.length) return Response.json({ error: 'command_attachments', message: 'Commands do not accept attachments' }, { status: 400 });
+                await ctx.fns.projects.principal({});
+                const result = await ctx.fns.commands.dispatch({ agentId: id, text, requestId: requestId || Bun.randomUUIDv7() });
+                return Response.json(result, { status: result.status === 'running' ? 202 : 200 });
+            }
+        } catch (error) {
+            const e = error as Error & { status?: number; code?: string };
+            return Response.json({ error: e.code ?? 'invalid_command', message: e.message }, { status: e.status ?? 400 });
+        }
+        if (requestId) {
+            const priorCommand = (await ctx.fns.procs.db.select({ sql: 'SELECT request_id FROM agent_command_requests WHERE agent_id=? AND request_id=?', params: [id, requestId] }))[0];
+            if (priorCommand) return Response.json({ error: 'idempotency_conflict' }, { status: 409 });
+        }
 
         if (files.length > 10 || files.some(file => file.size > 40 * 1024 * 1024) || files.reduce((sum, file) => sum + file.size, 0) > 80 * 1024 * 1024) return Response.json({ error: 'Не более 10 файлов, до 40 МБ каждый и 80 МБ суммарно.' }, { status: 400 });
         // The fingerprint binds the idempotency key to text AND exact file bytes.
@@ -65,8 +88,7 @@ export default async function (
                 return Response.json({ ok: true, duplicate: true, messageIdx: Number(existing.idx) });
             }
         }
-        try { uploads = await ctx.fns.attachments.saveUploads({ agentId: id, files }); }
-        catch (error) { return Response.json({ error: String(error instanceof Error ? error.message : error) }, { status: 400 }); }
+        let uploadsSaved = false;
         let userAppend: { idx: number; duplicate?: boolean } = { idx: -1 };
         // Other writers do not take this lock: retry the WHOLE transaction on an
         // idx collision, never just a statement in an aborted transaction.
@@ -84,7 +106,25 @@ export default async function (
                     }
                     // Serialize human resumption with inbound delivery and scratchpad writes.
                     // Only a NEW accepted human turn resumes a plan; retries return above.
-                    await ctx.fns.procs.db.select({ sql: 'SELECT id FROM agents WHERE id=? FOR UPDATE', params: [id] });
+                    const locked = (await ctx.fns.procs.db.select({ sql: 'SELECT id, archived_at, run_token, run_state, stopped_at, last_processed_msg_idx FROM agents WHERE id=? FOR UPDATE', params: [id] }))[0];
+                    if (!locked) throw new Error('SUBMISSION_NOT_FOUND');
+                    if (locked.archived_at != null) throw new Error('SUBMISSION_ARCHIVED');
+                    if (opts.queue) {
+                        const q = (await ctx.fns.procs.db.select({sql:"SELECT id,version,status FROM agent_turn_queue WHERE agent_id=? AND id=? FOR UPDATE",params:[id,opts.queue.id]}))[0];
+                        if (!q || q.status !== 'pending' || Number(q.version) !== opts.queue.version) throw new Error('SUBMISSION_CONFLICT');
+                        if (!opts.queue.runToken && (locked.run_state !== 'running' || locked.stopped_at != null)) throw new Error('SUBMISSION_CONFLICT');
+                        if (opts.queue.runToken) {
+                            if (locked.run_token !== opts.queue.runToken || locked.run_state !== 'running' || locked.stopped_at != null) throw new Error('SUBMISSION_CONFLICT');
+                            const pending = (await ctx.fns.procs.db.select({sql:"SELECT 1 FROM messages WHERE agent_id=? AND role='user' AND excluded_from_cursor=0 AND idx>? LIMIT 1",params:[id,locked.last_processed_msg_idx ?? -1]}))[0];
+                            const first = (await ctx.fns.procs.db.select({sql:"SELECT id FROM agent_turn_queue WHERE agent_id=? AND status='pending' ORDER BY sequence LIMIT 1",params:[id]}))[0];
+                            if (pending || first?.id !== q.id) throw new Error('SUBMISSION_CONFLICT');
+                        }
+                    }
+                    if (requestId && (await ctx.fns.procs.db.select({ sql: 'SELECT request_id FROM agent_command_requests WHERE agent_id=? AND request_id=?', params: [id, requestId] }))[0]) throw new Error('SUBMISSION_CONFLICT');
+                    if (!uploadsSaved) {
+                        try { uploads = await ctx.fns.attachments.saveUploads({ agentId: id, files }); uploadsSaved = true; }
+                        catch (error) { throw new Error('SUBMISSION_UPLOAD_FAILED', { cause: error }); }
+                    }
                     await ctx.fns.session.mutateScratchpad({ id, mutate: (scratchpad: Record<string, any>, now: number) => {
                         const plan = scratchpad.plan;
                         if (!plan?.pausedAt) return;
@@ -105,11 +145,15 @@ export default async function (
                     const payload = await ctx.fns.session.scrubUnicode({ text: JSON.stringify(event) });
                     await ctx.fns.procs.db.run({ sql: `INSERT INTO events (agent_id, idx, type, payload, ts, actor) SELECT ?, COALESCE(MAX(idx), -1)+1, 'user', ?, ?, ? FROM events WHERE agent_id=?`, params: [id, payload, ts, actor, id] });
                     await ctx.fns.procs.db.run({ sql: `UPDATE agents SET stopped_at=NULL, last_error=NULL, next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=?`, params: [sendAt, ts, id] });
+                    if (opts.queue) await ctx.fns.procs.db.run({sql:"UPDATE agent_turn_queue SET status='promoted',message_idx=?,files='[]'::jsonb WHERE id=?",params:[idx,opts.queue.id]});
                     return { idx };
                 } }) as { idx: number; duplicate?: boolean };
                 break;
             } catch (error) {
                 const message = String(error instanceof Error ? error.message : error);
+                if (message === 'SUBMISSION_ARCHIVED') return Response.json({ error: 'archived', message: 'Restore this archived chat before sending messages' }, { status: 409 });
+                if (message === 'SUBMISSION_NOT_FOUND') return Response.json({ error: 'not_found' }, { status: 404 });
+                if (message === 'SUBMISSION_UPLOAD_FAILED') return Response.json({ error: String(error instanceof Error ? error.cause : error) }, { status: 400 });
                 if (message === 'SUBMISSION_CONFLICT') return Response.json({ error: 'Этот ключ уже использован или прежняя отправка не завершена. Проверьте историю чата.' }, { status: 409 });
                 if (attempt >= 9 || !/duplicate key|messages_pkey|events_pkey|deadlock detected|serialization failure/i.test(message)) throw error;
                 await Bun.sleep(3 + Math.random() * 20 * (attempt + 1));

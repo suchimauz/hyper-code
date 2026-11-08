@@ -149,6 +149,7 @@ export default async function (
 
     const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
     const transport = ep.provider === "opencode" ? ctx.fns.llm.opencodeFetch : ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh,...request}) : ctx.fns.llm.connectFetch;
+    if ((ctx as Context & { goalRequestContext?: { authority?: types.goal.DelegationAuthority } }).goalRequestContext?.authority) await ctx.fns.goal.requestAuthorize({});
     const res = await transport({ url: ep.url, ...(ep.provider === "opencode" ? { sessionId: agent.id } : {}), init: {
         method: "POST",
         headers,

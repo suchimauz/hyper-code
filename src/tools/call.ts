@@ -9,7 +9,13 @@
 // Never throws for a tool's own failure: a broken call is a message to the
 // model, not an exception for the run loop. An unknown name is reported the
 // same way, because in JSON mode the model picks the name itself.
-/** Validates and invokes a registered tool, preserving text, tool envelopes and JSON data results for the model. */
+/**
+ * Validates and invokes a registered tool, preserving text, tool envelopes and JSON data results for the model.
+ * Use handlerExecuted to account for handler invocation independently of success:
+ * false means rejection or cancellation before invocation; true includes thrown
+ * handlers and cancellation after invocation, whose eventual result is unknown.
+ * Validator and infrastructure exceptions retain their existing propagation.
+ */
 export default async function (
     ctx: Context,
     session: Session | null,
@@ -21,29 +27,29 @@ export default async function (
         /** Owning agent whose workspace and cancellation scope apply to this call. */
         agent?: types.agent.Agent;
     },
-): Promise<{ output: string; content?: types.tools.Content[]; isError: boolean; terminal?: { type: 'html'; html: string; text: string } }> {
+): Promise<{ output: string; content?: types.tools.Content[]; isError: boolean; handlerExecuted: boolean; terminal?: { type: 'html'; html: string; text: string } }> {
     const name = String(opts.name ?? "").trim();
     const all = ctx.fns.tools.list({});
     const tool = all.find((t: any) => t.wireName === name || t.name === name || t.key === name);
     if (!tool) {
-        return { output: `Error: unknown tool "${name}". Available: ${all.map((t: any) => t.wireName).join(", ")}`, isError: true };
+        return { output: `Error: unknown tool "${name}". Available: ${all.map((t: any) => t.wireName).join(", ")}`, isError: true, handlerExecuted: false };
     }
 
     const args = opts.args ?? {};
     const check = ctx.fns.tools.validate({ schema: tool.parameters, args });
     if (!check.ok) {
-        return { output: `Error: invalid arguments for ${tool.wireName} — ${check.errors.join("; ")}`, isError: true };
+        return { output: `Error: invalid arguments for ${tool.wireName} — ${check.errors.join("; ")}`, isError: true, handlerExecuted: false };
     }
 
     // Rules a JSON Schema cannot state live in the tool's own validator.
     if (tool.validate) {
         const validator = String(tool.validate).split(".").reduce((node: any, seg: string) => node?.[seg], ctx.fns as any);
         if (typeof validator !== "function") {
-            return { output: `Error: tool "${tool.wireName}" declares validate "${tool.validate}", but nothing is registered under that name`, isError: true };
+            return { output: `Error: tool "${tool.wireName}" declares validate "${tool.validate}", but nothing is registered under that name`, isError: true, handlerExecuted: false };
         }
         const complaints = [await validator({ args })].flat().filter(Boolean);
         if (complaints.length) {
-            return { output: `Error: invalid arguments for ${tool.wireName} — ${complaints.join("; ")}`, isError: true };
+            return { output: `Error: invalid arguments for ${tool.wireName} — ${complaints.join("; ")}`, isError: true, handlerExecuted: false };
         }
     }
 
@@ -88,13 +94,14 @@ export default async function (
     if (typeof fn !== "function") {
         parentSignal?.removeEventListener('abort', cancelWithRun);
         ctx.fns.tools.endRun({ id: run.id });
-        return { output: `Error: tool "${tool.wireName}" declares fn "${tool.fn}", but nothing is registered under that name`, isError: true };
+        return { output: `Error: tool "${tool.wireName}" declares fn "${tool.fn}", but nothing is registered under that name`, isError: true, handlerExecuted: false };
     }
 
     let output = "";
     let content: types.tools.Content[] | undefined;
     let terminal: { type: 'html'; html: string; text: string } | undefined;
     let isError = false;
+    let handlerExecuted = false;
     const attrs: Record<string, any> = { "tool.name": tool.wireName, "agent.id": opts.agent?.id };
 
     let rejectAbort: (() => void) | undefined;
@@ -110,6 +117,7 @@ export default async function (
             // cooperative cancellation; arbitrary in-process eval is not killed.
             return Promise.race([Promise.resolve().then(() => {
                 run.controller.signal.throwIfAborted();
+                handlerExecuted = true;
                 return fn(args);
             }), cancelled]);
         };
@@ -162,5 +170,5 @@ export default async function (
     // agent cm). Replace with U+FFFD.
     output = output.replaceAll("\u0000", "\uFFFD");
 
-    return { output, ...(content?.length ? { content } : {}), ...(terminal ? { terminal } : {}), isError };
+    return { output, ...(content?.length ? { content } : {}), ...(terminal ? { terminal } : {}), isError, handlerExecuted };
 }

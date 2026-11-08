@@ -45,6 +45,7 @@ export default async function (
     if(opts.generationConfig && Object.keys(opts.generationConfig).length) body.generationConfig=opts.generationConfig;
     if(opts.tools?.length) body.tools=[{functionDeclarations:opts.tools}];
     const fetchOpts={url:url.href,init:{method:'POST',headers:{'content-type':'application/json',...(opts.sessionId ? {'x-opencode-session':opts.sessionId}:{})},body:JSON.stringify(body),signal:opts.signal},...(opts.sessionId ? {sessionId:opts.sessionId}:{})};
+    if ((ctx as Context & { goalRequestContext?: { authority?: types.goal.DelegationAuthority } }).goalRequestContext?.authority) await ctx.fns.goal.requestAuthorize({});
     const res=await ctx.fns.llm.opencodeFetch(fetchOpts);
     if(!res.ok) throw new Error('opencode Gemini '+res.status);
     if(!res.body) throw new Error('Gemini empty response body');

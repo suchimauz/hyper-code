@@ -21,6 +21,13 @@ export default async function (
     const title = String(opts.title ?? "").trim();
     if (!title) throw new Error("delegate: title is required");
     if (!Array.isArray(opts.tasks) || opts.tasks.length === 0) throw new Error("delegate: tasks must not be empty");
+    const authority = await ctx.fns.goal.delegationCapture({ agentId: opts.agent.id });
+    if (authority) {
+        const taskText = opts.tasks.map((task, index) => `${index + 1}. [${task.id}] ${task.title}${task.instructions ? ': ' + task.instructions : ''}`).join('\n');
+        const prompt = ['You are a delegated subagent working for a parent agent.', 'Execute the visible task plan in order. After each completed task call session.done({ agent, id }).', 'When complete call agent.finishTask({ agent, summary, result }) with a concrete JSON-compatible result.', 'This Goal delegation supports one worker claim only; later turns are not authorized automatically.', '', 'Plan:', taskText].join('\n');
+        const child = await ctx.fns.agent.publishGoalDelegation({ parent: opts.agent, title, tasks: opts.tasks, prompt, scratchpad: { delegation: { parentId: opts.agent.id, status: 'working', title, createdAt: Date.now() } } });
+        return { id: child.id, status: 'working' };
+    }
     // A delegated child is a fork in lineage/workspace, not a full transcript copy.
     // The task packet below is its bounded projection; offset 0 keeps the noisy
     // parent history out of the child context.

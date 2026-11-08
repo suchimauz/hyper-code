@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import accept from './acceptMessage';
-import mobile from '../api/$route_mobile_v1_agents_$id_messages_POST';
+import mobile from '../api/$route_v1_agents_$id_messages_POST';
 import submit from '../input/submit';
 import planRoute from './$route_$id_plan_POST';
 

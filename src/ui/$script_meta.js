@@ -251,12 +251,118 @@
         updateCompaction(slot);
     });
 
-    const SECTIONS = ['compaction', 'goal', 'knowledge', 'automation', 'settings', 'team', 'plan'];
+    // Goal drafts retain the entire authorized snapshot. Live events never rebase CAS.
+    const goalStates = new WeakMap();
+    const goalEscape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const goalFeedback = (root, text) => { root.querySelector('[data-goal-feedback]').textContent = text; };
+    function paintGoal(root, snapshot) {
+        const state = goalStates.get(root);
+        state.snapshot = snapshot;
+        state.dirty = false;
+        state.conflict = false;
+        const editor = root.querySelector('[data-goal-editor]');
+        if (!snapshot.enabled) { editor.replaceChildren(); goalFeedback(root, 'Постоянные цели отключены.'); return; }
+        const goal = snapshot.goal;
+        const status = { active: 'Активна', paused: 'На паузе', blocked: 'Заблокирована', usage_limited: 'Лимит использования', budget_limited: 'Бюджет исчерпан', complete: 'Завершена' };
+        const button = (action, label) => `<button type="button" data-goal-action="${action}" class="btn btn-ghost" style="min-height:44px">${label}</button>`;
+        editor.innerHTML = `<p class="inspector-help">${goal ? `${goalEscape(status[goal.status] || goal.status)} · ${goalEscape(goal.tokensUsed)} токенов · ${goalEscape(Math.round(goal.timeUsedSeconds))} с` : 'Цель ещё не задана.'}</p>
+          <label class="block">Задача<textarea name="goalObjective" aria-label="Задача постоянной цели" rows="3" class="textarea w-full" style="min-height:88px">${goalEscape(goal?.objective || '')}</textarea></label>
+          <label class="block">Бюджет токенов<input name="goalBudget" aria-label="Бюджет токенов" type="number" min="1" step="1" class="input w-full" style="min-height:44px" value="${goalEscape(goal?.tokenBudget ?? '')}" placeholder="Без лимита"></label>
+          <p class="inspector-help">Пустой бюджет — без лимита. Сохранение не запускает агента.</p>
+          <div class="flex flex-wrap gap-1">${button(goal ? 'edit' : 'create', goal ? 'Сохранить' : 'Создать')}${goal ? (goal.status === 'active' ? button('pause', 'Пауза') : button('resume', 'Продолжить')) + button('clear', 'Очистить') : ''}</div>
+          <div data-goal-clear-confirm hidden><p>Удалить постоянную цель и её бюджет? Наблюдения и план останутся.</p>${button('confirm-clear', 'Да, очистить')}${button('cancel-clear', 'Отмена')}</div>`;
+        goalFeedback(root, '');
+    }
+    async function loadGoal(root, discard = false) {
+        let state = goalStates.get(root);
+        if (!state) { state = { dirty: false, pending: false, snapshot: null, conflict: false }; goalStates.set(root, state); }
+        if (state.pending) return;
+        if (state.dirty && !discard) { goalFeedback(root, 'Есть обновление. Черновик сохранён; для новой версии нажмите «Обновить» и подтвердите сброс.'); return; }
+        state.pending = true;
+        try {
+            const response = await fetch(`/agent/${encodeURIComponent(root.dataset.agentId)}/persistent-goal`, { credentials: 'same-origin' });
+            const snapshot = await response.json();
+            if (!response.ok) throw new Error(snapshot.message || 'Не удалось загрузить цель.');
+            // Input during a read also owns the old CAS; never replace it.
+            if (!state.dirty) paintGoal(root, snapshot);
+        } catch (error) { goalFeedback(root, error.message || 'Не удалось загрузить цель.'); }
+        finally { state.pending = false; }
+    }
+    function initializeGoals(scope = document) {
+        const roots = [...(scope.querySelectorAll?.('[data-persistent-goal]') || [])];
+        if (scope.matches?.('[data-persistent-goal]')) roots.push(scope);
+        roots.forEach(root => { if (!goalStates.has(root)) loadGoal(root); });
+    }
+    document.addEventListener('input', event => {
+        const root = event.target.closest?.('[data-persistent-goal]');
+        const state = root && goalStates.get(root);
+        if (state && event.target.matches('[name="goalObjective"], [name="goalBudget"]')) state.dirty = true;
+    });
+    document.addEventListener('click', async event => {
+        const button = event.target.closest?.('[data-goal-action], [data-goal-refresh]');
+        const root = button?.closest('[data-persistent-goal]');
+        if (!root) return;
+        const state = goalStates.get(root);
+        if (!state || state.pending) return;
+        let action = button.dataset.goalAction;
+        if (button.hasAttribute('data-goal-refresh')) {
+            if (state.dirty) {
+                goalFeedback(root, 'Сбросить черновик и загрузить актуальную цель?');
+                if (!root.querySelector('[data-goal-action="discard"]')) {
+                    const discard = document.createElement('button');
+                    discard.type = 'button'; discard.dataset.goalAction = 'discard'; discard.className = 'btn btn-ghost'; discard.style.minHeight = '44px'; discard.textContent = 'Сбросить и обновить';
+                    root.querySelector('[data-goal-editor]').append(discard);
+                }
+            } else await loadGoal(root);
+            return;
+        }
+        if (action === 'discard') { state.dirty = false; await loadGoal(root, true); return; }
+        if (action === 'clear' || action === 'cancel-clear') { root.querySelector('[data-goal-clear-confirm]').hidden = action !== 'clear'; return; }
+        if (action === 'confirm-clear') action = 'clear';
+        if (!['create', 'edit', 'pause', 'resume', 'clear'].includes(action) || !state.snapshot?.enabled) return;
+        if (state.conflict) { goalFeedback(root, 'Версия изменилась. Сначала явно обновите цель; черновик не отправлен повторно.'); return; }
+        const { goal, owner, csrfToken } = state.snapshot;
+        const payload = { action, expectedGoalId: goal?.goalId ?? null, expectedRevision: goal?.revision ?? null, expectedRunToken: owner.runToken, csrfToken };
+        if (['create', 'edit', 'resume'].includes(action)) {
+            payload.objective = root.querySelector('[name="goalObjective"]').value.trim();
+            const budget = root.querySelector('[name="goalBudget"]').value.trim();
+            payload.tokenBudget = budget === '' ? null : Number(budget);
+            if (!payload.objective || (payload.tokenBudget !== null && (!Number.isSafeInteger(payload.tokenBudget) || payload.tokenBudget <= 0))) { goalFeedback(root, 'Укажите задачу и целый положительный бюджет либо оставьте бюджет пустым.'); return; }
+        }
+        if (action === 'resume') { payload.expectedStoppedAt = owner.stoppedAt; payload.resumeRequestId = crypto.randomUUID(); }
+        state.pending = true;
+        state.dirty = true; // Also freeze CAS after ambiguous transport failures.
+        root.setAttribute('aria-busy', 'true');
+        const controls = [...root.querySelectorAll('button, input, textarea')];
+        controls.forEach(control => { control.disabled = true; });
+        let success = false;
+        let resumeNotice = '';
+        try {
+            const response = await fetch(`/agent/${encodeURIComponent(root.dataset.agentId)}/persistent-goal`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(window.hyperRpcCsrfHeaders?.() || {}) }, body: JSON.stringify(payload) });
+            const result = await response.json();
+            if (!response.ok) { if (response.status === 409) state.conflict = true; throw new Error(result.message || 'Не удалось сохранить цель.'); }
+            if (action === 'resume' && result.resume?.scheduled === false) resumeNotice = `Запуск отложен: ${result.resume.reason || 'агент не запущен'}.`;
+            success = true;
+            state.dirty = false;
+        } catch (error) { state.conflict = true; goalFeedback(root, `${error.message || 'Ошибка запроса.'} Черновик и исходная версия сохранены. Обновите явно перед повторной попыткой.`); }
+        finally { state.pending = false; root.removeAttribute('aria-busy'); controls.forEach(control => { control.disabled = false; }); }
+        if (success) { await loadGoal(root); if (resumeNotice) goalFeedback(root, resumeNotice); }
+    });
+    initializeGoals();
+    document.addEventListener('htmx:after:process', event => initializeGoals(event.target));
+
+    const SECTIONS = ['persistentGoal', 'compaction', 'goal', 'knowledge', 'automation', 'settings', 'team', 'plan'];
     const pending = new Map(); // element -> timer
 
     // innerMorph keeps what the reader has in hand: open/closed sections
     // (morphIgnore "open"), focus, caret and typed text in inputs.
     function redraw(slot) {
+        // Persistent goal owns its DOM and original CAS while drafting or writing.
+        if (slot.dataset.metaSection === 'persistentGoal') {
+            const root = slot.querySelector('[data-persistent-goal]');
+            if (root) loadGoal(root);
+            return;
+        }
         // Do not detach the requesting form while its write is pending.
         if (compactionRequests.has(slot)) return;
         const agentId = slot.id.slice(slot.id.lastIndexOf('-') + 1);

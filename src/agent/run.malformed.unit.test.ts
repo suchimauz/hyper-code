@@ -11,15 +11,17 @@ function harness(turns: any[]) {
     const append = async ({ message }: any) => { const row = { ...message, idx: rows.length }; rows.push(row); return row; };
     const noop = async () => {};
     const ctx: any = { state: { agent: { [agent.id]: agent } }, fns: {
+        planning: { read: async ({agentId}: any) => ({version:1,agentId,mode:'execute',revision:0,scope:'session',advisory:true,runningPolicy:'reject',pending:null,proposal:null}) },
+        goal: { delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) },
         session: {
             forAgent: () => null, appendMessage: append,
             syncAgentState: async () => { agent.messages = rows.slice(); },
-            recordContextUsage: noop, appendAssistantEvent: noop, appendToolCallEvent: noop,
+            recordContextUsage: noop, appendAssistantEvent: async () => ({idx: 0}), appendToolCallEvent: noop,
             appendErrorEvent: async ({ error }: any) => { errors.push(error); },
             updateMessageContent: async ({ idx, content }: any) => { rows[idx].content = content; },
         },
         procs: { events: { emit: noop }, db: { select: async ({ sql }: any) => sql.includes('MAX(idx)') ? [{ i: 0 }] : [{ stopped_at: null }] } },
-        agent: { statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({ status: 'not_needed' }),
+        agent: { recordRunLifecycle: async () => {}, statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({ status: 'not_needed' }),
             stop: async () => { stops++; }, stashResult: async ({ output }: any) => ({ content: output }) },
         events: { emitAgentsChanged: noop, refreshAgentMeta: noop },
         markdown: { render: async ({ source }: any) => source },

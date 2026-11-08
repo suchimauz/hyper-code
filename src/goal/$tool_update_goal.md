@@ -1,0 +1,5 @@
+---
+fn: goal.toolUpdate
+description: "Update the existing goal status only. Set paused only at the user’s explicit request, never on your own initiative; ask if unclear. Report the returned status and stop goal work; budget limits take precedence. Set complete only when the objective is achieved and no required work remains, never merely because its budget is nearly exhausted or work is stopping. Set blocked only after the same blocking condition recurs for at least three consecutive goal turns and progress requires user input or external change. A resumed blocked goal starts a fresh blocked audit. Do not block merely because work is hard, slow, uncertain, incomplete, or would benefit from clarification. Once the threshold is met, mark blocked rather than repeatedly leaving it active. This tool cannot resume, budget-limit, or usage-limit a goal. When completing a budgeted goal, report final token usage."
+parameters: {"type":"object","properties":{"status":{"type":"string","enum":["complete","paused","blocked"]}},"required":["status"],"additionalProperties":false}
+---

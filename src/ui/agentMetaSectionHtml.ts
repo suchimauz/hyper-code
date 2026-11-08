@@ -18,7 +18,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     /** Agent whose section is rendered. */
     agentId: string;
     /** Section to render. */
-    section: "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
+    section: "persistentGoal" | "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
 }): Promise<string> {
     const agentId = String(opts.agentId ?? "");
     const section = String(opts.section ?? "");
@@ -56,5 +56,6 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         extraSettings = await ctx.fns.ui.agentSettingsBlocks({ agentId });
     }
     const globalCompactionPercent = section === "compaction" ? await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 }) : undefined;
-    return ctx.fns.ui.agentMetaSection({ globalCompactionPercent, agent, section: section as any, team, archivedTeam, models, accounts, disabledModels, triggers, extraSettings });
+    const persistentGoalEnabled = section === "persistentGoal" || section === "goal" ? await ctx.fns.goal.enabled({}) : false;
+    return ctx.fns.ui.agentMetaSection({ persistentGoalEnabled, globalCompactionPercent, agent, section: section as any, team, archivedTeam, models, accounts, disabledModels, triggers, extraSettings });
 }

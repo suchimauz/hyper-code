@@ -15,12 +15,13 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Active durable wake, cron and condition triggers for this agent. */ triggers?: any[];
     /** Trusted HTML blocks answered by the `ui.agentSettings` point, appended to the settings section. */ extraSettings?: string[];
     /** Current global automatic compaction percentage, resolved by the page route. */ globalCompactionPercent?: number;
+    /** Mount the independent persistent goal slot only when its storage gate is enabled. */ persistentGoalEnabled?: boolean;
     /** Render the inspector as its collapsed rail. */ collapsed?: boolean }): string {
     const esc = (s: any) => ctx.fns.procs.ui.escape({ text: s });
     const agent = opts.agent;
-    const slot = (section: "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan") =>
+    const slot = (section: "persistentGoal" | "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan") =>
         `<div id="agent-meta-${section}-${esc(agent.id)}" data-meta-section="${section}">`
-        + ctx.fns.ui.agentMetaSection({ agent, section, team: opts.team, archivedTeam: opts.archivedTeam, models: opts.models, accounts: opts.accounts, disabledModels: opts.disabledModels, triggers: opts.triggers, extraSettings: opts.extraSettings, globalCompactionPercent: opts.globalCompactionPercent })
+        + ctx.fns.ui.agentMetaSection({ agent, section, persistentGoalEnabled: opts.persistentGoalEnabled, team: opts.team, archivedTeam: opts.archivedTeam, models: opts.models, accounts: opts.accounts, disabledModels: opts.disabledModels, triggers: opts.triggers, extraSettings: opts.extraSettings, globalCompactionPercent: opts.globalCompactionPercent })
         + `</div>`;
     const tabs = [{ key: 'work', label: 'Работа' }, { key: 'context', label: 'Контекст' }, { key: 'settings', label: 'Настройки' }];
     const pane = (key: string, html: string) => `<div id="agent-inspector-pane-${key}-${esc(agent.id)}" data-agent-inspector-pane="${key}" role="tabpanel" aria-labelledby="agent-inspector-tab-${key}-${esc(agent.id)}" tabindex="0"${key === 'work' ? '' : ' hidden'}>${html}</div>`;
@@ -37,7 +38,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ${tabs.map(({ key, label }) => `<button type="button" id="agent-inspector-tab-${key}-${esc(agent.id)}" data-agent-inspector-tab="${key}" role="tab" aria-controls="agent-inspector-pane-${key}-${esc(agent.id)}" aria-selected="${key === 'work'}" tabindex="${key === 'work' ? '0' : '-1'}">${label}</button>`).join('')}
       </div>
       <div data-agent-meta-content class="flex-1 overflow-y-auto bg-transparent">
-        ${pane('work', slot('plan') + slot('team') + slot('automation'))}
+        ${pane('work', (opts.persistentGoalEnabled ? slot('persistentGoal') : '') + slot('plan') + slot('team') + slot('automation'))}
         ${pane('context', slot('goal') + slot('knowledge'))}
         ${pane('settings', slot('settings') + slot('compaction'))}
       </div>

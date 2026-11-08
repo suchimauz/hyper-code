@@ -5,8 +5,11 @@ id: string;
         /** Event to persist or render. */
 event: any;
         /** Event timestamp in epoch milliseconds. @default Date.now() */
-ts?: number }): Promise<{ idx: number }> {
+ts?: number;
+        /** Persist only for an unpublished child in a caller-owned transaction; caller publishes after commit. @default false */
+deferPublication?: boolean }): Promise<{ idx: number }> {
     const { id, event } = opts;
+    if (opts.deferPublication && (!ctx.state.procs?.db?.transactionStorage?.getStore()?.active || ctx.state.agent?.[id])) throw new Error('Deferred event requires an unpublished child and active transaction');
     const ts = opts.ts ?? Date.now();
     // Who caused this event. Kept in the payload too, so explicit replaceEvents
     // preserves it and the UI can show it without a join.
@@ -43,6 +46,7 @@ ts?: number }): Promise<{ idx: number }> {
         sql: `UPDATE agents SET updated_at = ?, last_notifiable_at = CASE WHEN ? = 1 THEN GREATEST(COALESCE(last_notifiable_at, -1), ?) ELSE last_notifiable_at END WHERE id = ?`,
         params: [ts, notifiable ? 1 : 0, ts, id],
     });
+    if (opts.deferPublication) return { idx };
     // Wake any in-process waiters AND broadcast over SSE so browser tabs
     // showing this agent fetch the delta with a short hx-get instead of
     // holding a long-poll connection per tab.

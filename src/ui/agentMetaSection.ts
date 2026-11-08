@@ -26,7 +26,9 @@ export default function (ctx: Context, _session: Session | null, opts: {
     /** Agent whose panel is rendered. */
     agent: types.agent.Agent;
     /** Section to render. */
-    section: "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
+    section: "persistentGoal" | "compaction" | "goal" | "knowledge" | "automation" | "settings" | "team" | "plan";
+    /** Whether the isolated persistent goal surface is enabled; false performs no goal schema access. */
+    persistentGoalEnabled?: boolean;
     /** Current global compaction percentage resolved by the page or RPC caller. */
     globalCompactionPercent?: number;
     /** Active durable wake, cron and condition triggers for this agent. */
@@ -55,6 +57,17 @@ export default function (ctx: Context, _session: Session | null, opts: {
         ? ctx.fns.ui.inspectorSection({ ...o, collapsible: false })
         : `<section><header><h3>${esc(o.title)}</h3>${o.badge ?? ''}${o.actions ?? ''}</header><div>${o.html}</div></section>`;
     const id = encodeURIComponent(agent.id);
+
+    if (opts.section === "persistentGoal") {
+        if (!opts.persistentGoalEnabled) return "";
+        return inspectorSection({ title: "Постоянная цель", icon: "target", html: `
+          <div data-persistent-goal data-agent-id="${esc(agent.id)}">
+            <p class="inspector-help">Задача агента, бюджет и расход. Не наблюдения из контекста.</p>
+            <p data-goal-feedback role="status" aria-live="polite">Загрузка цели…</p>
+            <div data-goal-editor></div>
+            <button type="button" data-goal-refresh class="btn btn-ghost" style="min-height:44px">Обновить</button>
+          </div>` });
+    }
 
     if (opts.section === "compaction") {
         const inherited = agent.autoCompactWindowPercent == null;
@@ -98,7 +111,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
                     ? `<p class="inspector-help">Observed from message ${Number(preview.sourceMessageIdx ?? 0)}${preview.sidecarId ? ` · sidecar ${esc(preview.sidecarId)}` : ''}</p>`
                     : '<p class="inspector-help">Display-only preview; it does not affect agent execution.</p>';
         const body = `${trackingToggle}<h3 class="inspector-section-title">Current observations</h3><p class="inspector-help">Observed goals, not execution tasks.</p><ol class="inspector-goal-list inspector-list">${currentRows}</ol>${completedRows}${state}`;
-        return inspectorSection({ title: 'Goals', icon: 'target', badge: statusBadge({ label: enabled ? String(goals.length) : 'off', tone: enabled && goals.length ? 'info' : 'neutral' }), html: body, collapsible: true, open: enabled });
+        return inspectorSection({ title: opts.persistentGoalEnabled ? 'Наблюдаемые цели' : 'Goals', icon: 'target', badge: statusBadge({ label: enabled ? String(goals.length) : 'off', tone: enabled && goals.length ? 'info' : 'neutral' }), html: body, collapsible: true, open: enabled });
     }
 
 

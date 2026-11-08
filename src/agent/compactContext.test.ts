@@ -38,6 +38,9 @@ describe("agent.compactContext", () => {
     };
     expect((await ctx.fns.agent.compactContext({agent})).status).toBe('stale');
     expect(agent.sleepContext.activeRevision).toBeNull();
+    const lifecycle = (await ctx.fns.session.getEvents({ id: agent.id })).filter((event: any) => event.type.startsWith('compaction_'));
+    expect(lifecycle.map((event: any) => event.type)).toEqual(['compaction_start', 'compaction_failed']);
+    expect(lifecycle[1].revision).toBe(lifecycle[0].revision);
   });
   test("disabled skips review; enabled unavailable review still activates", async () => {
     for (const enabled of [false,true]) {

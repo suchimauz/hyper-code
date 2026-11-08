@@ -14,11 +14,17 @@
  * Refuses durably stopped agents, fences awaited work against Stop/replacement,
  * and passes an immutable runSignal to cooperative tools. Cannot preempt arbitrary JS.
  * Retries an interrupted SSH inference once per run after 10 seconds, before persisting
- * or executing its partial response. Refreshes the durable transcript and honors Stop,
+ * or executing its partial response. Persists observed event-index run boundaries and
+ * final answer identity for grouping without guessing historical execution boundaries.
+ * Refreshes the durable transcript and honors Stop,
  * replacement and new input; provider auth/quota failures are not inference retries.
  * @param opts.agent Live agent whose transcript and turn state are updated.
  * @param opts.userText User input to append unless already persisted by ingestion.
  * @param opts.userMessageAlreadyAppended Skip appending input for worker-claimed messages. @default false
+ * @param opts.omitGoalContinuationIdxs Own-agent queued goal continuation indices omitted only from this run's outgoing requests.
+ * @param opts.goalAuthority Trusted immutable worker-consumed descendant capability; never accepted from model input.
+ * @param opts.onGoalFinalCheckpoint Trusted worker callback for the exact final committed receipt with drained provider requests, including failed turns.
+ * @param opts.onGoalBinding Trusted synchronous worker hook, called once before first provider execution with the captured root-local identity; never serialized or exposed to model tools.
  */
 export default async function (
     ctx: Context,
@@ -30,15 +36,36 @@ export default async function (
         userText: string;
         /** Skip appending input for worker-claimed messages. @default false */
         userMessageAlreadyAppended?: boolean;
+        /** Own-agent queued goal continuation indices omitted only from outgoing requests; durable history is unchanged. */
+        omitGoalContinuationIdxs?: number[];
+        /** Trusted worker-consumed descendant capability; a non-bound capture forbids execution. */
+        goalAuthority?: types.goal.DelegationAuthority;
+        /** Internal synchronous worker hook for immutable root-local identity at first provider execution; not model input. */
+        /** Trusted synchronous final receipt hook; absent for pending, blocked or unknown usage. */
+        onGoalFinalCheckpoint?: (proof: Readonly<{ sourceAgentId: string; sourceRunToken: string; goalId: string; capabilityId?: string; checkpointId: string; sequence: number; drained: true }>) => void;
+        onGoalBinding?: (binding: Readonly<{ goalId: string; runToken: string }>) => void;
     },
 ) {
     const { agent, userText } = opts;
     const agentCtx: any = Object.create(ctx);
     agentCtx.session = ctx.fns.session.forAgent({ agent });
+    // Derived context flows through provider adapters without sharing mutable agent state.
+    // Always replace any inherited scope: a nested run must never inherit its parent's filter.
+    agentCtx.goalRequestContext = Object.freeze({
+        agentId: agent.id,
+        authority: opts.goalAuthority ? Object.freeze({ ...opts.goalAuthority }) : undefined,
+        omitGoalContinuationIdxs: Object.freeze([...(opts.omitGoalContinuationIdxs ?? [])]),
+    });
     ctx = agentCtx;
     // Capture ownership before the first await; mutable currentJobId may belong
     // to a replacement by the time startup or a tool finishes.
     const runToken = agent.currentJobId ?? undefined;
+    const goalAuthority = opts.goalAuthority ? Object.freeze({ ...opts.goalAuthority }) : undefined;
+    const goalRole = agent.scratchpad?.goalSidecarFor ? 'goal-sidecar' : agent.scratchpad?.knowledgeSidecarFor ? 'knowledge-sidecar' : 'normal';
+    // parentId is transcript lineage, not delegation authority: manual forks own
+    // their local Goal. Capability-bound descendants and sidecars never gain root tools.
+    const toolRole = goalRole !== 'normal' ? 'sidecar' : goalAuthority ? 'descendant' : 'root';
+    // Native authority is supplied only by dispatchTool, never inherited from context.
     const ac = new AbortController();
     const assertRunActive = async () => {
         ac.signal.throwIfAborted();
@@ -57,11 +84,32 @@ export default async function (
     };
     // Downstream tools inherit the immutable run signal, not a replacement's controller.
     agentCtx.runSignal = ac.signal;
+    const lifecycleId = crypto.randomUUID();
+    let lifecycleStarted = false;
+    let goalRun: types.goal.RunState | undefined;
+    let goalOwnerLease: Readonly<{agentId:string;runToken:string|null}> | null = null;
+    // Shared reference: finally may grant permission only after the last checkpoint commits.
+    const goalReturn: { goalContinuation?: { goalId: string; revision: number; allowContinuation: true } } = {};
+    let goalResult: types.goal.RunResult | undefined;
+    let goalCompleted = false;
+    let goalBindingReported = false;
+    let nativeMutationStopped = false;
+    let nativeHandoffFailed = false;
+    let lifecycleStatus: 'completed' | 'stopped' | 'error' = 'completed';
+    let finalAnswerIdx: number | null = null;
+    let candidateAnswerIdx: number | null = null;
     let discardTransient: (() => void) | undefined;
     agent.abortController = ac;
     agent.activeRunCount = (agent.activeRunCount ?? 0) + 1;
     try {
     await assertRunActive();
+    // Compatibility for workers loaded before the dynamic startup validator.
+    // A prior startup promotion leaves an unconsumed user row, so acceptance
+    // rejects a second item under the agent lock for this same claim.
+    if (runToken && opts.userMessageAlreadyAppended && !goalAuthority) {
+        await ctx.fns.agent.promoteQueuedTurn({agentId:agent.id,runToken});
+        await assertRunActive();
+    }
     // One successful-turn hook shared by direct and worker runs. The cutoff is
     // the final durable assistant row, never the triggering user frontier or a
     // later MAX(idx) that could capture a concurrently arriving user message.
@@ -81,6 +129,92 @@ export default async function (
         await ctx.fns.session.syncAgentState({ agent });
         await assertRunActive();
     }
+
+    await ctx.fns.agent.recordRunLifecycle({ agentId: agent.id, runId: lifecycleId, status: 'open' });
+    lifecycleStarted = true;
+    await assertRunActive();
+    let goalBinding: types.goal.RunResult;
+    try {
+        goalBinding = await ctx.fns.goal.runBindingCapture({
+            sourceAgentId: agent.id, runId: lifecycleId, runToken: runToken ?? '', authority: goalAuthority,
+            role: goalRole,
+        });
+    } catch (error) {
+        if (goalAuthority) return { goalAdmissionBlocked: true };
+        throw error;
+    }
+    // Capture errors must never downgrade root work to unaccounted sampling.
+    // Confirmed inactive goals may chat; required descendants cannot, including
+    // gate-off/excluded-role races after consume. Leave their cursor untouched.
+    if ((goalAuthority && goalBinding.kind !== 'bound') || goalBinding.kind === 'blocked') return { goalAdmissionBlocked: true };
+    // Only an explicitly disabled feature or a confirmed absent Goal may use
+    // legacy automation. Inactive/read-failed/excluded bindings are authoritative.
+    let legacyAutomation = goalBinding.kind === 'disabled' || goalBinding.kind === 'absent';
+    // Initial observation is immutable until our own accounting commit or successful mutation.
+    const initialNativeRead = goalBinding.kind !== 'disabled' && runToken && toolRole === 'root'
+        ? await ctx.fns.goal.read({ agentId: agent.id }) : { enabled: false as const };
+    let nativeSnapshot = initialNativeRead.enabled ? initialNativeRead.goal : null;
+    nativeHandoffFailed = !!((goalBinding.kind === 'bound' && toolRole === 'root' && runToken
+            && (!nativeSnapshot || nativeSnapshot.goalId !== goalBinding.state.binding.goalId))
+        || (goalBinding.kind === 'absent' && nativeSnapshot)
+        || (goalBinding.kind === 'inactive' && (!nativeSnapshot || nativeSnapshot.goalId !== goalBinding.goalId || nativeSnapshot.status === 'active')));
+    const nativeBinding = () => runToken && toolRole === 'root' && goalBinding.kind !== 'disabled' ? Object.freeze({
+        sourceAgentId: agent.id, ownerAgentId: agent.id, runToken, role: toolRole,
+        expectedGoalId: nativeSnapshot?.goalId ?? null,
+        expectedRevision: nativeSnapshot?.revision ?? null,
+        // No host-cap setting exists: null is the explicit trusted unlimited default.
+        maxTokenBudget: null,
+    }) : undefined;
+    const refreshNativeRevision = () => {
+        if (nativeSnapshot && goalRun && goalResult?.kind === 'committed'
+            && nativeSnapshot.goalId === goalRun.binding.goalId && goalResult.revision >= nativeSnapshot.revision) {
+            nativeSnapshot = { ...nativeSnapshot, revision: goalResult.revision, status: goalResult.status };
+        }
+    };
+    const onNativeMutation = async (snapshot: types.goal.State | null) => {
+        nativeHandoffFailed = true;
+        await assertRunActive();
+        if (!snapshot || !runToken || toolRole !== 'root') throw new Error('Native Goal mutation lost run authority');
+        const replacing = snapshot.goalId !== nativeSnapshot?.goalId;
+        if (replacing) {
+            if (nativeSnapshot && nativeSnapshot.status !== 'complete') throw new Error('Unexpected Goal identity replacement');
+            if (goalRun && (goalRun.pendingRequests.size || goalRun.blocked)) throw new Error('Goal replacement requires drained accounting');
+            const next = await ctx.fns.goal.runBindingCapture({ sourceAgentId: agent.id, runId: lifecycleId, runToken, role: goalRole });
+            await assertRunActive();
+            if (next.kind !== 'bound' || next.state.binding.goalId !== snapshot.goalId || next.state.revision !== snapshot.revision) throw new Error('Native Goal accounting handoff failed');
+            if (goalRun) await ctx.fns.goal.runStopRegistry({ action: 'remove', agentId: agent.id, runToken, state: goalRun });
+            goalRun = next.state;
+            goalBinding = next;
+            goalBindingReported = false;
+            legacyAutomation = false;
+            await ctx.fns.goal.runStopRegistry({ action: 'register', agentId: agent.id, runToken, state: goalRun });
+            // Fresh accumulator begins AFTER activation; preceding response is never billed twice.
+            goalResult = await ctx.fns.goal.runCheckpointFlush({ state: goalRun });
+            if (goalResult.kind !== 'committed') throw new Error('Native Goal initial accounting failed');
+        } else if (goalRun) {
+            goalRun.revision = snapshot.revision;
+            // The mutation is already committed. Close the batch immediately,
+            // independently of the following accounting flush or handler envelope.
+            if (goalResult?.kind === 'committed') goalResult = {
+                ...goalResult, revision: snapshot.revision, status: snapshot.status,
+                allowContinuation: snapshot.status === 'active',
+            };
+        }
+        nativeMutationStopped = snapshot.status !== 'active';
+        nativeSnapshot = { ...snapshot };
+        refreshNativeRevision();
+        nativeHandoffFailed = false;
+    };
+    const goalBoundarySummary = 'Further automatic work stopped: Goal accounting or its budget cannot authorize more work. No additional tools were executed after this boundary.';
+    if (goalBinding.kind === 'bound') {
+        goalRun = goalBinding.state;
+        // A freshly captured binding establishes an empty request baseline before
+        // any sampling; forkRelease additionally validates the durable live lease.
+        if (!goalRun.binding.authority) await ctx.fns.goal.forkRelease({ agentId: agent.id, goalId: goalRun.binding.goalId, runToken: goalRun.binding.runToken, baselineAvailable: goalRun.pendingRequests.size === 0 && !goalRun.sealed });
+        await assertRunActive();
+        await ctx.fns.goal.runStopRegistry({ action: 'register', agentId: agent.id, runToken: goalRun.binding.runToken, state: goalRun });
+    }
+    await assertRunActive();
 
     agent.scratchpad ??= {};
     if (agent.scratchpad.plan?.pausedAt && userText.trim()) {
@@ -149,8 +283,10 @@ export default async function (
         ac.signal.throwIfAborted();
         // No retryable provider error: finish this run with a durable explanation,
         // preserving the cursor and every completed tool effect exactly once.
-        if (compactionBlocked || compacted?.status === 'compacted' || compacted?.status === 'already_compact') {
-            const budget = await ctx.fns.agent.autoCompactIfNeeded({ agent, runToken, signal: ac.signal, checkOnly: true });
+        if (opts.omitGoalContinuationIdxs?.length || compactionBlocked || compacted?.status === 'compacted' || compacted?.status === 'already_compact') {
+            const budget = opts.omitGoalContinuationIdxs?.length
+                ? await ctx.fns.agent.contextBudget({ agentId: agent.id })
+                : await ctx.fns.agent.autoCompactIfNeeded({ agent, runToken, signal: ac.signal, checkOnly: true });
             await assertRunActive();
             if (budget.contextWindow && budget.estimatedTokens >= budget.contextWindow * 0.9) {
                 const text = 'Paused before another model request: context is near the model limit and compaction could not reduce it. Compact the context or start a new chat before continuing.';
@@ -177,6 +313,15 @@ export default async function (
     const planAttempts: Record<string, number> = {};
     let totalPlanInjections = 0;
     while (true) {
+        if (nativeHandoffFailed) throw new Error('Native Goal accounting handoff failed; explicit retry required');
+        if (goalOwnerLease) {
+            await ctx.fns.goal.ownerBarrier({action:'release',agentId:agent.id,runToken:goalOwnerLease.runToken,lease:goalOwnerLease});
+            goalOwnerLease=null;
+        }
+        if (goalRun || nativeBinding()) {
+            goalOwnerLease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:agent.id,runToken:goalRun?.binding.runToken ?? runToken!});
+            if (!goalOwnerLease || goalRun?.sealed || goalRun?.blocked) throw new DOMException('Goal accounting boundary busy or closed; retry explicitly', 'AbortError');
+        }
         await assertRunActive();
         if (++turns > MAX_TURNS) {
             await ctx.fns.session.appendErrorEvent({ id: agent.id, error: `run hit the ${MAX_TURNS}-turn cap — closing; send a message to continue` });
@@ -191,7 +336,7 @@ export default async function (
             await assertRunActive();
         delete agent.scratchpad.activeStatusLine;
 
-            return { text: '', usage: null, consumedUserIdx };
+            return Object.assign(goalReturn, { text: '', usage: null, consumedUserIdx });
         }
 
         // Steering: read the frontier BEFORE refreshing the transcript, so a
@@ -209,7 +354,7 @@ export default async function (
         if (turns === 1) {
             const answered = new Set(agent.messages.filter((m: any) => m.role === 'tool').map((m: any) => m.tool_call_id));
             const complete = agent.messages.every((m: any) => !m.tool_calls?.some((c: any) => !answered.has(c.id)));
-            if (complete && await compactAtBoundary()) return { text: '', usage: null, consumedUserIdx };
+            if ((complete || opts.omitGoalContinuationIdxs?.length) && await compactAtBoundary()) return Object.assign(goalReturn, { text: '', usage: null, consumedUserIdx });
         }
 
         // Keep the current prose in live memory for native clients. Persisting
@@ -217,7 +362,7 @@ export default async function (
         // the durable source of truth. A monotonically increasing revision lets
         // pollers replace one transient bubble without creating duplicates.
         await assertRunActive();
-        const mobileStream = { text: "", revision: 0, startedAt: Date.now(), phase: 'streaming' };
+        const mobileStream = { text: "", revision: 0, startedAt: Date.now(), phase: 'streaming', thinking: false, thinkingStartedAt: null as number | null, thinkingSummary: '' };
         delete agent.scratchpad.streamHandoff;
         agent.scratchpad.mobileStream = mobileStream;
         await assertRunActive();
@@ -241,18 +386,58 @@ export default async function (
         const onRunAbort = () => sampling.abort(ac.signal.reason ?? "run_aborted");
         ac.signal.addEventListener("abort", onRunAbort, { once: true });
         let streamed: any;
+        const goalRequestId = crypto.randomUUID();
+        let goalProvider = 'unsupported';
+        let goalFormat: 'openai-chat' | 'unsupported' = 'unsupported';
+        const thinkingSpans: { startedAt: number; endedAt: number; summary: string }[] = [];
+        let thinkingStart: number | null = null;
+        const closeThinking = () => {
+            if (thinkingStart === null) return;
+            thinkingSpans.push({ startedAt: thinkingStart, endedAt: Date.now(), summary: mobileStream.thinkingSummary });
+            mobileStream.thinkingSummary = '';
+            thinkingStart = null;
+        };
         try {
             const onEvent = (event: any) => {
-                if (ac.signal.aborted || agent.abortController !== ac || sampling.signal.aborted || event?.type !== 'text_delta' || typeof event.delta !== 'string') return;
-                mobileStream.text += event.delta;
+                if (ac.signal.aborted || agent.abortController !== ac || sampling.signal.aborted || !['text_delta', 'thinking_delta'].includes(event?.type) || typeof event.delta !== 'string') return;
+                // Expose only provider activity, never its private reasoning text.
+                if (event.type === 'thinking_delta') {
+                    mobileStream.thinking = true;
+                    thinkingStart ??= Date.now();
+                    mobileStream.thinkingStartedAt = thinkingStart;
+                    if (event.visibility === 'public_summary') mobileStream.thinkingSummary = (mobileStream.thinkingSummary + event.delta).slice(0, 40000);
+                } else {
+                    closeThinking();
+                    mobileStream.thinking = false;
+                    mobileStream.text += event.delta;
+                }
                 mobileStream.revision++;
                 if (streamTimer === undefined) streamTimer = setTimeout(() => {
                     streamTimer = undefined;
                     if (!ac.signal.aborted && agent.abortController === ac) notifyStream();
                 }, 350);
             };
+            if (goalRun) {
+                const endpoint = await ctx.fns.llm.resolveEndpoint({ model: agent.model });
+                goalProvider = endpoint.provider;
+                // Match llm.stream dispatch; transformed adapters have no exact provenance.
+                const provider = endpoint.provider === 'hyper' ? endpoint.upstream : endpoint.provider;
+                if (endpoint.api === 'openai' && provider !== 'xai') goalFormat = 'openai-chat';
+                else throw new Error('Goal accounting requires an exact supported transport; no provider request dispatched');
+            }
+            if (goalRun?.sealed) throw new DOMException('Run accounting sealed for Stop', 'AbortError');
+            goalRun?.pendingRequests.add(goalRequestId);
+            // Capture is immutable, but setup/admission failures are not execution failures.
+            // Descendant authority must never let a child failure transition its root.
+            if (!goalBindingReported && goalRun && !goalRun.binding.authority
+                && goalRun.binding.rootAgentId === agent.id && goalRun.binding.sourceAgentId === agent.id) {
+                goalBindingReported = true;
+                opts.onGoalBinding?.(Object.freeze({ goalId: goalRun.binding.goalId, runToken: goalRun.binding.runToken }));
+            }
             streamed = await ctx.fns.llm.stream({ agent, signal: sampling.signal, onEvent });
+            if (goalRun) goalResult = await ctx.fns.goal.runUsageRecord({ state: goalRun, provider: goalProvider, requestId: goalRequestId, format: goalFormat, usage: streamed.usage });
         } catch (error: any) {
+            if (goalRun) goalResult = await ctx.fns.goal.runUsageRecord({ state: goalRun, provider: goalProvider, requestId: goalRequestId, format: 'unsupported', usage: undefined });
             // Failed partial prose is never a durable assistant response.
             clearStream();
             if (sampling.signal.aborted && sampling.signal.reason === "new_user_input" && !ac.signal.aborted) {
@@ -290,16 +475,45 @@ export default async function (
             if (agent.samplingAbortController === sampling) agent.samplingAbortController = null;
             ac.signal.removeEventListener("abort", onRunAbort);
             sampling.signal.removeEventListener("abort", abortStream);
+            const interrupted = thinkingStart !== null && (streamed === undefined || sampling.signal.aborted || ac.signal.aborted);
+            closeThinking();
+            // Persist timing and explicitly public summaries, never unclassified reasoning.
+            // A replaced run must not write into its successor's transcript.
+            if (agent.abortController === ac) {
+                for (const [index, span] of thinkingSpans.entries()) {
+                    await ctx.fns.session.appendEvent({ id: agent.id, ts: span.startedAt, event: {
+                        type: 'thinking', startedAt: span.startedAt, endedAt: span.endedAt,
+                        durationMs: Math.max(0, span.endedAt - span.startedAt),
+                        publicSummary: span.summary || undefined,
+                        status: interrupted && index === thinkingSpans.length - 1 ? 'interrupted' : 'completed',
+                    } });
+                }
+            }
+            mobileStream.thinking = false;
         }
         await assertRunActive();
         // Keep visible text until the durable tail replaces it in one swap.
         clearTimeout(streamTimer);
         streamTimer = undefined;
         mobileStream.phase = 'finalizing';
-        const { text, usage, finishReason, toolCalls = [] } = streamed;
-        await ctx.fns.session.recordContextUsage({ id: agent.id, usage });
+        mobileStream.thinking = false;
+        const { text, usage } = streamed;
+        let { finishReason, toolCalls = [] } = streamed;
+        await ctx.fns.session.recordContextUsage({ id: agent.id, usage, metrics: streamed.metrics });
         await assertRunActive();
-        const prose = String(text ?? '');
+        let prose = String(text ?? '');
+        // Account the just-finished request BEFORE authorizing its tool batch.
+        // Unknown usage gets a bounded local summary, never another model/tool loop.
+        if (goalRun) {
+            goalResult = await ctx.fns.goal.runCheckpointFlush({ state: goalRun });
+            await assertRunActive();
+            refreshNativeRevision();
+            if (goalResult.kind !== 'committed' || goalResult.status !== 'active') {
+                toolCalls = [];
+                finishReason = 'stop';
+                prose = goalBoundarySummary;
+            }
+        }
         delete agent.scratchpad.activeGoalFeedback;
 
         // Invalid JSON can arrive with any finish reason (including gateway
@@ -320,7 +534,8 @@ export default async function (
                 await ctx.fns.session.syncAgentState({ agent });
                 await assertRunActive();
                 delete agent.scratchpad.activeStatusLine;
-                return { text: error, usage, consumedUserIdx };
+                lifecycleStatus = 'error';
+                return Object.assign(goalReturn, { text: error, usage, consumedUserIdx });
             }
             await ctx.fns.session.appendErrorEvent({ id: agent.id, error: knownLength
                 ? 'reply truncated at token limit — tool calls not executed'
@@ -375,9 +590,10 @@ export default async function (
             // The durable tail now owns replacement; do not broadcast an empty
             // transient fragment between the streamed and persisted messages.
             clearStream(true);
-            await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
+            const answerEvent = await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
                 text: prose, html, usage, messageIdx: append.idx, instructionIndicators,
             } });
+            candidateAnswerIdx = answerEvent.idx;
             await assertRunActive();
             await ctx.fns.session.syncAgentState({ agent });
             await assertRunActive();
@@ -387,7 +603,19 @@ export default async function (
 
             const goal = agent.goal;
         if (toolCalls.length === 0) {
-            if (goal?.enabled && goal?.statement) {
+            let automationAllowed = legacyAutomation && (await ctx.fns.planning.read({ agentId: agent.id })).mode !== 'plan';
+            // Feature-off retains its original path. Feature-on with no Goal still
+            // respects open human forms; a failed guard read cannot authorize work.
+            if (automationAllowed && goalBinding.kind === 'absent') {
+                try {
+                    const rows = await ctx.fns.procs.db.select({ sql: "SELECT EXISTS(SELECT 1 FROM inputs WHERE agent_id=? AND state='open') AS pending_input", params: [agent.id] });
+                    automationAllowed = rows[0]?.pending_input === false;
+                } catch {
+                    automationAllowed = false;
+                }
+                await assertRunActive();
+            }
+            if (automationAllowed && goal?.enabled && goal?.statement) {
                 const check = await ctx.fns.agent.checkGoal({ agent, candidateAnswer: prose });
                 await assertRunActive();
                 const feedback = `${check.reason}\n${check.nextStep ?? ""}`.trim();
@@ -445,7 +673,9 @@ export default async function (
             const plan = agent.scratchpad?.plan;
             const activeTask = Array.isArray(plan?.tasks) ? plan.tasks.find((task: any) => task.status === "active") : null;
             const attempts = activeTask ? Number(planAttempts[activeTask.id] ?? 0) : 0;
-            if (activeTask && !plan.pausedAt && attempts < 2 && totalPlanInjections < 5) {
+            // Native Goal capability is unavailable: a plan is not a substitute
+            // continuation channel, including pending-input and unknown boundaries.
+            if (automationAllowed && activeTask && !plan.pausedAt && attempts < 2 && totalPlanInjections < 5) {
                 planAttempts[activeTask.id] = attempts + 1;
                 totalPlanInjections++;
                 const feedback = [
@@ -469,8 +699,10 @@ export default async function (
 
 
             delete agent.scratchpad.activeStatusLine;
+            finalAnswerIdx = candidateAnswerIdx;
             observeCompletedTurn(append.idx);
-            return { text: prose, usage, consumedUserIdx };
+            goalCompleted = true;
+            return Object.assign(goalReturn, { text: prose, usage, consumedUserIdx });
         }
 
         // Every answer row is written NOW, empty, right after the call it
@@ -502,7 +734,26 @@ export default async function (
         let terminal: { type: 'html'; html: string; text: string } | undefined;
         for (const call of toolCalls) {
             await assertRunActive();
-            const r = await ctx.fns.tools.call({ name: call.name, args: call.args, agent });
+            const toolStartedAt = performance.now();
+            const accountingBlocked = nativeHandoffFailed || nativeMutationStopped || (goalRun && (goalResult?.kind !== 'committed' || goalResult.status !== 'active'));
+            const dispatchTool = () => {
+                const binding = nativeBinding();
+                return typeof ctx.fns.goal.toolScope === 'function'
+                    ? ctx.fns.goal.toolScope({ action: binding ? 'with' : 'clear', binding, onMutation: binding ? onNativeMutation : undefined,
+                        fn: () => ctx.fns.tools.call({ name: call.name, args: call.args, agent }),
+                    }) as Promise<Awaited<ReturnType<typeof ctx.fns.tools.call>>>
+                    : ctx.fns.tools.call({ name: call.name, args: call.args, agent });
+            };
+            const r = accountingBlocked
+                ? { handlerExecuted: false, isError: true, output: goalBoundarySummary }
+                : goalRun
+                    ? await ctx.fns.goal.delegationScope({ action: 'with', binding: goalRun.binding,
+                        fn: dispatchTool,
+                    }) as Awaited<ReturnType<typeof ctx.fns.tools.call>>
+                    : await ctx.fns.goal.delegationScope({ action: 'clear',
+                        fn: dispatchTool,
+                    }) as Awaited<ReturnType<typeof ctx.fns.tools.call>>;
+            const toolDurationMs = Math.max(0, performance.now() - toolStartedAt);
             await assertRunActive();
             const { content: output, result_ref } = await ctx.fns.agent.stashResult({ agent, output: r.output, kind: call.name });
             await assertRunActive();
@@ -513,6 +764,7 @@ export default async function (
             await ctx.fns.session.appendToolCallEvent({ id: agent.id, payload: {
                 name: call.name, args: call.args, result: output, result_ref,
                 isError: r.isError,
+                durationMs: toolDurationMs,
                 messageIdx: append.idx,
             } });
             await assertRunActive();
@@ -524,10 +776,21 @@ export default async function (
             });
             await assertRunActive();
             if (!r.isError && r.terminal?.type === 'html') terminal = r.terminal;
+            if (goalRun && r.handlerExecuted) {
+                goalResult = await ctx.fns.goal.runCheckpointFlush({ state: goalRun });
+                refreshNativeRevision();
+                if (goalResult.kind === 'committed' && goalResult.budgetTransition && !terminal) {
+                    await ctx.fns.goal.budgetSteer({ agentId: goalRun.binding.rootAgentId, goalIdentity: goalRun.binding.goalId, runToken: goalRun.binding.runToken });
+                }
+            }
         }
         await ctx.fns.session.syncAgentState({ agent });
         await assertRunActive();
 
+        if (!terminal && (nativeHandoffFailed || nativeMutationStopped || (goalRun && (goalResult?.kind !== 'committed' || goalResult.status !== 'active')))) {
+            // Temporary fail-closed integration, not Codex soft-budget wrap-up parity.
+            terminal = { type: 'html', text: goalBoundarySummary, html: `<p>${goalBoundarySummary}</p>` };
+        }
         if (terminal) {
             await assertRunActive();
             const text = terminal.text.trim() || 'HTML response';
@@ -541,21 +804,61 @@ export default async function (
             const instructionIndicators = {
                 statusLine: activeStatus.split('\n').find((line: string) => line.startsWith('User status line: '))?.slice('User status line: '.length) || null,
             };
-            await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
+            const answerEvent = await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
                 text, html, usage, messageIdx: final.idx, instructionIndicators,
             } });
+            finalAnswerIdx = answerEvent.idx;
             await assertRunActive();
             await ctx.fns.session.syncAgentState({ agent });
             await assertRunActive();
             delete agent.scratchpad.activeStatusLine;
             observeCompletedTurn(final.idx);
-            return { text, html, usage, consumedUserIdx, terminal: true };
+            goalCompleted = true;
+            return Object.assign(goalReturn, { text, html, usage, consumedUserIdx, terminal: true });
         }
         // Every side effect and tool-result replacement is durable now. Never
         // restart the turn or replay a tool batch to reclaim model context.
-        if (await compactAtBoundary()) return { text: '', usage: null, consumedUserIdx };
+        if (await compactAtBoundary()) return Object.assign(goalReturn, { text: '', usage: null, consumedUserIdx });
     }
+    } catch (error) {
+        lifecycleStatus = ac.signal.aborted || (error instanceof Error && error.name === 'AbortError') ? 'stopped' : 'error';
+        throw error;
     } finally {
+        // A rejected cycle must not checkpoint concurrently with an external mutation.
+        if (goalRun && !goalOwnerLease) goalOwnerLease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:agent.id,runToken:goalRun.binding.runToken});
+        if (goalRun && goalOwnerLease) {
+            // Accounting must not mask the original exception or skip lifecycle cleanup.
+            try {
+                goalResult = await ctx.fns.goal.runCheckpointFlush({ state: goalRun });
+                if (goalResult.kind === 'committed' && !goalRun.sealed && goalRun.pendingRequests.size === 0) {
+                    opts.onGoalFinalCheckpoint?.(Object.freeze({ sourceAgentId: goalRun.binding.sourceAgentId,
+                        sourceRunToken: goalRun.binding.runToken, goalId: goalRun.binding.goalId,
+                        capabilityId: goalRun.binding.authority?.capabilityId,
+                        checkpointId: goalResult.checkpointId, sequence: goalResult.sequence, drained: true }));
+                }
+                const goalModelToolAvailable = toolRole === 'root' && typeof ctx.fns.goal.nativeCapability === 'function'
+                    && (await ctx.fns.goal.nativeCapability({ agentId: agent.id }).catch(() => ({ available: false }))).available;
+                if (!nativeHandoffFailed && !nativeMutationStopped && goalModelToolAvailable && goalCompleted && !ac.signal.aborted && lifecycleStatus === 'completed' && goalResult.kind === 'committed' && goalResult.allowContinuation) {
+                    goalReturn.goalContinuation = { goalId: goalRun.binding.goalId, revision: goalResult.revision, allowContinuation: true };
+                }
+                if (!goalRun.sealed) await ctx.fns.goal.runStopRegistry({ action: 'remove', agentId: agent.id, runToken: goalRun.binding.runToken, state: goalRun });
+            } catch (error) {
+                ctx.fns.procs.log.warn({ event: 'agent.run.goal.failed', msg: String(error), agentId: agent.id });
+            }
+        }
+        if (goalOwnerLease) {
+            await ctx.fns.goal.ownerBarrier({action:'release',agentId:agent.id,runToken:goalOwnerLease.runToken,lease:goalOwnerLease});
+            goalOwnerLease=null;
+        }
+        if (lifecycleStarted) {
+            try {
+                await ctx.fns.agent.recordRunLifecycle({ agentId: agent.id, runId: lifecycleId,
+                    status: ac.signal.aborted ? 'stopped' : lifecycleStatus, answerIdx: finalAnswerIdx });
+            } catch (error) {
+                // Metadata failure must not mask the execution error or skip ownership cleanup.
+                ctx.fns.procs.log.warn({ event: 'agent.run.lifecycle.failed', msg: String(error), agentId: agent.id });
+            }
+        }
         discardTransient?.();
         agent.activeRunCount = Math.max(0, (agent.activeRunCount ?? 1) - 1);
         if (agent.abortController === ac) agent.abortController = null;

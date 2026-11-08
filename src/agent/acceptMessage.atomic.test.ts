@@ -2,7 +2,7 @@ import {test,expect} from 'bun:test';
 import accept from './acceptMessage';
 function fixture(){
  let state={messages:[] as any[],events:[] as any[],uploads:[] as any[],scheduled:0,scratchpad:{plan:{pausedAt:100,updatedAt:100,tasks:[{status:'active',activeSince:null as number|null}]}}};let active=false,fail='',saves=0,wakes=0,collision=false;
- const db={transaction:async({fn}:any)=>{const before=structuredClone(state);active=true;try{return await fn();}catch(e){state=before;throw e;}finally{active=false;}},select:async({sql,params}:any)=>sql.includes('LEFT JOIN')?state.messages.filter(m=>m.key===params[1]).map(m=>({idx:m.idx,payload:state.events.find(e=>e.messageIdx===m.idx)})):[],run:async({sql,params}:any)=>{if(sql.startsWith('INSERT INTO messages')){const idx=state.messages.length;state.messages.push({idx,key:params[4],content:params[1]});return {rows:[{idx}]};}if(sql.startsWith('INSERT INTO events')){if(collision){collision=false;throw Error('events_pkey duplicate key');}state.events.push(JSON.parse(params[1]));}if(sql.startsWith('UPDATE agents')){if(fail)throw Error(fail);state.scheduled++;}return {rows:[]};}};
+ const db={transaction:async({fn}:any)=>{const before=structuredClone(state);active=true;try{return await fn();}catch(e){state=before;throw e;}finally{active=false;}},select:async({sql,params}:any)=>sql.includes('FROM agents')?[{id:'a',archived_at:null}]:sql.includes('LEFT JOIN')?state.messages.filter(m=>m.key===params[1]).map(m=>({idx:m.idx,payload:state.events.find(e=>e.messageIdx===m.idx)})):[],run:async({sql,params}:any)=>{if(sql.startsWith('INSERT INTO messages')){const idx=state.messages.length;state.messages.push({idx,key:params[4],content:params[1]});return {rows:[{idx}]};}if(sql.startsWith('INSERT INTO events')){if(collision){collision=false;throw Error('events_pkey duplicate key');}state.events.push(JSON.parse(params[1]));}if(sql.startsWith('UPDATE agents')){if(fail)throw Error(fail);state.scheduled++;}return {rows:[]};}};
  const ctx:any={state:{agent:{a:{id:'a',scratchpad:{}}}},fns:{procs:{db,events:{refresh:()=>{expect(active).toBe(false);}}},auth:{actorId:async()=>null},settings:{getNumber:async()=>0},attachments:{saveUploads:async({files}:any)=>{saves++;return files.map((f:any)=>({ref:{type:'document_ref',attachmentId:'one'},meta:{id:'one',fileName:f.name},pending:{}}));},commitUploads:async()=>{state.uploads.push('one');}},session:{mutateScratchpad:async({mutate}:any)=>{expect(active).toBe(true);await mutate(state.scratchpad,200);return {scratchpad:state.scratchpad};},scrubUnicode:async({text}:any)=>text,syncAgentState:async()=>{expect(active).toBe(false);}},agent:{renderEventHtml:async()=>'<p>user</p>',wakeWaiters:async()=>{expect(active).toBe(false);},wakeWorker:()=>{wakes++;expect(active).toBe(false);}},tools:{runs:()=>[]}}};
  const send=(text='hello',key='same',file=false,htmx=false)=>{const form=new FormData();form.set('text',text);form.set('requestId',key);if(file)form.append('files',new File(['abc'],'a.txt'));return accept(ctx,null,{req:new Request('http://local/agent/a',{method:'POST',body:form,headers:htmx?{'hx-request':'true'}:{}}),params:{id:'a'}});};
  return {send,state:()=>state,saves:()=>saves,wakes:()=>wakes,fail:(s:string)=>fail=s,collision:()=>collision=true};
@@ -21,4 +21,12 @@ test('HTMX acceptance and duplicate retry both acknowledge the same durable inde
  }
  expect(f.state().messages.length).toBe(1);
  expect(f.state().scheduled).toBe(1);
+});
+for(const race of [false,true]) test(`archived acceptance rejects ${race?'under row lock':'before reading body'} without uploads or writes`,async()=>{
+ let checks=0;
+ const ctx:any={state:{agent:{a:{id:'a'}}},fns:{auth:{actorId:async()=>null},settings:{getNumber:async()=>0},procs:{db:{select:async({sql}:any)=>sql.includes('FROM agents')?[{id:'a',archived_at:++checks===1&&race?null:123}]:[],transaction:async({fn}:any)=>fn()}}}};
+ const form=new FormData();form.set('text','hello');form.append('files',new File(['file'],'test.txt'));
+ const req=new Request('http://localhost/agent/a',{method:'POST',body:form});
+ const response=await accept(ctx,null,{req,params:{id:'a'}});
+ expect(response.status).toBe(409);expect(await response.json()).toMatchObject({error:'archived'});expect(checks).toBe(race?2:1);expect(req.bodyUsed).toBe(race);
 });

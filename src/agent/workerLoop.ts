@@ -124,6 +124,21 @@ async function claimOne(ctx: Context, now: number): Promise<{ id: string; token:
 
 // Run one agent end-to-end. Mirrors what the old single-agent loop body did:
 // frontier snapshot → run() → finally: advance cursor / reschedule / mark idle.
+async function parkDelegation(ctx: Context, agent: types.agent.Agent, runToken: string, reason: string): Promise<void> {
+    const parked = await ctx.fns.procs.db.run({
+        sql: `UPDATE agents SET run_state = 'idle', run_started_at = NULL,
+            run_heartbeat_at = NULL, run_token = NULL, next_run_at = NULL,
+            last_error = ?, updated_at = ? WHERE id = ? AND run_state = 'running' AND run_token = ?`,
+        params: [reason, Date.now(), agent.id, runToken],
+    });
+    // Pending inputs and cursor remain intact. No wake: a fresh claim cannot
+    // renew the one-shot reservation; explicit recovery is not implemented.
+    if (parked.changes) {
+        await ctx.fns.session.syncAgentState({ agent });
+        ctx.fns.events.emitAgentsChanged({ agentId: agent.id, reason: 'run-finished' });
+    }
+}
+
 async function runOne(ctx: Context, agentId: string, runToken: string): Promise<void> {
     const agent = await loadAgent(ctx, agentId);
     if (!agent) {
@@ -151,6 +166,85 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
         sql: 'SELECT run_token, run_state, stopped_at FROM agents WHERE id = ?', params: [agentId],
     }))[0];
     if (!owner || owner.run_token !== runToken || owner.run_state !== 'running' || owner.stopped_at != null) return;
+    // Claim is committed before this root-first hook: never acquire root locks
+    // inside the child-first claim transaction. A reservation is single-use.
+    let delegation: types.goal.DelegationConsumeResult;
+    try {
+        for (let attempt = 0; ; attempt++) {
+            try {
+                delegation = await ctx.fns.goal.delegationConsume({ sourceAgentId: agentId, sourceRunToken: runToken });
+                break;
+            } catch (error) {
+                // Only structured PostgreSQL lock contention may replay this exact
+                // hook/claim; messages and all other errors fail closed.
+                if (attempt !== 0 || (error as { code?: string })?.code !== '55P03') throw error;
+                await Bun.sleep(25);
+            }
+        }
+    } catch (error) {
+        delegation = { status: 'blocked', reason: error instanceof Error ? error.message : String(error) };
+    }
+    if (delegation.status === 'blocked') {
+        await parkDelegation(ctx, agent, runToken, delegation.reason);
+        return;
+    }
+    const goalAuthority = delegation.status === 'bound' ? Object.freeze({ ...delegation.authority }) : undefined;
+    // Descendants cannot redeem root continuation tickets.
+    const start = goalAuthority
+        ? { action: 'disabled' as const, suppressIdxs: [] as number[], continuationIdxs: [] as number[] }
+        : await ctx.fns.goal.continuationValidateStart({ agentId, runToken, frontierIdx });
+    let omitGoalContinuationIdxs = start.suppressIdxs;
+    let startAction = start.action;
+    let syntheticIdxs = start.continuationIdxs;
+    if (startAction === 'disabled') {
+        // The disabled validator deliberately never touches goal tables. Identify
+        // internal queue rows using message metadata only, not their text.
+        const pending = await ctx.fns.procs.db.select({
+            sql: `SELECT m.idx, m.message_type FROM messages m JOIN agents a ON a.id = m.agent_id
+                WHERE m.agent_id = ? AND m.role = 'user' AND m.excluded_from_cursor = 0
+                    AND m.idx > a.last_processed_msg_idx AND m.idx <= ?`,
+            params: [agentId, frontierIdx],
+        });
+        syntheticIdxs = pending.filter(m => m.message_type === 'goal_continuation').map(m => Number(m.idx));
+        omitGoalContinuationIdxs = syntheticIdxs;
+        startAction = pending.some(m => m.message_type !== 'goal_continuation') ? 'run' : 'skip';
+    }
+    if (startAction !== 'run') {
+        if (goalAuthority) {
+            await parkDelegation(ctx, agent, runToken, 'Delegated turns cannot consume continuation tickets');
+            return;
+        }
+        // A deferred frontier stays pending but must not spin. Only a newer
+        // ordinary message can wake this claim automatically. Keep its concurrent
+        // schedule in the same UPDATE; never read/clear next_run_at separately.
+        const retireSynthetic = startAction === 'skip' && syntheticIdxs.includes(frontierIdx);
+        const parked = await ctx.fns.procs.db.run({
+            sql: `UPDATE agents SET run_state = 'idle', run_started_at = NULL,
+                run_heartbeat_at = NULL, run_token = NULL,
+                last_processed_msg_idx = CASE WHEN ? = 1 AND NOT EXISTS (
+                    SELECT 1 FROM messages m WHERE m.agent_id = agents.id AND m.role = 'user'
+                        AND m.excluded_from_cursor = 0 AND m.idx > agents.last_processed_msg_idx
+                        AND m.idx <= ? AND m.message_type IS DISTINCT FROM 'goal_continuation'
+                ) THEN ? ELSE last_processed_msg_idx END,
+                next_run_at = CASE WHEN stopped_at IS NULL AND archived_at IS NULL AND EXISTS (
+                    SELECT 1 FROM messages m WHERE m.agent_id = agents.id AND m.role = 'user'
+                        AND m.excluded_from_cursor = 0 AND m.idx > ?
+                        AND m.message_type IS DISTINCT FROM 'goal_continuation'
+                ) THEN COALESCE(next_run_at, ?) ELSE NULL END,
+                updated_at = ?
+                WHERE id = ? AND run_state = 'running' AND run_token = ?
+                RETURNING next_run_at`,
+            params: [retireSynthetic ? 1 : 0, frontierIdx, frontierIdx, frontierIdx, Date.now(), Date.now(), agentId, runToken],
+        });
+        if (parked.changes) {
+            await ctx.fns.session.syncAgentState({ agent });
+            ctx.fns.events.emitAgentsChanged({ agentId, reason: 'run-finished' });
+            if ((parked.rows as { next_run_at?: number | null }[] | undefined)?.some(row => row.next_run_at != null)) {
+                ctx.fns.agent.wakeWorker({});
+            }
+        }
+        return;
+    }
     agent.isStreaming = true;
     agent.currentJobId = runToken;
     ctx.fns.events.emitAgentsChanged({ agentId, reason: 'run-started' });
@@ -174,14 +268,41 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
     let failure: types.llm.FailureInfo | null = null;
     let transportFailure: { kind: 'ssh_transport'; phase: 'before_dispatch' | 'ambiguous' | 'permanent'; retryable: boolean } | null = null;
     let aborted = false;
+    let delegationBlocked = false;
 
     // Steering: run() reports the user-message frontier its LAST model call
     // actually saw — everything up to it was answered inside this run, so the
     // cursor advances to it and no duplicate pass is scheduled for it.
     let consumedIdx = frontierIdx;
+    // Only run() may supply this immutable, pre-run identity/post-accounting revision.
+    // Never discover the current goal after a model run: it may have been replaced.
+    let goalContinuation: Readonly<{ goalId: string; revision: number }> | null = null;
+    let finalReceipt: Readonly<{ checkpointId: string; sequence: number }> | null = null;
+    let failureBinding: Readonly<{ goalId: string; runToken: string }> | null = null;
     try {
-        const result = await ctx.fns.agent.run({ agent, userText: '', userMessageAlreadyAppended: true });
-        consumedIdx = Math.max(frontierIdx, Number((result as any)?.consumedUserIdx ?? -1));
+        const result = await ctx.fns.agent.run({ agent, userText: '', userMessageAlreadyAppended: true, omitGoalContinuationIdxs, goalAuthority,
+            onGoalFinalCheckpoint: proof => {
+                if (goalAuthority && proof.drained && proof.sourceAgentId === agentId && proof.sourceRunToken === runToken
+                    && proof.goalId === goalAuthority.goalId && proof.capabilityId === goalAuthority.capabilityId) {
+                    finalReceipt = Object.freeze({ checkpointId: proof.checkpointId, sequence: proof.sequence });
+                }
+            },
+            onGoalBinding: binding => {
+                if (!goalAuthority && !failureBinding && binding.runToken === runToken && binding.goalId) {
+                    failureBinding = Object.freeze({ goalId: binding.goalId, runToken: binding.runToken });
+                }
+            },
+        });
+        delegationBlocked = (result as { goalAdmissionBlocked?: boolean } | undefined)?.goalAdmissionBlocked === true;
+        if (delegationBlocked) errorText = 'Delegated Goal authority could not bind; explicit renewal is unavailable';
+        consumedIdx = goalAuthority ? Math.min(goalAuthority.authorizedThroughIdx ?? -1, Number((result as any)?.consumedUserIdx ?? -1))
+            : Math.max(frontierIdx, Number((result as any)?.consumedUserIdx ?? -1));
+        const binding = (result as { goalContinuation?: { goalId?: string; revision?: number; allowContinuation?: boolean } } | undefined)?.goalContinuation;
+        if (binding?.allowContinuation === true && typeof binding.goalId === 'string' && binding.goalId.length > 0
+            && Number.isSafeInteger(binding.revision) && binding.revision! > 0) {
+            goalContinuation = Object.freeze({ goalId: binding.goalId, revision: binding.revision! });
+        }
+        if (agent.currentJobId !== runToken || agent.abortController?.signal.aborted) aborted = true;
     } catch (e: any) {
         if (agent.currentJobId !== runToken || agent.abortController?.signal.aborted) aborted = true;
         else if (e?.name === 'AbortError' || (!e?.transportFailure && isAbortError(e))) {
@@ -210,7 +331,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
             ? transportFailure.phase === 'before_dispatch' && transportFailure.retryable === true
             : failure ? failure.retryable
             : !!errorText && /stalled|429|(?:^|\D)5\d\d(?:\D|$)|connection (?:was )?closed|ConnectionRefused|network|ETIMEDOUT|ECONNRESET|timed? ?out/i.test(errorText);
-        const retry = !aborted && !!errorText && failure?.kind !== 'usage_limit' && transient && (retries[agentId] ?? 0) < 1;
+        const retry = (!goalAuthority || !!finalReceipt) && !delegationBlocked && !aborted && !!errorText && failure?.kind !== 'usage_limit' && transient && (retries[agentId] ?? 0) < 1;
         const retryAt = retry ? ts + (transportFailure ? 10_000 : Math.max(1_000, Number(failure?.retryAfterMs ?? 10_000))) : null;
 
         // ONE atomic finalize — the read-compute-write it replaces had a race:
@@ -222,13 +343,14 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
         // it stays put so the same messages retry on the next user-triggered
         // pass (no auto-retry — a permanently-broken LLM call would burn the
         // worker in a loop).
-        const finalized = await ctx.fns.procs.db.run({
+        const finalize = () => ctx.fns.procs.db.run({
             sql: `UPDATE agents
                 SET run_state = 'idle',
                     run_started_at = NULL,
                     last_processed_msg_idx = CASE WHEN ? = 1 THEN ? ELSE last_processed_msg_idx END,
                     next_run_at = CASE
                         WHEN stopped_at IS NOT NULL THEN NULL
+                        WHEN ${delegationBlocked ? 'TRUE' : 'FALSE'} THEN NULL
                         WHEN ? = 1 THEN
                             -- success: reschedule iff a user message exists past what
                             -- this run's LAST model call consumed (steering answered
@@ -253,6 +375,78 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
               RETURNING next_run_at`,
             params: [advanceCursor ? 1 : 0, consumedIdx, advanceCursor ? 1 : 0, consumedIdx, ts + 100, retryAt, errorText, advanceCursor ? 1 : 0, ts, agentId, runToken],
         });
+        let finalized: Awaited<ReturnType<typeof finalize>>;
+        if (goalAuthority) {
+            // Root-first lock order matches grant helpers. Never release a claim
+            // before its exact final receipt is settled; all writes roll back together.
+            finalized = await ctx.fns.procs.db.transaction({ fn: async () => {
+                await ctx.fns.goal.delegationLock({ rootAgentId: goalAuthority.rootAgentId,
+                    goalId: goalAuthority.goalId, sourceAgentId: agentId, sourceRunToken: runToken });
+                const [source] = await ctx.fns.procs.db.select({ sql: 'SELECT next_run_at FROM agents WHERE id = ? AND run_token = ?', params: [agentId, runToken] });
+                if (!source) return { changes: 0, rows: [] };
+                const successful = advanceCursor && !!finalReceipt && consumedIdx >= (goalAuthority.authorizedThroughIdx ?? Infinity);
+                const pendingSchedule = source.next_run_at;
+                await ctx.fns.procs.db.run({ sql: `UPDATE agents SET last_processed_msg_idx = CASE WHEN ? THEN ? ELSE last_processed_msg_idx END,
+                    next_run_at = ? WHERE id = ? AND run_token = ?`,
+                    params: [successful, consumedIdx, successful ? null : (pendingSchedule ?? retryAt), agentId, runToken] });
+                if (finalReceipt && (successful || retry)) {
+                    const receipt: Readonly<{ checkpointId: string; sequence: number }> = finalReceipt;
+                    await ctx.fns.goal.delegationSettle({ sourceAgentId: agentId, sourceRunToken: runToken,
+                        checkpointId: receipt.checkpointId, sequence: receipt.sequence, outcome: successful ? 'terminal' : 'retry' });
+                }
+                // Preserve an unrelated human wake. Its next admission parks once
+                // without advancing the unauthorized frontier; never auto-renew it.
+                const released = await ctx.fns.procs.db.run({ sql: `UPDATE agents SET run_state='idle', run_started_at=NULL,
+                    run_heartbeat_at=NULL, run_token=NULL, next_run_at=?, last_error=?, updated_at=?,
+                    stale_recovery_count=CASE WHEN ? THEN 0 ELSE stale_recovery_count END
+                    WHERE id=? AND run_token=? RETURNING next_run_at`,
+                    params: [pendingSchedule ?? (retry ? retryAt : null), errorText, ts, successful, agentId, runToken] });
+                if (!released.changes) throw new Error('Delegated finalization lost run token');
+                return released;
+            } });
+        } else if (goalContinuation && advanceCursor && !retry && await ctx.fns.goal.enabled({})) {
+            const binding = goalContinuation;
+            const staleFinalize = new Error('Goal continuation finalize lost run token');
+            try {
+                finalized = await ctx.fns.procs.db.transaction({ fn: async () => {
+                    await ctx.fns.goal.continuationAdmit({
+                        agentId, expectedGoalId: binding.goalId, expectedRevision: binding.revision,
+                        runToken, consumedIdx,
+                    });
+                    const result = await finalize();
+                    // A denied helper may still finalize, but no admission may survive
+                    // a stale worker. Throw inside the transaction, never after commit.
+                    if (!result.changes) throw staleFinalize;
+                    return result;
+                } });
+            } catch (error) {
+                if (error !== staleFinalize) throw error;
+                finalized = { changes: 0, rows: [] };
+            }
+        } else if (failureBinding && errorText && !aborted && !retry && await ctx.fns.goal.enabled({})) {
+            // run() has completed its final accounting. Transition the captured Goal
+            // in the same transaction BEFORE revoking this claim; never look up a
+            // replacement Goal after an error or attach authority to thrown errors.
+            const binding: Readonly<{ goalId: string; runToken: string }> = failureBinding;
+            const staleFinalize = new Error('Goal failure finalize lost run token');
+            try {
+                finalized = await ctx.fns.procs.db.transaction({ fn: async () => {
+                    await ctx.fns.goal.lifecycleFailure({
+                        agentId, expectedGoalId: binding.goalId, expectedRunToken: binding.runToken,
+                        reason: failure?.kind === 'usage_limit' ? 'usage_limit' : 'terminal_error',
+                        terminal: true, codexPlanMode: false,
+                    });
+                    const result = await finalize();
+                    if (!result.changes) throw staleFinalize;
+                    return result;
+                } });
+            } catch (error) {
+                if (error !== staleFinalize) throw error;
+                finalized = { changes: 0, rows: [] };
+            }
+        } else {
+            finalized = await finalize();
+        }
 
         ctx.fns.events.emitAgentsChanged({ agentId, reason: 'run-finalized' });
         // Recovery or an explicit stop may already have revoked this token.
@@ -443,7 +637,11 @@ async function workerPass(ctx: Context, inflight: Set<Promise<unknown>>): Promis
             const claim = await claimOne(ctx, Date.now());
             if (!claim) break;
             drained++;
-            const p = runOne(ctx, claim.id, claim.token).finally(() => {
+            const p = runOne(ctx, claim.id, claim.token).catch((error) => {
+                // Finalize transaction failures deliberately leave the lease for recovery.
+                // Observe the rejection even if this run settles before shutdown waits.
+                ctx.fns.procs.log.warn({ event: 'agent.worker.finalizeFailed', agentId: claim.id, msg: String(error?.message ?? error) });
+            }).finally(() => {
                 inflight.delete(p);
                 // A completion changes claimability (the agent becomes idle and
                 // may leave pending work). Wake the parked loop immediately;

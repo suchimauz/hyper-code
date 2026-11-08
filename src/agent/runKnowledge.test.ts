@@ -10,10 +10,11 @@ function harness(turns: any[], scratchpad: any = { knowledgeTrackingEnabled: tru
     const appendMessage = async ({ message }: any) => { const row = { ...message, idx: rows.length }; rows.push(row); return row; };
     const noop = async () => {};
     const ctx: any = { fns: {
+        goal: { delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) },
         session: { forAgent: () => ({}), appendUserMessage: ({ text }: any) => appendMessage({ message: { role: 'user', content: text } }), appendMessage,
-            syncAgentState: async () => { agent.messages = rows.map(r => ({ ...r })); }, appendAssistantEvent: noop, appendErrorEvent: noop, appendToolCallEvent: noop,
+            syncAgentState: async () => { agent.messages = rows.map(r => ({ ...r })); }, appendAssistantEvent: async () => ({idx: 0}), appendErrorEvent: noop, appendToolCallEvent: noop,
             updateMessageContent: async ({ idx, content }: any) => { rows[idx].content = content; }, recordContextUsage: noop },
-        agent: { autoCompactIfNeeded: async () => ({ status: 'not_needed' }), statusLineForTurn: async () => '', stashResult: async ({ output }: any) => ({ content: output }), sanitizeHtmlBody: ({ html }: any) => html },
+        agent: { recordRunLifecycle: async () => {}, autoCompactIfNeeded: async () => ({ status: 'not_needed' }), statusLineForTurn: async () => '', stashResult: async ({ output }: any) => ({ content: output }), sanitizeHtmlBody: ({ html }: any) => html },
         procs: { events: { emit: () => {} }, db: { select: async () => [{ i: Math.max(-1, ...rows.filter(r => r.role === 'user').map(r => r.idx)) }] } },
         llm: { stream: async () => { const turn = turns.shift(); if (turn instanceof Error) throw turn; return turn ?? { text: 'done' }; } },
         markdown: { render: async ({ source }: any) => source },
@@ -53,7 +54,7 @@ describe('Knowledge completed-turn hook (isolated)', () => {
     });
     test('cutoff is final append index, not concurrently arriving user index', async () => {
         const h = harness([{ text: 'answer' }]);
-        h.ctx.fns.session.appendAssistantEvent = async () => { h.rows.push({ idx: h.rows.length, role: 'user', content: 'next turn' }); };
+        h.ctx.fns.session.appendAssistantEvent = async () => { h.rows.push({ idx: h.rows.length, role: 'user', content: 'next turn' }); return {idx: 0}; };
         await h.execute();
         expect(h.launches[0].messageIdx).toBe(1);
         expect(h.rows.at(-1).idx).toBe(2);

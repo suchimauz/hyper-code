@@ -1,6 +1,6 @@
 // Dispatcher — picks the wire-protocol implementation based on endpoint.api.
 // Same return shape regardless of provider — callers don't care.
-/** Performs the llm.stream runtime operation. */
+/** Stream a model response and return provider usage plus monotonic request/first-token timing for durable session statistics. */
 /**
  * Dispatcher — picks the wire-protocol implementation based on endpoint.api.
  * @param opts.agent Agent associated with the operation.
@@ -21,7 +21,7 @@ export default async function (
     const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort ?? "auto" });
     let firstEventMs: number | undefined;
     const onEvent = (ev: any) => {
-        firstEventMs ??= Math.round((performance.now() - started) * 100) / 100;
+        if (ev?.type === 'text_delta' || ev?.type === 'thinking_delta') firstEventMs ??= Math.round((performance.now() - started) * 100) / 100;
         opts.onEvent?.(ev);
     };
     const attrs: Record<string, any> = {
@@ -47,7 +47,7 @@ export default async function (
         attrs["llm.finish_reason"] = result?.finishReason ?? null;
         attrs["llm.prompt_tokens"] = result?.usage?.prompt_tokens ?? result?.usage?.input_tokens ?? null;
         attrs["llm.completion_tokens"] = result?.usage?.completion_tokens ?? result?.usage?.output_tokens ?? null;
-        return result;
+        return { ...result, metrics: { llmTimeMs: Math.max(0, performance.now() - started), ttftMs: firstEventMs ?? null } };
     };
     const telemetry: any = (ctx.fns.procs as any).telemetry;
     return await (typeof telemetry?.safeSpan === "function"

@@ -27,7 +27,7 @@ async function scenario(kind:string, retryCount=0, stale=false) {
  return {changes:1,rows:[]};
  };
  const noop=async()=>{};
- ctx.fns={events:{emitAgentsChanged:noop},procs:{env:{mode:()=> 'test'},db:{select,run},log:{warn:noop}},settings:{getNumber:async()=>0},session:{syncAgentState:noop,appendErrorEvent:noop},agent:{
+ ctx.fns={goal: { delegationConsume: async () => ({ status: 'absent' }),continuationValidateStart:async()=>({action:'run',humanPending:true,suppressIdxs:[],continuationIdxs:[]})},events:{emitAgentsChanged:noop},procs:{env:{mode:()=> 'test'},db:{select,run},log:{warn:noop}},settings:{getNumber:async()=>0},session:{syncAgentState:noop,appendErrorEvent:noop},agent:{
  recoverOrphanedCompactions:noop,deliverWakes:noop,pollWatches:noop,pollTriggers:noop,wakeWorker:()=>{ctx.state.workerWakePending=true;},autoCompactIfNeeded:noop,
  parkOnUsageLimit:async()=>{if(kind==='park-failed')throw new Error('test park failure');wake=true;},run:async()=>{
  if(kind==='success')return {};

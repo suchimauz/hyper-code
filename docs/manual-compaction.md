@@ -176,7 +176,7 @@ It opens a small popup/form with optional focus instructions and a Compact submi
 
 ```text
 POST /agent/:id/compact
-POST /api/mobile/v1/agents/:id/compact
+POST /api/v1/agents/:id/compact
 ```
 
 Disable/reject while the root is running. Show lifecycle events:

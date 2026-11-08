@@ -28,8 +28,13 @@ export default async function (
         /** Listing policy; this does not grant or restrict access. @default nav */
     visibility?: "nav" | "team" | "hidden";
         /** Fork offset used by the operation. */
-    forkOffset?: number | null },
+    forkOffset?: number | null;
+    /** Internal caller-transaction mode: persist without publishing state or events; caller publishes after commit. Requires an active framework transaction. @default false */
+    deferPublication?: boolean }, 
 ): Promise<types.agent.Agent> {
+    if (opts.deferPublication && !(ctx.state.procs as any)?.db?.transactionStorage?.getStore()?.active) {
+        throw new Error('Deferred agent publication requires an active framework transaction');
+    }
     const id = await ctx.fns.agent.nextId({});
     const workspaceHost = String(opts.workspaceHost ?? "").trim();
     const workspaceDir = workspaceHost && opts.workspaceDir?.startsWith("/")
@@ -66,9 +71,11 @@ export default async function (
         wakeAt: null,
         wakeReason: null,
     };
-    (ctx.state as any).agent ??= {};
-    (ctx.state as any).agent[id] = agent;
+    if (!opts.deferPublication) {
+        (ctx.state as any).agent ??= {};
+        (ctx.state as any).agent[id] = agent;
+    }
     await ctx.fns.session?.save?.({ agent });
-    ctx.fns.events?.emitAgentsChanged?.({ agentId: agent.id, reason: "create" });
+    if (!opts.deferPublication) ctx.fns.events?.emitAgentsChanged?.({ agentId: agent.id, reason: "create" });
     return agent;
 }

@@ -31,6 +31,7 @@ export default async function (
     if (reasoning.applied !== "off") body.reasoning = { effort: reasoning.applied };
     const tools = ctx.fns.agent.wireTools({ agent, api: "responses" });
     if (tools.length) { body.tools = tools; body.parallel_tool_calls = true; }
+    if ((ctx as Context & { goalRequestContext?: { authority?: types.goal.DelegationAuthority } }).goalRequestContext?.authority) await ctx.fns.goal.requestAuthorize({});
     const res = await ctx.fns.llm.connectFetch({ url: ep.url, init: { method: "POST", headers: { authorization: `Bearer ${apiKey}`, accept: "text/event-stream", "content-type": "application/json", session_id: agent.id }, body: JSON.stringify(body), signal: opts.signal } });
     if (!res.ok) {
       if (res.status === 401 && ep.provider === "xai") await ctx.fns.llm.accountAuthHealth({ action: "mark", provider: ep.provider, account: ep.account });

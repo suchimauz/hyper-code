@@ -1,0 +1,35 @@
+import delegate from './delegate';
+import {test,expect} from 'bun:test';
+import publish from './publishGoalDelegation';
+import capture from '../goal/delegationCapture';
+import scope from '../goal/delegationScope';
+import delegateTask from './delegateTask';
+import plan from '../session/plan';
+import appendEvent from '../session/appendEvent';
+const binding:any={rootAgentId:'root',sourceAgentId:'root',goalId:'goal',runToken:'claim'};
+function fixture(fail='') {
+ let active=false;const calls:string[]=[];const rows:string[]=[];
+ const child:any={id:'child',scratchpad:{}};
+ const ctx:any={state:{agent:{},procs:{db:{transactionStorage:{getStore:()=>active?{active:true}:undefined}}}},fns:{goal:{},session:{},agent:{},events:{},procs:{db:{}}}};
+ const call=(name:string)=>async()=>{calls.push(name);if(name===fail)throw Error(name);if(['reserve','message','publish','event','schedule'].includes(name)){expect(active).toBe(true);rows.push(name);}return {idx:0};};
+ ctx.fns.goal.delegationCapture=async()=>binding;ctx.fns.goal.delegationReserve=async()=>{await call('reserve')();return {reservationId:'reservation'};};
+ ctx.fns.goal.delegationPublish=async(o:any)=>{expect(active).toBe(true);expect(o).toEqual({reservationId:'reservation',delegatorRunToken:'claim',authorizedThroughIdx:0});expect(calls).toContain('message');expect(calls).not.toContain('schedule');await call('publish')();};
+ ctx.fns.procs.db.transaction=async({fn}:any)=>{active=true;try{const result=await fn();calls.push('commit');return result;}catch(e){rows.length=0;throw e;}finally{active=false;}};
+ ctx.fns.session.fork=async(o:any)=>{expect(o.deferPublication).toBe(true);expect(active).toBe(true);calls.push('fork');return child;};
+ ctx.fns.agent.start=ctx.fns.session.fork;
+ ctx.fns.session.updateScratchpad=call('scratchpad');ctx.fns.session.plan=call('plan');ctx.fns.session.appendMessage=async(o:any)=>{expect(o.message.message_type).toBe('delegation_task');return call('message')();};
+ ctx.fns.session.appendEvent=async(o:any)=>{expect(o.deferPublication).toBe(true);return call('event')();};
+ ctx.fns.procs.db.run=call('schedule');ctx.fns.agent.renderEventHtml=async()=>'';
+ for(const [ns,key] of [['session','syncAgentState'],['events','emitAgentsChanged'],['events','refreshAgentMeta'],['agent','wakeWorker']])ctx.fns[ns][key]=async()=>{expect(active).toBe(false);calls.push(key);};
+ return {ctx,calls,rows};
+}
+const args:any={parent:{id:'root'},prompt:'task @someone',scratchpad:{}};
+test('publication commits reservation, first message and schedule before visibility',async()=>{const f=fixture();expect(await publish(f.ctx,null,args)).toEqual({id:'child'});expect(f.rows).toEqual(['reserve','message','publish','event','schedule']);expect(f.calls.indexOf('commit')).toBeLessThan(f.calls.indexOf('emitAgentsChanged'));expect(f.ctx.state.agent.child.id).toBe('child');});
+for(const point of ['reserve','message','publish','event','schedule'])test('rollback '+point+' leaves no live child or notification',async()=>{const f=fixture(point);await expect(publish(f.ctx,null,args)).rejects.toThrow(point);expect(f.rows).toEqual([]);expect(f.ctx.state.agent).toEqual({});expect(f.calls).not.toContain('emitAgentsChanged');expect(f.calls).not.toContain('wakeWorker');});
+test('Goal await refusal creates no child',async()=>{const f=fixture();await expect(delegateTask(f.ctx,null,{parent:args.parent,task:'work'})).rejects.toThrow('await mode');expect(f.calls).toEqual([]);});
+test('scope copies immutable authority and isolates concurrent dispatches',async()=>{const ctx:any={state:{}};const b={...binding};await scope(ctx,null,{action:'with',binding:b,fn:async()=>{b.runToken='changed';const a:any=await scope(ctx,null,{action:'read'});expect(a.runToken).toBe('claim');expect(Object.isFrozen(a)).toBe(true);}});expect(await scope(ctx,null,{action:'read'})).toBeUndefined();});
+test('capture rejects mismatched registry and source',async()=>{const f=fixture();f.ctx.fns.goal.delegationScope=async()=>binding;f.ctx.fns.goal.runStopRegistry=async()=>({binding:{...binding,runToken:'later'}});await expect(capture(f.ctx,null,{agentId:'root'})).rejects.toThrow('unavailable');await expect(capture(f.ctx,null,{agentId:'other'})).rejects.toThrow('match');});
+test('deferred session APIs reject outside transaction before writes',async()=>{const f=fixture();await expect(plan(f.ctx,null,{agent:{id:'child'} as any,tasks:[{id:'x',title:'x'}],deferPublication:true})).rejects.toThrow('transaction');await expect(appendEvent(f.ctx,null,{id:'child',event:{type:'user'},deferPublication:true})).rejects.toThrow('transaction');expect(f.calls).toEqual([]);});
+test('clear isolates nested dispatch, restores on throw, and does not affect concurrent scope',async()=>{const ctx:any={state:{}};await Promise.all([scope(ctx,null,{action:'with',binding,fn:async()=>{await expect(scope(ctx,null,{action:'clear',fn:async()=>{expect(await scope(ctx,null,{action:'read'})).toBeUndefined();await Promise.resolve();throw Error('nested');}})).rejects.toThrow('nested');expect((await scope(ctx,null,{action:'read'}) as any).runToken).toBe('claim');}}),scope(ctx,null,{action:'with',binding:{...binding,runToken:'parallel'},fn:async()=>{await new Promise(r=>setTimeout(r,1));expect((await scope(ctx,null,{action:'read'}) as any).runToken).toBe('parallel');}})]);expect(await scope(ctx,null,{action:'read'})).toBeUndefined();});
+test('delegate and async delegateTask both route through atomic publication, never direct run',async()=>{const f=fixture();let packet:any;f.ctx.fns.agent.publishGoalDelegation=async(o:any)=>{packet=o;return {id:'queued'};};f.ctx.fns.agent.buildDelegatedTaskPrompt=()=> 'wrapped task';expect(await delegate(f.ctx,null,{agent:args.parent,title:'Plan',tasks:[{id:'x',title:'Work'}]})).toEqual({id:'queued',status:'working'});expect(packet.tasks[0].id).toBe('x');expect(packet.forkContext).toBeUndefined();expect(await delegateTask(f.ctx,null,{parent:args.parent,task:'task',mode:'async',forkContext:true})).toEqual({childId:'queued',started:true});expect(packet.forkContext).toBe(true);expect(packet.prompt).toBe('wrapped task');expect(f.calls).toEqual([]);});
+test('capture ordinary disabled/absent allowed, required marker never fallback',async()=>{const f=fixture();f.ctx.fns.goal.delegationScope=async()=>undefined;f.ctx.fns.goal.enabled=async()=>false;f.ctx.fns.procs.db.select=async()=>[{required:null}];expect(await capture(f.ctx,null,{agentId:'ordinary'})).toBeUndefined();f.ctx.fns.goal.enabled=async()=>true;f.ctx.fns.goal.read=async()=>({enabled:true,goal:null});expect(await capture(f.ctx,null,{agentId:'ordinary'})).toBeUndefined();f.ctx.fns.procs.db.select=async()=>[{required:'true'}];await expect(capture(f.ctx,null,{agentId:'ordinary'})).rejects.toThrow('captured run');});

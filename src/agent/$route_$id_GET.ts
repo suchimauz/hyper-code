@@ -44,7 +44,8 @@ params: Record<string, string> }) {
         ctx.fns.llm.modelPolicy({ action: "list" }),
     ]) : null;
     const globalCompactionPercent = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
-    const meta = ctx.fns.ui.agentMetaPanel({ globalCompactionPercent, agent, team, archivedTeam, triggers, extraSettings, collapsed: metaCollapsed,
+    const persistentGoalEnabled = await ctx.fns.goal.enabled({});
+    const meta = ctx.fns.ui.agentMetaPanel({ persistentGoalEnabled, globalCompactionPercent, agent, team, archivedTeam, triggers, extraSettings, collapsed: metaCollapsed,
         models: recovery?.[0], accounts: recovery?.[1], disabledModels: recovery?.[2].disabledModels });
     // id="chat-panel" is the chat client's mount point: /agent/chat.js loads
     // once for the whole app and (re)binds itself to this element after every

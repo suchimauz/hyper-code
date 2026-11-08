@@ -3,7 +3,7 @@ import archive from './archive';
 import unarchive from './unarchive';
 import archiveRoute from '../agent/$route_$id_archive_POST';
 import restoreRoute from '../agent/$route_$id_unarchive_POST';
-import mobileRoute from '../api/$route_mobile_v1_agents_$id_archive_POST';
+import mobileRoute from '../api/$route_v1_agents_$id_archive_POST';
 import archiveCompleted from '../agent/archiveCompleted';
 
 function fixture() {

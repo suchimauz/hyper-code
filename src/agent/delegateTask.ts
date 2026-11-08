@@ -47,6 +47,15 @@ export default async function (
     const responseFormat = opts?.responseFormat ?? "text";
     const autoArchive = opts.autoArchive !== false;
 
+    const authority = await ctx.fns.goal.delegationCapture({ agentId: parentAgent.id });
+    if (authority) {
+        // Temporary parity gap: never substitute async behavior for an awaited task.
+        if (mode !== 'async') throw new Error('Goal delegateTask await mode is not supported; no child was created');
+        const prompt = ctx.fns.agent.buildDelegatedTaskPrompt({ task, instructions, responseFormat });
+        const child = await ctx.fns.agent.publishGoalDelegation({ parent: parentAgent, forkContext, prompt, scratchpad: { delegateTask: { parentId: parentAgent.id, mode, forkContext, task, instructions, responseFormat, autoArchive, status: 'running' } } });
+        return { childId: child.id, started: true };
+    }
+
     const child = forkContext
         ? await ctx.fns.session.fork({ id: parentAgent.id, visibility: "team" })
         : await ctx.fns.agent.start({

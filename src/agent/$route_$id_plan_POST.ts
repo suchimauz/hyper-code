@@ -20,6 +20,7 @@ params: Record<string, string> }) {
             const tasks = ids.map((taskId, index) => ({ id: taskId, title: titles[index]!, instructions: instructions[index] }));
             await ctx.fns.procs.db.transaction({ fn: async () => {
             await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [id] });
+            if ((await ctx.fns.planning.read({ agentId: id })).mode === 'plan') throw new Error('Task execution is paused in planning mode. Review a proposal or use /plan off before activating tasks.');
             const result = await ctx.fns.session.updatePlan({ agent, title: String(form.get("title") ?? ""), tasks });
             await ctx.fns.session.mutateScratchpad({ id, mutate: (scratchpad: Record<string, any>, now: number) => {
                 const plan = scratchpad.plan;

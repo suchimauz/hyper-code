@@ -14,6 +14,8 @@ export default async function (
 
         /** Short user-visible plan title. */
         title?: string;
+        /** Persist only for an unpublished child in a caller-owned transaction; caller publishes after commit. @default false */
+        deferPublication?: boolean;
 
         /** Ordered tasks; the first task becomes active immediately. */
         tasks: Array<{
@@ -31,6 +33,7 @@ export default async function (
 ): Promise<any> {
     const agent = opts.agent ?? (session as any)?.agent;
     if (!agent?.id) throw new Error("plan: agent is required");
+    if (opts.deferPublication && (!ctx.state.procs?.db?.transactionStorage?.getStore()?.active || ctx.state.agent?.[agent.id])) throw new Error('Deferred plan requires an unpublished child and active transaction');
     if (!Array.isArray(opts.tasks) || opts.tasks.length === 0) throw new Error("plan: tasks must not be empty");
 
     const ids = new Set<string>();
@@ -67,6 +70,7 @@ export default async function (
         return { plan, active: tasks[0] };
     } });
     agent.scratchpad = updated.scratchpad;
+    if (opts.deferPublication) return { ok: true, ...updated.result };
     ctx.fns.events.refreshAgentMeta({ agentId: agent.id, section: "plan", reason: "plan" });
     if (agent.parentId) ctx.fns.events.refreshAgentMeta({ agentId: String(agent.parentId), section: "team", reason: "team-plan" });
     return { ok: true, ...updated.result };

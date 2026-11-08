@@ -29,6 +29,14 @@ export default async function (ctx: Context, session: Session | null, opts: {
     delete values._action;
     const actor = (session as any)?.user?.id ?? null;
     try {
+        const input = await ctx.fns.input.get({ id });
+        if (input?.kind === 'planning-review') {
+            try {
+                if (cancel) throw new Error('Choose Keep planning instead');
+                await ctx.fns.planning.review({ req: opts.req, agentId: input.agentId, proposalId: String(values.proposalId ?? ''), decision: String(values.decision ?? '') as 'approve' | 'keep', expectedRevision: Number(values.expectedRevision) });
+                return html(await ctx.fns.input.card({ id }));
+            } catch (error) { return html(await ctx.fns.input.card({ id, error: String((error as Error).message) })); }
+        }
         const out = await ctx.fns.input.submit({ id, values, cancel, actor });
         return html(await ctx.fns.input.card({ id, error: out.error ?? null }));
     } catch (error: any) {

@@ -82,12 +82,13 @@ export default async function (
 
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (ep.apiKey) headers["authorization"] = `Bearer ${ep.apiKey}`;
+    if ((ep.upstream ?? ep.provider) === "oneapi" && agent.id) headers["X-Session-Affinity"] = agent.id;
 
     const transport = ep.provider === "opencode" ? ctx.fns.llm.opencodeFetch : ctx.fns.llm.connectFetch;
+    if ((ctx as Context & { goalRequestContext?: { authority?: types.goal.DelegationAuthority } }).goalRequestContext?.authority) await ctx.fns.goal.requestAuthorize({});
     const res = await transport({ url: ep.url, ...(ep.provider === "opencode" ? { sessionId: agent.id } : {}), init: {
         method: "POST",
         headers,
-    if ((ep.upstream ?? ep.provider) === "oneapi" && agent.id) headers["X-Session-Affinity"] = agent.id;
         body: JSON.stringify(body),
         signal: opts.signal,
     } });

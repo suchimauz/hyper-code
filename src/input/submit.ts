@@ -30,6 +30,9 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     actor?: string | null;
 }): Promise<{ state: string; error?: string }> {
     const id = String(opts.id ?? "");
+    // This kind has a separate exact-plan browser transition; generic calls may neither approve nor cancel it.
+    const existingInput = await ctx.fns.input.get({ id });
+    if (existingInput?.kind === 'planning-review') return { state: existingInput.state, error: 'Use the human planning review controls' };
     const claimed = await ctx.fns.procs.db.run({
         sql: "UPDATE inputs SET state = 'processing', updated_at = ? WHERE id = ? AND state = 'open' RETURNING id",
         params: [Date.now(), id],

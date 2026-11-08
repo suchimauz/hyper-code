@@ -10,6 +10,7 @@ function fixture({ plan = false, loadedPlan = plan } = {}) {
     let committed = false;
     let beforeCommit: (() => void) | undefined;
     const ctx: any = { fns: {
+        goal: { lifecyclePause: async () => ({ paused: false, reason: 'disabled' }) },
         procs: { db: {
             transaction: async ({ fn }: any) => { const out = await fn(); committed = true; beforeCommit?.(); return out; },
             select: async ({ sql }: any) => { expect(sql).toContain('FOR UPDATE'); return [row]; },

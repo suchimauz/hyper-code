@@ -18,6 +18,9 @@
 /**
  * Assemble the outgoing system prompt and effective transcript, including checkpoint fallback metadata.
  * Use preview for a read-only context estimate: it may reuse existing Jev decisions but never requests new scores.
+ * Refreshes authoritative goal context outside bootstrap on every request. A run-owned
+ * derived context can suppress only that agent's queued continuation rows; inherited
+ * indices remain untouched and compact summaries are bypassed while suppression applies.
  * @param opts.agent Agent whose prompt and transcript are assembled.
  * @param opts.preview Avoid external relevance scoring and repair logs for UI previews. @default false
  */
@@ -29,13 +32,42 @@ export default async function (
     agent: types.agent.Agent;
         /** Read-only preview; reuse cached relevance choices without external calls or repair logs. @default false */
     preview?: boolean },
-): Promise<{ system: string; messages: any[]; context: { mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null } }> {
+): Promise<{ system: string; messages: any[]; /** Number of leading synthetic instruction/ack messages, independent of wire role; excludes human transcript. */ bootstrapMessageCount: number; context: { mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null } }> {
     const { agent } = opts;
     const fullPrompt = await ctx.fns.agent.fullSystemPrompt({ agent });
-    const fullHistory = agent.parentId
+    // Fresh authoritative state on every request, never cached in bootstrap or agent.goal.
+    const goalState = await ctx.fns.goal.read({ agentId: agent.id });
+    const scopedCtx = ctx as Context & { goalContextDelivered?: boolean };
+    const capability = goalState.enabled && !opts.preview && typeof ctx.fns.goal.nativeCapability === 'function'
+        ? await ctx.fns.goal.nativeCapability({ agentId: agent.id }).catch(() => ({ available: false })) : { available: false };
+    const goalContext = goalState.enabled || scopedCtx.goalContextDelivered
+        ? await ctx.fns.goal.promptContext({ snapshot: goalState.enabled ? goalState.goal : null, enabled: goalState.enabled, modelToolAvailable: capability.available })
+        : '';
+    if (goalContext && !opts.preview && Object.hasOwn(ctx, 'goalRequestContext')) scopedCtx.goalContextDelivered = true;
+    const requestScope = (ctx as Context & { goalRequestContext?: { agentId: string; omitGoalContinuationIdxs: readonly number[]; authority?: types.goal.DelegationAuthority } }).goalRequestContext;
+    const omitted = new Set(requestScope?.agentId === agent.id ? requestScope.omitGoalContinuationIdxs : []);
+    const authority = requestScope?.agentId === agent.id ? requestScope.authority : undefined;
+    if (authority && (!Number.isSafeInteger(authority.authorizedThroughIdx) || authority.authorizedThroughIdx! < 0)) {
+        throw new Error('Delegated request missing authorized task frontier');
+    }
+    let fullHistory = agent.parentId
         ? await ctx.fns.session.getFullMessages({ id: agent.id })
         : (agent.messages ?? []);
-    const projection = await ctx.fns.compaction.project({ model: agent.model, messages: fullHistory, sleepContext: agent.sleepContext });
+    if (omitted.size || authority) {
+        // Indices are local, not globally unique. Read the fork boundary and own
+        // rows explicitly; getFullMessages deliberately drops origin metadata.
+        const rows = await ctx.fns.procs.db.select({ sql: 'SELECT parent_id, fork_offset FROM agents WHERE id = ?', params: [agent.id] });
+        const own = await ctx.fns.session.getMessages({ id: agent.id });
+        const parent = rows[0]?.parent_id
+            ? await ctx.fns.session.getFullMessages({ id: rows[0].parent_id }) : [];
+        const inherited = rows[0]?.fork_offset == null ? parent : parent.slice(0, Number(rows[0].fork_offset));
+        fullHistory = [...inherited, ...own.filter(message => !(message.message_type === 'goal_continuation' && omitted.has(Number(message.idx)))
+            && !(authority && message.role === 'user'
+                && (!Number.isSafeInteger(Number(message.idx)) || Number(message.idx) > authority.authorizedThroughIdx!)))];
+    }
+    // A checkpoint may already summarize the omitted row. Fail closed to full
+    // history rather than leaking its instructions through a compact summary.
+    const projection = await ctx.fns.compaction.project({ model: agent.model, messages: fullHistory, sleepContext: omitted.size || authority ? null : agent.sleepContext });
     const raw = projection.messages;
 
     // A call with no result is a transcript every provider refuses, and a run
@@ -145,10 +177,15 @@ export default async function (
         });
     }
 
+    if (goalContext) messages.push({ role: 'user', content: goalContext, excluded_from_cursor: true });
+    // Fresh control-plane mode always follows historical/compacted instructions.
+    const planningContext = await ctx.fns.planning.prompt({ agentId: agent.id });
+    messages.push({ role: 'user', content: planningContext, excluded_from_cursor: true });
 
     return {
         system,
         messages,
+        bootstrapMessageCount: bootstrap.length,
         context: { mode: projection.mode, fallback: projection.fallback, revision: projection.revision },
     };
 }
