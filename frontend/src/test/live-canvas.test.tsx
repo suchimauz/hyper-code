@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveApp } from '../LiveApp';
 import { useHyper } from '../hooks/useHyper';
@@ -14,10 +14,11 @@ let state: ReturnType<typeof canvas>;
 let chat: ReturnType<typeof hyper>;
 beforeEach(() => {
   state = canvas(); chat = hyper();
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({projects:[], tasks:[], items:[{id:7,title:'Document',active:true,icon:'file-text'}]})));
   vi.mocked(useCanvas).mockImplementation(() => state);
   vi.mocked(useHyper).mockImplementation(() => chat as unknown as ReturnType<typeof useHyper>);
 });
-afterEach(() => { vi.clearAllMocks(); localStorage.clear(); delete document.documentElement.dataset.theme; });
+afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); localStorage.clear(); delete document.documentElement.dataset.theme; });
 
 describe('LiveApp Canvas integration', () => {
   it('places chat in the primary pane and Canvas after the separator in the right pane', () => {
@@ -31,9 +32,9 @@ describe('LiveApp Canvas integration', () => {
     expect(useCanvas).toHaveBeenCalledWith('a');
   });
 
-  it('keeps the same iframe and local shell state across close, reopen, and revision changes', () => {
+  it('keeps the same item frame across close, reopen, and revision changes', async () => {
     const ui = render(<LiveApp />);
-    const frame = screen.getByTitle('Canvas Hyper') as HTMLIFrameElement;
+    const frame = await screen.findByTitle('Canvas Hyper') as HTMLIFrameElement;
     const doc = document.implementation.createHTMLDocument('shell');
     doc.body.innerHTML = '<main data-mobile-canvas><textarea>draft</textarea></main>';
     const resync = vi.fn();
@@ -55,39 +56,25 @@ describe('LiveApp Canvas integration', () => {
     expect(resync).not.toHaveBeenCalled();
   });
 
-  it('rebinds the loaded frame to a different agent in place instead of reloading it', () => {
-    const ui = render(<LiveApp />); const first = screen.getByTitle('Canvas Hyper') as HTMLIFrameElement;
-    const doc = document.implementation.createHTMLDocument('shell');
-    doc.body.innerHTML = '<main data-mobile-canvas data-canvas-agent="a"></main>';
-    const setAgent = vi.fn().mockReturnValue(true);
-    Object.defineProperty(first, 'contentDocument', { configurable: true, value: doc });
-    Object.defineProperty(first, 'contentWindow', { configurable: true, value: { hyperCanvas: { setAgent } } });
-    fireEvent.load(first);
+  it('loads an agent-bound document when switching agents', async () => {
+    const ui = render(<LiveApp />); const first = await screen.findByTitle('Canvas Hyper');
     chat = { ...chat, selected: 'b /?' }; ui.rerender(<LiveApp />);
-    expect(screen.getByTitle('Canvas Hyper')).toBe(first);
-    expect(first).toHaveAttribute('src', '/canvas/a/mobile?embed=1');
-    expect(setAgent).toHaveBeenCalledExactlyOnceWith('b /?');
+    await waitFor(() => expect(screen.getByTitle('Canvas Hyper')).toHaveAttribute('src', '/canvas/b%20%2F%3F/item/7/document?theme=light'));
+    expect(screen.getByTitle('Canvas Hyper')).not.toBe(first);
     expect(useCanvas).toHaveBeenLastCalledWith('b /?');
-  });
-
-  it('loads the new agent page when the shell cannot rebind in place', () => {
-    const ui = render(<LiveApp />); const first = screen.getByTitle('Canvas Hyper');
-    chat = { ...chat, selected: 'b /?' }; ui.rerender(<LiveApp />);
-    expect(screen.getByTitle('Canvas Hyper')).toBe(first);
-    expect(first).toHaveAttribute('src', '/canvas/b%20%2F%3F/mobile?embed=1');
   });
 
   it('propagates the selected app theme to the loaded Canvas shell', async () => {
     render(<LiveApp />);
-    const frame = screen.getByTitle('Canvas Hyper') as HTMLIFrameElement;
+    const frame = await screen.findByTitle('Canvas Hyper') as HTMLIFrameElement;
     const doc = document.implementation.createHTMLDocument('shell'); doc.body.innerHTML = '<main data-mobile-canvas></main>';
     Object.defineProperty(frame, 'contentDocument', { configurable: true, value: doc });
     fireEvent.load(frame);
-    expect(doc.documentElement.dataset.theme).toBe('light');
+    expect(frame).toHaveAttribute('src', '/canvas/a/item/7/document?theme=light');
     fireEvent.click(screen.getByRole('button', { name: 'Тема: Системная. Переключить на: Светлая' }));
     fireEvent.click(screen.getByRole('button', { name: 'Тема: Светлая. Переключить на: Тёмная' }));
     expect(document.documentElement.dataset.theme).toBe('dark');
-    expect(doc.documentElement.dataset.theme).toBe('dark');
+    expect(frame).toHaveAttribute('src', '/canvas/a/item/7/document?theme=dark');
     expect(screen.getByTitle('Canvas Hyper')).toBe(frame);
   });
 });

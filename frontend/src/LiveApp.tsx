@@ -28,6 +28,8 @@ import { SettingsDialog, type SettingsTab } from './components/settings/Settings
 import { AutomationTasks } from './components/hyper/AutomationTasks';
 import { PluginsPage } from './components/hyper/PluginsPage';
 import { useQuotas } from './hooks/useQuotas';
+import { installedExtensions } from './extensions/installed';
+import { ExtensionSurface, ExtensionActionButton } from './extensions/ExtensionHost';
 
 export function LiveApp() {
   const [widthControlTarget, setWidthControlTarget] = useState<HTMLSpanElement | null>(null);
@@ -84,7 +86,9 @@ export function LiveApp() {
   const canvasState = useCanvas(nestedCanvas ? null : hyper.selected);
   const [sideAgent, setSideAgent] = useState<{ id: string; title: string } | null>(null);
   const embedded = new URLSearchParams(location.search).get('embedded') === '1';
-  const canvasOpen = canvasState.open || !!sideAgent;
+  const [extensionPanel, setExtensionPanel] = useState<string | null>(null);
+  const canvasOpen = canvasState.open || !!sideAgent || !!extensionPanel;
+  useEffect(() => { setExtensionPanel(null); }, [hyper.selected]);
   useEffect(() => { setSideAgent(null); }, [hyper.selected]);
   const [mobileView, setMobileView] = useState<'chat' | 'canvas'>('chat');
   const [paneDrag, setPaneDrag] = useState<number | null>(null);
@@ -113,7 +117,7 @@ export function LiveApp() {
   }, [canvasOpen, canvasState.activeItemId, hyper.selected]);
   /** Hide Canvas (or the side agent panel). On mobile the pane slides out first and is closed after the animation. */
   const closeSecondary = () => {
-    const close = () => { if (sideAgent) setSideAgent(null); else void canvasState.setOpen(false); };
+    const close = () => { if (extensionPanel) setExtensionPanel(null); else if (sideAgent) setSideAgent(null); else void canvasState.setOpen(false); };
     const mobile = window.matchMedia?.('(max-width: 1000px)').matches;
     setMobileView('chat');
     if (!mobile || mobileView !== 'canvas') { close(); return; }
@@ -133,14 +137,18 @@ export function LiveApp() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('ssh-instances');
   const openSettings = useCallback(() => { setSheetOpen(false); setSettingsOpen(true); }, []);
   const openQuotas = useCallback(() => { setSheetOpen(false); setSettingsTab('llm-connections'); setSettingsOpen(true); }, []);
-  type PageView = 'automation' | 'plugins' | null;
-  const readView = (): PageView => { const v = new URL(location.href).searchParams.get('view'); return v === 'automation' || v === 'plugins' ? v : null; };
+  type PageView = 'automation' | 'plugins' | `extension:${string}` | null;
+  const readView = (): PageView => { const v = new URL(location.href).searchParams.get('view'); return v === 'automation' || v === 'plugins' ? v : installedExtensions.pages.some(page => `extension:${page.key}` === v) ? v as PageView : null; };
   const [pageView, setPageViewState] = useState<PageView>(readView);
   const setPageView = (next: PageView) => { setPageViewState(next); const url = new URL(location.href); if (next) url.searchParams.set('view', next); else url.searchParams.delete('view'); history.replaceState(null, '', url); };
   const automation = pageView === 'automation';
   const openPage = (next: Exclude<PageView, null>) => { setPageView(next); setSheetOpen(false); setMobileView('chat'); };
   const openAutomation = () => openPage('automation');
   const openPlugins = () => openPage('plugins');
+  const extensionContext = { agentId: hyper.selected || null, theme, readOnly };
+  const extensionPage = installedExtensions.pages.find(page => `extension:${page.key}` === pageView);
+  const activeExtensionPanel = installedExtensions.panels.find(panel => panel.key === extensionPanel);
+  const extensionNavigation = installedExtensions.navigation.map(item => ({ ...item, active: pageView === `extension:${item.key}`, onSelect: () => openPage(`extension:${item.key}`) }));
   const selectChat = (id: string) => { if (draftPending) return; setPageView(null); hyper.select(id); setSheetOpen(false); setMobileView('chat'); };
   const startNewSession = (projectId?: string) => {
     if (draftPending) return;
@@ -152,10 +160,14 @@ export function LiveApp() {
     selectChat('');
   };
   const created = (id: string) => { setDraftPending(false); setDraft(readNewSessionDraft()); navigation.refresh(); hyper.select(id); setSheetOpen(false); setMobileView('chat'); };
-  const sidebar = (mobile = false) => <WorkspaceSidebar {...navigation} onOpenAutomation={openAutomation} automationActive={automation} onOpenPlugins={openPlugins} pluginsActive={pageView === 'plugins'} onOpenSettings={openSettings} onProjectAction={(id, action) => { void navigation.actProject(id, action); }} onNewSession={startNewSession} draftProjectId={isNewSession && !pageView ? draft.projectId : undefined} onAction={(id, action) => { void navigation.act(id, action).then(ok => { if (ok) hyper.refresh(); }); }} selected={pageView ? '' : hyper.selected} compact={!mobile && sidebarCompact} mobile={mobile} theme={theme} themeMode={themeMode} onTheme={setTheme} onToggle={mobile ? () => setSheetOpen(false) : toggleSidebar} onSelect={selectChat} searchInputRef={mobile ? mobileSearchRef : desktopSearchRef} onRetry={navigation.refresh} quotas={quotas.accounts} onOpenQuotas={openQuotas} />;
+  const sidebar = (mobile = false) => <WorkspaceSidebar {...navigation} extensionNavigation={extensionNavigation} onOpenAutomation={openAutomation} automationActive={automation} onOpenPlugins={openPlugins} pluginsActive={pageView === 'plugins'} onOpenSettings={openSettings} onProjectAction={(id, action) => { void navigation.actProject(id, action); }} onNewSession={startNewSession} draftProjectId={isNewSession && !pageView ? draft.projectId : undefined} onAction={(id, action) => { void navigation.act(id, action).then(ok => { if (ok) hyper.refresh(); }); }} selected={pageView ? '' : hyper.selected} compact={!mobile && sidebarCompact} mobile={mobile} theme={theme} themeMode={themeMode} onTheme={setTheme} onToggle={mobile ? () => setSheetOpen(false) : toggleSidebar} onSelect={selectChat} searchInputRef={mobile ? mobileSearchRef : desktopSearchRef} onRetry={navigation.refresh} quotas={quotas.accounts} onOpenQuotas={openQuotas} />;
   const canvas = hyper.selected && !nestedCanvas ? <CanvasPanel agentId={hyper.selected} revision={canvasState.rev} theme={theme} onClose={closeCanvas} expanded={canvasExpanded} onExpand={() => setCanvasExpanded(!canvasExpanded)} /> : null;
   const chat = <section className={`chat-panel ${isNewSession ? 'new-session-panel' : ''} ${archived ? 'is-archived' : ''}`} aria-label="Чат">
     <ChatHeader onMenu={embedded ? undefined : () => setSheetOpen(true)} active={!!hyper.page?.isRunning || current?.runState === 'running' || current?.runState === 'claimed' || !!selectedChat?.teamRunningCount} icon={selectedChat?.icon} colorHue={selectedChat?.colorHue} widthControlRef={setWidthControlTarget} key={hyper.selected || 'new'} agentId={hyper.selected || ''} title={isNewSession ? 'New Session' : current?.title || `Агент ${hyper.selected}`} archived={archived} canvasOpen={canvasOpen} canvasDisabled={!hyper.selected || nestedCanvas || archived} onCanvas={() => { if (sideAgent) { setSideAgent(null); setMobileView('chat'); } else if (canvasOpen && mobileView === 'chat' && window.matchMedia('(max-width: 1000px)').matches) { setMobileView('canvas'); } else { void canvasState.setOpen(!canvasOpen); } }} onSelect={selectChat} onOpenSide={nestedCanvas ? undefined : (id, title) => { setSideAgent({ id, title }); setMobileView('canvas'); }} onRenamed={() => { navigation.refresh(); hyper.refresh(); }} />
+    <div className="hyper-extension-tools" aria-label="Расширения разговора">
+      {installedExtensions.panels.map(panel => <Button key={panel.key} disabled={canvasUnavailable} onClick={() => { setExtensionPanel(panel.key); setMobileView('canvas'); }}>{panel.title}</Button>)}
+      {installedExtensions.actions.map(action => <ExtensionActionButton key={action.key} action={action} context={extensionContext} />)}
+    </div>
     <ChatViewport disabled={archived} widthControlTarget={widthControlTarget}>
     {canvasState.error && <div className="connection-error" role="alert">{canvasState.error} <Button onClick={canvasState.refresh}>Повторить</Button></div>}
     {hyper.error && <div className="connection-error" role="alert">{hyper.error} <Button onClick={hyper.refresh}>Повторить</Button> <a href={`/auth/login?next=${encodeURIComponent(location.pathname + location.search)}`}>Войти в Hyper</a></div>}
@@ -169,7 +181,7 @@ export function LiveApp() {
   </section>;
   return <><div className={embedded ? 'embedded-chat-marker' : ''} hidden /><div hidden data-live-topic="agents" /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}` : 'agents'} /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}:stream` : 'agents'} />
     <AppShell sidebarVisible={!embedded} sidebar={embedded ? null : sidebar()} sidebarCompact={sidebarCompact} workspaceNav>
-      <div style={paneDrag == null ? undefined : { '--pane-drag': `${paneDrag}px` } as React.CSSProperties} className={`workspace-layout live-workspace view-${mobileView} ${paneDrag == null ? '' : 'pane-dragging'} ${canvasOpen ? 'has-canvas' : 'no-canvas'} ${canvasExpanded ? 'canvas-expanded' : ''}`}><SplitPane primary={automation ? <AutomationTasks /> : pageView === 'plugins' ? <PluginsPage onOpenAgent={selectChat} /> : chat} secondary={pageView ? null : sideAgent ? <SubagentPanel id={sideAgent.id} title={sideAgent.title} onClose={closeSecondary} /> : canvas} label="Ширина Canvas" secondaryWidth={canvasWidth} onWidthChange={resizeCanvas} maxWidth={1600} /></div>
+      <div style={paneDrag == null ? undefined : { '--pane-drag': `${paneDrag}px` } as React.CSSProperties} className={`workspace-layout live-workspace view-${mobileView} ${paneDrag == null ? '' : 'pane-dragging'} ${canvasOpen ? 'has-canvas' : 'no-canvas'} ${canvasExpanded ? 'canvas-expanded' : ''}`}><SplitPane primary={extensionPage ? <ExtensionSurface view={extensionPage} context={extensionContext} onClose={() => setPageView(null)} /> : automation ? <AutomationTasks /> : pageView === 'plugins' ? <PluginsPage onOpenAgent={selectChat} /> : chat} secondary={pageView ? null : activeExtensionPanel ? <ExtensionSurface view={activeExtensionPanel} context={extensionContext} onClose={() => setExtensionPanel(null)} /> : sideAgent ? <SubagentPanel id={sideAgent.id} title={sideAgent.title} onClose={closeSecondary} /> : canvas} label="Ширина Canvas" secondaryWidth={canvasWidth} onWidthChange={resizeCanvas} maxWidth={1600} /></div>
     </AppShell><SettingsDialog open={settingsOpen} tab={settingsTab} onTab={setSettingsTab} onOpenChange={setSettingsOpen} />{!embedded && <><EdgeSwipe side="right" label="Свайп влево — открыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'chat' || canvasUnavailable} onSwipe={showCanvas} /><EdgeSwipe side="left" label="Свайп вправо — закрыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'canvas'} onSwipe={closeSecondary} /></>}<Sheet hideHeader swipeToOpen={!embedded && mobileView === 'chat'} title="Рабочее пространство" open={sheetOpen} onOpenChange={setSheetOpen} initialFocus={mobileSearchRef}>{sidebar(true)}</Sheet>
   </>;
 }

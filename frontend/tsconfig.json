@@ -3,7 +3,8 @@
     "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext", "moduleResolution": "bundler", "jsx": "react-jsx",
     "strict": true, "noEmit": true, "skipLibCheck": true,
-    "allowImportingTsExtensions": true, "types": ["vite/client"]
+    "allowImportingTsExtensions": true, "types": ["vite/client"],
+    "paths": { "@hyper/ui": ["./src/sdk/index.ts"] }
   },
   "include": ["src", "vite.config.ts", ".storybook"]
 }

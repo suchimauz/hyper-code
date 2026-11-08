@@ -1,67 +1,30 @@
 # UI rendering and live updates
 
-## Goal
+## Primary React UI
 
-Keep the UI server-rendered and HTMX-driven while removing one-off refresh loops and global browser state.
+`frontend/src/LiveApp.tsx` owns the primary shell. New trusted extensions use `@hyper/ui`, not HTMX fragments or global DOM controllers. See [ui-architecture.md](ui-architecture.md) for registration and security boundaries.
 
-The implementation follows three rules:
+1. Fetch canonical endpoint data on mount. Events are invalidation hints; never treat them as a complete state snapshot.
+2. Use `subscribeLive` or `useLiveSubscription` from `@hyper/ui`. Supply `name`, optional event `types`, `onEvent`, **`resync` and `onError`**. Re-read authoritative data after reconnect/resume or recovery, and expose load failures rather than silently keeping stale data.
+3. Return subscription cleanup from the owning effect and abort pending requests. Ignore stale responses after unmount or selection changes. The helper also supports cleanup while the transport script is still loading.
+4. Declare required transport topics with `data-live-topic` on mounted content. `types` alone does not add topics. Keep topics narrow, such as `agents` or `agent:<id>`.
+5. Use `requestJson` for JSON reads/writes. Writes need the existing cookie-bound CSRF token and server authorization; frontend grants are not authorization.
 
-1. **Every live server fragment uses one contract.** A region declares its URL and topic. The shared SSE client turns a topic notification into one coalesced HTMX refresh. Timers are watchdogs only.
-2. **Transcript rows are summaries.** Expensive tool arguments, diffs, and highlighted output are fetched only when opened.
-3. **One chat panel owns one disposable controller.** Panel listeners and in-flight requests are aborted when HTMX removes the panel. Configuration lives on the panel DOM, not in `window` globals.
+One shared topic-filtered SSE connection serves a tab. Over HTTP/2 hidden tabs can keep it open; over HTTP/1.1 hidden tabs release the connection and resync on return. Read [live-updates.md](live-updates.md) for gap recovery. Reads must not publish invalidations or create refresh loops. Do not add one-second polling as a substitute for publishing the relevant topic after a write.
 
-## Live-region contract
+## Compatibility: server-rendered regions
 
-`ui.live` renders a region with:
+Shared SSR still serves compatibility surfaces, including inline approvals and Canvas content consumers. `/old-ui` redirects; that retired entry point is not proof that shared renderers and assets can be deleted.
 
-- `hx-get`: canonical server fragment URL;
-- `data-live-topic`: SSE topic to watch;
-- `hx-trigger`: `hyper-live from:body` plus a watchdog interval;
-- configurable element tag and HTMX swap mode.
+Where a server-rendered consumer still uses `ui.live`, it declares a canonical fragment URL, `data-live-topic`, and `hx-trigger="hyper-live from:body"` plus a watchdog. The shared client coalesces notifications and asks matching regions to fetch current markup through HTMX. Preserve region-local targets and swap modes. This is a compatibility contract, not the default for new extensions.
 
-The browser keeps one topic-filtered SSE connection per tab. Over HTTP/2 it stays open while the tab is hidden; over HTTP/1.1 a hidden tab closes it (Chrome's six-connections-per-origin pool) and resyncs on return. Transport, gaps and the `window.hyperLive` subscriber contract for non-region UI are in [live-updates.md](live-updates.md). Signals carry invalidation, not HTML. Signals within 100 ms are coalesced. Matching visible regions receive `hyper-live`; HTMX asks the server for current markup.
-
-Current topics:
-
-- `agent:<id>` — transcript tail, status, reflection state;
-- `agents` — navigation rail.
-
-Reads never publish invalidations, so refreshing a region cannot create a refresh loop.
-
-## Chat transcript
-
-Initial chat HTML contains the latest 100 events. `#msg-head` pages older events upward and preserves the viewport. `#msg-tail` is a live region on `agent:<id>` and requests only events after its offset. The offset is transcript state in the URL, not state in the SSE protocol.
-
-Tool-call events render as compact buttons keyed by `(agent_id, event_idx)`. Opening one calls popup RPC `agent.toolDetails`, which performs syntax highlighting and edit diff rendering on demand. The chat controller caches successful detail fragments for its lifetime.
-
-## Chat controller lifecycle
-
-`agent/chat.js` maintains at most one controller for the current `#chat-panel`.
-
-- `htmx:beforeCleanupElement` destroys a controller whose panel is being removed.
-- `htmx:afterSwap` mounts the current panel.
-- `AbortController` removes panel listeners and cancels detail fetches.
-- panel configuration is read from `data-*` attributes.
-- stale async work checks controller identity before changing the dialog.
-
-The controller owns scroll anchoring, upward paging, Enter-to-submit, inherited-context notice, tool trays, detail cache, and tool dialog focus restoration. Global `ui/hotkeys.js` owns `Cmd+J/K` scrolling plus `Ctrl+J` next-unread and `Ctrl+K` per-tab back history; navigation shortcuts intentionally work with composer focus.
-
-## Watchdogs
-
-Live updates should normally arrive over SSE. Watchdogs repair missed signals:
-
-- busy status: 5 s, because elapsed time is visible;
-- ordinary agent fragments: 30 s;
-- agents rail: 60 s.
-
-Do not introduce one-second polling for new widgets. Publish the relevant topic after a write instead.
+The older chat renderer/controller (`agent/chat.js`, `#chat-panel`, `#msg-head`, `#msg-tail`) has its own disposable lifecycle, offset-based paging, lazy tool-detail popup and scroll anchoring. Its HTMX cleanup/mount hooks and watchdogs apply only to consumers still using that renderer. Do not attach that controller to React-owned DOM or describe its markup as the primary chat contract.
 
 ## Verification
 
-Minimum checks for changes to this path:
-
-- `ui.live` contract tests;
-- event paging route tests;
-- lazy tool-detail route and summary-renderer tests;
-- chat controller syntax/browser smoke test;
-- manual browser check: switch agents repeatedly, test `Cmd+J/K` and `Ctrl+J/K` with composer focus, send with Enter, receive a live reply, page upward without jumping, hide/show multiple tabs without connection starvation, and open the same tool twice without a second request.
+- Run focused SDK API/live and extension-registry tests plus frontend typecheck/build checks.
+- Check navigation and repeated mounts/unmounts, error and pending states, and no duplicate subscriptions.
+- Test disconnect/reconnect, server restart, and hidden/visible tabs: all state consumers must refetch after a gap.
+- Test keyboard navigation, focus restoration, light/dark themes and reduced motion.
+- For changed SSR consumers, also run their route/live-region/controller tests and verify served assets.
+- Preserve ownership, authentication, CSRF and explicit confirmation tests for approvals; a React migration must not weaken them.

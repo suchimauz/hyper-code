@@ -1,94 +1,41 @@
-## Popup RPC contract
-
-The application shell owns one permanent native `<dialog id="app-popup">`. It is outside `#main`, survives navigation, and must never be created or removed by page fragments.
-
-A server-backed popup trigger has one behavior attribute and optional JSON params:
-
-```html
-<button hx-popup="agent.toolDetails"
-        hx-popup-params='{"agentId":"ef","idx":7}'>Open</button>
-```
-
-`hx-popup` is a trusted RPC function name resolved under `ctx.fns`; `hx-popup-params` is its opts object. The `popup-rpc` HTMX extension owns `POST /rpc`, the RPC envelope, loading state, target and swap. Do not add `hx-post`, `hx-rpc`, `hx-target`, `hx-swap`, manual `fetch`, or a local dialog to popup triggers.
-
-Popup forms use the same contract. Named controls are merged into params:
-
-```html
-<form hx-popup="secureInput.submit">
-  <input name="id" type="hidden" value="p1">
-  <input name="value">
-</form>
-```
-
-RPC popup functions return `ui.popupContent({ title, kind, html })`; an empty successful response closes the popup. Standalone resources should keep ordinary routes—`hx-popup` is for procedural popup partials.
-
-
 # UI architecture
 
-> Status: working document. This captures the current mental model; details are expected to change as we discuss and prototype it.
+## Current shell and migration boundary
 
-## Mental model
+The primary UI is the React/Vite frontend in `frontend/` (`LiveApp.tsx`), served at `/`. `/old-ui` is no longer an alternate application: its supported GET/HEAD root and agent links redirect to `/` with validated query state; other methods are rejected and unknown paths return 404. See `src/legacyUi/handle.ts`.
 
-Hyper-code is an addressable, programmable workspace:
+This does **not** mean all server-rendered UI has been removed. Shared SSR renderers, route assets, Canvas content renderers and inline approval surfaces still have compatibility consumers. React Canvas now reads tab metadata from `/canvas/:id/state` and displays `/canvas/:id/item/:itemId/document`; it no longer reads the `/mobile` shell DOM or embeds `ui.layout`. The item document still uses existing kind renderers and compatibility assets, with nested HTML/URL sandboxing intact. Do not delete these shared renderers or claim every kind is native React.
 
-- **URL is a resource (noun).** Anything durable and openable should have a URL: an agent chat, file, task, tool result, settings screen, or plugin-defined view.
-- **Function is an action (verb).** Anything executable should be a named runtime function. Buttons, shortcuts, the global menu, HTTP routes, agents, and plugins should converge on the same function.
-- **Pane displays a URL.** A pane does not own domain state; it renders an addressable resource.
-- **Workspace stores a composition of panes.** Layout is presentation state over resources, not part of the resources themselves.
+`SecureInputHost` reads metadata from owner-only `/input/compat?agentId=…`. On explicit opening, supported secure kinds use the original card transports inside an isolated document; Redmine approval opens a separate top-level page, preserving its confirmation authority. No approval is inferred from generic form submission. Native React choice/confirm remain separate.
 
-In short:
+Postgres is authoritative. React owns presentation state; HTTP endpoints own access checks and durable changes. SSE carries invalidation hints, followed by canonical authorized reads, not a second domain-state store.
 
-```text
-noun       = URL
-verb       = function
-view       = renderer(URL)
-window     = pane(URL)
-session    = workspace(layout<URL>)
-navigation = open URL
-action     = call function
-live update = invalidate/refetch URL
-```
+## Public React extension contract
 
-Postgres remains the source of truth. UI events carry invalidation signals, not copies of application state.
+`frontend/src/sdk/index.ts` is the public `@hyper/ui` v1 entry. This is a local Vite alias, **not** a published npm package or remote module loader. Read the actual entry and `frontend/src/extensions/{types,registry,installed}.ts`, `ExtensionHost.tsx`, and `frontend/src/ui-plugins/sdk-example.tsx` before extending it.
 
-## Pages
+- Import UI primitives, API/live helpers and public types from `@hyper/ui`; use React from the host. Vite deduplicates React and React DOM. Do not bundle another React runtime, deep-import `@hyper/ui/*`, or import private host components. The Vite boundary restricts modules under `ui-plugins/` to React and the public entry.
+- Export a `UiExtension` with a valid unique `id` and `apiVersion: 1`. It can declare `pages`, `navigation`, `panels`, and `actions`.
+- Host code imports reviewed extensions in `extensions/installed.ts` and supplies explicit per-extension grants for page, panel and action IDs. Navigation must reference a declared, granted page. Backend plugin installation does not automatically install browser code.
+- The registry validates IDs, duplicate entries, titles and navigation references. The host owns placement and supplies `ExtensionContext`: `agentId`, `theme`, and `readOnly`. Views receive `{ context }`; actions receive the context directly. Mark mutating actions with `mutates` so read-only host controls can disable them.
+- `ExtensionHost` provides error containment and pending/error presentation. These are UI safeguards, **not** a security sandbox. Extensions execute as trusted code in the host origin. No remote module URLs, user-supplied HTML-to-module loading, or untrusted extensions.
 
-Every durable UI surface is a page with its own URL. This includes core screens and plugin-defined views. A page can be opened directly, reloaded, shared, restored through browser history, and rendered in any pane.
+Frontend grants control exposure only. Every backend endpoint must independently enforce authentication, authorization, ownership, CSRF and any explicit human approval. Hiding an action or setting `readOnly` cannot grant or revoke server access.
 
-The URL identifies the page and its meaningful state; the page is rendered on the server as full HTML or an HTML fragment. Temporary presentation details such as focus, hover, and panel size do not need to be encoded in the URL.
+## Data, writes and live updates
 
-One core page type is **agent chat**, addressed as `/agent/:id`. It represents the durable conversation and current state of one agent. The global menu can search and open these pages directly.
+Use `requestJson<T>` for same-origin JSON requests with safe root-relative paths. Writes require `X-CSRF-Token`: supply the endpoint's cookie-bound token via `csrfToken` (or the supported header); the helper can fall back to `meta[name="csrf-token"]`. Do not invent a token endpoint or fake an Origin header. It rejects redirects, does not retry writes, and reports errors through `ApiError`; handle 401 and 403 explicitly without claiming every 403 is a login failure. The generic type is not runtime response validation.
 
+Use `subscribeLive` or `useLiveSubscription`, with **both** `resync` and `onError`. Refetch authoritative data on events and after stream gaps. Subscriptions reuse the shared transport; dispose them and abort pending requests on unmount. Event types filter delivery, not transport topics: declare the needed `data-live-topic` on the mounted surface. See [live-updates.md](live-updates.md).
 
-## Global menu
+## Navigation and presentation
 
-The global menu is the primary navigation and command interface. It searches two spaces:
+The host owns sidebar entries, selected pages, secondary panels and action slots. An extension does not mutate the shell DOM or assume a `#main` target. Do not promise arbitrary pane placement, URL persistence or global search providers merely because the type supports a page; only the implemented host slots are public today.
 
-1. **Resources** — agents/chats, files, tasks, tool results, settings, and plugin-defined URLs. Selecting one opens its URL.
-2. **Commands** — named functions available in the current context. Selecting one calls the function.
+Use the SDK's `Button`, `IconButton`, `Sheet`, `Stack`, `Panel`, `TextField` and `Dialog`. Preserve semantic light/dark tokens, visible labels, keyboard focus, focus restoration and reduced-motion behavior. For Hyper UI work first read [Apple Design](skills/apple-design/SKILL.md) and its [scope notes](skills/apple-design/README.md); this preference does not apply to unrelated projects.
 
-Chats in the menu are grouped by project/workspace folder and expose running, pinned and unread state. `Cmd+/` opens the menu. When it is closed, `Ctrl+J` opens the next unread chat and `Ctrl+K` returns through this tab's chat jump history; `Cmd+J/K` retain chat scrolling.
+## Compatibility only: SSR, HTMX and popup RPC
 
-## Navigation shell
+Existing SSR consumers may still use `ui.layout`, `#main`, `ui.live`, `$script_*.js`, and the shared `app-popup` dialog. These are not the primary extension contract. In these consumers keep navigation attributes off containers whose descendants own refreshes; self-refreshing fragments target themselves.
 
-The shell contains the current URL-addressed page and the full-screen global menu. The menu's Quick section shows New agent plus the ten most recently opened chats; pinned and unread chats are rendered separately, followed by workspace-grouped chats and project/plugin/system columns.
-
-## Plugins
-
-Plugins may contribute:
-
-- addressable resources and their renderers;
-- named functions;
-- global and contextual menu entries;
-- search providers;
-- suggested display policies.
-
-A plugin can therefore provide arbitrary windows—for example a Telegram dialog, GitHub pull request, calendar, terminal, table, or map—without modifying the global shell.
-
-The shell owns placement. A resource may be displayed in the current pane, split, popup, drawer, inspector, or browser tab. A plugin may suggest a default display policy but must not own or mutate the global layout directly.
-
-## Boundary
-
-Not every runtime function is public UI or HTTP API. Functions and resources must be explicitly contributed to the UI registry, with metadata such as title, context conditions, arguments, permissions, and preferred display policy.
-
-Not every transient UI detail needs a URL. A state deserves an address when it should survive reload, participate in browser history, or be shareable. Hover, focus, menu prefixes, and temporary resize state remain local presentation state.
+Existing `hx-popup="module.function"` triggers with optional `hx-popup-params` use the popup-RPC HTMX extension and `POST /rpc`. Popup functions return `ui.popupContent({ title, kind, html })`; an empty successful response closes the dialog. Preserve that contract where used, including confirmation/authentication flows, rather than mixing manual fetch/swaps into it. New React extensions use SDK components and authorized APIs, not popup RPC by default.

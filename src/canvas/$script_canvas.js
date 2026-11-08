@@ -117,7 +117,9 @@
     let refreshing = 0;
     const refreshPanel = async (root, force = false) => {
         const ticket = ++refreshing;
-        const r = await fetch(`/canvas/${encodeURIComponent(agentOf(root))}/panel`, { headers: { accept: 'text/html' } }).catch(() => null);
+        const documentItem = root.getAttribute('data-canvas-document');
+        const endpoint = documentItem ? `/canvas/${encodeURIComponent(agentOf(root))}/item/${encodeURIComponent(documentItem)}/document?fragment=1` : `/canvas/${encodeURIComponent(agentOf(root))}/panel`;
+        const r = await fetch(endpoint, { headers: { accept: 'text/html' } }).catch(() => null);
         if (!r?.ok || ticket !== refreshing) return;
         const html = await r.text();
         if (ticket !== refreshing) return;

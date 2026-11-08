@@ -4,7 +4,21 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   root: new URL('.', import.meta.url).pathname,
   base: '/ui-lab/',
-  plugins: [react()],
+  plugins: [react(), {
+    name: 'hyper-ui-public-boundary',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (source.startsWith('@hyper/ui/')) throw new Error('Use the public @hyper/ui entry, not deep imports');
+      if (importer?.replaceAll('\\\\', '/').includes('/ui-plugins/') && source !== '@hyper/ui' && source !== new URL('./src/sdk/index.ts', import.meta.url).pathname && source !== 'react' && !source.startsWith('react/') && source !== '/@react-refresh' && source.split('?')[0] !== importer?.split('?')[0]) {
+        throw new Error(`UI plugins may import only React and @hyper/ui: ${source}`);
+      }
+      return null;
+    },
+  }],
+  resolve: {
+    alias: [{ find: /^@hyper\/ui$/, replacement: new URL('./src/sdk/index.ts', import.meta.url).pathname }],
+    dedupe: ['react', 'react-dom'],
+  },
   server: {
     host: '127.0.0.1', port: 5174, strictPort: true,
     fs: { strict: true, allow: [new URL('.', import.meta.url).pathname, new URL('../node_modules', import.meta.url).pathname] },

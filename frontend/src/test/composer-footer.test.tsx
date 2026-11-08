@@ -25,7 +25,7 @@ it('shows unavailable context honestly and disables plus while busy', async () =
   vi.stubGlobal('fetch', vi.fn(async () => json({ budget: null })));
   const toggle = vi.fn();
   render(<ComposerFooter agentId="fixture" busy running revision={0} onMenuToggle={toggle} />);
-  expect(screen.getByText('—')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Оценка контекста недоступна/ })).toHaveTextContent('—');
   expect(screen.getByRole('button', { name: 'Добавить' })).toBeDisabled();
   await userEvent.click(screen.getByRole('button', { name: 'Добавить' }));
   expect(toggle).not.toHaveBeenCalled();

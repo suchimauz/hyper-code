@@ -179,25 +179,24 @@ Vendored `src/procs/` is upstream code: keep local patches minimal and marked wi
 - Don't rename `ctx.fns.agent.run` / `workerLoop` carelessly.
 - Don't edit `src/ctx_ns.d.ts` (generated) or add files under `src/procs/` for app features.
 
-## UI frame (workspace-style)
+## Primary UI and extension contract
 
-- Layout (`src/ui/layout.ts`): TWO regions — the persistent agents rail on the left, and ONE page in `#main` on the right. An agent is an ordinary page (`GET /agent/:id` renders `ui.chatColumn` + `ui.agentMetaPanel`), so `/llms` or `/files` replaces it completely; the layout owns no current agent and keeps no hidden chat alive. Rail links swap `#main` in place (`hx-get` + `hx-push-url`), so the rail keeps its scroll while the page changes.
-- **No htmx attributes on containers that hold content.** htmx inherits `hx-target`, `hx-swap` and `hx-push-url` into every descendant, and `#main` is full of fragments that poll for themselves (chat tail, status bar, meta panel). Navigation attributes live on the things that navigate — rail links, palette rows. Self-refreshing fragments say `hx-target="this"` out loud (`ui.live` emits it by default); a fragment whose response is not UI says `hx-swap="none"`.
-- **Navigation is the ⌘K palette**, uniskill-style: no menu bar. `ui.navMenu` (island at the end of `<body>`) over `GET /nav/items` — pages and module pages first, then agents; the rail header's ☰ button and ⌘K both open it. Mount a module → its top-level GET pages become reachable, no tab to add. ⌘J/⌘K step to the neighbouring agent through `GET /agent/:id/next` (the server owns the order), swapped into `#main`.
-- The chat client (`/agent/chat.js`) loads once and mounts on `#chat-panel` after every swap — Enter-to-send, stick-to-bottom, older-message paging and the tool cards all hang off that id.
-- **The agents rail** (`ui.agentsRail`, served by `GET /ui/rail`): a one-line placeholder in the layout that loads itself and re-fetches every 10s + on the `rail-refresh` custom event — the layout never awaits the agent list. Agents are grouped by `workspace_dir` (the folder is the project); each row is a running light (`run_state`), the title with the id in brackets, and a WhatsApp-style **unread badge** — assistant messages past the `seen:<id>` watermark in `kv`. The watermark moves when the chat renders (`ui.chatColumn`) and on every open-chat poll (`agent/$route_$id_events.html_GET`): an open chat never accumulates unread. The header's archive toggle (state in `localStorage`, sent via `hx-vals js:`) shows archived agents dimmed with an unarchive button (`POST /agent/:id/unarchive` → `session.unarchive`). The "+" opens the new-agent form as an overlay (`GET /agent/new?popup=1` → `#modal`): full form — model (preselected from `kv last-model`, written on every create), workdir with live directory autocomplete (`GET /agent/dirs?q=`), base prompt, presets, custom instructions.
-- **The chat header** names THIS agent only (title, id, model badge, statusbar) plus ⓘ/archive/delete icons — switching and creating live in the rail. The stop button exists only while something runs: it renders inside the statusbar fragment (1s poll) when `run_state`/`next_run_at` say busy.
-- **Toasts are agent-scoped**: `ui.notify({agentId})` rides the event; the client (ui/controlScript) drops toasts whose agentId differs from `document.body.dataset.agentId`. Toasts without an agentId stay global.
-- `GET /agent/:id` is the agent's overview/passport page (right pane) and sets the current agent.
-- ⌘K palette (`ui.navMenu` island + `nav.items` + `GET /nav/items`): agents, built-in pages, and every mounted module's top-level GET pages. Module tabs come from procs modules metadata (`m.tab`), uniskill-style: mount a module → it shows up in nav.
-- **Files UI** (`GET /files`, implementation and route contract in `docs/files-ui.md`): centered GitHub-style directory browser with relative and absolute breadcrumbs, text Code/Edit tabs, Markdown/HTML preview, and browser-native image/video/audio/PDF preview through `GET /files/raw`. To visibly open a file from server code, call `ctx.fns.ui.openFile({ path })`; `ctx.fns.files.open({ path })` only maintains open-file state and is not browser navigation.
+- The primary shell is React/Vite in `frontend/src/LiveApp.tsx`, served at `/`. `/old-ui` only redirects supported GET/HEAD entry links; it is not a second application.
+- New trusted React extensions use `@hyper/ui`, the local Vite alias for `frontend/src/sdk/index.ts`, not a published package. Read `frontend/src/extensions/{types,registry,installed}.ts`, `ExtensionHost.tsx` and `frontend/src/ui-plugins/sdk-example.tsx` before adding one.
+- Import only the public SDK and host React from extension modules. No deep SDK imports, private host components, remote modules or second React runtime. Vite deduplicates React/React DOM.
+- Extensions declare `apiVersion: 1`, pages, navigation, panels and actions. Host-reviewed build-time imports and explicit grants in `extensions/installed.ts` determine which entries are exposed. Backend plugin installation alone grants no browser execution.
+- The host owns layout and supplies `agentId`, resolved `theme` and `readOnly` context. Mark mutating actions with `mutates`. These are trusted same-origin modules, not sandboxed plugins; frontend grants and disabled controls never replace backend auth, ownership, CSRF or explicit approval.
+- Use SDK components and `requestJson`; writes require a cookie-bound CSRF token via the supported option/header or meta fallback. Handle 401/403 and failures; do not automatically retry writes or invent token endpoints.
+- Use `subscribeLive`/`useLiveSubscription` with required `resync` and `onError`, cleanup on unmount, and narrow `data-live-topic` declarations. Events invalidate; canonical authorized HTTP reads restore state after gaps.
+- Shared SSR, Canvas content renderers and inline approvals still have compatibility consumers. Do not delete them because `/old-ui` redirects, or describe all Canvas/approval surfaces as migrated. `#main`, HTMX and `$script_*.js` are compatibility mechanisms, not the public React extension contract.
+- To show a file alongside chat use `canvas.show({ kind: 'file', args: { path } })`, not whole-page navigation. See `docs/ui-architecture.md`, `docs/ui-design-system.md`, and `docs/live-updates.md`.
 
 ## Transcript storage invariants
 
 - `events.idx` / `messages.idx` are per-agent, contiguous, and allocated INSIDE the insert (`SELECT COALESCE(MAX(idx),-1)+1 … RETURNING idx` with a jittered retry on duplicate — `session/appendEvent.ts`, `appendMessage.ts`). Never allocate an idx with a separate SELECT: two overlapping appends (a stop's error event against a running turn's tool events) collide on the pkey.
 - Tool-call cards in the transcript age out client-side (open → one line → tucked circle in a tray); an ERRORED call keeps its red tint but tucks like the rest — only a human click pins a card.
 
-## screen & tour (ported from health-workspaces)
+## Compatibility screen & tour (SSR consumers)
 
 - `ctx.fns.screen.*` drives the tab the person already has open — no browser in
   the process: `screen.eval` pushes code down the SSE stream, the tab answers at
@@ -208,8 +207,8 @@ Vendored `src/procs/` is upstream code: keep local patches minimal and marked wi
 - Targets are addressed by `procs.ui.attr` data-* markers (page/entity/id/form/
   action/role), NEVER CSS selectors. Seeded so far: the rail's menu button
   (action: open-menu), chat form (form: chat), agent picker (role), search page/form/hits,
-  agent passport (page: agent + fork/archive/delete actions). New UI should
-  carry markers from birth.
+  agent passport (page: agent + fork/archive/delete actions). These are SSR
+  integration markers, not the public React extension API.
 - `ctx.fns.tour.play({steps})` — scripted walk (Back/Next/Show me); `tour.review`
   checks steps against pages with no browser; `screen.step` — live tour, one
   step per turn; the person's press comes back through the `screen.press` hook
@@ -218,33 +217,17 @@ Vendored `src/procs/` is upstream code: keep local patches minimal and marked wi
 - The pointer/tour CSS lives in the framework sheet — the layout links
   `ctx.state.procs.styles` (procs/styles/app.css); don't remove that link.
 
-## UI script routes
+## Compatibility UI script routes
 
 - `$script_*.js` files are served as bundled browser assets by `procs/http/$loader_script.ts`, not as fns. After changing one, `ctx.fns.procs.http.loadRoutes({})` (or dev.sync) and verify the actually served HTTP output (e.g. `/agent/chat.js`), including `.hyper` overrides — not just the file on disk.
 - Live updates: browser code never listens to `hyper-events` directly. A server fragment is a live region (`ui.live`); anything else that mirrors server state uses `window.hyperLive.subscribe({ types, onEvent, resync })` — `resync` re-reads the state after a gap in the stream (hidden tab on HTTP/1.1, network drop) and is required. One-shot instructions use `hyperLive.command`. Enforced by the `live-subscribe` code.quality rule. Read `docs/live-updates.md` before adding anything that updates by itself.
-- The app layout is `src/ui/layout.ts` (procs `toResponse` picks `registry.ui.layout` over the framework default). String / `{main, title}` returns from routes are wrapped by it; `Response` passes through.
+- The compatibility SSR layout is `src/ui/layout.ts` (procs `toResponse` picks `registry.ui.layout` over the framework default). String / `{main, title}` returns from routes are wrapped by it; `Response` passes through.
 
 ## Git helpers
 
 `ctx.fns.git.run/stage/commit/push/status/stageCommitPush({ ... })` — use these from agent code instead of ad-hoc shell (they handle `$`-filenames and take an optional `dir` for temp-repo tests).
 
 
-## UI: HTMX first
+## Compatibility SSR maintenance
 
-The browser UI is server-rendered HTML with HTMX. Do not add Datastar, Alpine, React, or a second reactive/runtime layer without an explicit architecture migration.
-
-Choose the smallest mechanism in this order:
-
-1. **Native HTML/CSS** for local state and behaviour: `<details>`, `<dialog>`, forms, validation, focus, hover.
-2. **HTMX** for anything that reads or writes server state: forms, fragment loading, lazy details, paging, and live-region refreshes.
-3. **Small delegated JavaScript** only for transient browser behaviour HTML/HTMX cannot express cleanly: chat scroll anchoring, Enter-to-send, unsaved row reordering/removal, panel resize.
-
-Rules:
-
-- Server templates are the single source of markup. Never duplicate a row/card template in browser JavaScript.
-- Prefer ordinary named form controls and `FormData.getAll()` over hidden JSON assembled on submit.
-- A `+` that adds server-defined markup should be `hx-get` + `hx-swap="beforeend"`.
-- The shell owns one permanent popup `<dialog>`. Procedural popup partials use only `hx-popup="module.function"` and optional `hx-popup-params='{"key":"value"}'`; the extension owns `/rpc`, target and swap. Do not add `hx-post`, `hx-rpc`, `hx-target`, `hx-swap`, local dialogs or manual fetch to popup triggers/forms.
-- Live state uses `ui.live`: Postgres is authoritative, SSE topics invalidate, HTMX fetches current HTML. Keep topics narrow (`agent:<id>`, `agent-meta:<id>`, `agents`).
-- Browser scripts must use event delegation when their targets can be replaced by HTMX. Do not bind/re-mount handlers on every fragment swap.
-- Do not use JavaScript `fetch()` where an HTMX attribute describes the same request and swap.
+Keep existing SSR consumers working without expanding them into the primary frontend contract. Native controls, `ui.live`, delegated browser handlers and popup RPC remain appropriate where that consumer already uses them. `hx-popup`/`hx-popup-params` owns the shared popup request and swap; do not mix manual fetch or competing HTMX attributes into existing popup triggers. Avoid inherited navigation attributes on containers whose descendants refresh themselves. Preserve authentication, CSRF, explicit approvals, themes, accessible labels/focus, and SSE resync behavior during migration. New React extensions follow the SDK contract above, not an HTMX-first policy.

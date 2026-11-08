@@ -24,7 +24,7 @@ A recording of Health Samurai's **Agents on FHIR working group meeting — Octob
 - **Delegate focused work.** Give agents separate tasks and follow their plans and results without putting every detail into one chat.
 - **Bring tools into the conversation.** Discover plugin capabilities for services such as GitHub, Google Workspace, Telegram, and web search. Individual integrations may require credentials or additional software.
 - **See the output beside the chat.** Open files, documents, diagrams, charts, and plugin views in Canvas.
-- **Extend the workspace while it runs.** Add procedures, HTTP routes, and plugin UI surfaces, then hot-reload them without discarding session state.
+- **Extend the workspace while it runs.** Hot-reload procedures and HTTP routes without discarding session state. Trusted React UI extensions use the host's reviewed build-time registration and Vite workflow.
 - **Use your existing coding harness.** Give trusted local Claude Code, Codex, and other shell-capable tools access to Hyper through its CLI.
 
 For example: ask an agent to review a pull request, research an issue and show its findings in Canvas, or build a small integration you can reuse in later conversations.
@@ -59,7 +59,7 @@ The installer can also update an existing installation: it fast-forwards the che
 
 The React UI lives in `frontend/` and shares the root `package.json`, `bun.lock`, and `node_modules` with Hyper. Install once with `bun install`; start everything with `bun run start` (or the existing Hyper service). Hyper starts and closes an in-process Vite server automatically. Do not run `frontend:dev` alongside the service: both use loopback port 5174.
 
-The main UI is served at `/`, and the previous interface remains available at `/old-ui/`. Frontend edits use Vite Fast Refresh through the same Hyper address; `/ui-lab/` carries assets and the HMR socket, while `/ui-lab-api/` is the integrated UI adapter. Port 5174 is internal, not a separate public entry point. No production bundle is required for this live-development setup; install dev dependencies too.
+The main UI is served at `/`; supported `/old-ui/` entry links now redirect to it. Shared SSR renderers, Canvas content and approval compatibility surfaces remain—this is not complete removal of legacy UI. Frontend edits use Vite Fast Refresh through the same Hyper address; `/ui-lab/` carries assets and the HMR socket, while `/ui-lab-api/` is the integrated UI adapter. Port 5174 is internal, not a separate public entry point. No production bundle is required for this live-development setup; install dev dependencies too.
 
 - `bun run frontend:test` — React tests.
 - `bun run frontend:build` — optional typecheck and bundle verification.
@@ -96,7 +96,7 @@ Subscription access depends on the provider's current authentication and model a
 
 ## Workspace and plugins
 
-The UI brings navigation, a working surface, and conversation together:
+The UI brings navigation, a working surface, and conversation together. The older composition vocabulary below is a conceptual map; the primary React shell uses its sidebar, chat and secondary surfaces, not an automatically mounted SSR Dock/menu:
 
 ```text
 Layout
@@ -111,7 +111,7 @@ Home / global menu
 
 **Layout → Regions → Widgets** is the direction of the UI redesign: the layout defines areas of the screen, plugins supply independent parts, and settings control their composition. Not every UI part is a home widget; Canvas tabs, chat parts, and search sources have separate contracts. The redesign is ongoing—this is a conceptual map, not a screenshot or a promise of a finished drag-and-drop editor.
 
-Plugins can provide more than tools:
+Runtime plugins can provide more than tools. The `$widget_`, `$search_`, `$app_` and `$dock_` conventions below belong to compatibility SSR navigation; they do not automatically register React pages or grant browser execution. New primary-shell contributions use the host-reviewed `@hyper/ui` extension registry. Canvas and Markdown renderers have their own contracts and remain separate from React extension slots:
 
 | Convention | Purpose |
 | --- | --- |
@@ -145,7 +145,9 @@ await ctx.fns.procs.repl.load({ name: "myModule" });
 
 **Calls resolve through the registry.** Project functions call one another through `ctx.fns`, rather than importing each other's implementations. This makes hot-reload apply to existing call sites. Capitalized type files generate the shared `types.<module>.<Name>` namespace.
 
-**The UI is server-rendered.** Bun serves HTML and HTTP routes; HTMX handles incremental interactions. Plugins extend the same procedural runtime rather than running a separate frontend application for every feature.
+**The primary UI is React/Vite.** Bun serves the authenticated shell and APIs. Trusted React extensions use the local `@hyper/ui` alias (not a published package), host React, shared components and explicit build-time grants for pages, navigation, panels and actions. No private/deep imports or second React runtime. HTMX, `#main` and `$script` assets remain compatibility mechanisms, not the primary extension contract.
+
+Extensions are trusted same-origin code, not a sandbox. Frontend grants and read-only controls never replace backend authentication, ownership, CSRF or explicit human approval. SDK `requestJson` writes require the existing cookie-bound CSRF token. `subscribeLive`/`useLiveSubscription` require resync and error callbacks, topic declarations and cleanup. Preserve themes, keyboard focus, accessibility and reduced motion; the [Apple Design guidance](docs/skills/apple-design/README.md) applies only to Hyper UI. Start with [UI architecture](docs/ui-architecture.md) and `frontend/src/ui-plugins/sdk-example.tsx`.
 
 Read more in [architecture](docs/architecture.md), [settings](docs/settings.md), and [tool-call protocols](docs/toolcall-protocols.md).
 

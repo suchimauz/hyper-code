@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppWindow, Compass, FileText, FolderOpen, Globe, Maximize, Minimize, PanelRightClose, Plus, Square, SquareTerminal, X } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
-import embedStyles from './canvas-embed.css?inline';
-import { itemKey, readShellTabs, readTabs, resolveSelected, startKey, termKey, writeTabs, type CanvasItemTab, type CanvasTabsStore } from './canvasTabs';
+import { itemKey, parseCanvasTabs, readTabs, resolveSelected, startKey, termKey, writeTabs, type CanvasItemTab, type CanvasTabsStore } from './canvasTabs';
 import { CanvasTerminal } from './CanvasTerminal';
 import './canvas-panel.css';
 
-type CanvasShell = Window & { hyperCanvas?: { setAgent: (id: string) => boolean } };
 type Props = { agentId: string; revision: string | null; theme: 'light' | 'dark'; onClose: () => void; expanded: boolean; onExpand: () => void };
-const shellUrl = (agentId: string) => `/canvas/${encodeURIComponent(agentId)}/mobile?embed=1`;
+const stateUrl = (agentId: string) => `/canvas/${encodeURIComponent(agentId)}/state`;
 /** dsh dockkit close/appear timing; the CSS keyframes use the same values. */
 const CLOSE_MS = 120;
 
@@ -23,7 +21,7 @@ function ItemIcon({ icon }: { icon: string }) {
 async function canvasPost(agentId: string, body: object) {
   const response = await fetch(`/canvas/${encodeURIComponent(agentId)}`, {
     method: 'POST', credentials: 'same-origin', cache: 'no-store',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'x-csrf-token': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '' }, body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error((await response.text().catch(() => '')) || `Canvas: HTTP ${response.status}`);
   return response.json() as Promise<{ activeItemId: number | null }>;
@@ -47,13 +45,11 @@ export function CanvasStartPage({ onFiles, onTerminal, busy, error }: { onFiles:
   </div>;
 }
 
-/** Embed the authenticated, agent-bound Canvas under a dsh-style React tab strip.
- * Start tabs are local pages (saved per agent); item tabs mirror the agent's real canvas items, whose
- * bodies stay in the trusted shell iframe. The shell's own header is hidden and only read as data.
- * Inner HTML/URL frames keep their original CSP and sandbox. Switching agents rebinds the shell in place. */
-export function CanvasPanel({ agentId, theme, onClose, expanded, onExpand }: Props) {
+/** Render authenticated JSON tabs alongside local Start/Terminal pages.
+ * Content lives in an agent/item-bound compatibility document, not the legacy application shell.
+ * Inner HTML/URL frames keep their original CSP and sandbox. */
+export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExpand }: Props) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const [src] = useState(() => shellUrl(agentId));
   const bound = useRef(agentId);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(false);
@@ -68,69 +64,42 @@ export function CanvasPanel({ agentId, theme, onClose, expanded, onExpand }: Pro
     setStoreState(value => { const next = update(value); writeTabs(bound.current, next); return next; });
   }, []);
 
-  /** Follow the shell's tab data; a newly opened or newly activated item (by the agent or a link) comes to the front. */
-  const sync = useCallback(() => {
-    let doc: Document | null | undefined;
-    try { doc = frame.current?.contentDocument; } catch { return; }
-    const next = readShellTabs(doc, bound.current);
-    if (!next) return;
-    setItems(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
-    const active = next.find(item => item.active)?.id ?? null;
-    const known = knownItems.current;
-    const added = known ? next.find(item => !known.has(item.id)) : undefined;
-    const activated = known && active !== null && active !== lastActive.current;
-    knownItems.current = new Set(next.map(item => item.id));
-    lastActive.current = active;
-    const focus = added?.id ?? (activated ? active : null);
-    if (focus !== null && focus !== undefined) setStore(value => ({ ...value, selected: itemKey(focus) }));
-  }, [setStore]);
-
-  const decorate = useCallback(() => {
+  // JSON is the sole source of tab metadata. Never inspect the frame DOM.
+  const request = useRef(0);
+  const sync = useCallback(async () => {
+    const id = bound.current;
+    const ticket = ++request.current;
     try {
-      const doc = frame.current?.contentDocument;
-      if (!doc?.querySelector('[data-mobile-canvas]')) { setError(true); return; }
-      let style = doc.getElementById('hyper-react-canvas-style');
-      if (!style) { style = doc.createElement('style'); style.id = 'hyper-react-canvas-style'; doc.head.append(style); }
-      style.textContent = embedStyles;
-      doc.documentElement.dataset.theme = theme;
-      doc.documentElement.dataset.reactTabs = '';
-      setReady(true); setError(false);
-    } catch { setError(true); }
-  }, [theme]);
-  const load = useCallback(() => {
-    // A load after an agent switch the shell could not take (not ready yet) must show the current agent.
-    const root = frame.current?.contentDocument?.querySelector('[data-canvas-agent]');
-    if (root && root.getAttribute('data-canvas-agent') !== bound.current) {
-      (frame.current?.contentWindow as CanvasShell | null)?.hyperCanvas?.setAgent(bound.current);
+      const response = await fetch(stateUrl(id), { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('Canvas state unavailable');
+      const next = parseCanvasTabs(await response.json());
+      if (ticket !== request.current || bound.current !== id) return;
+      setItems(next); setReady(true); setError(false);
+      const active = next.find(item => item.active)?.id ?? null;
+      const known = knownItems.current;
+      const added = known ? next.find(item => !known.has(item.id)) : undefined;
+      const activated = known && active !== null && active !== lastActive.current;
+      knownItems.current = new Set(next.map(item => item.id));
+      lastActive.current = active;
+      const focus = added?.id ?? (activated ? active : null);
+      if (focus != null) setStore(value => ({ ...value, selected: itemKey(focus) }));
+    } catch { if (ticket === request.current && bound.current === id) setError(true); }
+  }, [setStore]);
+  useEffect(() => {
+    if (bound.current !== agentId) {
+      bound.current = agentId; setStoreState(readTabs(agentId)); setItems([]);
+      knownItems.current = null; lastActive.current = null; setStartError(null); setReady(false);
     }
-    decorate();
-    sync();
-  }, [decorate, sync]);
-  useEffect(() => { if (ready) decorate(); }, [decorate, ready]);
-  // The shell swaps its panel HTML on every change; observe it instead of polling.
+    void sync();
+    return () => { request.current++; };
+  }, [agentId, revision, sync]);
   useEffect(() => {
-    if (!ready) return;
-    let doc: Document | null | undefined;
-    try { doc = frame.current?.contentDocument; } catch { return; }
-    const view = doc?.defaultView as (Window & typeof globalThis) | null | undefined;
-    const Observer = view?.MutationObserver ?? MutationObserver;
-    if (!doc?.body) return;
-    const observer = new Observer(() => sync());
-    observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-current', 'data-canvas-agent'] });
-    sync();
-    return () => observer.disconnect();
-  }, [ready, sync]);
-  useEffect(() => {
-    if (bound.current === agentId) return;
-    bound.current = agentId;
-    setStoreState(readTabs(agentId)); setItems([]); knownItems.current = null; lastActive.current = null; setStartError(null);
-    const shell = frame.current?.contentWindow as CanvasShell | null;
-    if (ready && shell?.hyperCanvas?.setAgent) { shell.hyperCanvas.setAgent(agentId); return; }
-    // Older shell without in-place rebinding: load the new agent's page.
-    setReady(false); setError(false);
-    if (frame.current) frame.current.src = shellUrl(agentId);
-  }, [agentId, ready]);
-  const retry = () => { setReady(false); setError(false); if (frame.current) frame.current.src = shellUrl(bound.current); };
+    const refresh = () => { if (!document.hidden) void sync(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [sync]);
+  const retry = () => { setError(false); void sync(); };
 
   // Every tab gone (also when the agent closed its items) leaves a fresh Start page, like dsh's guide.
   // A just-opened item that the shell has not drawn yet is pending, not gone.
@@ -140,10 +109,15 @@ export function CanvasPanel({ agentId, theme, onClose, expanded, onExpand }: Pro
   }, [ready, opening, pending, items.length, store.starts.length, store.terms.length, setStore]);
   const selected = resolveSelected(store, items);
   const selectedItem = items.find(item => itemKey(item.id) === selected) ?? null;
+  // Keep the last content document mounted behind local tabs (unsaved file edits survive).
+  const lastDocument = useRef<{ agentId: string; id: number } | null>(null);
+  if (selectedItem) lastDocument.current = { agentId, id: selectedItem.id };
+  const documentItem = lastDocument.current?.agentId === agentId
+    ? items.find(item => item.id === lastDocument.current?.id) ?? null : null;
   const select = (key: string) => {
     setStore(value => ({ ...value, selected: key }));
     const item = items.find(entry => itemKey(entry.id) === key);
-    if (item && !item.active) void canvasPost(bound.current, { activeItemId: item.id }).catch(() => undefined);
+    if (item && !item.active) void canvasPost(bound.current, { activeItemId: item.id }).then(() => sync()).catch(() => setError(true));
   };
   const addStart = () => setStore(value => ({ ...value, starts: [...value.starts, value.next], next: value.next + 1, selected: startKey(value.next) }));
   const order = [...items.map(item => itemKey(item.id)), ...store.terms.map(termKey), ...store.starts.map(startKey)];
@@ -165,7 +139,7 @@ export function CanvasPanel({ agentId, theme, onClose, expanded, onExpand }: Pro
       });
       if (item) {
         setItems(list => list.filter(entry => entry.id !== item.id));
-        void canvasPost(bound.current, { closeItemId: item.id }).catch(() => undefined);
+        void canvasPost(bound.current, { closeItemId: item.id }).then(() => sync()).catch(() => { setError(true); void sync(); });
       }
     }, CLOSE_MS);
   };
@@ -173,6 +147,7 @@ export function CanvasPanel({ agentId, theme, onClose, expanded, onExpand }: Pro
     setOpening(true); setStartError(null);
     try {
       const state = await canvasPost(bound.current, { show: { kind: 'file', args: { path: '.' } } });
+      await sync();
       // The Start page becomes the opened page, as a dsh guide capsule does.
       setStore(value => ({ ...value, starts: value.starts.filter(n => startKey(n) !== startTab), selected: state.activeItemId == null ? value.selected : itemKey(state.activeItemId) }));
     } catch (failure) {
@@ -214,9 +189,11 @@ export function CanvasPanel({ agentId, theme, onClose, expanded, onExpand }: Pro
       {onStart && selected && <CanvasStartPage key={selected} onFiles={() => void openFiles(selected)} onTerminal={() => openTerminal(selected)} busy={opening} error={startError} />}
       {store.terms.map(n => <CanvasTerminal key={`${agentId}:${n}`} agentId={agentId} theme={theme} active={selected === termKey(n)} />)}
       {!onLocal && !ready && !error && <div className="canvas-loading" role="status">Загружаем Canvas…</div>}
-      {error && <div className="canvas-load-error" role="alert">Не удалось загрузить Canvas. <button onClick={retry}>Повторить</button> <a href={shellUrl(agentId)} target="_blank" rel="noreferrer">Открыть отдельно</a></div>}
-      <iframe ref={frame} title="Canvas Hyper" src={src} onLoad={load} aria-hidden={onLocal || undefined}
-        className={`canvas-frame${ready ? ' ready' : ''}${onLocal || (ready && !selectedItem) ? ' behind' : ''}`} />
+      {error && <div className="canvas-load-error" role="alert">Не удалось загрузить Canvas. <button onClick={retry}>Повторить</button></div>}
+      {documentItem && <iframe ref={frame} key={agentId + ':' + documentItem.id} title="Canvas Hyper"
+        src={`/canvas/${encodeURIComponent(agentId)}/item/${documentItem.id}/document?theme=${theme}`}
+        onLoad={() => setError(false)} onError={() => setError(true)} aria-hidden={onLocal || undefined}
+        className={`canvas-frame ready${onLocal ? ' behind' : ''}`} />}
     </div>
   </section>;
 }

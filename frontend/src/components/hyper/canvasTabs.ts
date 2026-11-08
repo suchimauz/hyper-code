@@ -25,17 +25,13 @@ export function writeTabs(agentId: string, store: CanvasTabsStore) {
   try { localStorage.setItem(storageKey(agentId), JSON.stringify(store)); } catch { /* Tabs still work in memory. */ }
 }
 
-/** Read the trusted shell's own tab strip (hidden by the embed style) as plain data. */
-export function readShellTabs(doc: Document | null | undefined, agentId: string): CanvasItemTab[] | null {
-  const root = doc?.querySelector('[data-canvas-agent]');
-  if (root && root.getAttribute('data-canvas-agent') !== agentId) return null;
-  if (!doc) return null;
-  return [...doc.querySelectorAll('[data-canvas-tab]')].flatMap(tab => {
-    const id = Number(tab.getAttribute('data-canvas-tab'));
-    if (!Number.isInteger(id)) return [];
-    const select = tab.querySelector('[data-canvas-select]');
-    const icon = /ph-([\w-]+)/.exec(select?.querySelector('i')?.className || '')?.[1] || 'square';
-    return [{ id, title: select?.textContent?.trim() || `Вкладка ${id}`, icon, active: tab.getAttribute('aria-current') === 'true' }];
+/** Validate the authenticated state endpoint's plain tab metadata; no frame DOM is read. */
+export function parseCanvasTabs(value: unknown): CanvasItemTab[] {
+  const items = (value as { items?: unknown })?.items;
+  if (!Array.isArray(items)) throw new Error('Invalid Canvas state');
+  return items.map(item => {
+    if (!item || !Number.isSafeInteger(item.id) || item.id < 1 || typeof item.title !== 'string' || typeof item.active !== 'boolean') throw new Error('Invalid Canvas tab');
+    return { id: item.id, title: item.title, icon: typeof item.icon === 'string' ? item.icon : 'square', active: item.active };
   });
 }
 

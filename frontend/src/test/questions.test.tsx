@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QuestionCard } from '../components/hyper/QuestionCard';
 import { ConnectedQuestionCard } from '../components/hyper/ConnectedQuestionCard';
 import { choiceEpisode, choiceAnswer, clearChoiceDraft, type ChoiceInput } from '../lib/questions';
+// Secure kinds have independent transport coverage in SecureInputHost.test.tsx.
+vi.mock('../components/hyper/SecureInputHost', () => ({ SecureInputHost: () => null }));
 const input: ChoiceInput = { id:'q', agentId:'a', kind:'choice', title:'Which?', state:'open', spec:{options:[{value:'stable-a',label:'Alpha (Recommended)',description:'Details'}, {value:'stable-b',label:'Beta'}],allowOther:true} };
 afterEach(() => { cleanup(); clearChoiceDraft('a','q'); vi.restoreAllMocks(); });
 function card(item = input) { const submit = vi.fn(); render(<QuestionCard input={item} onSubmit={submit}/>); return submit; }

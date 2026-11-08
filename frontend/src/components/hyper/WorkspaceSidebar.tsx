@@ -15,6 +15,7 @@ import type { QuotaAccount } from '../../lib/quotas';
 import './workspace-sidebar.css';
 
 export type WorkspaceSidebarProps = {
+  extensionNavigation?: readonly { key: string; title: string; active: boolean; onSelect: () => void }[];
   onNewSession?: (projectId?: string) => void;
   /** Opens the in-app Settings screen from the account menu. */
   onOpenSettings?: () => void;
@@ -54,7 +55,7 @@ function WorkspaceSection({ project, selected, query, onSelect, archivedView, pe
   </section>;
 }
 
-export function WorkspaceSidebar({ onOpenAutomation, automationActive, onOpenPlugins, pluginsActive, onOpenSettings, pendingProjects, onProjectAction, onNewSession, draftProjectId, pendingChats, actionError, onAction, projects, user, selected, compact = false, mobile = false, loading, error, profileError, theme, themeMode, onTheme, onToggle, onSelect, searchInputRef, onRetry, quotas, onOpenQuotas }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ extensionNavigation = [], onOpenAutomation, automationActive, onOpenPlugins, pluginsActive, onOpenSettings, pendingProjects, onProjectAction, onNewSession, draftProjectId, pendingChats, actionError, onAction, projects, user, selected, compact = false, mobile = false, loading, error, profileError, theme, themeMode, onTheme, onToggle, onSelect, searchInputRef, onRetry, quotas, onOpenQuotas }: WorkspaceSidebarProps) {
   const [query, setQuery] = useState('');
   const [view, setView] = useState(readWorkspaceView);
   const [adding, setAdding] = useState(false);
@@ -74,6 +75,7 @@ export function WorkspaceSidebar({ onOpenAutomation, automationActive, onOpenPlu
     {!compact && <div className="workspace-filter"><Search size={14} strokeWidth={1} aria-hidden="true" /><input ref={searchInputRef} aria-keyshortcuts="Meta+/ Control+/" title="Найти агента или проект · ⌘/" aria-label="Найти агента или проект" placeholder="Найти агента или проект…" value={query} onChange={event => setQuery(event.target.value)} /><kbd className="workspace-filter-shortcut" aria-hidden="true">⌘/</kbd>{query && <button aria-label="Очистить фильтр" onClick={() => setQuery('')}><X size={12} /></button>}</div>}
     <div className="workspace-actions">
       <button className="workspace-action" aria-label="New Session" title="New Session" onClick={() => onNewSession?.()} disabled={!onNewSession}><span className="new-session-icon"><Plus size={12} strokeWidth={1.5} /></span>{!compact && <span>New Session</span>}</button>
+      {extensionNavigation.map(item => <button key={item.key} className={`workspace-action ${item.active ? 'is-selected' : ''}`} aria-current={item.active ? 'page' : undefined} aria-label={item.title} title={item.title} onClick={item.onSelect}><Puzzle size={16} strokeWidth={1} />{!compact && <span>{item.title}</span>}</button>)}
       {onOpenPlugins && <button className={`workspace-action ${pluginsActive ? 'is-selected' : ''}`} aria-current={pluginsActive ? 'page' : undefined} aria-label="Plugins" title="Plugins" onClick={onOpenPlugins}><Puzzle size={16} strokeWidth={1} />{!compact && <span>Plugins</span>}</button>}
       {onOpenAutomation && <button className={`workspace-action ${automationActive ? 'is-selected' : ''}`} aria-current={automationActive ? 'page' : undefined} aria-label="Cron Tasks" title="Cron Tasks" onClick={onOpenAutomation}><Timer size={16} strokeWidth={1} />{!compact && <span>Cron Tasks</span>}</button>}
       {compact && <button className="workspace-action" aria-label="Workspaces" title="Workspaces" onClick={onToggle}><Folder size={16} strokeWidth={1} /></button>}

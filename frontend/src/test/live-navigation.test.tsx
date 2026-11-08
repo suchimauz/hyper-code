@@ -29,6 +29,8 @@ it('collapses to a persistent rail instead of unmounting navigation', () => {
 });
 it.each(['metaKey', 'ctrlKey'])('focuses the navigation filter with %s + / without opening global search', key => {
   setup(); render(<LiveApp />);
+  // Canvas performs its own initial JSON read; shortcuts must not add requests.
+  vi.mocked(fetch).mockClear();
   const input = screen.getByRole('textbox', { name: 'Найти агента или проект' }) as HTMLInputElement;
   fireEvent.change(input, { target: { value: 'Chat' } });
   fireEvent.keyDown(document, { key: '/', [key]: true });

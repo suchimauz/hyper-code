@@ -2,7 +2,13 @@
 
 ## Direction
 
-## Declarative navigation apps
+The primary shell is React/Vite in `frontend/`, served at `/`. Trusted browser extensions use the local `@hyper/ui` SDK and host-reviewed build-time registration/grants for pages, navigation, panels and actions. React/React DOM is supplied by the host; private imports and a second runtime are not supported. See [ui-architecture.md](ui-architecture.md) for the actual contract, not the older SSR extension mechanisms below.
+
+`/old-ui` redirects supported entry links to the primary shell. Shared SSR, Canvas content and approval compatibility surfaces remain; retirement of that entry does not authorize removal of their renderers/assets. Frontend grants/readOnly are not security boundaries: backend authentication, ownership, CSRF and explicit human approval still apply. SDK writes require a cookie-bound CSRF token; live subscriptions require resync, error handling, topic declarations and cleanup.
+
+## Compatibility SSR: declarative navigation apps
+
+The following `$app`/Dock/menu declarations describe existing server-rendered consumers, not automatic registration of React extensions.
 
 A module that owns a user-facing page can publish it to global navigation with a `$app_<name>.json` file. The `nav/$loader_app.ts` loader collects these declarations; `nav.items` merges them with core pages, plugins, and agents.
 
@@ -26,7 +32,7 @@ The global menu (⌘/, `ui.navMenu` + GET `/nav/items`) is built from tabs (`nav
 Core static pages use the same declarations as module pages; `nav.items` contains no hard-coded page catalogue. Dynamic plugin pages and agent chats continue to come from their own registries.
 
 
-**Simplicity first. DB-first. Server-rendered HTMX fragments plus topic-filtered SSE invalidation. One in-process worker, runs agents in parallel.**
+**Simplicity first. DB-first. React shell plus compatibility SSR consumers, with topic-filtered SSE invalidation. One in-process worker runs agents in parallel.**
 
 Agent-deferred work uses the unified trigger engine described in [Agent triggers](agent-triggers.md): `agent.wake`, `agent.cron`, and `agent.watch` share durable `agent_triggers` storage and deliver prompts into the same conversation.
 
@@ -67,7 +73,7 @@ graph TB
 
 ---
 
-## Chat parts: header, panel and composer
+## Compatibility SSR: chat parts, header, panel and composer
 
 The chat column (`ui.chatColumn`) is assembled from small part files, the same way the Dock is. The `chat` module owns the frame — the icon, the name, order, hiding, timeouts and the look — and every module may add parts:
 
@@ -87,13 +93,15 @@ The chat icon is `agents.icon` (sanitized SVG, `chat.sanitizeSvg`; set with `cha
 
 1. **The DB is the source of truth.** Messages, events, run-state, scheduling — all in Postgres. Memory is only an execution cache.
 2. **HTTP is the data plane.** Browser fetches visible state through normal short HTTP requests. SSE carries only coalesced invalidation signals; watchdog timers repair missed signals.
-3. **Signals are not data.** SSE topics and `wakeWorker` carry no domain payload; consumers re-read Postgres or refetch canonical HTML. A lost invalidation is repaired by the live-region watchdog.
+3. **Signals are not data.** State invalidations and `wakeWorker` are hints; consumers re-read Postgres or refetch canonical JSON/HTML. Gap resync repairs missing invalidations; compatibility live-region watchdogs provide an additional fallback.
 4. **One worker. No queue table. Parallel drain.** Run scheduling is two columns on `agents`: `next_run_at` (when to fire) and `run_state` (`'idle' | 'running'`). One in-process `workerLoop` claims every currently-eligible agent in a tight `claimOne()` loop and spawns each as its own promise — different agents run concurrently. Per-agent serialisation is enforced by Postgres row locking on `UPDATE … RETURNING` (two concurrent claims can't both win the same `idle` row), not by an in-memory lock.
-5. **Small shared client controllers.** HTMX owns server fragments; shared scripts own SSE visibility, hotkeys, popup RPC and one disposable controller per chat panel.
+5. **Clear rendering ownership.** React owns the primary shell and SDK extension lifecycle. Shared transport handles SSE gaps; HTMX/controllers own only compatibility fragments. Never attach competing controllers to React-owned DOM.
 
 ---
 
 ## Channels at a glance
+
+The route/form examples below describe the compatibility SSR transport. The primary React frontend uses its authorized API endpoints; SDK extensions use `requestJson`, not an HTMX form contract.
 
 | Concern              | Channel                                           | Driven by                             |
 |----------------------|---------------------------------------------------|---------------------------------------|
@@ -143,7 +151,7 @@ If two POSTs land within the debounce window, both rows are appended to `message
 
 ## Receive flow
 
-The browser keeps one topic-filtered `GET /procs/events` stream only while the tab is visible. An `agent:<id>` invalidation triggers a short HTMX request to `/agent/:id/events.html?offset=N`; the route renders any delta and returns a replacement live tail. A 30-second watchdog catches missed signals after disconnects. Hidden tabs close SSE and catch up when visible again.
+The browser shares one topic-filtered `GET /procs/events` stream. React state consumers refetch authoritative JSON on invalidations and resync after gaps. SDK subscribers must supply `resync` and `onError`, declare topics and clean up on unmount. Over HTTP/2 hidden tabs may keep the stream; over HTTP/1.1 they release it and catch up on return (see [live-updates.md](live-updates.md)). Compatibility SSR chat consumers still request `/agent/:id/events.html?offset=N` and use live-tail/watchdog refreshes; these are not the primary React rendering contract.
 
 
 ---
@@ -347,9 +355,9 @@ We **do** run agents in parallel — that's the whole point of the parallel-drai
 
 If writes ever become the bottleneck, we'd partition the agent space across multiple driver loops keyed on `agent_id % N`. Until then it's premature.
 
-### Why htmx and not React/Datastar/etc
+### Why React with a compatibility boundary
 
-The DOM is already the right kind of stateful machine: append-only event log + tiny ephemeral form. htmx's `outerHTML` swap of `#msg-tail` is a one-line description of "infinite scroll backwards in time". Adding a frontend framework here is pure cost.
+The primary shell uses React/Vite and a public SDK so reviewed extensions share components, theme tokens, lifecycle and host-owned slots. Existing HTMX/SSR consumers are maintained separately until their actual callers migrate. Keep one React runtime and explicit backend security checks; neither the SDK nor host grants sandbox trusted same-origin extension code.
 
 ### Why no durable `agent.thinking.delta` channel
 

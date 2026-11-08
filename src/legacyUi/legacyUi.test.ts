@@ -18,16 +18,35 @@ test('rewrites navigation, preserving assets, cookies and external URLs',async()
  const html=await r.text();
  expect(html).toContain('href="/old-ui/agent/ab?q=1"');expect(html).toContain('action="/old-ui/agent/new"');expect(html).toContain('src="/ui/app.js"');expect(html).toContain('href="https://other.test/"');expect(html).toContain('hx-get="/old-ui/agent/ab"');
 });
-test('adapter retains origin query cookie CSRF and body, sets trusted dispatch flag',async()=>{
- const ctx=context(); let seen:any;
- ctx.fns.procs={http:{dispatch:async(opts:any)=>{seen=opts;return new Response(null,{status:303,headers:{location:'/agent/ab'}});}}};
- const req=new Request('https://hyper.test/old-ui/agent/new?q=1',{method:'POST',headers:{cookie:'session=x',origin:'https://hyper.test','x-csrf-token':'token'},body:'name=abc'});
- const r=await handle(ctx,null,{req});
- expect(seen.url).toBe('https://hyper.test/agent/new?q=1');expect(seen.request).toBe(req);expect(seen.legacyUi).toBe(true);expect(await seen.request.text()).toBe('name=abc');expect(seen.request.headers.get('cookie')).toBe('session=x');expect(seen.request.headers.get('x-csrf-token')).toBe('token');expect(r?.headers.get('location')).toBe('/old-ui/agent/ab');
+test('retired entry redirects GET and HEAD with validated shell query only',async()=>{
+ for (const method of ['GET','HEAD']) {
+  for (const [path,location] of [
+   ['/old-ui','/'], ['/old-ui/','/'],
+   ['/old-ui/agent/ab-1_/?agent=other&embedded=1&next=https://evil.test&token=secret','/?agent=ab-1_&embedded=1'],
+   ['/old-ui/a/xy?new=1','/?agent=xy'],
+   ['/old-ui?agent=xy&view=plugins','/?agent=xy&view=plugins'],
+   ['/old-ui?new=1&view=automation','/?new=1&view=automation'],
+   ['/old-ui?agent=%2F%2Fevil.test&embedded=evil&view=evil&redirect=//evil.test','/'],
+   ['/old-ui?agent=new&demo=1','/'],
+  ]) {
+   const r=await handle(context(),null,{req:new Request('https://hyper.test'+path,{method})});
+   expect(r?.status).toBe(302);expect(r?.headers.get('location')).toBe(location);
+   expect(r?.headers.get('cache-control')).toBe('no-store');expect(await r?.text()).toBe('');
+  }
+ }
 });
-test('adapter ignores canonical paths and rejects nested aliases',async()=>{
- const ctx=context(); expect(await handle(ctx,null,{req:new Request('https://hyper.test/agent/ab')})).toBeUndefined();
- expect((await handle(ctx,null,{req:new Request('https://hyper.test/old-ui/old-ui/')}))?.status).toBe(404);
+test('retired entry rejects writes without dispatching or replaying request bodies',async()=>{
+ for (const method of ['POST','PUT','PATCH','DELETE','OPTIONS']) {
+  const r=await handle(context(),null,{req:new Request('https://hyper.test/old-ui/agent/new',{method,body:'name=abc'})});
+  expect(r?.status).toBe(405);expect(r?.headers.get('allow')).toBe('GET, HEAD');expect(r?.headers.has('location')).toBe(false);
+ }
+});
+test('entry ignores canonical paths and rejects unsupported or malformed aliases',async()=>{
+ const ctx=context();
+ for(const path of ['/agent/ab','/old-ui-other']) expect(await handle(ctx,null,{req:new Request('https://hyper.test'+path)})).toBeUndefined();
+ for(const path of ['/old-ui/old-ui/','/old-ui//evil.test','/old-ui/agent/new','/old-ui/a/new','/old-ui/agent/a%2Fb','/old-ui/agent/a/queue','/old-ui/settings']) {
+  expect((await handle(ctx,null,{req:new Request('https://hyper.test'+path)}))?.status).toBe(404);
+ }
 });
 test('dispatch reruns guards, and browser marker cannot select legacy',async()=>{
  let marker:any;let called=false;

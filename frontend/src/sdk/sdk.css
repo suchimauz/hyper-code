@@ -1,0 +1,12 @@
+.hyper-sdk-panel { padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--text); min-width: 0; }
+.hyper-sdk-panel-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+.hyper-sdk-panel-header h2 { font-size: var(--font-lg); margin: 0; }
+.hyper-sdk-field { display: grid; gap: var(--space-2); }
+.hyper-sdk-field label { font-weight: 500; }
+.hyper-sdk-field p { margin: 0; color: var(--text-secondary); }
+.hyper-sdk-field .hyper-sdk-error { color: var(--tool-error); }
+.hyper-sdk-input { box-sizing: border-box; width: 100%; min-height: var(--control-height); padding: var(--space-2) var(--space-3); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font: inherit; }
+.hyper-sdk-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hyper-sdk-input:disabled { opacity: .6; cursor: not-allowed; }
+.hyper-sdk-dialog-backdrop { position: fixed; inset: 0; z-index: 100; background: #0006; }
+.hyper-sdk-dialog { box-sizing: border-box; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 101; width: min(32rem, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-overlay); color: var(--text); box-shadow: var(--shadow); }

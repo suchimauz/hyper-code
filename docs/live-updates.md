@@ -4,7 +4,7 @@ How a Hyper page learns that something changed on the server, and how it makes s
 state after missing some of those notices. Read this before adding anything to a page that should
 "update by itself".
 
-Related: [ui-live-rendering.md](ui-live-rendering.md) (server-rendered live regions), [https.md](https.md)
+Related: [ui-live-rendering.md](ui-live-rendering.md) (React lifecycle and compatibility live regions), [https.md](https.md)
 (the HTTP/2 port).
 
 ## The one rule
@@ -14,6 +14,14 @@ Related: [ui-live-rendering.md](ui-live-rendering.md) (server-rendered live regi
 Events tell a page *that* something changed. They are not stored and not replayed: a page that was not
 listening when an event went out never gets it. So every piece of the page that mirrors server state must
 be able to re-read that state on its own, and must do so after every gap in the stream.
+
+## React SDK subscriptions (primary UI)
+
+New trusted React extensions import `subscribeLive` or `useLiveSubscription` from `@hyper/ui`. Supply `name`, optional event `types`, `onEvent`, and required `resync` and `onError` callbacks. Refetch canonical authorized endpoint data on invalidation and after gaps; report transport/load errors. Return cleanup from the owning effect and abort stale fetches. The hook cleans up its subscription on unmount; the plain helper returns cleanup immediately, even while the transport is loading.
+
+Declare transport topics on mounted content with `data-live-topic`; `types` filters delivered event types and does not register SSE topics. The SDK example in `frontend/src/ui-plugins/sdk-example.tsx` demonstrates `agents`, an initial fetch, resync and cleanup. Reuse the host transport rather than opening another EventSource. JSON writes through `requestJson` require the existing cookie-bound CSRF token; SSE subscription never grants authorization.
+
+The lower-level `window.hyperLive` and HTMX live-region examples below document the shared transport and compatibility consumers, not the primary extension import API. `/old-ui` redirects, but shared SSR/Canvas content and inline approvals still use compatibility code.
 
 ## Pieces
 
@@ -38,8 +46,8 @@ GET <state route>  ◄────── resync ──────────�
   topic means everybody.
 - `src/procs/events/$route__GET.ts`: the SSE stream. Every connection starts with
   `{ type: "hello", serverStart }`.
-- `src/procs/events/client.js`: the browser half. Loaded first on every page (`ui/layout.ts`) and exposes
-  `window.hyperLive`.
+- `src/procs/events/client.js`: the shared browser transport exposing `window.hyperLive`.
+  React loads it through `frontend/src/lib/live.ts` (wrapped by the SDK); compatibility SSR loads it from `ui/layout.ts`.
 
 ## Transport: when a tab keeps its stream
 
@@ -155,10 +163,11 @@ re-fetching on events and on gaps for free.
 
 1. Server: after the write, `ctx.fns.procs.events.emit({ event: { type: "<thing>.changed", … } })`.
 2. Server: a GET that returns the current state (or markup) — reads must never emit.
-3. Browser: a live region (`ui.live`) if it is a server fragment; otherwise
-   `window.hyperLive.subscribe({ types, onEvent, resync })`, with `resync` calling that GET.
-4. Load the script after `client.js` (any script in the page body is; `layout.ts` puts `client.js` first in
-   the head).
+3. React extensions: use SDK `subscribeLive`/`useLiveSubscription` with `resync` calling that GET,
+   `onError`, mounted topic declarations and effect cleanup. Compatibility server fragments use
+   `ui.live`; other compatibility scripts use `window.hyperLive.subscribe` with required `resync`.
+4. The SDK loads the shared client through the host. Compatibility SSR scripts must load after
+   `client.js`; do not assume a React extension is running inside `ui.layout`.
 5. Test: hide the page, change the thing on the server, show the page, expect the new state.
 
 ## History

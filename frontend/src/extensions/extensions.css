@@ -1,0 +1,5 @@
+.hyper-extension-surface { padding: 20px; min-width: 0; height: 100%; overflow: auto; color: var(--text); background: var(--surface); }
+.hyper-extension-surface > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.hyper-extension-surface h2 { font-size: 18px; margin: 0; }
+.hyper-extension-tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px; }
+.hyper-extension-demo { display: grid; gap: 16px; max-width: 640px; }
