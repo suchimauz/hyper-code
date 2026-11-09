@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { FilesPage, parseFilesLocation } from './FilesPage';
 import { requestJson } from '../../sdk/api';
+vi.mock('./CodeEditor', () => ({ CodeEditor: ({ value, onChange, path }: { value: string; onChange: (v: string) => void; path: string }) => <textarea aria-label={`Текст файла ${path}`} defaultValue={value} onChange={event => onChange(event.target.value)} /> }));
 vi.mock('../../sdk/api', () => ({ requestJson: vi.fn() }));
 const request=vi.mocked(requestJson);
 beforeEach(()=>{request.mockReset(); window.history.replaceState({},'', '/files?path=/work/a.txt');});

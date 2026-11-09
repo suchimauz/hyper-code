@@ -20,7 +20,13 @@ export default {
         const absolute = path.startsWith("/") || path === "~" || path.startsWith("~/") || !base ? path : base.replace(/\/+$/, "") + "/" + path.replace(/^\.\//, "");
         const at = await ctx.fns.files.embedUrl({ path: absolute, host, mode });
         const name = at.path.split("/").filter(Boolean).pop() || at.path;
-        return { args: { path: at.path, host: at.host ?? "local", mode, ...(tab ? { tab } : {}) }, title: at.host ? `${at.host}:${name}` : name };
+        // Tree root for the side browser: the agent workspace when the target lives inside it, else the target
+        // directory (or the file's parent). The HTTP transport never lets the tab reach outside this root.
+        const wsDir = String(ws.workspace_dir ?? "").replace(/\/+$/, "");
+        const sameHost = (at.host ?? "local") === (wsHost || "local");
+        const root = sameHost && wsDir.startsWith("/") && (at.path === wsDir || at.path.startsWith(wsDir + "/")) ? wsDir
+            : at.isDir ? at.path : at.path.replace(/\/[^/]*$/, "") || "/";
+        return { args: { path: at.path, host: at.host ?? "local", mode, root, ...(tab ? { tab } : {}) }, title: at.host ? `${at.host}:${name}` : name };
     },
     render() {
         return '<p>Open this file in the native Canvas file tab.</p>';

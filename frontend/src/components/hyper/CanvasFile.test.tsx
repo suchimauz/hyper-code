@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { CanvasFile } from './CanvasFile';
 import { requestJson } from '../../sdk/api';
+vi.mock('./CodeEditor', () => ({ CodeEditor: ({ value, onChange, path }: { value: string; onChange: (v: string) => void; path: string }) => <textarea aria-label={`Текст файла ${path}`} defaultValue={value} onChange={event => onChange(event.target.value)} /> }));
 vi.mock('../../sdk/api', () => ({ requestJson: vi.fn() }));
 const request = vi.mocked(requestJson);
 const item = { id: 7, title: 'file', icon: 'file-text', active: true, kind: 'file', args: { path: '/tmp/file', host: 'local' } };
@@ -62,4 +63,31 @@ it('gives HTML a path-based base and restrictive CSP without enabling scripts', 
   expect(frame.getAttribute('srcdoc')).toContain("default-src 'none'");
   expect(frame.getAttribute('srcdoc')).toContain('Content-Security-Policy');
   expect(frame).not.toHaveAttribute('src');
+});
+it('shows the workspace tree and opens a file in place through the tab-bound endpoint', async () => {
+  const tabItem = { ...item, args: { path: '/w/src/a.ts', host: 'local', root: '/w' } };
+  request.mockImplementation(async (_url: string, options: any) => {
+    const body = options?.body ?? {};
+    if (body.fileAction === 'list' && body.path === '/w') return { path: '/w', isDir: true, entries: [{ name: 'src', isDir: true }, { name: 'README.md', isDir: false }] };
+    if (body.fileAction === 'list' && body.path === '/w/src') return { path: '/w/src', isDir: true, entries: [{ name: 'a.ts', isDir: false }] };
+    if (body.fileAction === 'read' && body.path === '/w/README.md') return { path: '/w/README.md', root: '/w', content: '# Hi', previewKind: 'markdown' };
+    if (body.fileAction === 'read') return { path: '/w/src/a.ts', root: '/w', content: 'x', previewKind: 'text' };
+    return {};
+  });
+  render(<CanvasFile csrfToken="t" agentId="a" item={tabItem} theme="light" refresh={() => {}} />);
+  expect(await screen.findByRole('tree', { name: 'Файлы рабочей папки' })).toBeVisible();
+  expect(await screen.findByRole('treeitem', { name: /a\.ts/ })).toHaveAttribute('aria-selected', 'true');
+  fireEvent.click(await screen.findByRole('treeitem', { name: /README\.md/ }));
+  expect(await screen.findByRole('heading', { name: 'Hi' })).toBeVisible();
+  expect(request).toHaveBeenCalledWith('/canvas/a/item/7', { method: 'POST', csrfToken: 't', body: { fileAction: 'read', path: '/w/README.md' } });
+});
+it('toggles line wrapping and remembers the choice', async () => {
+  localStorage.removeItem('hyper.canvas.files.wrap');
+  request.mockResolvedValue({ path: '/tmp/file', content: 'x' });
+  render(<CanvasFile csrfToken="t" agentId="a" item={item} theme="light" refresh={() => {}} />);
+  const button = await screen.findByRole('button', { name: 'Перенос строк' });
+  expect(button).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(button);
+  expect(button).toHaveAttribute('aria-pressed', 'true');
+  expect(localStorage.getItem('hyper.canvas.files.wrap')).toBe('1');
 });

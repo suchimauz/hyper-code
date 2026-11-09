@@ -9,8 +9,12 @@ export default async function(ctx: Context, _session: Session | null, opts: {
     if (denied) return denied;
     const item = (await ctx.fns.canvas.list({ agentId: String(opts.params.id ?? '') })).find(value => value.id === itemId);
     if (item?.kind === 'file') {
-        // Only the stored, owner-bound path is accepted; query-string paths are never used.
-        const response = await ctx.fns.files.rawResponse({ path: String(item.args.path), host: item.args.host && item.args.host !== 'local' ? String(item.args.host) : undefined });
+        // Only the stored, owner-bound path or a path inside the tab's tree root is accepted.
+        const asked = new URL(opts.req.url).searchParams.get('path');
+        const target = await ctx.fns.canvas.fileTarget({ item, path: asked ?? undefined });
+        if (!target.ok) return new Response(target.error, { status: target.status });
+        if (await ctx.fns.files.isPrivateResult({ path: target.path, host: target.host })) return new Response('File unavailable', { status: 404 });
+        const response = await ctx.fns.files.rawResponse({ path: target.path, host: target.host });
         const headers = new Headers(response.headers);
         // Raw HTML, SVG and PDF must never execute with the application's origin.
         headers.set('Content-Security-Policy', "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:");

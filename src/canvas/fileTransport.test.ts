@@ -3,6 +3,7 @@ import route from './$route_$id_item_$itemId_POST';
 import stateRoute from './$id/state/$route__GET';
 import documentRoute from './$route_$id_item_$itemId_document_GET';
 import authorizeHttp from './authorizeHttp';
+import fileTarget from './fileTarget';
 import currentUser from '../auth/currentUser';
 import csrfToken from '../auth/csrfToken';
 import verifyCsrf from '../auth/verifyCsrf';
@@ -10,8 +11,8 @@ import verifyCsrf from '../auth/verifyCsrf';
 function fixture(options: { missing?: boolean; private?: boolean; directory?: boolean; binary?: boolean; user?: string; role?: string; archived?: boolean; csrf?: 'missing' | 'wrong'; anonymous?: boolean } = {}) {
   let written: unknown;
   const ctx = { fns: {
-    canvas: { authorizeHttp: (opts: any) => authorizeHttp(ctx, null, opts), get: async () => ({}), revision: async () => ({panel:'rev'}), itemDocument: async () => new Response('document'), list: async ({ agentId }: { agentId: string }) => agentId === 'owner' && !options.missing ? [{ id: 7, kind: 'file', args: { path: '/safe/file', host: 'local' } }] : [] },
-    files: { rawResponse: async ({path}: {path:string}) => { expect(path).toBe('/safe/file'); return new Response('raw', {headers:{'content-type':'text/html'}}); }, isPrivateResult: async () => !!options.private, stat: async () => ({ size: 12, isDir: !!options.directory }), list: async () => [{ name: 'hello', isDir: false }], read: async () => options.binary ? '\0binary' : 'original', write: async (opts: unknown) => { written = opts; } },
+    canvas: { authorizeHttp: (opts: any) => authorizeHttp(ctx, null, opts), fileTarget: (opts: any) => fileTarget(ctx, null, opts), get: async () => ({}), revision: async () => ({panel:'rev'}), itemDocument: async () => new Response('document'), list: async ({ agentId }: { agentId: string }) => agentId === 'owner' && !options.missing ? [{ id: 7, kind: 'file', args: { path: '/safe/file', host: 'local' } }] : [] },
+    files: { rawResponse: async ({path}: {path:string}) => { expect(path.startsWith('/safe/')).toBe(true); return new Response('raw', {headers:{'content-type':'text/html'}}); }, isPrivateResult: async () => !!options.private, stat: async () => ({ size: 12, isDir: !!options.directory }), list: async () => [{ name: 'hello', isDir: false }], read: async () => options.binary ? '\0binary' : 'original', write: async (opts: unknown) => { written = opts; } },
   } } as any;
   const user = {id: options.user ?? 'alice', role: options.role ?? 'member', canSignIn:true};
   ctx.state = {};
@@ -67,7 +68,10 @@ describe('React Canvas file transport', () => {
   });
   test('reads only stored target and refuses other agents', async () => {
     const f = fixture();
-    expect(await (await f.call({ fileAction: 'read', path: '/attacker' })).json()).toEqual({ path: '/safe/file', content: 'original', previewKind: 'text' });
+    expect((await f.call({ fileAction: 'read', path: '/attacker' })).status).toBe(403);
+    expect((await f.call({ fileAction: 'read', path: '../etc/passwd' })).status).toBe(403);
+    expect(await (await f.call({ fileAction: 'read' })).json()).toEqual({ path: '/safe/file', root: '/safe', content: 'original', previewKind: 'text' });
+    expect(await (await f.call({ fileAction: 'read', path: 'other.txt' })).json()).toMatchObject({ path: '/safe/other.txt', root: '/safe' });
     expect((await f.call({ fileAction: 'read' }, 'other')).status).toBe(404);
   });
   test('private results are not exposed', async () => { expect((await fixture({ private: true }).call({ fileAction: 'read' })).status).toBe(404); });
@@ -82,4 +86,13 @@ describe('React Canvas file transport', () => {
     const f = fixture({ directory: true }); expect(await (await f.call({ fileAction: 'read' })).json()).toMatchObject({isDir:true}); expect((await f.call({ fileAction: 'save', content: '' })).status).toBe(400);
   });
   test('binary files retain safe preview transport', async () => { expect(await (await fixture({ binary: true }).call({ fileAction: 'read' })).json()).toMatchObject({preview:true}); });
+  test('lists directories inside the tab tree only', async () => {
+    const f = fixture({ directory: true });
+    expect(await (await f.call({ fileAction: 'list', path: '/safe/file' })).json()).toMatchObject({ isDir: true, root: '/safe/file', entries: [{ name: 'hello', isDir: false }] });
+    expect((await f.call({ fileAction: 'list', path: '/safe' })).status).toBe(403);
+  });
+  test('save into a tree path writes that path', async () => {
+    const f = fixture(); expect((await f.call({ fileAction: 'save', path: 'b.txt', content: 'new', expectedContent: 'original' })).status).toBe(200);
+    expect(f.written()).toEqual({ path: '/safe/b.txt', host: undefined, content: 'new', expectedContent: 'original' });
+  });
 });
