@@ -70,6 +70,20 @@ test('manifest serves only approved hashes; official plugins are pre-approved', 
     } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test('sidebar placement is explicit, page-bound and included in approval equality', async () => {
+    const dir = await plugin({ pages: ['main'], sidebarNavigation: ['main'] }, { 'ui/index.tsx': view, 'ui/helper.ts': "export const helper = 'Demo';" });
+    try {
+        const built = await compile(context(dir), null, { name: 'demo' });
+        expect(built.build?.error).toBeNull();
+        const hash = built.build!.hash!;
+        const grants = { pages: ['main'], panels: [], actions: [], canvasKinds: [] };
+        expect((await manifest(context(dir, 'user', [{ name: 'demo', hash, grants }]), null, {})).pending[0]?.reason).toBe('changed');
+        expect((await manifest(context(dir, 'user', [{ name: 'demo', hash, grants: { ...grants, sidebarNavigation: ['main'] } }]), null, {})).plugins).toHaveLength(1);
+        await writeFile(join(dir, 'package.json'), JSON.stringify({ procs: { ui: { pages: ['main'], sidebarNavigation: ['missing'] } } }));
+        expect((await compile(context(dir), null, { name: 'demo' })).build?.error).toMatch(/must reference a requested page/);
+    } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test('approval route requires owner, same origin and CSRF', async () => {
     const calls: unknown[] = [];
     const make = (role: string | null) => ({ fns: {

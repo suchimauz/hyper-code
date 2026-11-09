@@ -13,17 +13,21 @@ export type UiExtension = {
   id: string;
   apiVersion: 1;
   pages?: readonly ExtensionPage[];
+  /** Page menu entries. Plugin entries appear under Pages, not directly in the sidebar. */
   navigation?: readonly { page: string; title: string }[];
+  /** Opt-in direct sidebar links; each page also requires a sidebarNavigation grant. */
+  sidebarNavigation?: readonly { page: string; title: string }[];
   panels?: readonly ExtensionPanel[];
   canvasKinds?: readonly ExtensionCanvasKind[];
   actions?: readonly ExtensionAction[];
 };
-export type ExtensionGrant = Readonly<{ pages?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[] }>;
+export type ExtensionGrant = Readonly<{ pages?: readonly string[]; sidebarNavigation?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[] }>;
 export type RegisteredView = Readonly<{ key: string; title: string; component: ComponentType<ExtensionViewProps> }>;
 export type RegisteredAction = Readonly<ExtensionAction & { key: string }>;
 export type ExtensionRegistry = Readonly<{
   pages: readonly RegisteredView[];
   navigation: readonly Readonly<{ key: string; title: string }>[];
+  sidebarNavigation: readonly Readonly<{ key: string; title: string }>[];
   panels: readonly RegisteredView[];
   canvasKinds: readonly Readonly<ExtensionCanvasKind & { key: string }>[];
   actions: readonly RegisteredAction[];

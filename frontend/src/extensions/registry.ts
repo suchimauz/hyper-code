@@ -4,6 +4,7 @@ import type { ExtensionGrant, ExtensionRegistry, UiExtension } from './types';
 export function createExtensionRegistry(extensions: readonly UiExtension[], grants: Readonly<Record<string, ExtensionGrant>>): ExtensionRegistry {
   const pages: ExtensionRegistry['pages'][number][] = [];
   const navigation: ExtensionRegistry['navigation'][number][] = [];
+  const sidebarNavigation: ExtensionRegistry['sidebarNavigation'][number][] = [];
   const panels: ExtensionRegistry['panels'][number][] = [];
   const actions: ExtensionRegistry['actions'][number][] = [];
   const canvasKinds: ExtensionRegistry['canvasKinds'][number][] = [];
@@ -32,13 +33,17 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
       if (canvasKinds.some(kind => kind.kind === entry.kind)) throw new Error(`Duplicate Canvas kind: ${entry.kind}`);
       canvasKinds.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.kind}` }));
     }
+    for (const placement of ['navigation', 'sidebarNavigation'] as const) {
     const seenNav = new Set<string>();
-    for (const item of extension.navigation ?? []) {
+    for (const item of extension[placement] ?? []) {
       if (!extension.pages?.some(page => page.id === item.page) || seenNav.has(item.page) || !item.title.trim()) throw new Error(`Invalid navigation: ${extension.id}/${item.page}`);
       seenNav.add(item.page);
       const key = `${extension.id}/${item.page}`;
-      if (pages.some(page => page.key === key)) navigation.push(Object.freeze({ key, title: item.title }));
+      if (pages.some(page => page.key === key) && (placement === 'navigation' || grant?.sidebarNavigation?.includes(item.page))) {
+        (placement === 'navigation' ? navigation : sidebarNavigation).push(Object.freeze({ key, title: item.title }));
+      }
+    }
     }
   }
-  return Object.freeze({ canvasKinds: Object.freeze(canvasKinds), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
+  return Object.freeze({ sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
 }
