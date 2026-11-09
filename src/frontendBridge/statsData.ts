@@ -60,7 +60,7 @@ export default async function statsData(
     type Model={model:string;messages:number;totalTokens:number|null;inputTokens:number|null;outputTokens:number|null};
     type Day={date:string;messages:number;sessions:number;totalTokens:number|null;models:Array<{model:string;totalTokens:number|null}>};
     const models=new Map<string,Model>(),daily=new Map<string,Day>(),hours=new Array<number>(24).fill(0),active=new Set<string>();
-    const model=(name:string)=>{let m=models.get(name);if(!m){m={model:name,messages:0,totalTokens:null,inputTokens:null,outputTokens:null};models.set(name,m);}return m;};
+    const model=(raw:string)=>{const name=raw.slice(raw.lastIndexOf(':')+1)||raw;let m=models.get(name);if(!m){m={model:name,messages:0,totalTokens:null,inputTokens:null,outputTokens:null};models.set(name,m);}return m;};
     const day=(date:string)=>{let d=daily.get(date);if(!d){d={date,messages:0,sessions:0,totalTokens:null,models:[]};daily.set(date,d);}return d;};
     const within=(date:string)=>date<=today&&(!start||date>=start);
     let sessions=0,count=0,totalTokens:number|null=null,inputTokens:number|null=null,outputTokens:number|null=null,knownUsage=0,missingUsage=0;
@@ -70,7 +70,7 @@ export default async function statsData(
         const input=Number(e.input),output=Number(e.output),total=Number(e.total);
         totalTokens=(totalTokens??0)+total;inputTokens=(inputTokens??0)+input;outputTokens=(outputTokens??0)+output;
         const m=model(String(e.model));m.totalTokens=(m.totalTokens??0)+total;m.inputTokens=(m.inputTokens??0)+input;m.outputTokens=(m.outputTokens??0)+output;
-        const d=day(e.date);d.totalTokens=(d.totalTokens??0)+total;d.models.push({model:m.model,totalTokens:total});
+        const d=day(e.date);d.totalTokens=(d.totalTokens??0)+total;const dm=d.models.find(x=>x.model===m.model);if(dm)dm.totalTokens=(dm.totalTokens??0)+total;else d.models.push({model:m.model,totalTokens:total});
     }
     const ranked=[...models.values()].sort((a,b)=>b.messages-a.messages||a.model.localeCompare(b.model));
     return {refreshing:false,range,timezone,asOf,startDate:start,sessions,messages:count,totalTokens,inputTokens,outputTokens,activeDays:active.size,peakHour:count?hours.indexOf(Math.max(...hours)):null,favoriteModel:ranked[0]?.messages?ranked[0].model:null,models:ranked,daily:[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date)),usageCoverage:{known:knownUsage,missing:missingUsage,historicalCompleteness:'unknown'},semantics:{scope:'owner nav sessions including archived; legacy null owner belongs to first owner',sessions:'created within calendar range',messages:'user and assistant records excluding cursor-excluded records',activeDays:'days with counted messages',tokens:'sum of available context_usage events only; absent usage is null, historical completeness unknown',models:'current session model, not historical request model',range:'inclusive local calendar days through asOf; all includes complete retained history'}};

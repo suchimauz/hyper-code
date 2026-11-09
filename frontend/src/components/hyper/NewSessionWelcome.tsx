@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Tooltip } from '@base-ui/react/tooltip';
+import './navigation-tooltip.css';
 import { compactCount, getWelcomeStats, heatmapDays, type StatsRange, type WelcomeStats } from '../../lib/welcomeStats';
 import { ApiError } from '../../lib/hyper';
 import './new-session-welcome.css';
@@ -82,7 +84,15 @@ export function NewSessionWelcome({ userName }: { userName: string }) {
 function Heatmap({ stats }: { stats: WelcomeStats }) {
   const days = heatmapDays(stats);
   const max = Math.max(1, ...days.map(day => day.messages));
-  return <div className="welcome-heat" role="img" aria-label="Daily message activity over the last 26 weeks, UTC">{days.map(day => <span key={day.date} className="welcome-heat-cell" data-level={day.messages ? Math.max(1, Math.ceil(day.messages / max * 4)) : 0} title={`${day.date} · ${day.messages.toLocaleString('en-US')} messages · ${compactCount(day.totalTokens)} tokens`} />)}</div>;
+  return <div className="welcome-heat" role="img" aria-label="Daily message activity over the last 26 weeks, UTC">{days.map(day => <Tooltip.Root key={day.date} disableHoverablePopup>
+    <Tooltip.Trigger delay={0} closeDelay={0} render={<span className="welcome-heat-cell" data-level={day.messages ? Math.max(1, Math.ceil(day.messages / max * 4)) : 0} />} />
+    <Tooltip.Portal><Tooltip.Positioner side="top" sideOffset={6} collisionPadding={8} className="navigation-tooltip-positioner">
+      <Tooltip.Popup role="tooltip" className="navigation-tooltip welcome-heat-tooltip">
+        <div className="welcome-heat-tooltip-date">{day.date}</div>
+        <div>{day.messages.toLocaleString('en-US')} messages · {compactCount(day.totalTokens)} tokens</div>
+      </Tooltip.Popup>
+    </Tooltip.Positioner></Tooltip.Portal>
+  </Tooltip.Root>)}</div>;
 }
 function rankStyle(index: number): CSSProperties { return { '--model-opacity': Math.max(.2, 1 - index * .2) } as CSSProperties; }
 function ModelChart({ stats }: { stats: WelcomeStats }) {

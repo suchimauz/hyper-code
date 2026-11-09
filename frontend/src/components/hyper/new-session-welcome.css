@@ -38,3 +38,6 @@
 .welcome-chart-axis { display: flex; justify-content: space-between; margin-left: 34px; height: 14px; font-size: 11px; line-height: 14px; color: var(--text-tertiary); }
 @container (max-width: 340px) { .welcome-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .welcome-model { grid-template-columns: 8px minmax(0,1fr) 46px; } .welcome-model-split { display: none; } }
 @media (pointer: coarse) { .welcome-switch button { min-height: 32px; } }
+
+.welcome-heat-tooltip { width: auto; padding: 6px 10px; border-radius: 10px; gap: 2px; white-space: nowrap; pointer-events: none; }
+.welcome-heat-tooltip-date { color: #fff; font-weight: 600; }
