@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { utilityExtension } from '../ui-plugins/utilities';
+import { utilityExtension } from '../core-ui/utilities';
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 const context={readOnly:false} as any;
 test('update requires a separate confirmation and sends the displayed target',async()=>{

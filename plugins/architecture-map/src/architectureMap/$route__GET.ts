@@ -12,7 +12,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     const minWeight = Math.max(1, Math.min(50, Number(url.searchParams.get("minWeight")) || 2));
     const json = opts.req.headers.get("accept")?.includes("application/json");
     if (!json) {
-        const query = new URLSearchParams({ view: "extension:visualizations/architecture", scope, minWeight: String(minWeight) });
+        const query = new URLSearchParams({ view: "extension:architecture-map/architecture", scope, minWeight: String(minWeight) });
         return new Response(null, { status: 302, headers: { Location: `/?${query}` } });
     }
     const [graph, boundary] = await Promise.all([

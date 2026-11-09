@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { settingsExtension } from '../ui-plugins/settings';
+import { settingsExtension } from '../core-ui/settings';
 vi.mock('@hyper/ui', async () => { const actual = await vi.importActual<typeof import('@hyper/ui')>('@hyper/ui'); return {...actual, requestJson:vi.fn()}; });
 import { requestJson } from '@hyper/ui';
 const request=vi.mocked(requestJson);

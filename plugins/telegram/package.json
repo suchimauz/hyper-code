@@ -7,7 +7,16 @@
     "label": "Telegram",
     "icon": "ph-telegram-logo",
     "optional": true,
-    "description": "Read and search chats, messages, contacts, folders, and participants, with guarded messaging actions."
+    "description": "Read and search chats, messages, contacts, folders, and participants, with guarded messaging actions.",
+    "ui": {
+      "entry": "ui/index.tsx",
+      "pages": [
+        "overview"
+      ],
+      "applications": {
+        "/telegram": "overview"
+      }
+    }
   },
   "dependencies": {
     "telegram": "^2.26.22"

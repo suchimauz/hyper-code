@@ -51,7 +51,7 @@ function ArchitecturePage({canvas}:CanvasBinding = {}) {
   </>}</Panel>;
 }
 /** Read-only native architecture pages. */
-export const visualizationsExtension: UiExtension = {id:'visualizations',apiVersion:1,canvasKinds:[{kind:'architectureMap.map',component:ArchitectureCanvas},{kind:'architectureMap.turbulence',component:TurbulenceCanvas}],pages:[{id:'architecture',title:'Архитектура',component:ArchitecturePage},{id:'turbulence',title:'Turbulence',component:TurbulencePage}]};
+const visualizationsExtension: UiExtension = {id:'architecture-map',apiVersion:1,canvasKinds:[{kind:'architectureMap.map',component:ArchitectureCanvas},{kind:'architectureMap.turbulence',component:TurbulenceCanvas}],pages:[{id:'architecture',title:'Архитектура',component:ArchitecturePage},{id:'turbulence',title:'Turbulence',component:TurbulencePage}]};
 
 function ArchitectureCanvas(props:ExtensionCanvasProps){return <ArchitecturePage key={props.item.id} canvas={props}/>;}
 function TurbulenceCanvas(props:ExtensionCanvasProps){return <TurbulencePage key={props.item.id} canvas={props}/>;}
@@ -73,3 +73,4 @@ function TurbulencePage({canvas}:CanvasBinding = {}) {
     <h2>Файлы по риску</h2><div style={{overflowX:'auto'}}><table><thead><tr><th>Файл</th><th>Зона</th><th>Commits</th><th>Complexity</th><th>Danger</th></tr></thead><tbody>{[...files].sort((a,b)=>b.danger-a.danger).map(file=><tr key={file.path}><td><Button onClick={()=>setSelected(file.path)}>{file.path}</Button></td><td>{file.quadrant}</td><td>{file.commits}</td><td>{file.complexity}</td><td>{file.danger}</td></tr>)}</tbody></table></div>
   </Panel>;
 }
+export default visualizationsExtension;

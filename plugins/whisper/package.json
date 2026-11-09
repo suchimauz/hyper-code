@@ -1,1 +1,21 @@
-{"name":"whisper","private":true,"type":"module","procs":{"src":"src","label":"Whisper","icon":"ph-microphone","optional":true,"description":"Transcribe audio locally with whisper.cpp on Apple Silicon and manage speech-recognition models."}}
+{
+  "name": "whisper",
+  "private": true,
+  "type": "module",
+  "procs": {
+    "src": "src",
+    "label": "Whisper",
+    "icon": "ph-microphone",
+    "optional": true,
+    "description": "Transcribe audio locally with whisper.cpp on Apple Silicon and manage speech-recognition models.",
+    "ui": {
+      "entry": "ui/index.tsx",
+      "pages": [
+        "overview"
+      ],
+      "applications": {
+        "/whisper": "overview"
+      }
+    }
+  }
+}

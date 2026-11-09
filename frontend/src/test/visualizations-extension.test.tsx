@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { visualizationsExtension } from '../ui-plugins/visualizations';
+import visualizationsExtension from '../../../plugins/architecture-map/ui';
 const context={agentId:null,theme:'light' as const,readOnly:false};
 afterEach(()=>{cleanup();vi.restoreAllMocks();history.replaceState(null,'','/');});
 it('shows accessible module dependencies and filters them without a new request',async()=>{

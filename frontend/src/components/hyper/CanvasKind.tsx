@@ -1,9 +1,10 @@
-import { installedExtensions } from '../../extensions/installed';
+import { usePluginUi } from '../../extensions/pluginRuntime';
 import { ExtensionBoundary } from '../../extensions/ExtensionHost';
 import type { CanvasItemTab } from './canvasTabs';
 
 /** Only explicitly granted, build-time React kinds execute in the host. */
 export function CanvasKind({ agentId, item, theme }: { agentId: string; item: CanvasItemTab; theme: 'light' | 'dark' }) {
+  const installedExtensions = usePluginUi().registry;
   const entry = installedExtensions.canvasKinds.find(entry => entry.kind === item.kind);
   if (entry && item.kind) {
     const View = entry.component;

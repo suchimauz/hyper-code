@@ -3,21 +3,14 @@ import { requestJson, safeApiPath } from '../../sdk/api';
 import { subscribeLive } from '../../sdk/live';
 import { Button } from '../ui/Button';
 import './application-pages.css';
+import { pluginRuntime } from '../../extensions/pluginRuntime';
 
 type Application = { id: string; label: string; href: string; group?: string };
-/** Explicit host-owned destinations; backend registration cannot install browser code. */
-const nativePages: Record<string, string> = {
-  '/search': 'documentation/search', '/functions': 'documentation/functions',
-  '/settings': 'settings/overview', '/settings/declared': 'settings/declared',
-  '/shared-agents': 'shared-agents/overview', '/controlPlane': 'instances/overview',
-  '/architectureMap': 'visualizations/architecture',
-  '/architectureMap/turbulence': 'visualizations/turbulence', '/browser/live': 'browser-live/live',
-  '/whisper': 'whisper/overview',
-  '/autotext': 'utilities/autotext', '/update': 'utilities/update', '/telegram': 'telegram/overview',
-};
-export function nativeApplicationHref(href: string): string | null {
+/** Native destinations: core pages plus those plugins declare in package.json procs.ui.applications. */
+export function nativeApplicationHref(href: string, applications: Readonly<Record<string, string>> = pluginRuntime.getState().applications): string | null {
   const url = new URL(href, location.origin);
-  const page = nativePages[url.pathname.replace(/\/$/, '')];
+  const path = url.pathname.replace(/\/$/, '') || '/';
+  const page = Object.hasOwn(applications, path) ? applications[path] : undefined;
   if (!page) return null;
   url.pathname = '/'; url.searchParams.set('view', `extension:${page}`);
   return url.pathname + url.search;

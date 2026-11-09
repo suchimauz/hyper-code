@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { AgentSource } from '../ui-plugins/agent-source';
+import { AgentSource } from '../core-ui/agent-source';
 import { readNewSessionDraft } from '../lib/newSession';
 afterEach(()=>{vi.unstubAllGlobals();history.replaceState(null,'','/');sessionStorage.clear();localStorage.clear();});
 it('renders source content literally through the read-only JSON route',async()=>{

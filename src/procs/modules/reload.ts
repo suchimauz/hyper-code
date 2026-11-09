@@ -20,6 +20,10 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
     // Optional: `services` is a library a host mounts, and the framework alone
     // reloads perfectly well without it.
     await root.fns.services?.track?.({});
+    // Plugin UI bundles are rebuilt here so a mounted, removed or edited plugin's
+    // browser UI appears without a frontend rebuild (emits plugins.changed).
+    try { await root.fns.plugins?.uiBuildAll?.({}); }
+    catch (error: any) { root.fns.procs.log.warn({ event: "plugins.ui.build.failed", msg: String(error?.message ?? error) }); }
     // A mounted/removed module changes the tab strip; reload the open tabs so it
     // shows without anyone pressing anything. The manager's POST still returns the
     // strip out of band, so its own click updates instantly and the broadcast just

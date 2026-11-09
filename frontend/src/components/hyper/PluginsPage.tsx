@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Info, Plus, Puzzle, RotateCw, Search, X } from 'lucide-react';
 import { getPluginSources, type SourcePlugin, type SourceProvider, getPlugins, groupPlugins, phosphorClass, reloadPlugins, reviewPluginInstall, searchPluginMarket, type InstalledPlugin, type MarketItem, type MarketSection } from '../../lib/plugins';
 import { PluginDetail } from './PluginDetail';
+import { PluginUiReview } from './PluginUiReview';
 import './plugins-page.css';
 
 type Tab = 'installed' | 'market' | 'sources';
@@ -110,6 +111,7 @@ function Market({ csrf, onOpenAgent, onOpenPlugin }: { csrf: string; onOpenAgent
   </>;
 }
 
+
 /** Plugins page, as in dsh, over Hyper's mounted plugins and provider catalogue. */
 export function PluginsPage({ onOpenAgent }: { onOpenAgent?: (id: string) => void } = {}) {
   usePhosphor();
@@ -161,6 +163,7 @@ export function PluginsPage({ onOpenAgent }: { onOpenAgent?: (id: string) => voi
       {error && <p className="plugins-error" role="alert">{error}</p>}
       {tab === 'installed' ? <>
         <label className="plugins-search"><Search size={14} strokeWidth={1.5} aria-hidden="true" /><input type="search" aria-label="Filter installed plugins" placeholder="Filter installed plugins" value={query} onChange={e => setQuery(e.target.value)} />{query && <button aria-label="Clear filter" onClick={() => setQuery('')}><X size={12} /></button>}</label>
+        <PluginUiReview />
         {!plugins && !error && <p className="plugins-muted">Loading…</p>}
         {plugins && !groups.length && <p className="plugins-muted">No plugins match.</p>}
         {groups.map(group => <section key={group.title} className="plugins-section">

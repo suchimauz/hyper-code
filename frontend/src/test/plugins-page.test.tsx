@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PluginsPage } from '../components/hyper/PluginsPage';
+vi.mock('../components/hyper/PluginUiReview', () => ({ PluginUiReview: () => null }));
 import { groupPlugins, phosphorClass, type InstalledPlugin } from '../lib/plugins';
 
 const plugin = (over: Partial<InstalledPlugin>): InstalledPlugin => ({ name: 'p', label: 'P', description: 'd', icon: 'ph-browser', version: null, source: 'official', namespaces: ['p'], functions: 2, routes: 0, hasSkill: true, configurable: false, ...over });

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { TelegramPage, telegramExtension } from '../ui-plugins/telegram';
+import telegramExtension, { TelegramPage } from '../../../plugins/telegram/ui';
 const context = { agentId: null, theme: 'light' as const, readOnly: false };
 const chats = [{ id: '123', title: 'Alice', lastMessage: 'Hello', unreadCount: 2 }];
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });

@@ -6,5 +6,5 @@
     "allowImportingTsExtensions": true, "types": ["vite/client"],
     "paths": { "@hyper/ui": ["./src/sdk/index.ts"] }
   },
-  "include": ["src", "vite.config.ts", ".storybook"]
+  "include": ["src", "vite.config.ts", ".storybook", "../plugins/*/ui"]
 }

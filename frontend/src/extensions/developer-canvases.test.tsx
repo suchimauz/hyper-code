@@ -1,7 +1,9 @@
 import { it, expect, vi, afterEach } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { TestsCanvas, IconsCanvas } from '../ui-plugins/developer-canvases';
-import { BrowserLive } from '../ui-plugins/browser-live';
+import { TestsCanvas } from '../core-ui/developer-canvases';
+import iconsExtension from '../../../plugins/icons/ui';
+import { BrowserLive } from '../../../plugins/browser/ui';
+const IconsCanvas = iconsExtension.canvasKinds![0]!.component as unknown as import('react').FC;
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@hyper/ui', () => ({requestJson:request,Panel:({title,children}:any)=><section><h1>{title}</h1>{children}</section>,Button:({children,...props}:any)=><button {...props}>{children}</button>,TextField:({label,...props}:any)=><label>{label}<input {...props}/></label>}));
 afterEach(()=>{cleanup();request.mockReset();vi.unstubAllGlobals();});

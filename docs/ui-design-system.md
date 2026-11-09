@@ -6,7 +6,7 @@ For Hyper UI work first read [Apple Design](skills/apple-design/SKILL.md) and it
 
 The primary React frontend owns its component and theme layer. Trusted extensions import `Button`, `IconButton`, `Sheet`, `Stack`, `Panel`, `TextField` and `Dialog` from `@hyper/ui` (`frontend/src/sdk/index.ts`). Use these shared primitives instead of private host imports, a second component runtime, or injected HTML. The host supplies one React/React DOM instance.
 
-`ui-plugins/sdk-example.tsx` demonstrates these primitives as a dev/test fixture; it is not installed in the production extension registry. SSH settings switches to the native `llm-connections` tab via callback instead of linking to `/llms`. Shared styles still serve People `/auth/users`, draft and built-in/plugin SSR pages, Canvas kind documents and secure cards; see the [residual consumer map](ui-architecture.md#residual-compatibility-consumers).
+`test/fixtures/sdk-example.tsx` demonstrates these primitives as a dev/test fixture; it is not installed in the production extension registry. SSH settings switches to the native `llm-connections` tab via callback instead of linking to `/llms`. Shared styles still serve People `/auth/users`, draft and built-in/plugin SSR pages, Canvas kind documents and secure cards; see the [residual consumer map](ui-architecture.md#residual-compatibility-consumers).
 
 ## Tokens and themes
 

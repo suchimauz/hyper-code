@@ -192,6 +192,23 @@ export default {
 
 Use `settings.get`/`settings.set` for values. An instance may fix a plugin's values in `~/.hyper/settings/$settings_<plugin>.json` (see docs/settings.md) — never ship such files inside the plugin. Setting keys come from namespace plus filename. Descriptor fields such as `type`, `default`, `env`, `title`, `description`, `options`, `min` and `max` belong in declarations and must match the consuming settings implementation. Never commit secret values as defaults, environment files, package metadata or SKILL.md examples. Use encrypted secret storage and references through supported consumers; never print secret values to discovery output or logs.
 
+## Plugin UI (React, loaded at runtime)
+
+A plugin's browser UI lives only in its own folder — never in `frontend/src`, never in a host allowlist.
+
+1. Write `ui/index.tsx` with `export default` a `UiExtension` whose `id` equals the plugin name. Import only `react`, `react/jsx-runtime`, `react-dom`, `@hyper/ui` and relative files inside `ui/`.
+2. Declare the requested grants in `package.json`:
+
+```json
+"procs": { "src": "src", "ui": { "entry": "ui/index.tsx", "pages": ["overview"], "canvasKinds": ["example.board"], "applications": { "/example": "overview" } } }
+```
+
+   Canvas kinds must start with one of the plugin's namespaces; `applications` maps a legacy document path to a requested page.
+3. Run `plugins.reload({ name })`. Hyper rebuilds the bundle (`plugins.uiCompile`), emits `plugins.changed`, and open tabs pick it up without a page reload or frontend rebuild. Check `ctx.state.plugins.ui[name].error` or `plugins.uiManifest({})` for build errors.
+4. Official plugins are pre-approved. A user or other plugin's UI runs only after a person approves the exact bundle hash and grants in the Plugins page; any change to the code or grants sends it back for review. Never approve on a person's behalf.
+
+UI code is trusted same-origin code, not a sandbox: every route it calls still enforces authentication, ownership and CSRF itself.
+
 ## Plugin-specific configuration
 
 A mounted plugin has one detail page, `/plugins/:name`: **Overview** (default, `?tab=overview`) shows SKILL.md, **Settings** (`?tab=settings`) contains declared settings, safe secret status and the optional widget, and **Functions** (`?tab=functions`) shows generated live API documentation. The widget runs only when rendering Settings, not during catalogue browsing or other tabs. The compatibility GET `/plugins/:name/config` redirects to the Settings tab; its POST remains the form submission endpoint and redirects back after a successful save. Secret rows show references/status and secure-input guidance, not plaintext inputs.

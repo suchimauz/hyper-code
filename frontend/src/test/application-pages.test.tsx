@@ -10,10 +10,12 @@ describe('declared application documents', () => {
     expect(applicationLinks({ items: ['/docs', '/files', '//evil.test', '/%2f%2fevil.test', '/a/../b', '/%0aevil', '/', '/auth/users', '/sber/login', '/tbank', 'https://example.com'].map(item) }).map(x => x.href)).toEqual(['/docs', '/files']);
     expect(applicationLinks(null)).toEqual([]);
     expect(nativeApplicationHref('/news?source=rss')).toBeNull();
-    expect(nativeApplicationHref('/architectureMap/')).toBe('/?view=extension%3Avisualizations%2Farchitecture');
-    expect(nativeApplicationHref('/architectureMap/turbulence?days=7')).toBe('/?days=7&view=extension%3Avisualizations%2Fturbulence');
-    expect(nativeApplicationHref('/browser/live?target=tab')).toBe('/?target=tab&view=extension%3Abrowser-live%2Flive');
-    expect(nativeApplicationHref('/custom-plugin')).toBeNull();
+    const apps = { '/architectureMap': 'architecture-map/architecture', '/architectureMap/turbulence': 'architecture-map/turbulence', '/browser/live': 'browser/live' };
+    expect(nativeApplicationHref('/architectureMap/', apps)).toBe('/?view=extension%3Aarchitecture-map%2Farchitecture');
+    expect(nativeApplicationHref('/architectureMap/turbulence?days=7', apps)).toBe('/?days=7&view=extension%3Aarchitecture-map%2Fturbulence');
+    expect(nativeApplicationHref('/browser/live?target=tab', apps)).toBe('/?target=tab&view=extension%3Abrowser%2Flive');
+    expect(nativeApplicationHref('/custom-plugin', apps)).toBeNull();
+    expect(nativeApplicationHref('/browser/live')).toBeNull();
   });
   it('loads only declared pages, hosts the chosen document and disposes live subscription', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ items: [{ id: 'custom', label: 'Custom', href: '/custom-plugin', group: 'Приложения' }] })));

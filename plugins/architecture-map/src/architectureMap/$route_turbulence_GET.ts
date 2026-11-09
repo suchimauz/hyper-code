@@ -8,6 +8,6 @@ export default async function(ctx: Context, _session: Session | null, opts: { /*
     const itemId = Number(url.searchParams.get('itemId'));
     if (!(await ctx.fns.canvas.list({ agentId })).some(item => item.id === itemId && item.kind === 'architectureMap.turbulence')) return new Response('No such canvas item', { status: 404 });
   }
-  if (!opts.req.headers.get('accept')?.includes('application/json')) return new Response(null, {status:302,headers:{Location:'/?view=extension:visualizations/turbulence'}});
+  if (!opts.req.headers.get('accept')?.includes('application/json')) return new Response(null, {status:302,headers:{Location:'/?view=extension:architecture-map/turbulence'}});
   return Response.json(await ctx.fns.architectureMap.turbulence({root:url.searchParams.get('root') || undefined,limit:3000}));
 }

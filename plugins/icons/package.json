@@ -6,6 +6,12 @@
     "src": "src",
     "label": "Icons",
     "icon": "ph-shapes",
-    "description": "Search local Lucide SVG icons and install consistently padded chat icons."
+    "description": "Search local Lucide SVG icons and install consistently padded chat icons.",
+    "ui": {
+      "entry": "ui/index.tsx",
+      "canvasKinds": [
+        "icons.browser"
+      ]
+    }
   }
 }

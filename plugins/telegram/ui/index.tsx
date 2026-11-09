@@ -94,4 +94,5 @@ export function TelegramPage({ context }: ExtensionViewProps) {
     </Dialog>
   </div>;
 }
-export const telegramExtension: UiExtension = { id: 'telegram', apiVersion: 1, pages: [{ id: 'overview', title: 'Telegram', component: TelegramPage }], navigation: [{ page: 'overview', title: 'Telegram' }] };
+const telegramExtension: UiExtension = { id: 'telegram', apiVersion: 1, pages: [{ id: 'overview', title: 'Telegram', component: TelegramPage }], navigation: [{ page: 'overview', title: 'Telegram' }] };
+export default telegramExtension;

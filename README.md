@@ -24,7 +24,7 @@ A recording of Health Samurai's **Agents on FHIR working group meeting — Octob
 - **Delegate focused work.** Give agents separate tasks and follow their plans and results without putting every detail into one chat.
 - **Bring tools into the conversation.** Discover plugin capabilities for services such as GitHub, Google Workspace, Telegram, and web search. Individual integrations may require credentials or additional software.
 - **See the output beside the chat.** Open files, documents, diagrams, charts, and plugin views in Canvas.
-- **Extend the workspace while it runs.** Hot-reload procedures and HTTP routes without discarding session state. Trusted React UI extensions use the host's reviewed build-time registration and Vite workflow.
+- **Extend the workspace while it runs.** Hot-reload procedures and HTTP routes without discarding session state. Plugins ship their own React UI in `ui/`; Hyper builds and loads it at runtime, without a frontend rebuild.
 - **Use your existing coding harness.** Give trusted local Claude Code, Codex, and other shell-capable tools access to Hyper through its CLI.
 
 For example: ask an agent to review a pull request, research an issue and show its findings in Canvas, or build a small integration you can reuse in later conversations.
@@ -145,11 +145,11 @@ await ctx.fns.procs.repl.load({ name: "myModule" });
 
 **Calls resolve through the registry.** Project functions call one another through `ctx.fns`, rather than importing each other's implementations. This makes hot-reload apply to existing call sites. Capitalized type files generate the shared `types.<module>.<Name>` namespace.
 
-**The primary UI is React/Vite.** Bun serves the authenticated shell and APIs. Trusted React extensions use the local `@hyper/ui` alias (not a published package), host React, shared components and explicit build-time grants for pages, navigation, panels and actions. No private/deep imports or second React runtime. HTMX, `#main` and `$script` assets remain compatibility mechanisms, not the primary extension contract.
+**The primary UI is React/Vite.** Bun serves the authenticated shell and APIs. Trusted React extensions use the local `@hyper/ui` alias (not a published package), host React, shared components and explicit grants (declared in a plugin's `package.json` `procs.ui`, approved per bundle) for pages, navigation, panels and actions. No private/deep imports or second React runtime. HTMX, `#main` and `$script` assets remain compatibility mechanisms, not the primary extension contract.
 
 The SDK example remains a dev/test fixture with a separate test registry; it is not installed in production. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers have been removed, and SSH settings opens the native LLM Connections tab via callback rather than `/llms`. Dynamic HTTP layouts, People and other SSR pages, Canvas kind documents and secure approval transports still have live consumers; see the [concrete compatibility map](docs/ui-architecture.md#residual-compatibility-consumers).
 
-Extensions are trusted same-origin code, not a sandbox. Frontend grants and read-only controls never replace backend authentication, ownership, CSRF or explicit human approval. SDK `requestJson` writes require the existing cookie-bound CSRF token. `subscribeLive`/`useLiveSubscription` require resync and error callbacks, topic declarations and cleanup. Preserve themes, keyboard focus, accessibility and reduced motion; the [Apple Design guidance](docs/skills/apple-design/README.md) applies only to Hyper UI. Start with [UI architecture](docs/ui-architecture.md) and `frontend/src/ui-plugins/sdk-example.tsx`.
+Extensions are trusted same-origin code, not a sandbox. Frontend grants and read-only controls never replace backend authentication, ownership, CSRF or explicit human approval. SDK `requestJson` writes require the existing cookie-bound CSRF token. `subscribeLive`/`useLiveSubscription` require resync and error callbacks, topic declarations and cleanup. Preserve themes, keyboard focus, accessibility and reduced motion; the [Apple Design guidance](docs/skills/apple-design/README.md) applies only to Hyper UI. Start with [UI architecture](docs/ui-architecture.md) and `frontend/src/test/fixtures/sdk-example.tsx`.
 
 Read more in [architecture](docs/architecture.md), [settings](docs/settings.md), and [tool-call protocols](docs/toolcall-protocols.md).
 

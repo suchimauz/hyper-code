@@ -13,6 +13,15 @@
     "label": "Browser",
     "icon": "ph-browser",
     "optional": true,
-    "description": "Navigate Chrome tabs, inspect and interact with pages, capture screenshots, and share a live browser view."
+    "description": "Navigate Chrome tabs, inspect and interact with pages, capture screenshots, and share a live browser view.",
+    "ui": {
+      "entry": "ui/index.tsx",
+      "pages": [
+        "live"
+      ],
+      "applications": {
+        "/browser/live": "live"
+      }
+    }
   }
 }

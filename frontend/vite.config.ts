@@ -9,8 +9,8 @@ export default defineConfig({
     enforce: 'pre',
     resolveId(source, importer) {
       if (source.startsWith('@hyper/ui/')) throw new Error('Use the public @hyper/ui entry, not deep imports');
-      if (importer?.replaceAll('\\\\', '/').includes('/ui-plugins/') && source !== '@hyper/ui' && source !== new URL('./src/sdk/index.ts', import.meta.url).pathname && source !== 'react' && !source.startsWith('react/') && source !== '/@react-refresh' && source.split('?')[0] !== importer?.split('?')[0]) {
-        throw new Error(`UI plugins may import only React and @hyper/ui: ${source}`);
+      if (importer && /\/(?:core-ui\/|plugins\/[^/]+\/ui\/)/.test(importer.replaceAll('\\\\', '/')) && !source.startsWith('.') && source !== '@hyper/ui' && source !== new URL('./src/sdk/index.ts', import.meta.url).pathname && source !== 'react' && !source.startsWith('react/') && source !== '/@react-refresh' && source.split('?')[0] !== importer?.split('?')[0]) {
+        throw new Error(`Core and plugin UIs may import only React and @hyper/ui: ${source}`);
       }
       return null;
     },
@@ -21,7 +21,7 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1', port: 5174, strictPort: true,
-    fs: { strict: true, allow: [new URL('.', import.meta.url).pathname, new URL('../node_modules', import.meta.url).pathname] },
+    fs: { strict: true, allow: [new URL('.', import.meta.url).pathname, new URL('../node_modules', import.meta.url).pathname, new URL('../plugins', import.meta.url).pathname] },
     hmr: { path: 'hmr' },
   },
   test: { environment: 'jsdom', setupFiles: ['./src/test/setup.ts'], css: false, exclude: ['**/node_modules/**', '**/dist/**', '.hyper/**'] },

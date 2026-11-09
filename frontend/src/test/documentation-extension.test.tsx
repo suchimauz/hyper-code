@@ -1,6 +1,6 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {render,screen} from '@testing-library/react';
-import {documentationExtension} from '../ui-plugins/documentation';
+import {documentationExtension} from '../core-ui/documentation';
 const context={agentId:null,theme:'light' as const,readOnly:false};
 afterEach(()=>{vi.restoreAllMocks();history.replaceState(null,'','/');});
 it('renders transcript snippets as text with only bold markers interpreted',async()=>{

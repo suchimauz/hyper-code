@@ -32,11 +32,14 @@ import { PeoplePage } from './components/PeoplePage';
 import { SidebarDraftPage } from './components/SidebarDraftPage';
 import { ApplicationPages } from './components/hyper/ApplicationPages';
 import { useQuotas } from './hooks/useQuotas';
-import { installedExtensions } from './extensions/installed';
+import { pluginRuntime, usePluginUi } from './extensions/pluginRuntime';
 import { ExtensionSurface, ExtensionActionButton } from './extensions/ExtensionHost';
 
 export function LiveApp() {
   const [widthControlTarget, setWidthControlTarget] = useState<HTMLSpanElement | null>(null);
+  const pluginUi = usePluginUi();
+  const installedExtensions = pluginUi.registry;
+  useEffect(() => { pluginRuntime.start(); }, []);
   const hyper = useHyper();
   const [historyInputs, setHistoryInputs] = useState<ChoiceInput[]>([]);
   const { theme, themeMode, setTheme } = useTheme();
@@ -147,7 +150,7 @@ export function LiveApp() {
   const openSettings = useCallback(() => { setSheetOpen(false); setSettingsOpen(true); }, []);
   const openQuotas = useCallback(() => { setSheetOpen(false); setSettingsTab('llm-connections'); setSettingsOpen(true); }, []);
   type PageView = 'automation' | 'plugins' | 'people' | 'applications' | `extension:${string}` | null;
-  const readView = (): PageView => { const v = new URL(location.href).searchParams.get('view'); return v === 'automation' || v === 'plugins' || v === 'people' || v === 'applications' ? v : installedExtensions.pages.some(page => `extension:${page.key}` === v) ? v as PageView : null; };
+  const readView = (): PageView => { const v = new URL(location.href).searchParams.get('view'); return v === 'automation' || v === 'plugins' || v === 'people' || v === 'applications' ? v : /^extension:[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/.test(v ?? '') ? v as PageView : null; }; // runtime plugins load after first render
   const [pageView, setPageViewState] = useState<PageView>(readView);
   const setPageView = (next: PageView) => { setPageViewState(next); const url = new URL(location.href); if (next) url.searchParams.set('view', next); else url.searchParams.delete('view'); history.replaceState(null, '', url); };
   const automation = pageView === 'automation';
@@ -191,7 +194,7 @@ export function LiveApp() {
   </section>;
   return <><div className={embedded ? 'embedded-chat-marker' : ''} hidden /><div hidden data-live-topic="agents" /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}` : 'agents'} /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}:stream` : 'agents'} />
     <AppShell sidebarVisible={!embedded} sidebar={embedded ? null : sidebar()} sidebarCompact={sidebarCompact} workspaceNav>
-      <div style={paneDrag == null ? undefined : { '--pane-drag': `${paneDrag}px` } as React.CSSProperties} className={`workspace-layout live-workspace view-${mobileView} ${paneDrag == null ? '' : 'pane-dragging'} ${canvasOpen ? 'has-canvas' : 'no-canvas'} ${canvasExpanded ? 'canvas-expanded' : ''}`}><SplitPane primary={sidebarBindingId ? <SidebarDraftPage bindingId={sidebarBindingId} onCreated={id => { const url = new URL(location.href); url.searchParams.delete('sidebarDraft'); url.searchParams.set('agent', id); url.searchParams.set('presentation', 'sidebar'); history.replaceState(null, '', url); created(id); }} /> : pageView === 'people' ? <PeoplePage /> : pageView === 'applications' ? <ApplicationPages theme={theme} /> : extensionPage ? <ExtensionSurface view={extensionPage} context={{ agentId: null, theme, readOnly: navigation.canManage !== true }} onClose={() => setPageView(null)} /> : automation ? <AutomationTasks /> : pageView === 'plugins' ? <PluginsPage onOpenAgent={selectChat} /> : chat} secondary={pageView ? null : activeExtensionPanel ? <ExtensionSurface view={activeExtensionPanel} context={extensionContext} onClose={() => setExtensionPanel(null)} /> : sideAgent ? <SubagentPanel id={sideAgent.id} title={sideAgent.title} onClose={closeSecondary} /> : canvas} label="Ширина Canvas" secondaryWidth={canvasWidth} onWidthChange={resizeCanvas} maxWidth={1600} /></div>
+      <div style={paneDrag == null ? undefined : { '--pane-drag': `${paneDrag}px` } as React.CSSProperties} className={`workspace-layout live-workspace view-${mobileView} ${paneDrag == null ? '' : 'pane-dragging'} ${canvasOpen ? 'has-canvas' : 'no-canvas'} ${canvasExpanded ? 'canvas-expanded' : ''}`}><SplitPane primary={sidebarBindingId ? <SidebarDraftPage bindingId={sidebarBindingId} onCreated={id => { const url = new URL(location.href); url.searchParams.delete('sidebarDraft'); url.searchParams.set('agent', id); url.searchParams.set('presentation', 'sidebar'); history.replaceState(null, '', url); created(id); }} /> : pageView === 'people' ? <PeoplePage /> : pageView === 'applications' ? <ApplicationPages theme={theme} /> : extensionPage ? <ExtensionSurface view={extensionPage} context={{ agentId: null, theme, readOnly: navigation.canManage !== true }} onClose={() => setPageView(null)} /> : pageView?.startsWith('extension:') ? <p role="status" className="extension-page-pending">{pluginUi.loaded ? 'Страница недоступна: расширение не загружено или не одобрено.' : 'Загрузка расширения…'}</p> : automation ? <AutomationTasks /> : pageView === 'plugins' ? <PluginsPage onOpenAgent={selectChat} /> : chat} secondary={pageView ? null : activeExtensionPanel ? <ExtensionSurface view={activeExtensionPanel} context={extensionContext} onClose={() => setExtensionPanel(null)} /> : sideAgent ? <SubagentPanel id={sideAgent.id} title={sideAgent.title} onClose={closeSecondary} /> : canvas} label="Ширина Canvas" secondaryWidth={canvasWidth} onWidthChange={resizeCanvas} maxWidth={1600} /></div>
     </AppShell>{!embedded && <SecureInputDialog />}<SettingsDialog open={settingsOpen} tab={settingsTab} onTab={setSettingsTab} onOpenChange={changeSettingsOpen} />{!embedded && <><EdgeSwipe side="right" label="Свайп влево — открыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'chat' || canvasUnavailable} onSwipe={showCanvas} /><EdgeSwipe side="left" label="Свайп вправо — закрыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'canvas'} onSwipe={closeSecondary} /></>}<Sheet hideHeader swipeToOpen={!embedded && mobileView === 'chat'} title="Рабочее пространство" open={sheetOpen} onOpenChange={setSheetOpen} initialFocus={mobileSearchRef}>{sidebar(true)}</Sheet>
   </>;
 }

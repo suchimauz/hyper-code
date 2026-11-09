@@ -102,4 +102,5 @@ export function WhisperPage({context}:ExtensionViewProps) {
     <form onSubmit={e=>{e.preventDefault();const text=typed.trim();if(text&&!context.readOnly){setTyped('');void route(text,false).catch(e=>setStatus(String(e)));}}}><label>Test a phrase without microphone<input className="my-2 block w-full rounded border border-line bg-transparent p-2" value={typed} onChange={e=>setTyped(e.target.value)}/></label><Button type="submit" disabled={context.readOnly||!typed.trim()}>Preview phrase</Button></form>
     {pending&&<p role="status">Pending dry run — say cancel, clap, or <Button onClick={cancel}>Cancel</Button></p>}<div aria-label="Command previews" className="mt-3 max-h-80 space-y-2 overflow-auto">{logs.map((l,i)=><pre className="whitespace-pre-wrap rounded border border-line p-2 text-xs" key={i}>{l}</pre>)}</div></Panel></div>;
 }
-export const whisperExtension:UiExtension={id:'whisper',apiVersion:1,pages:[{id:'overview',title:'Whisper live',component:WhisperPage}],navigation:[{page:'overview',title:'Whisper live'}]};
+const whisperExtension:UiExtension={id:'whisper',apiVersion:1,pages:[{id:'overview',title:'Whisper live',component:WhisperPage}],navigation:[{page:'overview',title:'Whisper live'}]};
+export default whisperExtension;

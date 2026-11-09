@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CanvasKind } from './CanvasKind';
-vi.mock('../../extensions/installed', () => ({ installedExtensions: { canvasKinds: [{ key: 'test/test.map', kind: 'test.map', component: ({ context, item }: { context: { agentId: string; theme: string }; item: { state: { zoom: number } } }) => <p>{context.agentId}:{context.theme}:{item.state.zoom}</p> }] } }));
+vi.mock('../../extensions/pluginRuntime', () => ({ usePluginUi: () => ({ registry: { canvasKinds: [{ key: 'test/test.map', kind: 'test.map', component: ({ context, item }: { context: { agentId: string; theme: string }; item: { state: { zoom: number } } }) => <p>{context.agentId}:{context.theme}:{item.state.zoom}</p> }] } }) }));
 it('renders a host-granted React kind with current identity and state', () => {
   const item = { id: 1, title: 'Map', active: true, icon: 'square', kind: 'test.map', state: { zoom: 2 } };
   const view = render(<CanvasKind agentId="a" item={item} theme="dark" />);

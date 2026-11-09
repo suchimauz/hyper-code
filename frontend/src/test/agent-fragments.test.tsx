@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { WorkspaceSuggestions } from '../components/hyper/WorkspaceSuggestions';
-import { TriggerAudit } from '../ui-plugins/agent-meta';
+import { TriggerAudit } from '../core-ui/agent-meta';
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 test('custom path autocomplete renders JSON status without HTML execution',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({paths:['/work/alpha'],path:'/work',status:'directory'}),{headers:{'Content-Type':'application/json'}})));render(<WorkspaceSuggestions value="/work" onChange={()=>{}}/>);await screen.findByText('Directory exists');expect(screen.getByLabelText('Custom local workspace')).toHaveValue('/work');expect(document.querySelector('option')?.value).toBe('/work/alpha');});
 test('native audit shows bounded history and full-result reference as text',async()=>{const fetch=vi.fn(async()=>new Response(JSON.stringify({trigger:{id:'t',kind:'wake',status:'completed',prompt:'<script>bad</script>',attempts:1,config:{},nextAt:null,timeoutAt:null,createdAt:1,finishedAt:2},runs:[{id:'r',outcome:'fired',scheduledAt:1,createdAt:2,result:{ok:true},resultRef:{id:'stored-uuid'}}]}),{headers:{'Content-Type':'application/json'}}));vi.stubGlobal('fetch',fetch);render(<TriggerAudit agentId="owner" triggerId="t"/>);await screen.findByText('<script>bad</script>');expect(screen.getByText('Run history (latest 1, maximum 100)')).toBeInTheDocument();expect(screen.getByText(/stored-uuid/)).toBeInTheDocument();expect(document.querySelector('script')).toBeNull();await waitFor(()=>expect(fetch).toHaveBeenCalledTimes(1));});

@@ -3,6 +3,21 @@
   "version": "0.1.0",
   "description": "Interactive module-level architecture map backed by Hyper's indexed code call graph.",
   "procs": {
-    "src": "src"
+    "src": "src",
+    "ui": {
+      "entry": "ui/index.tsx",
+      "pages": [
+        "architecture",
+        "turbulence"
+      ],
+      "canvasKinds": [
+        "architectureMap.map",
+        "architectureMap.turbulence"
+      ],
+      "applications": {
+        "/architectureMap": "architecture",
+        "/architectureMap/turbulence": "turbulence"
+      }
+    }
   }
 }

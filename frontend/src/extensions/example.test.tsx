@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { installedExtensions } from './installed';
 import { createExtensionRegistry } from './registry';
-import { sdkExample } from '../ui-plugins/sdk-example';
+import { sdkExample } from '../test/fixtures/sdk-example';
 
 const exampleExtensions = createExtensionRegistry([sdkExample], {
   'sdk-example': { pages: ['overview'], panels: ['overview'], actions: ['top'] },
@@ -17,12 +17,11 @@ describe('public-SDK dev/test fixture', () => {
     expect(installedExtensions.pages.map(page => page.key)).toEqual([
       'documentation/search', 'documentation/functions',
       'settings/overview', 'settings/declared', 'shared-agents/overview', 'instances/overview',
-      'visualizations/architecture', 'visualizations/turbulence', 'whisper/overview',
-      'utilities/autotext', 'utilities/update', 'telegram/overview', 'agent-source/overview', 'browser-live/live', 'initial-prompt/overview',
+      'utilities/autotext', 'utilities/update', 'agent-source/overview', 'initial-prompt/overview',
     ]);
     expect(installedExtensions.panels.map(panel => panel.key)).toEqual(['agent-meta/overview']);
     expect(installedExtensions.actions).toEqual([]);
-    expect(installedExtensions.canvasKinds.map(entry => entry.kind)).toEqual(['architectureMap.map', 'architectureMap.turbulence', 'code.tests', 'icons.browser']);
+    expect(installedExtensions.canvasKinds.map(entry => entry.kind)).toEqual(['code.tests']);
     expect(exampleExtensions.pages).toHaveLength(1);
     expect(exampleExtensions.navigation).toHaveLength(1);
     expect(exampleExtensions.panels).toHaveLength(1);
