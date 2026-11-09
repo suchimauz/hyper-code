@@ -5,7 +5,7 @@
  * @param opts.instance Exact registered SSH instance name.
  * @param opts.provider Provider whose remote credentials authorize the request.
  * @param opts.account Exact remote account name, not a synthetic local account ID.
- * @param opts.timeoutMs Overall deadline including SSH startup, remote refresh and body consumption. @default 5000 @minimum 500 @maximum 30000
+ * @param opts.timeoutMs Overall deadline including SSH startup, remote refresh and body consumption. @default 90000 @minimum 500 @maximum 90000
  */
 export default async function (
     ctx: Context,
@@ -17,12 +17,12 @@ export default async function (
         provider: "codex" | "claude-code" | "kimi-coding";
         /** Exact remote account name, not a synthetic local account ID. */
         account: string;
-        /** Overall deadline including SSH startup, remote refresh and body consumption. @default 5000 @minimum 500 @maximum 30000 */
+        /** Overall deadline including SSH startup, remote refresh and body consumption. @default 90000 @minimum 500 @maximum 90000 */
         timeoutMs?: number;
     },
 ): Promise<Response> {
-    const ms=opts.timeoutMs ?? 5000;
-    if (!Number.isFinite(ms) || ms<500 || ms>30000) throw new Error('Usage timeout must be between 500 and 30000 milliseconds');
+    const ms=opts.timeoutMs ?? 90000;
+    if (!Number.isFinite(ms) || ms<500 || ms>90000) throw new Error('Usage timeout must be between 500 and 90000 milliseconds');
     if (!['codex','claude-code','kimi-coding'].includes(opts.provider)) throw new Error('Unsupported SSH usage provider');
     const url=opts.provider==='codex'?'https://chatgpt.com/backend-api/wham/usage':opts.provider==='kimi-coding'?'https://api.kimi.com/coding/v1/usages':'https://api.anthropic.com/api/oauth/usage';
     const controller=new AbortController();

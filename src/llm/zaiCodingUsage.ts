@@ -2,19 +2,19 @@
  * Fetch measured five-hour and weekly Z.ai Coding Plan quota windows
  *
  * Use for subscription quota refresh with the configured Coding Plan key. Calls only the Z.ai monitoring endpoint with a bounded deadline and no redirects. Rejects failed or unrecognized responses instead of inferring unused quota; returns normalized windows for llm.recordUsage. This monitoring endpoint is not in the public API reference and may change.
- * @param opts.timeoutMs Request deadline in milliseconds. @default 5000 @minimum 500 @maximum 30000
+ * @param opts.timeoutMs Request deadline in milliseconds. @default 90000 @minimum 500 @maximum 90000
  */
 export default async function (
     ctx: Context,
     session: Session | null,
     opts: {
-        /** Request deadline in milliseconds. @default 5000 @minimum 500 @maximum 30000 */
+        /** Request deadline in milliseconds. @default 90000 @minimum 500 @maximum 90000 */
         timeoutMs?: number;
     },
 ): Promise<{ primary?: { used_percent: number; window_minutes: number; resets_at: number }; secondary?: { used_percent: number; window_minutes: number; resets_at: number }; planType: string | null }> {
     const key = await ctx.fns.secrets.resolveSetting({ module: "llm", scopeType: "global", key: "zaiCodingApiKey" });
     if (!key) throw new Error("Z.ai Coding Plan key is not configured");
-    const timeout = Math.min(30000, Math.max(500, opts.timeoutMs ?? 5000));
+    const timeout = Math.min(90000, Math.max(500, opts.timeoutMs ?? 90000));
     // The plan can leave through a chosen SSH instance; the same key rides the bridge.
     const { instance } = ctx.fns?.llm?.codingInstance ? await ctx.fns.llm.codingInstance({ provider: "zai-coding" }) : { instance: null };
     const url = "https://api.z.ai/api/monitor/usage/quota/limit";

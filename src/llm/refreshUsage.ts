@@ -5,7 +5,7 @@
  * @param opts.provider Only refresh this provider.
  * @param opts.account Only refresh this credential account.
  * @param opts.maxAgeMs Reuse a recent successful refresh for this many milliseconds. @default 60000 @minimum 0 @maximum 3600000
- * @param opts.timeoutMs Deadline for each provider usage request in milliseconds. @default 5000 @minimum 500 @maximum 30000
+ * @param opts.timeoutMs Deadline for each provider usage request in milliseconds. @default 90000 @minimum 500 @maximum 90000
  * @param opts.now Current timestamp in milliseconds, for testing.
  * @param opts.accounts Explicit account inventory, primarily for callers that already listed accounts and for tests.
  */
@@ -19,7 +19,7 @@ export default async function (
         account?: string;
         /** Reuse a recent successful refresh for this many milliseconds. @default 60000 @minimum 0 @maximum 3600000 */
         maxAgeMs?: number;
-        /** Deadline for each provider usage request in milliseconds. @default 5000 @minimum 500 @maximum 30000 */
+        /** Deadline for each provider usage request in milliseconds. @default 90000 @minimum 500 @maximum 90000 */
         timeoutMs?: number;
         /** Current timestamp in milliseconds, for testing. */
         now?: number;
@@ -29,7 +29,7 @@ export default async function (
 ): Promise<Array<{ provider: string; account: string; status: "refreshed" | "cached" | "unsupported" | "failed"; error: string | null }>> {
     const now = opts.now ?? Date.now();
     const maxAgeMs = Math.max(0, Number(opts.maxAgeMs ?? 60_000));
-    const timeoutMs = Math.max(500, Number(opts.timeoutMs ?? 5_000));
+    const timeoutMs = Math.max(500, Number(opts.timeoutMs ?? 90_000));
     const inventory = opts.accounts ?? (await ctx.fns.llm.listAccounts({ provider: opts.provider })).map((a: any) => ({ provider: a.provider, account: a.account }));
     const accounts = inventory.filter((a: any) => (!opts.provider || a.provider === opts.provider) && (!opts.account || a.account === opts.account));
     const results = await Promise.all(accounts.map(async (item: any) => {

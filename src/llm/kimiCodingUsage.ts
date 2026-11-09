@@ -3,7 +3,7 @@
  *
  * Use for subscription quota refresh of a Kimi Coding account, including named local credentials or credentials held on a trusted SSH instance. Local OAuth access tokens are refreshed before use; configured API keys apply only to the default account. Calls only the account's /coding/v1/usages endpoint (and /coding/v1/me for the plan name) with a bounded deadline and no redirects. Rejects failed or unrecognized quota responses instead of inferring unused quota; returns normalized windows for llm.recordUsage. Each window is reported as a used ratio between 0 and 1, which is scaled to used percent. The plan name comes from user_level_name (e.g. "Pro"); when /me fails the plan falls back to "Kimi Coding".
  * @param opts.account Kimi Coding account slot; omit for the default local credential. @default "default"
- * @param opts.timeoutMs Request deadline in milliseconds. @default 5000 @minimum 500 @maximum 30000
+ * @param opts.timeoutMs Request deadline in milliseconds. @default 90000 @minimum 500 @maximum 90000
  */
 export default async function (
     ctx: Context,
@@ -11,12 +11,12 @@ export default async function (
     opts: {
         /** Kimi Coding account slot; omit for the default local credential. @default "default" */
         account?: string;
-        /** Request deadline in milliseconds. @default 5000 @minimum 500 @maximum 30000 */
+        /** Request deadline in milliseconds. @default 90000 @minimum 500 @maximum 90000 */
         timeoutMs?: number;
     },
 ): Promise<{ primary?: { used_percent: number; window_minutes: number; resets_at: number }; secondary?: { used_percent: number; window_minutes: number; resets_at: number }; tertiary?: { used_percent: number; window_minutes: number; resets_at: number }; planType: string | null }> {
     const account = String(opts.account ?? "default").trim() || "default";
-    const timeout = Math.min(30000, Math.max(500, opts.timeoutMs ?? 5000));
+    const timeout = Math.min(90000, Math.max(500, opts.timeoutMs ?? 90000));
     const base = "https://api.kimi.com/coding/v1/";
     const url = base + "usages";
     const init = { method: "GET", headers: { accept: "application/json" }, signal: AbortSignal.timeout(timeout) };

@@ -10,7 +10,7 @@ it('uses fixed GET endpoints, returns status and body, never sends credentials',
  }
 });
 it('rejects oversized response',async()=>{await expect(fetchUsage(fake(async()=>new Response(new Uint8Array(1048577))),null,opts)).rejects.toThrow('exceeds limit');});
-it('rejects invalid deadlines without transport',async()=>{for(const timeoutMs of [0,499,30001,NaN])await expect(fetchUsage(fake(()=>{throw Error('unexpected transport');}),null,{...opts,timeoutMs})).rejects.toThrow('timeout');});
+it('rejects invalid deadlines without transport',async()=>{for(const timeoutMs of [0,499,90001,NaN])await expect(fetchUsage(fake(()=>{throw Error('unexpected transport');}),null,{...opts,timeoutMs})).rejects.toThrow('timeout');});
 it('bounds startup and body deadlines even when cancellation stalls',async()=>{
  let signal:AbortSignal|undefined; const start=Date.now();
  await expect(fetchUsage(fake(async(o:any)=>{signal=o.init.signal;return new Promise(()=>{});}),null,{...opts,timeoutMs:500})).rejects.toThrow('timed out');expect(signal?.aborted).toBe(true);

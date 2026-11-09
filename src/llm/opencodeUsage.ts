@@ -2,20 +2,20 @@
  * Read a single OpenCode member monthly budget without exposing member identities
  *
  * Use for Usage monetary spend and monthly budget. This is not the prepaid credit balance or a subscription allowance. Ambiguous multi-member responses and permission errors return unavailable; never aggregate members or return identifying data.
- * @param opts.timeoutMs Request deadline in milliseconds. @default 8000 @minimum 500 @maximum 30000
+ * @param opts.timeoutMs Request deadline in milliseconds. @default 90000 @minimum 500 @maximum 90000
  */
 export default async function (
     ctx: Context,
     session: Session | null,
     opts: {
-        /** Request deadline in milliseconds. @default 8000 @minimum 500 @maximum 30000 */
+        /** Request deadline in milliseconds. @default 90000 @minimum 500 @maximum 90000 */
         timeoutMs?: number;
     },
 ): Promise<{available:boolean;spentUsd?:number;limitUsd?:number|null;resetsAt?:number;reason?:string}> {
     const plan = await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodePlan'}) ?? 'payg';
     if (plan === 'go') return {available:false,reason:'Go quota is separate from member budgets; use llm.opencodeGoUsage'};
     try {
-    const res=await ctx.fns.llm.opencodeFetch({url:'https://opencode.ai/console/api/v1/budgets/members',init:{method:'GET',signal:AbortSignal.timeout(Math.max(500,Math.min(30000,opts.timeoutMs ?? 8000)))}});
+    const res=await ctx.fns.llm.opencodeFetch({url:'https://opencode.ai/console/api/v1/budgets/members',init:{method:'GET',signal:AbortSignal.timeout(Math.max(500,Math.min(90000,opts.timeoutMs ?? 90000)))}});
     if(!res.ok) return {available:false,reason:'Member budget unavailable (HTTP '+res.status+')'};
     const rows=await res.json() as Array<{spent_micro_cents?:string;limit_micro_cents?:string|null;resets_at?:string}>;
     if(!Array.isArray(rows)||rows.length!==1) return {available:false,reason:'Member budget requires a single unambiguous member'};
