@@ -15,15 +15,14 @@ describe('public-SDK dev/test fixture', () => {
       expect(entries.some(entry => entry.key.startsWith('sdk-example/'))).toBe(false);
     }
     expect(installedExtensions.pages.map(page => page.key)).toEqual([
-      'tasks/overview', 'documentation/search', 'documentation/functions',
+      'documentation/search', 'documentation/functions',
       'settings/overview', 'settings/declared', 'shared-agents/overview', 'instances/overview',
-      'readers/hackernews', 'readers/substack', 'readers/inbox', 'news/overview', 'news/rss',
-      'visualizations/calendar', 'visualizations/architecture', 'visualizations/turbulence', 'whisper/overview', 'knowledge/overview',
-      'operations/telemetry', 'operations/gaps', 'utilities/autotext', 'utilities/update', 'telegram/overview', 'agent-source/overview', 'browser-live/live', 'initial-prompt/overview',
+      'visualizations/architecture', 'visualizations/turbulence', 'whisper/overview',
+      'utilities/autotext', 'utilities/update', 'telegram/overview', 'agent-source/overview', 'browser-live/live', 'initial-prompt/overview',
     ]);
     expect(installedExtensions.panels.map(panel => panel.key)).toEqual(['agent-meta/overview']);
     expect(installedExtensions.actions).toEqual([]);
-    expect(installedExtensions.canvasKinds.map(entry => entry.kind)).toEqual(['gcal.calendar', 'architectureMap.map', 'architectureMap.turbulence', 'code.tests', 'icons.browser']);
+    expect(installedExtensions.canvasKinds.map(entry => entry.kind)).toEqual(['architectureMap.map', 'architectureMap.turbulence', 'code.tests', 'icons.browser']);
     expect(exampleExtensions.pages).toHaveLength(1);
     expect(exampleExtensions.navigation).toHaveLength(1);
     expect(exampleExtensions.panels).toHaveLength(1);

@@ -134,7 +134,7 @@ bun script/repl.ts -f /tmp/play.js                     # from file; stdin works 
   | file | kind | may touch | run |
   |---|---|---|---|
   | `*.test.ts` | fast | code, stubs, the test Postgres (`testCtx`) | `bun run test` — on every change |
-  | `*.it.test.ts` | integration | real processes: git repos, docker sshd (`test/ssh`), tsgo, duckdb, headless Chrome (`test/chrome`) | `bun run test:it` |
+  | `*.it.test.ts` | integration | real processes: git repos, docker sshd (`test/ssh`), tsgo, headless Chrome (`test/chrome`) | `bun run test:it` |
   | `*.live.test.ts` | live | the real network and real accounts | `bun run test:live` — by hand only |
 
   `bun run test:all` = fast + integration (never live). Per-test timeout is 20 s via `script/test.ts` (bun's own 5 s times out healthy tests under parallel load); `TEST_TIMEOUT_MS` or `--timeout=` overrides it. A new test is fast unless it needs one of the above; a fast file that takes over ~1 s or spawns processes belongs in `.it`. Paths narrow a run: `bun script/test.ts it ./src/remote`.

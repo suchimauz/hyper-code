@@ -47,7 +47,7 @@ export default async function (
         /** Number of top search results read as evidence. @default 3 @minimum 1 @maximum 8 */
         pages?: number;
         /** Search backend passed to websearch.search; when omitted, the `websearch.defaultEngine` setting applies. */
-        engine?: 'brave' | 'google-browser' | 'openserp';
+        engine?: 'google-browser' | 'openserp';
         /** Provider-qualified model override; when omitted, uses `websearch.fetchModel`, then the global default model. */
         model?: string;
         /** Maximum readable Markdown characters kept per page. @default 12000 @minimum 1000 @maximum 50000 */

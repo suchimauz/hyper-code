@@ -1,1 +1,0 @@
-{"name":"flow","private":true,"type":"module","procs":{"src":"src","label":"Flows","icon":"ph-list-checks","optional":true,"description":"Find attention gaps in source data and apply explicit, individually verified actions."}}

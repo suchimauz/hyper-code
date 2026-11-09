@@ -14,6 +14,6 @@
     "label": "Web Search",
     "icon": "ph-magnifying-glass",
     "optional": true,
-    "description": "Search the public web through the Brave API, Google in the user’s browser, or an optional operator-run OpenSERP service."
+    "description": "Search the public web through Google in the user’s browser or an optional operator-run OpenSERP service."
   }
 }

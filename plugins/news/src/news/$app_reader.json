@@ -1,8 +1,0 @@
-{
-  "label": "News reader",
-  "href": "/news/reader",
-  "hint": "Read archived stories one at a time with keyboard controls",
-  "icon": "ph-newspaper",
-  "group": "Pages",
-  "order": 50
-}

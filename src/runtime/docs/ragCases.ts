@@ -37,18 +37,14 @@ export default function (_ctx: Context, _session: Session | null, opts: {
 const CASES: types.runtime.docs.RagCase[] = [
     // ---- original hand-written probes -------------------------------------
     { query: "send a telegram message", expected: ["telegram.send"], relevant: ["telegram.sendFile", "telegram.messages"], source: "synthetic" },
-    { query: "read only duckdb sql", expected: ["duckdb.query"], relevant: ["duckdb.run", "duckdb.ndjson"], source: "synthetic" },
     { query: "wait until a condition becomes true then resume the agent", expected: ["agent.wakeUpWhen", "agent.waitForEvent"], source: "synthetic" },
-    { query: "list unread gmail messages", expected: ["gmail.list"], relevant: ["gmail.get"], source: "synthetic" },
     { query: "create a GitHub issue", expected: ["gh.createIssue"], relevant: ["gh.issues", "gh.issue"], source: "synthetic" },
-    { query: "find a place near me", expected: ["gplaces.nearby", "gplaces.search"], source: "synthetic" },
     { query: "read a file with line anchors", expected: ["files.readHashline"], relevant: ["files.formatHashline"], source: "synthetic" },
     { query: "schedule agent wake up tomorrow", expected: ["agent.wakeAt", "agent.wakeIn"], relevant: ["agent.wakeUpWhen"], source: "synthetic" },
     { query: "thanks, continue", expected: [], noResult: true, source: "synthetic" },
     { query: "make this prettier", expected: [], noResult: true, source: "synthetic" },
     { query: "hello how are you", expected: [], noResult: true, source: "synthetic" },
     { query: "спасибо продолжай", expected: [], noResult: true, source: "synthetic" },
-    { query: "проверить почту", expected: ["gmail.list", "gmail.get"], source: "synthetic" },
 
     // ---- mined from real transcripts, hand-checked ------------------------
     // Messaging and mail.
@@ -57,15 +53,8 @@ const CASES: types.runtime.docs.RagCase[] = [
     { query: "кто нибудь мне пишет в личку?", expected: ["telegram.dialogs", "telegram.messages"], source: "transcript" },
     { query: "давай теперь telegram reauth", expected: ["telegram.reauth"], source: "transcript" },
     { query: "оправь mary ryzhikova в telegram", expected: ["telegram.send", "telegram.findChat"], source: "transcript" },
-    { query: "А сейчас почта работает?", expected: ["gmail.list"], relevant: ["gmail.get"], source: "transcript" },
-    { query: "пометь письмо прочитанным", expected: ["gmail.modify"], source: "transcript" },
-    { query: "отпишись в чат zulip", expected: ["zulip.send"], source: "transcript" },
-    { query: "найди упоминания сроков в зулипе", expected: ["zulip.messages"], relevant: ["zulip.search"], source: "transcript" },
 
     // Calendar and places.
-    { query: "когда у нас сегодня визит?", expected: ["gcal.events"], source: "transcript" },
-    { query: "добавь на рабочую почту встречу", expected: ["gcal.create"], source: "transcript" },
-    { query: "Во сколько открывается первая", expected: ["gplaces.details"], relevant: ["gplaces.search"], source: "transcript" },
 
     // Repository and delivery.
     { query: "запиши эти документы к нам в репу", expected: ["gh.api", "gh.repo"], relevant: ["git.stageCommitPush"], source: "transcript" },
@@ -75,12 +64,9 @@ const CASES: types.runtime.docs.RagCase[] = [
     { query: "запушь на телефон", expected: ["mobiledev.install"], source: "transcript" },
 
     // Research and reading.
-    { query: "а поищи про task driven ui", expected: ["research.ask", "research.search"], relevant: ["websearch.search"], source: "transcript" },
-    { query: "простыми словами распиши с цитатами исследования", expected: ["research.ask"], source: "transcript" },
     { query: "а где можно купить jev?", expected: ["websearch.search"], relevant: ["browser.googleSearch"], source: "transcript" },
     { query: "можешь поискать в circleback sql on fhir", expected: ["circleback.meetings"], relevant: ["circleback.meeting"], source: "transcript" },
     { query: "Что конкретно говорил Джон найди цитаты", expected: ["circleback.meeting", "circleback.meetings"], source: "transcript" },
-    { query: "а какие сейчас фиды в hacker news?", expected: ["hackernews.listFeeds"], source: "transcript" },
     { query: "а прочитай https://docs.art-decor.org/clinicalmodeling/", expected: ["browser.navigate", "browser.snapshot"], relevant: ["browser.readPage"], source: "transcript" },
     { query: "открой ребят во вкладках - я добавлю", expected: ["browser.navigate"], relevant: ["browser.tabs"], source: "transcript" },
 

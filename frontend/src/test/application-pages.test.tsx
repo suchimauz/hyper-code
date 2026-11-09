@@ -7,10 +7,10 @@ afterEach(() => { vi.restoreAllMocks(); live.stop.mockClear(); });
 const item = (href: string) => ({ id: href, label: href, href });
 describe('declared application documents', () => {
   it('rejects arbitrary origins, unsafe paths, native shell and disabled banking surfaces', () => {
-    expect(applicationLinks({ items: ['/news', '/files', '//evil.test', '/%2f%2fevil.test', '/a/../b', '/%0aevil', '/', '/auth/users', '/sber/login', '/tbank', 'https://example.com'].map(item) }).map(x => x.href)).toEqual(['/news', '/files']);
+    expect(applicationLinks({ items: ['/docs', '/files', '//evil.test', '/%2f%2fevil.test', '/a/../b', '/%0aevil', '/', '/auth/users', '/sber/login', '/tbank', 'https://example.com'].map(item) }).map(x => x.href)).toEqual(['/docs', '/files']);
     expect(applicationLinks(null)).toEqual([]);
-    expect(nativeApplicationHref('/news?source=rss')).toBe('/?source=rss&view=extension%3Anews%2Foverview');
-    expect(nativeApplicationHref('/gcal/')).toBe('/?view=extension%3Avisualizations%2Fcalendar');
+    expect(nativeApplicationHref('/news?source=rss')).toBeNull();
+    expect(nativeApplicationHref('/architectureMap/')).toBe('/?view=extension%3Avisualizations%2Farchitecture');
     expect(nativeApplicationHref('/architectureMap/turbulence?days=7')).toBe('/?days=7&view=extension%3Avisualizations%2Fturbulence');
     expect(nativeApplicationHref('/browser/live?target=tab')).toBe('/?target=tab&view=extension%3Abrowser-live%2Flive');
     expect(nativeApplicationHref('/custom-plugin')).toBeNull();

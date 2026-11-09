@@ -2,8 +2,6 @@ import { test, expect } from 'bun:test';
 import chats from '../nav/$widget_chats';
 import mentions from '../mentions/rowsData';
 import pages from '../nav/$widget_pluginPages';
-import inbox from '../../plugins/inbox/src/inbox/$widget_unread';
-import calendar from '../../plugins/google/src/gcal/$widget_today';
 import search from './searchData';
 const opts = {size:'M',config:{}} as any;
 test('chat and mention providers return plain data, no HTML or popup calls', async()=>{
@@ -17,13 +15,9 @@ test('chat and mention providers return plain data, no HTML or popup calls', asy
  expect(out.sections?.[0].items).toEqual(rows);expect(JSON.stringify(out)).not.toContain('"html"');
  expect((await chats.render(ctx,null,{...opts,config:{hideNewChat:true}})).items).toEqual([]);
 });
-test('inbox count, empty calendar and plugin catalogue are structured without network access',async()=>{
- const ctx:any={fns:{inbox:{list:async()=>[{id:'mail-1',subject:'Subject',text:'Text',from:'a@host',verified:true,readAt:null}]},gcal:{agenda:async()=>({events:[]})},nav:{items:async()=>[]}}};
- expect(await inbox.render(ctx,null,opts)).toEqual({items:[{id:'inbox:unread',label:'1 unread',href:'/inbox',unreadCount:1},{id:'inbox:mail-1',label:'Subject',href:'/inbox/mail-1',icon:'ph-envelope',hint:'a'}]});
- expect(await calendar.render(ctx,null,opts)).toEqual({items:[{id:'gcal:empty',label:'Nothing more today',href:'/gcal/',icon:'ph-calendar-blank'}]});
+test('plugin catalogue is structured without network access',async()=>{
+ const ctx:any={fns:{nav:{items:async()=>[]}}};
  expect((await pages.render(ctx)).items?.[0]).toEqual({id:'plugins:catalogue',label:'All plugins',href:'/plugins',hint:'catalogue',icon:'ph-squares-four'});
- ctx.fns.gcal.agenda=async()=>({events:[{id:'e',calendarId:'c',summary:'Event',allDay:true,start:'2099-01-01',htmlLink:'https://evil.example/'}]});
- expect((await calendar.render(ctx,null,opts)).items?.[0].href).toBe('/gcal/');
 });
 test('bridge allows exact native destinations, refuses external URLs and unknown HTML even when empty',async()=>{
  const good=['/?newSession=1','/agent/abc#m-3','/inbox/mail-1','/gcal/','/gcal'];

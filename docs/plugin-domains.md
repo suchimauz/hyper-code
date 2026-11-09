@@ -25,12 +25,8 @@ Hints are trusted installed-package metadata, kept separate from untrusted page 
 
 ## Initial registrations and provenance
 
-- `youtube`: youtube.com, www.youtube.com, youtu.be — `src/youtube/{search,transcript,parse}.ts`.
-- `google`: docs.google.com, drive.google.com — `src/gdoc/{create,upload,createFolder}.ts`. Mail/calendar web hosts are intentionally not guessed from API capability names.
-- `zulip`: chat.fhir.org — SKILL.md configured instance example.
 - `gh`: github.com and api.github.com — GitHub REST workflow in SKILL.md and `src/gh/api.ts`.
 
-- `arxiv`: arxiv.org — `src/arxiv/download.ts` PDF/source URLs.
 Optional packages still need to be mounted to produce hints. No USER_PLUGINS files were changed; private plugins can add the same field to their package manifests and reload. There is no central registry to update.
 
 Tests: `bun test ./src/plugins/siteHint.test.ts` (host boundaries, invalid URLs, absent plugin, short escaped hint, fresh navigation, null binding, missing sidebar and metadata projection).

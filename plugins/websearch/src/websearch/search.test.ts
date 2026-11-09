@@ -6,7 +6,6 @@ const originalTimer = globalThis.setTimeout;
 afterEach(() => { globalThis.fetch = originalFetch; globalThis.setTimeout = originalTimer; });
 const ctx = (engine = 'openserp', endpoint = 'http://127.0.0.1:7000') => ({ fns: {
     settings: { getString: async ({ key }: { key: string }) => key === 'defaultEngine' ? engine : endpoint },
-    brave: { search: async () => ({ results: [{ title: 'Brave', url: 'https://brave.test/', description: '<strong>snippet</strong>' }] }) },
     browser: { googleSearch: async () => ({ results: [{ title: 'Google', url: 'https://google.test/', snippet: 'snippet' }] }) },
 } }) as unknown as Context;
 const row = (engine = 'duckduckgo', patch = {}) => ({ type: 'organic', engine, title: '<b>Actual title</b>', url: 'https://example.test/a', snippet: 'Actual &amp; snippet', ...patch });
@@ -111,13 +110,13 @@ describe('OpenSERP search (DB-free)', () => {
         const found = await search(ctx('google-browser', 'http://127.0.0.1:7000/api/'), null, { query: 'question', engine: 'openserp' });
         expect(calls[0].pathname).toBe('/api/duckduckgo/search'); expect(found.engine).toBe('openserp');
     });
-    test('Brave and Google retain their prior mapping with no HTTP backend calls', async () => {
+    test('Google retains its prior mapping with no HTTP backend calls', async () => {
         const calls = mockFetch(() => { throw new Error('unexpected fetch'); });
-        for (const engine of ['brave', 'google-browser'] as const) {
+        for (const engine of ['google-browser'] as const) {
             const found = await search(ctx(engine), null, { query: 'question' });
             expect(found.engine).toBe(engine); expect(found.sourceEngine).toBeUndefined();
             expect(found.results[0].description).toBe('snippet');
-            expect(found.results[0].title).toBe(engine === 'brave' ? 'Brave' : 'Google');
+            expect(found.results[0].title).toBe('Google');
         }
         expect(calls).toHaveLength(0);
     });

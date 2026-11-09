@@ -1,2 +1,0 @@
-/** Redirect legacy telemetry links into the native Operations page. */
-export default async function (_ctx: Context, _session: Session|null, opts: { /** Incoming navigation request. */ req: Request }): Promise<Response> { const hours=new URL(opts.req.url).searchParams.get('hours')??'24'; return new Response(null,{status:302,headers:{Location:'/?view=extension:operations/telemetry&hours='+encodeURIComponent(hours)}}); }

@@ -33,8 +33,6 @@ Telegram owns a durable broadcast-channel catalogue in `telegram.news_channels`;
 - `telegram.newsDiscover({ folder?, add? })` — discover broadcast channels in a Telegram folder; excludes `Haiku` and `Just links` by default.
 - `telegram.newsChannelAdd({ chat, title, folderId?, enabled? })` — add or update a channel.
 - `telegram.newsChannels({ enabled? })` — list channels, cursors and post counts.
-- `telegram.newsSyncChannel({ chat, max? })` — incrementally sync one channel through `news.put`.
-- `telegram.newsSync({ max? })` — explicitly sync all enabled channels.
 
 The producer never writes `news.items` directly. It ships no cron declaration; scheduling, if desired, belongs to the host. `Just links` remains disabled because link-following and article summarization require a separate producer.
 

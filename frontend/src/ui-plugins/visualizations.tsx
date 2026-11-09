@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Panel, TextField, requestJson, type ExtensionCanvasProps, type UiExtension } from '@hyper/ui';
 
-type Event = { id:string; account:string; calendarId:string; calendar:string; summary:string; start:string; end:string; allDay:boolean; location?:string; description?:string; htmlLink?:string; meetLink?:string; organizer?:string; attendees?:{email:string;name?:string;responseStatus?:string}[] };
-type Agenda = {events:Event[]; errors:{account:string;calendar?:string;error:string}[]};
 type Node = {id:string;functions:number;incoming:number;outgoing:number;entryPoints:number;roots:string[]};
 type Edge = {source:string;target:string;weight:number;samples:{rel:string;line:number}[]};
 type MapData = {graph:{nodes:Node[];edges:Edge[];cycles:string[][];totals:{indexedFunctions:number;modules:number;dependencies:number;cycles:number}};boundary:{total:number;violations:{caller:string;callee:string}[]}};
@@ -15,8 +13,6 @@ function useData<T>(url:string) {
   },[url,revision]);
   return {data,error,refresh:()=>setRevision(value=>value+1)};
 }
-function localDate(date:Date) {return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;}
-function safeLink(value?:string) {try {const url=new URL(value ?? '');return ['https:','http:'].includes(url.protocol)?url.href:undefined;}catch{return undefined;}}
 type CanvasBinding = { canvas?: ExtensionCanvasProps; context?: ExtensionCanvasProps['context'] };
 function useViewState<T>(canvas: ExtensionCanvasProps | undefined, key: string, fallback: T): [T,(value:T)=>void,string] {
   const external = canvas ? {...canvas.item.args,...canvas.item.state}[key] : undefined;
@@ -27,26 +23,6 @@ function useViewState<T>(canvas: ExtensionCanvasProps | undefined, key: string, 
   }},error];
 }
 function canvasQuery(canvas?:ExtensionCanvasProps) {return canvas ? `&agentId=${encodeURIComponent(canvas.context.agentId ?? '')}&itemId=${canvas.item.id}` : '';}
-function CalendarPage({canvas}:CanvasBinding = {}) {
-  const [date,setDate,stateError]=useViewState(canvas,'date',new URLSearchParams(window.location.search).get('date') || localDate(new Date()));
-  const day=new Date(`${/^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date)) ? date : localDate(new Date())}T00:00:00`),next=new Date(day);next.setDate(next.getDate()+1);
-  const {data,error,refresh}=useData<Agenda>(`/gcal/api/events?${new URLSearchParams({from:day.toISOString(),to:next.toISOString()})}${canvasQuery(canvas)}`);
-  const move=(delta:number)=>{const value=new Date(day);value.setDate(value.getDate()+delta);setDate(localDate(value));};
-  return <Panel title="Календарь">{stateError && <p role="alert">{stateError}</p>}<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'end'}}>
-    <Button onClick={()=>move(-1)} aria-label="Предыдущий день">←</Button><Button onClick={()=>setDate(localDate(new Date()))}>Сегодня</Button><Button onClick={()=>move(1)} aria-label="Следующий день">→</Button>
-    <label>Дата <input type="date" value={date} onChange={event=>{if(event.target.value && !isNaN(Date.parse(event.target.value)))setDate(event.target.value);}}/></label><Button onClick={refresh}>Обновить</Button>
-  </div><h2>{day.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</h2>
-  {error && <p role="alert">{error}</p>}{!data && !error && <p role="status">Загрузка календарей…</p>}
-  {data?.errors.map((item,index)=><p role="alert" key={index}>{item.account} {item.calendar}: {item.error}</p>)}
-  {data && !data.events.length && <p>На этот день событий нет.</p>}
-  {data?.events.map(event=><article key={`${event.account}/${event.calendarId}/${event.id}`} style={{borderTop:'1px solid var(--border)',padding:'16px 0'}}>
-    <h3>{event.summary}</h3><p>{event.allDay?'Весь день':`${new Date(event.start).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} — ${new Date(event.end).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}`}</p>
-    <p>{event.calendar} · {event.account}</p>{event.location && <p>{event.location}</p>}
-    <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>{safeLink(event.meetLink) && <a href={safeLink(event.meetLink)} target="_blank" rel="noopener noreferrer">Присоединиться к встрече ↗</a>}{safeLink(event.htmlLink) && <a href={safeLink(event.htmlLink)} target="_blank" rel="noopener noreferrer">Открыть в Google Calendar ↗</a>}</div>
-    {(event.description || event.organizer || event.attendees?.length) && <details><summary>Подробности</summary>{event.organizer && <p>Организатор: {event.organizer}</p>}{event.description && <p style={{whiteSpace:'pre-wrap'}}>{event.description}</p>}<ul>{event.attendees?.map(person=><li key={person.email}>{person.name || person.email} — {person.responseStatus}</li>)}</ul></details>}
-  </article>)}
-  </Panel>;
-}
 function ArchitecturePage({canvas}:CanvasBinding = {}) {
   const initial=new URLSearchParams(window.location.search);
   const [scope,setScope,stateError]=useViewState(canvas,'scope',initial.get('scope') || 'all');
@@ -74,10 +50,9 @@ function ArchitecturePage({canvas}:CanvasBinding = {}) {
     <h2>Направленные зависимости</h2><div style={{overflowX:'auto'}}><table><thead><tr><th scope="col">Источник</th><th scope="col">Назначение</th><th scope="col">Вызовы</th><th scope="col">Диагностика</th></tr></thead><tbody>{edges.filter(edge=>!selected||edge.source===selected||edge.target===selected).map(edge=><tr key={`${edge.source}/${edge.target}`}><td>{edge.source}</td><td>{edge.target}</td><td>{edge.weight}</td><td>{violations.has(`${edge.source}→${edge.target}`)?'Граница ':''}<details><summary>Места вызова</summary><ul>{edge.samples.map((sample,index)=><li key={index}>{sample.rel}:{sample.line}</li>)}</ul></details></td></tr>)}</tbody></table></div>{selected && <Button onClick={()=>setSelected('')}>Показать все связи</Button>}
   </>}</Panel>;
 }
-/** Read-only native pages. Calendar writes remain explicit actions in Google, not automatic RPCs. */
-export const visualizationsExtension: UiExtension = {id:'visualizations',apiVersion:1,canvasKinds:[{kind:'gcal.calendar',component:CalendarCanvas},{kind:'architectureMap.map',component:ArchitectureCanvas},{kind:'architectureMap.turbulence',component:TurbulenceCanvas}],pages:[{id:'calendar',title:'Календарь',component:CalendarPage},{id:'architecture',title:'Архитектура',component:ArchitecturePage},{id:'turbulence',title:'Turbulence',component:TurbulencePage}]};
+/** Read-only native architecture pages. */
+export const visualizationsExtension: UiExtension = {id:'visualizations',apiVersion:1,canvasKinds:[{kind:'architectureMap.map',component:ArchitectureCanvas},{kind:'architectureMap.turbulence',component:TurbulenceCanvas}],pages:[{id:'architecture',title:'Архитектура',component:ArchitecturePage},{id:'turbulence',title:'Turbulence',component:TurbulencePage}]};
 
-function CalendarCanvas(props:ExtensionCanvasProps){return <CalendarPage key={props.item.id} canvas={props}/>;}
 function ArchitectureCanvas(props:ExtensionCanvasProps){return <ArchitecturePage key={props.item.id} canvas={props}/>;}
 function TurbulenceCanvas(props:ExtensionCanvasProps){return <TurbulencePage key={props.item.id} canvas={props}/>;}
 type TurbulenceFile = {path:string;rel:string;root:string;commits:number;churn:number;complexity:number;worstFunction:number;cognitive:number;nestingMax:number;lines:number;functions:number;danger:number;quadrant:string};

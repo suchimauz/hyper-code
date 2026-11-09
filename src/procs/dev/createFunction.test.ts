@@ -31,13 +31,13 @@ test("createFunction refuses an existing function without overwrite", async () =
 
 const authoring = {module:'demo',name:'ping',summary:'Returns a synthetic test response',description:'Use this synthetic procedure to verify safe source-root authoring.',params:[],returnType:'Promise<string>',body:"return 'pong';",dryRun:true};
 test('createFunction supports src, .hyper and mounted official source roots',async()=>{
- for(const root of ['src','.hyper','plugin:flow','plugins/flow/src']) {
+ for(const root of ['src','.hyper','plugin:whisper','plugins/whisper/src']) {
   const result=await ctx.fns.procs.dev.createFunction({...authoring,root});
   expect(result.ok).toBe(true);expect(result.path).toBe(`${root}/demo/ping.ts`);
  }
 });
 test('createFunction rejects unmounted roots, absolute paths and traversal',async()=>{
- for(const root of ['/tmp','../src','plugin:../../bad','plugins/flow/../../src','plugin:unmountedExample']) await expect(ctx.fns.procs.dev.createFunction({...authoring,root})).rejects.toThrow();
+ for(const root of ['/tmp','../src','plugin:../../bad','plugins/whisper/../../src','plugin:unmountedExample']) await expect(ctx.fns.procs.dev.createFunction({...authoring,root})).rejects.toThrow();
  for(const module of ['../outside','demo/../../bad','/tmp/demo']) await expect(ctx.fns.procs.dev.createFunction({...authoring,module})).rejects.toThrow('module');
 });
 test('createFunction selects user plugin source by registered name, not arbitrary path',async()=>{

@@ -1,4 +1,4 @@
-type SearchEngine = 'brave' | 'google-browser' | 'openserp';
+type SearchEngine = 'google-browser' | 'openserp';
 
 type SearchResult = {
     /** Result title as reported by the engine. */
@@ -31,7 +31,7 @@ const stripTags = (value: string): string =>
         .trim();
 
 /**
- * Searches the public web through Brave, Google Browser or optional OpenSERP and returns normalized ranked links.
+ * Searches the public web through Google Browser or optional OpenSERP and returns normalized ranked links.
  *
  * Use this for retrieval-only web discovery. It does not open result pages or ask an LLM to summarize them.
  * Snippets are returned twice: `description` with the engine's highlight markup stripped, and `descriptionHtml` as the
@@ -67,35 +67,14 @@ export default async function (
         fallback: 'google-browser',
     });
     const engine = (opts.engine ?? configured) as SearchEngine;
-    if (engine !== 'brave' && engine !== 'google-browser' && engine !== 'openserp') {
+    if (engine !== 'google-browser' && engine !== 'openserp') {
         throw new Error(`websearch.search: unsupported engine ${String(engine)}`);
     }
 
     const startedAt = performance.now();
     let results: SearchResult[];
     let sourceEngine: 'duckduckgo' | 'bing' | undefined;
-    if (engine === 'brave') {
-        const response = await ctx.fns.brave.search({ query, count: limit });
-        results = response.results.map((item: {
-            title: string;
-            url: string;
-            description: string;
-            age?: string | null;
-            pageAge?: string | null;
-            language?: string | null;
-            profile?: string | null;
-            extraSnippets?: string[] | null;
-        }) => ({
-            title: stripTags(item.title),
-            url: item.url,
-            description: stripTags(item.description),
-            descriptionHtml: /<[^>]+>/.test(String(item.description ?? '')) ? item.description : null,
-            publishedAt: item.age ?? item.pageAge ?? null,
-            language: item.language ?? null,
-            site: item.profile ?? null,
-            extraSnippets: (item.extraSnippets ?? []).map(stripTags).filter((snippet) => snippet.length > 0),
-        }));
-    } else if (engine === 'openserp') {
+    if (engine === 'openserp') {
         const endpoint = new URL(await ctx.fns.settings.getString({
             module: 'websearch', scopeType: 'global', key: 'openserpEndpoint', fallback: 'http://127.0.0.1:7000',
         }) ?? 'http://127.0.0.1:7000');

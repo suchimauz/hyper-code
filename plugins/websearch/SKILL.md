@@ -1,13 +1,12 @@
 ---
 name: websearch
-description: "Provider-neutral public web search, grounded answers with verified citations, and focused page processing. Use to retrieve ranked links through Brave, Google Browser or an operator-run OpenSERP service, answer a question from the live web with quote-level citations, or open a selected public page and apply an LLM instruction to its readable content."
+description: "Provider-neutral public web search, grounded answers with verified citations, and focused page processing. Use to retrieve ranked links through Google Browser or an operator-run OpenSERP service, answer a question from the live web with quote-level citations, or open a selected public page and apply an LLM instruction to its readable content."
 ---
 
 # Web Search and Fetch
 
-Use `websearch.search` for ranked public-web links and snippets. It returns one stable result shape across three engines:
+Use `websearch.search` for ranked public-web links and snippets. It returns one stable result shape across two engines:
 
-- `brave` — direct Brave Search API; fast and suitable for routine retrieval.
 - `google-browser` — Google Search through the user's real Chrome; the default engine and useful for independent comparison.
 
 - `openserp` — optional HTTP search via an operator-run OpenSERP service (tested with 0.8.14). DuckDuckGo first, Bing once only on HTTP/transport/timeout/invalid response or no usable results. Each attempt is bounded to 10 seconds and the requests share a 20-second budget. Both failing throws a concise error, never fabricated results or a Google fallback. `sourceEngine` reports the engine whose results were actually used. Search needs no Chrome or paid API; `answer`, `fetch` and page reading still require the browser.
@@ -16,7 +15,7 @@ Configure `websearch.openserpEndpoint` (default `http://127.0.0.1:7000`) with an
 
 The engine can be selected per call. When omitted, `websearch.defaultEngine` is used. Search is retrieval-only and does not generate an LLM answer.
 
-Brave and Google retain their existing result fields. `description` has highlight markup stripped, `descriptionHtml` keeps it, and Brave additionally fills `publishedAt` (is this page current?), `language`, `site` and `extraSnippets` — extra page excerpts that often answer the question without opening the page. Google fills the shared fields and leaves the rest null/empty.
+`description` has highlight markup stripped and `descriptionHtml` keeps it. `publishedAt`, `language`, `site` and `extraSnippets` are part of the shared shape; engines that do not report them leave them null/empty.
 
 ## Ranking and filtering results
 

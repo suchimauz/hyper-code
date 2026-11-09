@@ -5,18 +5,17 @@ const ctx = await testCtx({ env: { PROCS_PLUGINS: "./plugins" } });   // officia
 
 describe("generated plugin docs", () => {
     test("deduplicates mounted functions and exposes runtime metadata", () => {
-        const result = ctx.fns.plugins.docs({ name: "arxiv" });
+        const result = ctx.fns.plugins.docs({ name: "gh" });
         expect(result.functions.map((fn: any) => fn.name)).toEqual([...new Set(result.functions.map((fn: any) => fn.name))]);
-        const search = result.functions.find((fn: any) => fn.name === "arxiv.search");
+        const search = result.functions.find((fn: any) => fn.name === "gh.search");
         expect(search).toBeDefined();
-        expect(search!.summary).toContain("Searches public arXiv");
-        expect(search!.paramsSchema.properties.query).toBeDefined();
-        expect(search!.returnType).toContain("SearchResult");
+        expect(search!.summary).toContain("Search GitHub");
+        expect(search!.paramsSchema.properties.q).toBeDefined();
     });
 
     test("plugins.read combines overview with generated functions", async () => {
-        const result = await ctx.fns.plugins.read({ name: "arxiv" });
-        expect(result.overview.markdown).toContain("# arXiv");
-        expect(result.functions.some((fn: any) => fn.name === "arxiv.download")).toBe(true);
+        const result = await ctx.fns.plugins.read({ name: "gh" });
+        expect(result.overview.markdown).toContain("# GitHub");
+        expect(result.functions.some((fn: any) => fn.name === "gh.pr")).toBe(true);
     });
 });

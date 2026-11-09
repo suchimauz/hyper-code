@@ -56,7 +56,7 @@ Registry reads use the Git server's existing repository read authorization. Reso
 
 Indexing does not import TypeScript, run package scripts or install dependencies. Installation is different: a mounted Hyper plugin executes with Hyper's privileges. Preview and explicit approval are required before publication or activation. Staging must stay outside `USER_PLUGINS`, whose children are automatically mountable. Existing local plugin directories must never be silently overwritten.
 
-The client does not change the behavior or return shape of the existing mounted-plugin `plugins.search`; registry discovery belongs to the `hyperhub` plugin. Its public operations are `hyperhub.search`, `hyperhub.get`, `hyperhub.resolve`, `hyperhub.publish` and `hyperhub.install`. Use live runtime documentation for their exact arguments once loaded.
+The client does not change the behavior or return shape of the existing mounted-plugin `plugins.search`; registry discovery belonged to the `hyperhub` plugin, which has been removed from this repository. Its public operations are `hyperhub.search`, `hyperhub.get`, `hyperhub.resolve`, `hyperhub.publish` and `hyperhub.install`. Use live runtime documentation for their exact arguments once loaded.
 
 ## HyperHub publication and installation
 

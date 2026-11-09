@@ -7,15 +7,12 @@ import './application-pages.css';
 type Application = { id: string; label: string; href: string; group?: string };
 /** Explicit host-owned destinations; backend registration cannot install browser code. */
 const nativePages: Record<string, string> = {
-  '/tasks': 'tasks/overview', '/search': 'documentation/search', '/functions': 'documentation/functions',
+  '/search': 'documentation/search', '/functions': 'documentation/functions',
   '/settings': 'settings/overview', '/settings/declared': 'settings/declared',
   '/shared-agents': 'shared-agents/overview', '/controlPlane': 'instances/overview',
-  '/hackernews': 'readers/hackernews', '/substack': 'readers/substack', '/inbox': 'readers/inbox',
-  '/news': 'news/overview', '/news/reader': 'news/overview', '/rss': 'news/rss',
-  '/gcal': 'visualizations/calendar', '/architectureMap': 'visualizations/architecture',
+  '/architectureMap': 'visualizations/architecture',
   '/architectureMap/turbulence': 'visualizations/turbulence', '/browser/live': 'browser-live/live',
-  '/whisper': 'whisper/overview', '/knowledge': 'knowledge/overview',
-  '/telemetry': 'operations/telemetry', '/gaps': 'operations/gaps',
+  '/whisper': 'whisper/overview',
   '/autotext': 'utilities/autotext', '/update': 'utilities/update', '/telegram': 'telegram/overview',
 };
 export function nativeApplicationHref(href: string): string | null {
