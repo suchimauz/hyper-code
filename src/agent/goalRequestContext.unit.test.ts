@@ -77,15 +77,11 @@ describe('goal outgoing request context (offline)', () => {
         expect(text(filtered)).not.toContain('queued synthetic'); expect(text(normal)).toContain('queued synthetic');
         expect(Object.hasOwn(h.ctx, 'goalRequestContext')).toBe(false);
     });
-    test('inactive, replaced and disabled snapshots supersede previous context, capability unavailable', async () => {
-        const h = fixture(); h.setGoal(true, { goalId: 'old', revision: 1, status: 'paused' });
+    test('goal context is never rendered per request; it travels as persisted goal_context rows', async () => {
+        const h = fixture(); h.setGoal(true, { goalId: 'g', revision: 1, status: 'active', objective: 'obj', tokenBudget: null, tokensUsed: 0 });
         const first = await h.scoped.fns.agent.buildLlmRequest({ agent: h.agent });
-        expect(text(first)).toContain('Goal continuation revoked');
-        h.setGoal(true, { goalId: 'new', revision: 2, status: 'active', objective: 'new objective', tokenBudget: 500, timeBudgetMs: 5000, tokensUsed: 0, elapsedMs: 0 });
-        const next = await h.scoped.fns.agent.buildLlmRequest({ agent: h.agent });
-        expect(text(next)).toContain('new objective'); expect(text(next)).not.toContain('Goal ID: "old"');
-        expect(text(next)).toContain('unavailable'); expect(next.messages[0]).toEqual(first.messages[0]);
-        h.setGoal(false, null);
-        expect(text(await h.scoped.fns.agent.buildLlmRequest({ agent: h.agent }))).toContain('feature disabled');
+        expect(text(first)).not.toContain('Authoritative current goal');
+        h.setGoal(true, { goalId: 'g', revision: 2, status: 'active', objective: 'obj', tokenBudget: null, tokensUsed: 900 });
+        expect((await h.scoped.fns.agent.buildLlmRequest({ agent: h.agent })).messages).toEqual(first.messages);
     });
 });

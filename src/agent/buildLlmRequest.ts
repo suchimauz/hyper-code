@@ -18,9 +18,10 @@
 /**
  * Assemble the outgoing system prompt and effective transcript, including checkpoint fallback metadata.
  * Use preview for a read-only context estimate: it may reuse existing Jev decisions but never requests new scores.
- * Refreshes authoritative goal context outside bootstrap on every request. A run-owned
- * derived context can suppress only that agent's queued continuation rows; inherited
- * indices remain untouched and compact summaries are bypassed while suppression applies.
+ * Goal context is not rendered here: agent.syncGoalContext appends it as a persisted
+ * `goal_context` transcript row when the goal changes (Codex-style steering), so the cached
+ * prefix is never rewritten. A run-owned derived context can suppress only that agent's queued
+ * continuation rows; inherited indices remain untouched and compact summaries are bypassed while suppression applies.
  * @param opts.agent Agent whose prompt and transcript are assembled.
  * @param opts.preview Avoid external relevance scoring and repair logs for UI previews. @default false
  */
@@ -35,24 +36,8 @@ export default async function (
 ): Promise<{ system: string; messages: any[]; /** Number of leading synthetic instruction/ack messages, independent of wire role; excludes human transcript. */ bootstrapMessageCount: number; /** Exclusive canonical-message boundary before per-request control instructions. */ cacheableMessageCount: number; context: { mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null } }> {
     const { agent } = opts;
     const fullPrompt = await ctx.fns.agent.fullSystemPrompt({ agent });
-    // Fresh authoritative state on every request, never cached in bootstrap or agent.goal.
-    const goalState = await ctx.fns.goal.read({ agentId: agent.id });
-    const scopedCtx = ctx as Context & { goalContextDelivered?: boolean };
-    const capability = goalState.enabled && !opts.preview && typeof ctx.fns.goal.nativeCapability === 'function'
-        ? await ctx.fns.goal.nativeCapability({ agentId: agent.id }).catch(() => ({ available: false })) : { available: false };
-    // Like Codex goal steering: render once per run (turn) and keep that exact text at the
-    // position where it was first delivered. Re-rendering per request (tokens used, revision)
-    // and re-appending it after every tool result made the model treat each step as a fresh
-    // "inspect current state" instruction and re-run its reconnaissance.
-    const runScoped = !opts.preview && Object.hasOwn(ctx, 'goalRequestContext');
-    const turnCtx = ctx as Context & { goalTurnContext?: { key: string; text: string; at: number | null } };
-    const g = goalState.enabled ? goalState.goal : null;
-    const goalKey = JSON.stringify([goalState.enabled, g?.goalId ?? null, g?.status ?? null, g?.objective ?? null, g?.tokenBudget ?? null, capability.available]);
-    const frozen = runScoped && turnCtx.goalTurnContext?.key === goalKey ? turnCtx.goalTurnContext : null;
-    const goalContext = frozen ? frozen.text : goalState.enabled || scopedCtx.goalContextDelivered
-        ? await ctx.fns.goal.promptContext({ snapshot: goalState.enabled ? goalState.goal : null, enabled: goalState.enabled, modelToolAvailable: capability.available })
-        : '';
-    if (goalContext && !opts.preview && Object.hasOwn(ctx, 'goalRequestContext')) scopedCtx.goalContextDelivered = true;
+    // Goal context travels as persisted `goal_context` rows (agent.syncGoalContext), like
+    // Codex goal steering: never re-rendered per request, never moved to the tail.
     const requestScope = (ctx as Context & { goalRequestContext?: { agentId: string; omitGoalContinuationIdxs: readonly number[]; authority?: types.goal.DelegationAuthority } }).goalRequestContext;
     const omitted = new Set(requestScope?.agentId === agent.id ? requestScope.omitGoalContinuationIdxs : []);
     const authority = requestScope?.agentId === agent.id ? requestScope.authority : undefined;
@@ -174,13 +159,6 @@ export default async function (
 
     // Only the durable prefix can be reused by the next request. Synthetic
     // continuation, goal and planning instructions remain outside this boundary.
-    // A run-frozen goal context sits where it was first delivered, inside the stable prefix,
-    // so later requests of the same run extend the cached prefix instead of rewriting its tail.
-    let goalPlaced = false;
-    if (goalContext && frozen && frozen.at !== null && frozen.at <= messages.length) {
-        messages.splice(frozen.at, 0, { role: 'user', content: goalContext, excluded_from_cursor: true });
-        goalPlaced = true;
-    }
     const cacheableMessageCount = messages.length;
 
     // A transcript that ENDS with an assistant message is a "prefill" request:
@@ -201,10 +179,6 @@ export default async function (
         });
     }
 
-    if (goalContext && !goalPlaced) {
-        if (runScoped) turnCtx.goalTurnContext = { key: goalKey, text: goalContext, at: messages.length };
-        messages.push({ role: 'user', content: goalContext, excluded_from_cursor: true });
-    }
     // Fresh control-plane mode always follows historical/compacted instructions.
     const planningContext = await ctx.fns.planning.prompt({ agentId: agent.id });
     messages.push({ role: 'user', content: planningContext, excluded_from_cursor: true });

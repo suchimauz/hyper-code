@@ -266,6 +266,13 @@ export default async function (
         return null;
     });
     await assertRunActive();
+    // Goal context, Codex-style: a persisted row appended only when the goal changes,
+    // never re-rendered per request, so the cached prefix keeps growing from the tail.
+    await ctx.fns.agent.syncGoalContext?.({ agent })?.catch?.((error: any) => {
+        ctx.fns.procs.log?.warn?.({ event: "agent.goal-context.failed", msg: String(error?.message ?? error), agentId: agent.id });
+        return null;
+    });
+    await assertRunActive();
     let consumedUserIdx = -1;
     const MAX_TURNS = 300;
     let turns = 0;
