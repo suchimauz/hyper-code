@@ -20,10 +20,10 @@ function ItemIcon({ icon }: { icon: string }) {
   return <Square size={14} aria-hidden="true" />;
 }
 
-async function canvasPost(agentId: string, body: object) {
+async function canvasPost(agentId: string, body: object, csrfToken: string) {
   const response = await fetch(`/canvas/${encodeURIComponent(agentId)}`, {
     method: 'POST', credentials: 'same-origin', cache: 'no-store',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'x-csrf-token': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '' }, body: JSON.stringify(body),
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error((await response.text().catch(() => '')) || `Canvas: HTTP ${response.status}`);
   return response.json() as Promise<{ activeItemId: number | null }>;
@@ -56,6 +56,7 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
   const [error, setError] = useState(false);
   const [store, setStoreState] = useState<CanvasTabsStore>(() => readTabs(agentId));
   const [items, setItems] = useState<CanvasItemTab[]>([]);
+  const [csrfToken, setCsrfToken] = useState('');
   const [closing, setClosing] = useState<Set<string>>(() => new Set());
   const [opening, setOpening] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -73,8 +74,10 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
     try {
       const response = await fetch(stateUrl(id), { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('Canvas state unavailable');
-      const next = parseCanvasTabs(await response.json());
+      const data = await response.json();
+      const next = parseCanvasTabs(data);
       if (ticket !== request.current || bound.current !== id) return;
+      setCsrfToken(typeof data.csrfToken === 'string' ? data.csrfToken : '');
       setItems(next); setReady(true); setError(false);
       const active = next.find(item => item.active)?.id ?? null;
       const known = knownItems.current;
@@ -88,7 +91,7 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
   }, [setStore]);
   useEffect(() => {
     if (bound.current !== agentId) {
-      bound.current = agentId; setStoreState(readTabs(agentId)); setItems([]);
+      bound.current = agentId; setStoreState(readTabs(agentId)); setItems([]); setCsrfToken('');
       knownItems.current = null; lastActive.current = null; setStartError(null); setReady(false);
     }
     void sync();
@@ -118,7 +121,7 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
   const select = (key: string) => {
     setStore(value => ({ ...value, selected: key }));
     const item = items.find(entry => itemKey(entry.id) === key);
-    if (item && !item.active) void canvasPost(bound.current, { activeItemId: item.id }).then(() => sync()).catch(() => setError(true));
+    if (item && !item.active) void canvasPost(bound.current, { activeItemId: item.id }, csrfToken).then(() => sync()).catch(() => setError(true));
   };
   const addStart = () => setStore(value => ({ ...value, starts: [...value.starts, value.next], next: value.next + 1, selected: startKey(value.next) }));
   const order = [...items.map(item => itemKey(item.id)), ...store.terms.map(termKey), ...store.starts.map(startKey)];
@@ -140,14 +143,14 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
       });
       if (item) {
         setItems(list => list.filter(entry => entry.id !== item.id));
-        void canvasPost(bound.current, { closeItemId: item.id }).then(() => sync()).catch(() => { setError(true); void sync(); });
+        void canvasPost(bound.current, { closeItemId: item.id }, csrfToken).then(() => sync()).catch(() => { setError(true); void sync(); });
       }
     }, CLOSE_MS);
   };
   const openFiles = async (startTab: string) => {
     setOpening(true); setStartError(null);
     try {
-      const state = await canvasPost(bound.current, { show: { kind: 'file', args: { path: '.' } } });
+      const state = await canvasPost(bound.current, { show: { kind: 'file', args: { path: '.' } } }, csrfToken);
       await sync();
       // The Start page becomes the opened page, as a dsh guide capsule does.
       setStore(value => ({ ...value, starts: value.starts.filter(n => startKey(n) !== startTab), selected: state.activeItemId == null ? value.selected : itemKey(state.activeItemId) }));
@@ -192,7 +195,7 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
       {!onLocal && !ready && !error && <div className="canvas-loading" role="status">Загружаем Canvas…</div>}
       {error && <div className="canvas-load-error" role="alert">Не удалось загрузить Canvas. <button onClick={retry}>Повторить</button></div>}
       {documentItems.map(item => <div key={`${agentId}:${item.id}`} className="canvas-content" hidden={selectedItem?.id !== item.id}>
-        {item.kind === 'file' ? <CanvasFile agentId={agentId} item={item} theme={theme} refresh={() => void sync()} /> :
+        {item.kind === 'file' ? <CanvasFile agentId={agentId} item={item} theme={theme} csrfToken={csrfToken} refresh={() => void sync()} /> :
           <CanvasKind agentId={agentId} item={item} theme={theme} />}
       </div>)}
     </div>

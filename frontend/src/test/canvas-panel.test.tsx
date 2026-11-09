@@ -41,3 +41,20 @@ it('validates tab metadata instead of parsing HTML',()=>{
  expect(()=>parseCanvasTabs({items:[{...tab,id:'12'}]})).toThrow();expect(()=>parseCanvasTabs('<div>')).toThrow();
  expect(parseCanvasTabs({items:[tab]})).toEqual([tab]);
 });
+
+it('opens Workspace and reads its directory using the state token without a meta tag',async()=>{
+ document.querySelector('meta[name="csrf-token"]')?.remove();
+ let opened=false;
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>{
+  if(url==='/canvas/a/state') return Response.json({csrfToken:'cookie-bound-state',items:opened?[{id:7,title:'Workspace',icon:'folder',active:true,kind:'file',args:{path:'/workspace',host:'local'}}]:[]});
+  expect(new Headers(init?.headers).get('x-csrf-token')).toBe('cookie-bound-state');
+  if(url==='/canvas/a'){opened=true;return Response.json({activeItemId:7});}
+  if(url==='/canvas/a/item/7') return Response.json({path:'/workspace',isDir:true,entries:[{name:'README.md',isDir:false}]});
+  throw new Error(`Unexpected request ${url}`);
+ });
+ vi.stubGlobal('fetch',fetcher);render(<CanvasPanel {...props}/>);
+ await waitFor(()=>expect(fetcher).toHaveBeenCalledWith('/canvas/a/state',expect.anything()));
+ fireEvent.click(await screen.findByRole('button',{name:/Workspace files/}));
+ expect(await screen.findByRole('button',{name:'README.md'})).toBeInTheDocument();
+ expect(screen.queryByRole('alert')).toBeNull();
+});

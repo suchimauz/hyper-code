@@ -20,7 +20,7 @@ beforeAll(async () => {
   server = Bun.serve({ hostname: '127.0.0.1', port: 0, async fetch(req) {
     const url = new URL(req.url), path = url.pathname;
     const json = (value: unknown) => Response.json(value);
-    if (req.method === 'GET' && path === '/') return new Response(`<!doctype html><html><head><meta name="csrf-token" content="fixture-csrf">${css}</head><body><div id="root"></div><script type="module" src="${js}"></script></body></html>`, { headers: { 'Content-Type': 'text/html', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; img-src 'self' data:; font-src 'self'" } });
+    if (req.method === 'GET' && path === '/') return new Response(`<!doctype html><html><head>${css}</head><body><div id="root"></div><script type="module" src="${js}"></script></body></html>`, { headers: { 'Content-Type': 'text/html', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; img-src 'self' data:; font-src 'self'" } });
     if (req.method === 'GET' && assets.has(path)) return new Response(assets.get(path));
     if (path === '/favicon.ico') return new Response(null, { status: 204 });
     if (req.method === 'GET' && path === '/nav/items') return json({ items: [
@@ -30,7 +30,7 @@ beforeAll(async () => {
     ] });
     if (req.method === 'GET' && path === '/fixture-document') return new Response('<!doctype html><html><body><h1>Isolated application document</h1></body></html>', { headers: { 'Content-Type': 'text/html' } });
     if (req.method === 'GET' && path === '/auth/users') return json({ meId: 'fixture-owner', csrfToken: 'fixture-csrf', google: null, users: [{ id: 'fixture-owner', name: 'Fixture Owner', email: 'owner@example.invalid', role: 'owner', disabledAt: null, hasPassword: false, providers: [] }] });
-    if (req.method === 'GET' && path === '/canvas/fixture/state') return json({ items: [1, 2].map(id => ({ id, title: `Fixture ${id}`, icon: 'file-text', active: id === activeItemId, kind: 'file', args: { path: `/fixture/${id}.txt` } })) });
+    if (req.method === 'GET' && path === '/canvas/fixture/state') return json({ csrfToken: 'fixture-csrf', items: [1, 2].map(id => ({ id, title: `Fixture ${id}`, icon: 'file-text', active: id === activeItemId, kind: 'file', args: { path: `/fixture/${id}.txt` } })) });
     if (req.method === 'POST' && path === '/canvas/fixture') {
       const body = await req.json();
       if ([1, 2].includes(body.activeItemId) && Object.keys(body).length === 1) { activeItemId = body.activeItemId; return json({ activeItemId }); }
