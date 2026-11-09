@@ -18,6 +18,8 @@ export type UiBundle = {
     grants: types.plugins.UiGrants;
     /** Legacy document path → granted page id, so Applications opens the native page instead of an iframe. */
     applications: Record<string, string>;
+    /** package.json procs.icon (Phosphor class), the default icon of the plugin's Canvas launchers; null when absent. */
+    icon: string | null;
     /** Build or manifest validation error shown in the plugin status. */
     error: string | null;
     /** Epoch milliseconds of the build. */

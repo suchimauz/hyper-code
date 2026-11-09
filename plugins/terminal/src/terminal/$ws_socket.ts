@@ -1,4 +1,4 @@
-// Owner-only interactive shell for the UI Lab Canvas Terminal tab. One socket owns
+// /terminal/socket — owner-only interactive shell for the Terminal plugin's Canvas tab. One socket owns
 // exactly one PTY in the agent's local workspace; closing the socket kills it, and
 // the process exiting closes the socket. Protocol (client → server JSON text):
 //   {"type":"input","data":"…"}   {"type":"resize","cols":N,"rows":N}
@@ -28,7 +28,7 @@ function kill(term: Term) {
 
 export default {
     async upgrade(ctx: Context, _session: Session | null, opts: {req: Request}) {
-        const start = await ctx.fns.frontendBridge.authorizeTerminal({req: opts.req});
+        const start = await ctx.fns.terminal.authorize({req: opts.req});
         if (start instanceof Response) return start;
         if (live.size >= MAX_SESSIONS) return new Response(`At most ${MAX_SESSIONS} terminals at once`, {status: 429});
         const term: Term = {...start, closed: false};

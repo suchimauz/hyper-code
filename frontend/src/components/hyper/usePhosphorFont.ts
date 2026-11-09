@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Puzzle } from 'lucide-react';
 import { phosphorClass } from '../../lib/plugins';
 
-/** Local icon font only: plugin metadata cannot introduce SVG markup or URLs. */
-export function PluginIcon({ icon }: { icon?: string | null }) {
+/** Load the local Phosphor icon font once per document (no SVG markup or URLs from plugin metadata).
+ * Returns the validated icon class, or null when the class is invalid or the font failed to load. */
+export function usePhosphorFont(icon: string | null | undefined): string | null {
   const cls = phosphorClass(icon ?? null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -22,5 +22,5 @@ export function PluginIcon({ icon }: { icon?: string | null }) {
     if (created) document.head.append(link);
     return () => { link.removeEventListener('error', onError); link.removeEventListener('load', onLoad); };
   }, [cls]);
-  return <span className="plugins-tile" aria-hidden="true">{cls && !failed ? <i className={`ph ${cls}`} /> : <Puzzle size={20} strokeWidth={1.25} />}</span>;
+  return cls && !failed ? cls : null;
 }

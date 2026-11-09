@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Terminal, ITheme } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
-import '@xterm/xterm/css/xterm.css';
-import './canvas-terminal-font.css';
+import { viewCss, xtermCss } from './styles';
+
+/** A plugin bundle is one JS file, so the styles are injected once as a <style> element. */
+function useTerminalStyles() {
+  useEffect(() => {
+    if (document.querySelector('style[data-hyper-terminal]')) return;
+    const style = document.createElement('style');
+    style.dataset.hyperTerminal = '';
+    style.textContent = `${xtermCss}\n${viewCss}`;
+    document.head.append(style);
+  }, []);
+}
 
 /** Letters come from the system monospace font; prompt icons (powerlevel10k, Nerd Font private-use glyphs)
  * fall through to the bundled symbols-only Nerd Font, which loads only when such a glyph appears. */
@@ -23,7 +33,7 @@ export const terminalThemes: Record<'light' | 'dark', ITheme> = {
 
 const socketUrl = (agentId: string, cols: number, rows: number) => {
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${scheme}//${location.host}/ui-lab/terminal?agentId=${encodeURIComponent(agentId)}&cols=${cols}&rows=${rows}`;
+  return `${scheme}//${location.host}/terminal/socket?agentId=${encodeURIComponent(agentId)}&cols=${cols}&rows=${rows}`;
 };
 const closeMessage = (code: number, reason: string) => {
   if (code === 1000 || code === 1001) return reason === 'Idle timeout' ? 'Сессия закрыта по неактивности' : 'Терминал закрыт';
@@ -32,9 +42,10 @@ const closeMessage = (code: number, reason: string) => {
   return reason || 'Не удалось подключиться к терминалу (возможно, превышен лимит сессий или папка недоступна)';
 };
 
-/** An interactive shell in the agent's local workspace, over the owner-only /ui-lab/terminal socket.
+/** An interactive shell in the agent's local workspace, over the owner-only /terminal/socket WebSocket.
  * The xterm instance and its socket live while the tab exists; hiding the tab keeps the shell running. */
-export function CanvasTerminal({ agentId, theme, active }: Props) {
+export function TerminalView({ agentId, theme, active }: Props) {
+  useTerminalStyles();
   const host = useRef<HTMLDivElement>(null);
   const term = useRef<Terminal | null>(null);
   const fit = useRef<FitAddon | null>(null);

@@ -6,7 +6,7 @@ import { coreApplications, coreExtensions, coreGrants } from './installed';
 import { installHostRuntime } from './hostRuntime';
 import type { ExtensionGrant, ExtensionRegistry, UiExtension } from './types';
 
-export type PluginUiEntry = { name: string; url: string; hash: string; grants: ExtensionGrant; applications?: Record<string, string> };
+export type PluginUiEntry = { name: string; url: string; hash: string; grants: ExtensionGrant; applications?: Record<string, string>; /** package.json procs.icon, the default launcher icon. */ icon?: string | null };
 export type PluginUiManifest = { apiVersion: 1; plugins: PluginUiEntry[] };
 export type PluginUiState = Readonly<{
   registry: ExtensionRegistry;
@@ -47,6 +47,7 @@ export function createPluginRuntime(options: { importer?: Importer; fetchManifes
     const grants: Record<string, ExtensionGrant> = { ...coreGrants };
     const applications: Record<string, string> = { ...coreApplications };
     const errors: Record<string, string> = {};
+    const icons: Record<string, string | null> = {};
     await Promise.all(manifest.plugins.map(async entry => {
       try {
         const cached = modules.get(entry.name);
@@ -56,17 +57,17 @@ export function createPluginRuntime(options: { importer?: Importer; fetchManifes
           extension = module?.default as UiExtension;
           if (!extension || typeof extension !== 'object' || extension.id !== entry.name) throw new Error(`UI extension id must equal plugin name ${entry.name}`);
           if (Object.hasOwn(coreGrants, extension.id)) throw new Error(`Plugin ${entry.name} cannot replace a built-in surface`);
-          createExtensionRegistry([extension], { [entry.name]: entry.grants }); // validate alone first
+          createExtensionRegistry([extension], { [entry.name]: entry.grants }, { [entry.name]: entry.icon }); // validate alone first
           modules.set(entry.name, { hash: entry.hash, extension });
         }
-        extensions.push(extension); grants[entry.name] = entry.grants;
+        extensions.push(extension); grants[entry.name] = entry.grants; icons[entry.name] = typeof entry.icon === 'string' ? entry.icon : null;
         for (const [href, page] of Object.entries(entry.applications ?? {})) applications[href] = `${entry.name}/${page}`;
       } catch (error) { errors[entry.name] = error instanceof Error ? error.message : String(error); }
     }));
     if (current !== generation) return state;
     for (const name of [...modules.keys()]) if (!manifest.plugins.some(entry => entry.name === name)) modules.delete(name);
     let registry: ExtensionRegistry;
-    try { registry = createExtensionRegistry(extensions, grants); }
+    try { registry = createExtensionRegistry(extensions, grants, icons); }
     catch (error) { // e.g. two plugins claiming the same Canvas kind: keep the core working
       registry = createExtensionRegistry(coreExtensions, coreGrants); errors.registry = error instanceof Error ? error.message : String(error);
     }

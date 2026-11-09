@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Info, Plus, RotateCw, Search, X } from 'lucide-react';
 import { getPluginSources, type SourcePlugin, type SourceProvider, getPlugins, groupPlugins, reloadPlugins, reviewPluginInstall, searchPluginMarket, type InstalledPlugin, type MarketItem, type MarketSection } from '../../lib/plugins';
-import { PluginIcon } from './PluginIcon';
+import { PluginTile } from './PluginTile';
 import { PluginDetail } from './PluginDetail';
 import { PluginUiReview } from './PluginUiReview';
 import './plugins-page.css';
@@ -11,7 +11,7 @@ type Tab = 'installed' | 'market' | 'sources';
 function InstalledCard({ plugin, pending, onOpen, onReload }: { plugin: InstalledPlugin; pending: boolean; onOpen: () => void; onReload?: () => void }) {
   return <li className="plugins-card">
     <div className="plugins-card-row">
-      <PluginIcon icon={plugin.icon} />
+      <PluginTile icon={plugin.icon} />
       <div className="plugins-card-main">
         <button className="plugins-card-title" onClick={onOpen}>{plugin.label}</button>
         <p className="plugins-card-desc" title={plugin.description}>{plugin.description || plugin.name}</p>
@@ -89,7 +89,7 @@ function Market({ csrf, onOpenAgent, onOpenPlugin }: { csrf: string; onOpenAgent
       <h3>{section.label}</h3>
       {section.errors.map(e => <p key={e} className="plugins-muted">{e}</p>)}
       {section.items.length ? <ul className="plugins-list">{section.items.map(item => <li key={item.name} className="plugins-card"><div className="plugins-card-row">
-        <PluginIcon icon={item.icon} />
+        <PluginTile icon={item.icon} />
         <div className="plugins-card-main">{item.mounted ? <button className="plugins-card-title" onClick={() => onOpenPlugin(item.name)}>{item.label}</button> : <span className="plugins-card-title">{item.label}</span>}<p className="plugins-card-desc" title={item.description}>{item.description || item.name}</p></div>
         {operation(item) && csrf && onOpenAgent ? <button className="plugins-get" aria-label={`Review ${operation(item)} ${item.label}`} title="Opens a review agent; installing needs your confirmation there" disabled={!!installing} onClick={() => void install(item)}>{installing === item.name ? 'Opening…' : `Review ${operation(item)}`}</button> : <span className="plugins-badge" title="No safe source change available">{item.mounted ? 'Mounted' : 'Unavailable'}</span>}
       </div></li>)}</ul> : <p className="plugins-muted">No plugins found.</p>}
@@ -139,7 +139,7 @@ export function PluginsPage({ onOpenAgent }: { onOpenAgent?: (id: string) => voi
         </div>
       </header>
       {about && <p className="plugins-about">Plugins add functions, routes, and skills to Hyper. Installing new code always goes through Hyper's reviewed flow with a separate confirmation.</p>}
-      {opened ? <PluginDetail name={opened} icon={<PluginIcon icon={plugins?.find(p => p.name === opened)?.icon ?? null} />} onBack={() => setOpened(null)} /> : <>
+      {opened ? <PluginDetail name={opened} icon={<PluginTile icon={plugins?.find(p => p.name === opened)?.icon ?? null} />} onBack={() => setOpened(null)} /> : <>
       <div className="plugins-tabs" role="tablist" aria-label="Plugins">
         <button role="tab" aria-selected={tab === 'installed'} onClick={() => setTab('installed')}>Installed</button>
         <button role="tab" aria-selected={tab === 'market'} onClick={() => setTab('market')}>Plugin Market</button>

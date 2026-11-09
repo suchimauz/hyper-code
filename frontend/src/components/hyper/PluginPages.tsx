@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { getPlugins } from '../../lib/plugins';
-import { PluginIcon } from './PluginIcon';
+import { PluginTile } from './PluginTile';
 import './plugins-page.css';
 
 /** Approved plugin page catalogue, sharing the Plugins page layout and card styles. */
@@ -31,7 +31,7 @@ export function PluginPages({ pages, loaded, onOpen }: { pages: readonly { key: 
       {loaded && pages.length > 0 && !filtered.length && <p className="plugins-muted" role="status">Страницы не найдены.</p>}
       <ul className="plugins-list">
         {filtered.map(page => <li key={page.key} className="plugins-card"><div className="plugins-card-row">
-          <PluginIcon icon={icons.get(page.key.split('/')[0]!)} />
+          <PluginTile icon={icons.get(page.key.split('/')[0]!)} />
           <div className="plugins-card-main"><button className="plugins-card-title" onClick={() => onOpen(page.key)}>{page.title}</button><p className="plugins-card-desc">{page.key.split('/')[0]}</p></div>
         </div></li>)}
       </ul>

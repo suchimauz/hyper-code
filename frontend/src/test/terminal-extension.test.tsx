@@ -2,8 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const xterm = vi.hoisted(() => ({ instances: [] as any[] }));
-vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
-vi.mock('@xterm/xterm', () => ({
+vi.mock('../../../plugins/terminal/node_modules/@xterm/xterm', () => ({
   Terminal: class {
     cols = 80; rows = 24; options: any; written: any[] = []; data?: (d: string) => void; resized?: (s: { cols: number; rows: number }) => void; disposed = false;
     constructor(options: any) { this.options = options; xterm.instances.push(this); }
@@ -13,8 +12,10 @@ vi.mock('@xterm/xterm', () => ({
     dispose() { this.disposed = true; }
   },
 }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
-import { CanvasTerminal, terminalThemes } from '../components/hyper/CanvasTerminal';
+vi.mock('../../../plugins/terminal/node_modules/@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
+import { TerminalView as CanvasTerminal, terminalThemes } from '../../../plugins/terminal/ui/TerminalView';
+import terminalExtension, { TerminalLauncher } from '../../../plugins/terminal/ui';
+import { createExtensionRegistry } from '../extensions/registry';
 
 class FakeSocket {
   static OPEN = 1; static all: FakeSocket[] = [];
@@ -32,12 +33,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 const settle = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 
+describe('terminal plugin', () => {
+  it('declares one granted Start launcher that inherits the plugin icon', () => {
+    const registry = createExtensionRegistry([terminalExtension], { terminal: { canvasLaunchers: ['terminal'] } }, { terminal: 'ph-terminal-window' });
+    expect(registry.canvasLaunchers).toHaveLength(1);
+    expect(registry.canvasLaunchers[0]).toMatchObject({ key: 'terminal/terminal', title: 'Terminal', icon: 'ph-terminal-window' });
+  });
+  it('asks for a chat when there is no agent', () => {
+    render(<TerminalLauncher context={{ agentId: null, theme: 'dark', readOnly: false }} tabId="page-1" active />);
+    expect(screen.getByRole('alert')).toHaveTextContent('только внутри чата');
+  });
+});
+
 describe('CanvasTerminal', () => {
   it('connects to the owner terminal socket with size, relays input, output, resize and theme', async () => {
     const ui = render(<CanvasTerminal agentId="a b" theme="light" active />);
     await settle();
     const ws = FakeSocket.all[0]!; const term = xterm.instances[0];
-    expect(ws.url).toBe(`ws://${location.host}/ui-lab/terminal?agentId=a%20b&cols=80&rows=24`);
+    expect(ws.url).toBe(`ws://${location.host}/terminal/socket?agentId=a%20b&cols=80&rows=24`);
     expect(ws.protocols).toEqual(['hyper-terminal']);
     expect(screen.getByRole('status')).toHaveTextContent('Запускаем терминал');
     act(() => ws.onmessage!({ data: JSON.stringify({ type: 'ready', cwd: '/w' }) }));

@@ -2,10 +2,19 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest';
 import { CanvasPanel } from '../components/hyper/CanvasPanel';
 import { parseCanvasTabs } from '../components/hyper/canvasTabs';
-vi.mock('../components/hyper/CanvasTerminal', () => ({ CanvasTerminal: ({ active }: { active: boolean }) => <div hidden={!active}>Terminal content</div> }));
+import { readTabs } from '../components/hyper/canvasTabs';
+import { createExtensionRegistry } from '../extensions/registry';
+import type { ExtensionLauncherProps, UiExtension } from '../extensions/types';
+const launcherExtension: UiExtension = { id: 'terminal', apiVersion: 1, canvasLaunchers: [{ id: 'terminal', title: 'Terminal', description: 'Shell', component: ({ active, tabId }: ExtensionLauncherProps) => <div hidden={!active}>Terminal content {tabId}</div> }] };
+const pluginUi = vi.hoisted(() => ({ state: null as any }));
+vi.mock('../extensions/pluginRuntime', () => ({ usePluginUi: () => pluginUi.state }));
+const setLaunchers = (loaded = true, icon: string | null = 'ph-terminal-window', extensions = [launcherExtension]) => {
+  pluginUi.state = { registry: createExtensionRegistry(extensions, { terminal: { canvasLaunchers: ['terminal'] } }, { terminal: icon }), applications: {}, errors: {}, loaded };
+};
+setLaunchers();
 const props = {agentId:'a', revision:'1', theme:'light' as const, onClose:vi.fn(), expanded:false, onExpand:vi.fn()};
 const tab = {id:12,title:'File <unsafe>',icon:'file-text',active:true};
-afterEach(()=>{localStorage.clear();vi.unstubAllGlobals();vi.useRealTimers();});
+afterEach(()=>{setLaunchers();localStorage.clear();vi.unstubAllGlobals();vi.useRealTimers();});
 function api(items = [tab]) { const fetcher=vi.fn(async(_url: string)=>Response.json({items}));vi.stubGlobal('fetch',fetcher);return fetcher; }
 it('reads JSON tabs and uses an item document, never a mobile shell',async()=>{
  const fetcher=api();render(<CanvasPanel {...props}/>);
@@ -36,6 +45,27 @@ it('keeps local Start and Terminal tabs and keyboard actions',async()=>{
  fireEvent.click(screen.getByRole('button',{name:'Новая вкладка'}));expect(screen.getAllByRole('tab',{name:'Start'})).toHaveLength(2);
  fireEvent.click(screen.getByRole('button',{name:/Terminal/}));expect(screen.getByRole('tab',{name:'Terminal'})).toHaveAttribute('aria-selected','true');
  fireEvent.click(screen.getByRole('button',{name:'Свернуть Canvas'}));expect(props.onClose).toHaveBeenCalled();
+});
+it('Start lists plugin launchers with the plugin icon and opens their page',async()=>{
+ api([]);render(<CanvasPanel {...props}/>);await waitFor(()=>expect(fetch).toHaveBeenCalled());
+ const button=document.querySelector<HTMLButtonElement>('.canvas-start-entry[data-launcher="terminal/terminal"]')!;expect(button.querySelector('i.ph.ph-terminal-window')).not.toBeNull();
+ fireEvent.click(button);expect(screen.getByText(/Terminal content page-/)).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Новая вкладка'}));fireEvent.click(document.querySelector('.canvas-start-entry[data-launcher="terminal/terminal"]')!);
+ expect(screen.getByRole('tab',{name:'Terminal 2'})).toHaveAttribute('aria-selected','true');
+});
+it('launcher icon falls back to the default without a plugin icon, and own icon wins',()=>{
+ expect(createExtensionRegistry([launcherExtension],{terminal:{canvasLaunchers:['terminal']}}).canvasLaunchers[0]?.icon).toBeNull();
+ const own={...launcherExtension,canvasLaunchers:[{...launcherExtension.canvasLaunchers![0]!,icon:'ph-code'}]};
+ expect(createExtensionRegistry([own],{terminal:{canvasLaunchers:['terminal']}},{terminal:'ph-terminal-window'}).canvasLaunchers[0]?.icon).toBe('ph-code');
+ expect(createExtensionRegistry([launcherExtension],{terminal:{}}).canvasLaunchers).toHaveLength(0);
+});
+it('migrates stored Terminal tabs to the terminal plugin launcher',()=>{
+ localStorage.setItem('hyper.canvas.tabs.m',JSON.stringify({starts:[],terms:[3],next:4,selected:'terminal-3'}));
+ expect(readTabs('m')).toEqual({starts:[],pages:[{n:3,launcher:'terminal/terminal'}],next:4,selected:'page-3'});
+});
+it('a tab of an unavailable plugin shows a notice',async()=>{
+ setLaunchers(true,null,[]);localStorage.setItem('hyper.canvas.tabs.a',JSON.stringify({starts:[],pages:[{n:2,launcher:'terminal/terminal'}],next:3,selected:'page-2'}));
+ api([]);render(<CanvasPanel {...props}/>);expect(await screen.findByText(/Плагин недоступен/)).toBeInTheDocument();
 });
 it('validates tab metadata instead of parsing HTML',()=>{
  expect(()=>parseCanvasTabs({items:[{...tab,id:'12'}]})).toThrow();expect(()=>parseCanvasTabs('<div>')).toThrow();

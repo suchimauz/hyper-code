@@ -1,7 +1,7 @@
 /**
- * Authorize an owner-only same-origin UI Lab terminal WebSocket handshake for one local agent workspace
+ * Authorize an owner-only same-origin Terminal plugin WebSocket handshake for one local agent workspace
  *
- * Use from the /ui-lab/terminal upgrade hook after global authentication. Requires a signed-in owner, a GET handshake on exactly /ui-lab/terminal, an Origin equal to the public origin, the hyper-terminal subprotocol, a valid agentId query parameter and integer cols/rows in range. The agent must exist with a local workspace (empty workspace_host) whose directory exists; remote SSH workspaces are refused. Returns the terminal start parameters or a refusal Response; it never spawns a process.
+ * Use from the /terminal/socket upgrade hook after global authentication. Requires a signed-in owner, a GET handshake on exactly /terminal/socket, an Origin equal to the public origin, the hyper-terminal subprotocol, a valid agentId query parameter and integer cols/rows in range. The agent must exist with a local workspace (empty workspace_host) whose directory exists; remote SSH workspaces are refused. Returns the terminal start parameters or a refusal Response; it never spawns a process.
  * @param opts.req Incoming browser WebSocket handshake carrying agentId, cols and rows query parameters.
  */
 export default async function (
@@ -17,7 +17,7 @@ export default async function (
     if(!user) return new Response('Authentication required',{status:401});
     if(user.role!=='owner') return new Response('Owner access required',{status:403});
     const url=new URL(req.url);
-    if(req.method!=='GET' || url.pathname!=='/ui-lab/terminal') return new Response('Invalid endpoint',{status:400});
+    if(req.method!=='GET' || url.pathname!=='/terminal/socket') return new Response('Invalid endpoint',{status:400});
     const origin=req.headers.get('origin');
     if(!origin || origin!==await ctx.fns.http.publicOrigin({req})) return new Response('Cross-origin WebSocket rejected',{status:403});
     if(req.headers.get('sec-websocket-protocol')!=='hyper-terminal') return new Response('hyper-terminal required',{status:400});

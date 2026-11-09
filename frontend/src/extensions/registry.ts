@@ -1,13 +1,16 @@
 import type { ExtensionGrant, ExtensionRegistry, UiExtension } from './types';
 
-/** Build a snapshot from an explicit host allowlist; ungranted entries never reach a slot. */
-export function createExtensionRegistry(extensions: readonly UiExtension[], grants: Readonly<Record<string, ExtensionGrant>>): ExtensionRegistry {
+/** Build a snapshot from an explicit host allowlist; ungranted entries never reach a slot.
+ * `icons` maps extension id → its plugin icon, the default for launchers without their own. */
+export function createExtensionRegistry(extensions: readonly UiExtension[], grants: Readonly<Record<string, ExtensionGrant>>, icons: Readonly<Record<string, string | null | undefined>> = {}): ExtensionRegistry {
   const pages: ExtensionRegistry['pages'][number][] = [];
   const navigation: ExtensionRegistry['navigation'][number][] = [];
   const sidebarNavigation: ExtensionRegistry['sidebarNavigation'][number][] = [];
   const panels: ExtensionRegistry['panels'][number][] = [];
   const actions: ExtensionRegistry['actions'][number][] = [];
   const canvasKinds: ExtensionRegistry['canvasKinds'][number][] = [];
+  const canvasLaunchers: ExtensionRegistry['canvasLaunchers'][number][] = [];
+  const iconClass = (icon: unknown) => typeof icon === 'string' && /^ph-[a-z0-9-]{1,64}$/.test(icon) ? icon : null;
   const ids = new Set<string>();
   const valid = (id: string) => /^[a-z][a-z0-9-]{0,63}$/.test(id);
   for (const extension of extensions) {
@@ -33,6 +36,14 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
       if (canvasKinds.some(kind => kind.kind === entry.kind)) throw new Error(`Duplicate Canvas kind: ${entry.kind}`);
       canvasKinds.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.kind}` }));
     }
+    const seenLaunchers = new Set<string>();
+    for (const entry of extension.canvasLaunchers ?? []) {
+      if (!valid(entry.id) || seenLaunchers.has(entry.id) || !entry.title?.trim() || typeof entry.component !== 'function') throw new Error(`Invalid Canvas launcher: ${extension.id}/${entry.id}`);
+      seenLaunchers.add(entry.id);
+      if (!grant?.canvasLaunchers?.includes(entry.id)) continue;
+      const icon = iconClass(entry.icon) ?? iconClass(Object.hasOwn(icons, extension.id) ? icons[extension.id] : null);
+      canvasLaunchers.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.id}`, icon }));
+    }
     for (const placement of ['navigation', 'sidebarNavigation'] as const) {
     const seenNav = new Set<string>();
     for (const item of extension[placement] ?? []) {
@@ -45,5 +56,5 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
     }
     }
   }
-  return Object.freeze({ sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
+  return Object.freeze({ sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), canvasLaunchers: Object.freeze(canvasLaunchers), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
 }

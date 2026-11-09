@@ -36,7 +36,7 @@ export default async function (
         } catch { return new Response('Forbidden path', {status:403}); }
     }
     if (req.headers.get('upgrade')) {
-     if(url.pathname === '/ui-lab/hmr' || url.pathname === '/ui-lab/terminal') return;
+     if(url.pathname === '/ui-lab/hmr') return;
      return new Response('Unknown socket',{status:404});
     }
     if(url.pathname === '/ui-lab') return new Response(null,{status:307,headers:{location:'/ui-lab/'}});
