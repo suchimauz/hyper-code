@@ -56,8 +56,8 @@ export function GoalDock({ agentId, running, disabled, editor, onClose, onAccept
     <div className="queue-row">
       <Target size={16} className="queue-lead" />
       <button type="button" className="goal-summary" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}<span className="queue-preview">{goal?.objective || 'Новая цель'}</span></button>
-      {goal && <span className="goal-status-dot" data-status={goal.status} role="status" aria-label={goalStatus[goal.status]} title={goalStatus[goal.status]} />}
       <div className="goal-actions">
+        {goal && <span className="goal-status-dot" data-status={goal.status} role="status" aria-label={goalStatus[goal.status]} title={goalStatus[goal.status]} />}
         {goal && <IconButton size="compact" label="Редактировать цель" disabled={disabled || busy} onClick={() => { setObjective(goal.objective); setBudget(goal.tokenBudget?.toString() || ''); setEditing(true); setExpanded(true); }}><Pencil size={16} /></IconButton>}
         {goal && goal.status !== 'complete' && <IconButton size="compact" label={goal.status === 'active' ? 'Приостановить цель' : 'Продолжить цель'} disabled={disabled || busy || (goal.status !== 'active' && (running || !!snapshot?.owner?.runToken))} onClick={() => void perform(goal.status === 'active' ? 'pause' : 'resume')}>{goal.status === 'active' ? <Pause size={16} /> : <Play size={16} />}</IconButton>}
       </div>

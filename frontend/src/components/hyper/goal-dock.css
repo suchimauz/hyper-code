@@ -7,13 +7,15 @@
 .goal-form textarea { width:100%; box-sizing:border-box; min-height:28px; max-height:160px; resize:none; overflow-y:auto; }
 .goal-form input { width:100%; box-sizing:border-box; }
 .goal-form-actions { display:flex; justify-content:flex-end; gap:var(--space-2); }
-.goal-actions { display:flex; align-items:center; flex:none; gap:var(--space-2); }
+.goal-actions { display:flex; align-items:center; flex:none; gap:var(--space-1); }
 .goal-dock:has(+ .queue-dock) + .queue-dock { border-radius:0; }
 @media (max-width:480px) { .goal-dock .queue-row { flex-wrap:wrap; gap:6px; } .goal-dock .queue-status { font-size:11px; } }
-.goal-status-dot { position:relative; width:8px; height:8px; margin:0 4px; flex:none; border-radius:50%; background:var(--text-caption); }
+/* The dot fills a slot as wide as a compact icon button, so dot, edit and pause sit at equal steps. */
+.goal-status-dot { position:relative; width:8px; height:8px; margin:0 10px; flex:none; border-radius:50%; background:var(--text-caption); }
 .goal-status-dot[data-status="active"]::after { content:''; position:absolute; inset:-4px; border:1px solid color-mix(in srgb, var(--success) 22%, transparent); border-top-color:var(--success); border-right-color:var(--success); border-radius:50%; animation:goal-status-spin 1.2s linear infinite; pointer-events:none; }
 @keyframes goal-status-spin { to { transform:rotate(360deg); } }
 @media (prefers-reduced-motion:reduce) { .goal-status-dot[data-status="active"]::after { animation:none; } }
 .goal-status-dot[data-status="active"], .goal-status-dot[data-status="complete"] { background:var(--success); }
 .goal-status-dot[data-status="paused"] { background:var(--tool-stopped); }
 .goal-status-dot[data-status="blocked"], .goal-status-dot[data-status="usage_limited"], .goal-status-dot[data-status="budget_limited"] { background:var(--tool-error); }
+@media (pointer: coarse) { .goal-status-dot { margin:0 18px; } }
