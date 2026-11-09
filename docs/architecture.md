@@ -6,6 +6,8 @@ The primary shell is React/Vite in `frontend/`, served at `/`. Trusted browser e
 
 `/old-ui` redirects supported entry links to the primary shell. Shared SSR, Canvas content and approval compatibility surfaces remain; retirement of that entry does not authorize removal of their renderers/assets. Frontend grants/readOnly are not security boundaries: backend authentication, ownership, CSRF and explicit human approval still apply. SDK writes require a cookie-bound CSRF token; live subscriptions require resync, error handling, topic declarations and cleanup.
 
+The SDK example is absent from production `extensions/installed.ts` and retained in `ui-plugins/sdk-example.tsx` with a separate test registry. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers are removed; `procs.http.toResponse` still dynamically dispatches HTTP strings/`{ main }` through `ui.layout`. People `/auth/users`, `sidebar.draft`, built-in/plugin SSR pages, Canvas kind renderers/assets and secure input transports remain live: see the [residual consumer map](ui-architecture.md#residual-compatibility-consumers). SSH settings uses a callback to the native `llm-connections` tab, not `/llms`.
+
 ## Compatibility SSR: declarative navigation apps
 
 The following `$app`/Dock/menu declarations describe existing server-rendered consumers, not automatic registration of React extensions.

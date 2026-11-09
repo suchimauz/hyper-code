@@ -147,6 +147,8 @@ await ctx.fns.procs.repl.load({ name: "myModule" });
 
 **The primary UI is React/Vite.** Bun serves the authenticated shell and APIs. Trusted React extensions use the local `@hyper/ui` alias (not a published package), host React, shared components and explicit build-time grants for pages, navigation, panels and actions. No private/deep imports or second React runtime. HTMX, `#main` and `$script` assets remain compatibility mechanisms, not the primary extension contract.
 
+The SDK example remains a dev/test fixture with a separate test registry; it is not installed in production. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers have been removed, and SSH settings opens the native LLM Connections tab via callback rather than `/llms`. Dynamic HTTP layouts, People and other SSR pages, Canvas kind documents and secure approval transports still have live consumers; see the [concrete compatibility map](docs/ui-architecture.md#residual-compatibility-consumers).
+
 Extensions are trusted same-origin code, not a sandbox. Frontend grants and read-only controls never replace backend authentication, ownership, CSRF or explicit human approval. SDK `requestJson` writes require the existing cookie-bound CSRF token. `subscribeLive`/`useLiveSubscription` require resync and error callbacks, topic declarations and cleanup. Preserve themes, keyboard focus, accessibility and reduced motion; the [Apple Design guidance](docs/skills/apple-design/README.md) applies only to Hyper UI. Start with [UI architecture](docs/ui-architecture.md) and `frontend/src/ui-plugins/sdk-example.tsx`.
 
 Read more in [architecture](docs/architecture.md), [settings](docs/settings.md), and [tool-call protocols](docs/toolcall-protocols.md).

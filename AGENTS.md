@@ -189,6 +189,8 @@ Vendored `src/procs/` is upstream code: keep local patches minimal and marked wi
 - Use SDK components and `requestJson`; writes require a cookie-bound CSRF token via the supported option/header or meta fallback. Handle 401/403 and failures; do not automatically retry writes or invent token endpoints.
 - Use `subscribeLive`/`useLiveSubscription` with required `resync` and `onError`, cleanup on unmount, and narrow `data-live-topic` declarations. Events invalidate; canonical authorized HTTP reads restore state after gaps.
 - Shared SSR, Canvas content renderers and inline approvals still have compatibility consumers. Do not delete them because `/old-ui` redirects, or describe all Canvas/approval surfaces as migrated. `#main`, HTMX and `$script_*.js` are compatibility mechanisms, not the public React extension contract.
+
+Migration facts: the SDK example is absent from production `extensions/installed.ts`, retained as a dev/test fixture with a separate test registry. Removed `legacyUi.rewriteResponse`/`navigationUrl` do not retire dynamic HTTP layouts, People `/auth/users`, `sidebar.draft`, built-in/plugin SSR pages, Canvas kind renderers/assets or secure input transports. See the residual consumer map in `docs/ui-architecture.md`. SSH settings opens native `llm-connections` via callback, not `/llms`.
 - To show a file alongside chat use `canvas.show({ kind: 'file', args: { path } })`, not whole-page navigation. See `docs/ui-architecture.md`, `docs/ui-design-system.md`, and `docs/live-updates.md`.
 
 ## Transcript storage invariants

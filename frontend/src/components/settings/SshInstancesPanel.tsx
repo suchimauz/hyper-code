@@ -130,7 +130,7 @@ function AddForm({ run, busy, first }: { run: Run; busy: boolean; first: boolean
 }
 
 /** Settings tab: manage owner SSH instances through the authenticated UI Lab bridge. */
-export function SshInstancesPanel() {
+export function SshInstancesPanel({ onOpenConnections }: { onOpenConnections?: () => void }) {
   const [instances, setInstances] = useState<SshInstance[] | null>(null);
   const [csrf, setCsrf] = useState('');
   const [loadError, setLoadError] = useState<{ text: string; forbidden: boolean } | null>(null);
@@ -159,7 +159,7 @@ export function SshInstancesPanel() {
   return <div className="settings-panel" data-page="ssh-instances">
     <header className="settings-panel-header">
       <h2>SSH Instances</h2>
-      <p>Connect a server to run subscription requests remotely. Manage provider accounts in <a href="/llms">LLM Connections</a>.</p>
+      <p>Connect a server to run subscription requests remotely. Manage provider accounts in {onOpenConnections ? <button type="button" onClick={onOpenConnections}>LLM Connections</button> : 'the LLM Connections settings tab'}.</p>
     </header>
     {feedback && <div className={`settings-feedback is-${feedback.tone}`} role={feedback.tone === 'error' ? 'alert' : 'status'} aria-live="polite">{feedback.text}</div>}
     {loadError ? <div className="settings-feedback is-error" role="alert">{loadError.forbidden ? 'Только владелец может управлять SSH Instances.' : loadError.text}{!loadError.forbidden && <Button variant="ghost" onClick={() => { void load(); }}>Повторить</Button>}</div>

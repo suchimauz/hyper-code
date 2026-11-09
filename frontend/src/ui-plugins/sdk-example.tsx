@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Dialog, Panel, TextField, requestJson, subscribeLive, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
 
-/** A bundled, read-only SDK example, not a private integration. */
+/** Read-only dev/test fixture for the public SDK. Never install in the production registry. */
 function Overview({ context }: ExtensionViewProps) {
   const [name, setName] = useState('');
   const [open, setOpen] = useState(false);

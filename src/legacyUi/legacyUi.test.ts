@@ -1,23 +1,8 @@
 import {test,expect} from 'bun:test';
 import handle from './handle';
-import rewrite from './rewriteResponse';
-import navigation from './navigationUrl';
 import dispatch from '../procs/http/dispatch';
 
-const context = () => {
- const ctx:any={fns:{legacyUi:{}}};
- ctx.fns.legacyUi.navigationUrl=(opts:any)=>navigation(ctx,null,opts);
- ctx.fns.legacyUi.rewriteResponse=(opts:any)=>rewrite(ctx,null,opts);
- return ctx;
-};
-test('rewrites navigation, preserving assets, cookies and external URLs',async()=>{
- const ctx=context();
- const r=await rewrite(ctx,null,{origin:'https://hyper.test',response:new Response('<a href="/agent/ab?q=1">a</a><form action="/agent/new"></form><script src="/ui/app.js"></script><a href="https://other.test/">external</a><div hx-get="/agent/ab" hx-target="#main"></div>',{headers:{'content-type':'text/html','set-cookie':'sid=x; HttpOnly','hx-push-url':'/agent/ab'}})});
- expect(r.headers.get('set-cookie')).toBe('sid=x; HttpOnly');
- expect(r.headers.get('hx-push-url')).toBe('/old-ui/agent/ab');
- const html=await r.text();
- expect(html).toContain('href="/old-ui/agent/ab?q=1"');expect(html).toContain('action="/old-ui/agent/new"');expect(html).toContain('src="/ui/app.js"');expect(html).toContain('href="https://other.test/"');expect(html).toContain('hx-get="/old-ui/agent/ab"');
-});
+const context = () => ({fns:{}} as any);
 test('retired entry redirects GET and HEAD with validated shell query only',async()=>{
  for (const method of ['GET','HEAD']) {
   for (const [path,location] of [

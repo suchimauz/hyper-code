@@ -25,7 +25,7 @@ export function SettingsDialog({ open, tab, onTab, onOpenChange }: { open: boole
         </nav>
         <div className="settings-content">
           <div className="settings-header"><Dialog.Close className="settings-close" aria-label="Закрыть настройки"><X size={14} strokeWidth={1.5} /></Dialog.Close></div>
-          <div className="settings-options">{tab === 'llm-connections' && <LlmConnectionsPanel />}{tab === 'ssh-instances' && <SshInstancesPanel />}</div>
+          <div className="settings-options">{tab === 'llm-connections' && <LlmConnectionsPanel />}{tab === 'ssh-instances' && <SshInstancesPanel onOpenConnections={() => onTab('llm-connections')} />}</div>
         </div>
       </Dialog.Popup>
     </Dialog.Portal>

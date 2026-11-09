@@ -16,6 +16,8 @@ One shared topic-filtered SSE connection serves a tab. Over HTTP/2 hidden tabs c
 
 Shared SSR still serves compatibility surfaces, including inline approvals and Canvas content consumers. `/old-ui` redirects; that retired entry point is not proof that shared renderers and assets can be deleted.
 
+Concrete consumers are mapped in [ui-architecture.md](ui-architecture.md#residual-compatibility-consumers): dynamic HTTP `ui.layout` dispatch, People `/auth/users`, `sidebar.draft`, built-in/plugin SSR pages, Canvas `kind.render` with assets, and secure input transports. Removing dead `legacyUi.rewriteResponse`/`navigationUrl` helpers does not retire these renderers. The SDK example is a dev/test fixture with its own test registry, not a production-mounted subscription consumer.
+
 Where a server-rendered consumer still uses `ui.live`, it declares a canonical fragment URL, `data-live-topic`, and `hx-trigger="hyper-live from:body"` plus a watchdog. The shared client coalesces notifications and asks matching regions to fetch current markup through HTMX. Preserve region-local targets and swap modes. This is a compatibility contract, not the default for new extensions.
 
 The older chat renderer/controller (`agent/chat.js`, `#chat-panel`, `#msg-head`, `#msg-tail`) has its own disposable lifecycle, offset-based paging, lazy tool-detail popup and scroll anchoring. Its HTMX cleanup/mount hooks and watchdogs apply only to consumers still using that renderer. Do not attach that controller to React-owned DOM or describe its markup as the primary chat contract.

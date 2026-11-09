@@ -1,6 +1,6 @@
 # Hyper frontend
 
-The primary React interface for Hyper, maintained in the same repository and using the existing authenticated APIs. The previous interface remains at `/old-ui/`.
+The primary React interface for Hyper, maintained in the same repository and using the existing authenticated APIs. Supported `/old-ui/` entry links redirect to `/`; it is not a second application.
 
 ## Run
 
@@ -38,8 +38,8 @@ The live composer loads slash suggestions from `GET /commands`. Type `/`, choose
 - Stop: `POST /api/v1/agents/:id/stop`.
 - Live: existing `/procs/events/client.js` + `hyperLive.subscribe` with reconnect resync; 2.5-second visible-page refresh fallback also reads partial responses (15 seconds while hidden). List refreshes every 15 seconds.
 - Authentication and agent visibility follow existing Hyper API policies, not a new ACL. Send requests stay on the authenticated same origin.
-- Markdown is rendered without raw HTML. Specialized HTML responses, approval cards, secrets and settings remain in the original UI via explicit links. Approval is never inferred from chat text.
-- Canvas: the real `/canvas/:id/mobile?embed=1` surface in a same-origin iframe on the right. `/state` + `/watch` synchronize open/active state; POST changes open state. The stock renderer owns tabs, file navigation/editing, plugin kinds and sandboxed HTML. The React adapter styles only its trusted shell. Closing hides rather than remounts it; revisions call its fingerprint-aware resync. A nested UI URL cannot recursively create another Canvas.
+- Secure inputs: `SecureInputHost` reads owner-only `/input/compat` metadata. Supported cards retain their original secure transports in isolated documents; Redmine approval opens a separate top-level page. Generic submit and chat text never confer approval.
+- Canvas: React owns tabs via `/canvas/:id/state` and hosts `/canvas/:id/item/:itemId/document`, not the `/mobile` shell. `canvas.itemDocument` retains kind renderers and compatibility assets, including nested HTML/URL sandboxing; this is not a migration of every kind to native React.
 - No REPL endpoint, API key or database credential is exposed to this frontend.
 
 ## Component layers
@@ -59,7 +59,7 @@ Desktop: sidebar, chat, optional real Canvas on the right. dsh-style 38px tab st
 
 `WorkspaceSidebar` uses the current dsh shell measurements (280px expanded, 56px compact rail, 28px desktop rows), with existing Hyper tokens and a fresh React implementation. The top field filters agents and projects locally. Cmd+/ (Ctrl+/) focuses it and selects the current query; compact navigation expands, and mobile navigation opens its sheet. There is no separate Search button or global search menu. Compact state and workspace disclosure persist locally.
 
-The authenticated private `hyper-ui-bridge` plugin supplies read-only `/ui-lab-api/navigation` and `/ui-lab-api/search?q=&tab=`. Project identity includes host, and timestamps are actual assistant reply times, not `updatedAt`. The profile uses `/auth/session`; People links to `/auth/users` for owners, and Sign out remains an explicit native POST form to `/auth/logout`. The profile opens on hover and click/keyboard. HTML-only plugin widgets link back to native Hyper instead of injecting server HTML into React. Existing chat links stay inside UI Lab; other safe menu destinations use their native pages.
+Navigation and search use the authenticated integrated `/ui-lab-api/navigation` and `/ui-lab-api/search?q=&tab=` adapters. Project identity includes host. The profile uses `/auth/session`; People links to the live SSR `/auth/users` page for owners, and Sign out remains an explicit native POST form to `/auth/logout`. HTML-only plugin pages retain their own SSR routes. SSH settings opens the native `llm-connections` tab through a host callback instead of linking to `/llms`.
 
 
 ## Attachments
@@ -72,4 +72,6 @@ First-message uploads use the owner/CSRF-protected bridge and native message acc
 
 Apple-inspired hierarchy and restraint with Medeo typography, semantic colors, subtle borders, immediate pressed feedback and visible focus. Compact desktop controls; 44px controls on narrow/coarse-pointer screens. All motion respects reduced motion; never make a gesture the only way to perform an action. Use shared tokens and add new states to Storybook. Custom CSS is the initial styling layer; Tailwind/shadcn generation and Motion are not installed yet.
 
-Do not let HTMX and React own the same DOM subtree. This is a development interface, not a production rollout. Remaining work: interactive tool/approval cards, remaining settings flows, swipe/pinch gestures and production deployment. Canvas content keeps its existing Hyper capabilities; this does not port dsh's terminal or multi-pane workspace engine.
+Do not let HTMX and React own the same DOM subtree. The primary shell is React, but compatibility consumers remain: `procs.http.toResponse` dynamically resolves `ui.layout` for HTTP strings/`{ main }`, People `/auth/users`, `sidebar.draft` and built-in/plugin SSR pages remain live, as do Canvas kind renderers/assets and secure input transports. Removed dead `legacyUi.rewriteResponse`/`navigationUrl` helpers do not imply complete legacy removal. See the [residual consumer map](../docs/ui-architecture.md#residual-compatibility-consumers).
+
+Trusted extensions use the public `@hyper/ui` entry and explicit host-reviewed build-time registration/grants. The SDK example in `src/ui-plugins/sdk-example.tsx` is retained as a dev/test fixture with a separate registry in `src/extensions/example.test.tsx`; it is absent from production `src/extensions/installed.ts`. Frontend grants never replace backend authentication, ownership, CSRF or explicit human approval.

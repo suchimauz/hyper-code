@@ -20,6 +20,16 @@ function mockApi(instances: unknown[], post?: (body: any) => Response) {
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
+it('opens native LLM settings rather than navigating to the SSR shell', async () => {
+  mockApi([]);
+  const onTab = vi.fn();
+  render(<SettingsDialog open tab="ssh-instances" onTab={onTab} onOpenChange={() => {}} />);
+  await screen.findByRole('region', { name: 'Add SSH instance' });
+  expect(document.querySelector('a[href="/llms"]')).toBeNull();
+  fireEvent.click(within(document.querySelector('.settings-panel-header') as HTMLElement).getByRole('button', { name: 'LLM Connections' }));
+  expect(onTab).toHaveBeenCalledWith('llm-connections');
+});
+
 it('renders instances with status badges and the public key for pending setup', async () => {
   mockApi([pending, verified]); render(<SshInstancesPanel />);
   const box = await screen.findByRole('article', { name: 'box' });

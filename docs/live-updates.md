@@ -23,6 +23,8 @@ Declare transport topics on mounted content with `data-live-topic`; `types` filt
 
 The lower-level `window.hyperLive` and HTMX live-region examples below document the shared transport and compatibility consumers, not the primary extension import API. `/old-ui` redirects, but shared SSR/Canvas content and inline approvals still use compatibility code.
 
+The SDK example is retained only as a dev/test fixture, with a separate registry in `frontend/src/extensions/example.test.tsx`; production `extensions/installed.ts` does not mount it or its subscription. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers are removed, not the dynamic HTTP layout or live SSR transports. See the [residual consumer map](ui-architecture.md#residual-compatibility-consumers) before removing assets or subscriptions.
+
 ## Pieces
 
 ```

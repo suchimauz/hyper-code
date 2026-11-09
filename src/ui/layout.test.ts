@@ -1,8 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry.ts";
 import { Window } from "happy-dom";
+import layout from "./layout";
 
 describe("ui.layout", () => {
+    test("retired legacy navigation asset is never included in the shared shell", async () => {
+        // Isolate asset rendering from database-backed navigation and auth fixtures.
+        const ctx: any = { state: {}, fns: {
+            procs: { ui: { escape: ({ text }: { text: string }) => Bun.escapeHTML(text), button: () => "" } },
+            ui: { faviconUrl: async () => "/favicon.ico", navMenu: () => "" },
+            dock: { render: async () => "" },
+        } };
+        for (const legacyUi of [false, true]) {
+            const html = await layout(ctx, { legacyUi } as any, { main: "<p>shared</p>" });
+            expect(html).not.toContain('/legacyUi/navigation.js');
+            expect(html).toContain('<p>shared</p>');
+        }
+        expect(await Bun.file(new URL('../legacyUi/$script_navigation.js', import.meta.url)).exists()).toBe(false);
+    });
+
     // The bug this guards against: navigation attributes were declared on the
     // section that WRAPS the page. htmx inherits hx-target/hx-swap/hx-push-url
     // into every descendant, so the chat's tail poll — sitting inside #main —
