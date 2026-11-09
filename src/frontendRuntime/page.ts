@@ -23,5 +23,13 @@ export default async function (
     }
     if (url.pathname !== '/') return;
     url.pathname = '/ui-lab/';
-    return ctx.fns.frontendBridge.proxy({req:new Request(url.toString(), {method:opts.req.method, headers:opts.req.headers})});
+    const response = await ctx.fns.frontendBridge.proxy({req:new Request(url.toString(), {method:opts.req.method, headers:opts.req.headers})});
+    // Embed the cookie-bound CSRF token once per page, so writes need no extra token round-trip.
+    if (!response || opts.req.method !== 'GET' || !response.ok || !response.headers.get('content-type')?.includes('text/html')) return response;
+    const token = await ctx.fns.auth.csrfToken({req:opts.req});
+    if (!token) return response;
+    const esc = (value: string) => value.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]!);
+    const html = (await response.text()).replace(/<head>/i, `<head><meta name="csrf-token" content="${esc(token)}">`);
+    const headers = new Headers(response.headers); headers.delete('content-length'); headers.set('vary', 'Cookie');
+    return new Response(html, {status:response.status, headers});
 }

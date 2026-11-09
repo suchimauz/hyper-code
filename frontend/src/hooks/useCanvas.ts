@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadLiveClient, type LiveEvent } from '../lib/live';
+import { pageCsrfToken } from '../lib/csrf';
 
 export type CanvasView = { agentId: string; open: boolean; activeItemId: number | null; rev: string };
 type CanvasEvent = LiveEvent & Partial<CanvasView>;
 
 /** Canvas routes sometimes answer errors as text rather than JSON. */
-async function canvasRequest<T>(path: string, signal: AbortSignal, body?: object): Promise<T> {
+async function canvasRequest<T>(path: string, signal: AbortSignal, body?: object, csrfToken?: string): Promise<T> {
   const response = await fetch(path, {
     signal, credentials: 'same-origin', cache: 'no-store',
-    headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) },
     ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
   });
   if (!response.ok) throw new Error(`Canvas: HTTP ${response.status}`);
@@ -27,6 +28,7 @@ export function useCanvas(agentId: string | null | undefined) {
   const currentId = useRef(agentId); currentId.current = agentId;
   const controller = useRef<AbortController | null>(null);
   const sequence = useRef(0);
+  const csrf = useRef<string | undefined>(undefined);
   const refresh = useCallback(() => {
     sequence.current++;
     controller.current?.abort();
@@ -50,7 +52,8 @@ export function useCanvas(agentId: string | null | undefined) {
       timer = setTimeout(() => { if (valid()) retry(); }, 2000);
     };
     const read = async () => {
-      const state = await canvasRequest<CanvasView>(`${base}/state`, run.signal);
+      const state = await canvasRequest<CanvasView & { csrfToken?: string }>(`${base}/state`, run.signal);
+      if (typeof state.csrfToken === 'string') csrf.current = state.csrfToken;
       if (!valid()) return null;
       setView(state); setBusy(false); setFailure(null);
       return state;
@@ -98,7 +101,8 @@ export function useCanvas(agentId: string | null | undefined) {
     const valid = () => !run.signal.aborted && sequence.current === token && currentId.current === agentId;
     setBusy(true); setFailure(null);
     try {
-      const state = await canvasRequest<CanvasView>(`/canvas/${encodeURIComponent(agentId)}`, run.signal, { open });
+      // POST /canvas/:id requires the cookie-bound CSRF token: the page's meta, else the one /state answered.
+      const state = await canvasRequest<CanvasView>(`/canvas/${encodeURIComponent(agentId)}`, run.signal, { open }, pageCsrfToken() || csrf.current);
       if (valid()) setView(state);
     } catch (error) {
       if (valid()) setFailure({ id: agentId, message: error instanceof Error ? error.message : String(error) });
