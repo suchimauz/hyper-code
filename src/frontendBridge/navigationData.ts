@@ -7,7 +7,7 @@ export default async function (
     ctx: Context,
     session: Session | null,
     opts: {},
-): Promise<{projects: Array<{id:string;icon?:string|null;createdAt:number|null;title:string;dir:string;host:string;virtual:boolean;archived:boolean;runningCount:number;unreadCount:number;chats:Array<{id:string;createdAt:number|null;title:string;model:string;colorHue:number|null;modelLabel:string;effort:{requested:types.llm.ReasoningEffort;applied:types.llm.ReasoningEffort;label:string|null;downgraded:boolean}|null;runState:string;teamRunningCount:number;hasUnread:boolean;archived:boolean;pinned:boolean;pinnedAt:number|null;lastReplyAt:number|null;icon?:{src:string;custom:boolean}|null}>}>}> {
+): Promise<{projects: Array<{id:string;createdAt:number|null;title:string;dir:string;host:string;virtual:boolean;archived:boolean;runningCount:number;unreadCount:number;chats:Array<{id:string;createdAt:number|null;title:string;model:string;colorHue:number|null;modelLabel:string;effort:{requested:types.llm.ReasoningEffort;applied:types.llm.ReasoningEffort;label:string|null;downgraded:boolean}|null;runState:string;teamRunningCount:number;hasUnread:boolean;archived:boolean;pinned:boolean;pinnedAt:number|null;lastReplyAt:number|null;icon?:{src:string;custom:boolean}|null}>}>}> {
     if (!(session as Session & {user?: {id:string}})?.user) throw new Error('Unauthorized');
     // Native pins are viewer-specific; updated_at is the native state update time, not a separate first-pin timestamp.
     const viewerId=(session as Session & {user:{id:string}}).user.id;

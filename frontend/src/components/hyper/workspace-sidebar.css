@@ -150,3 +150,5 @@
 .workspace-action > svg, .new-session-icon { transition: transform .24s ease; transform-origin: center; }
 .workspace-action:hover:not(:disabled) > svg, .workspace-action:hover:not(:disabled) .new-session-icon { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .workspace-action > svg, .new-session-icon { transition: none; } .workspace-action:hover:not(:disabled) > svg, .workspace-action:hover:not(:disabled) .new-session-icon { transform: none; } }
+.workspace-folder-icon { flex: 0 0 14px; color: var(--text-tertiary); }
+.workspace-section-chats { padding-left: 12px; }

@@ -16,7 +16,7 @@ Current source redirects `/projects/view` and `/projects/archive` into the nativ
 
 ## Third-wave source and verification
 
-The worktree now removes ordinary `renderEventHtml` branches and `ui.chatEventCard`, with only the protected input-card adapter retained. Native lifecycle/busy-tool receipts, Push settings, People presence, initial-prompt inspection, project-icon editing and transient `SecureInputDialog` replace their old app UI paths. Mentions uses structured `mentions.rowsData`. Shared document rendering, Canvas fallback documents and protected input/Redmine authority are preserved; not all SSR is removed.
+The worktree now removes ordinary `renderEventHtml` branches and `ui.chatEventCard`, with only the protected input-card adapter retained. Native lifecycle/busy-tool receipts, Push settings, People presence, initial-prompt inspection and transient `SecureInputDialog` replace their old app UI paths. Mentions uses structured `mentions.rowsData`. Shared document rendering, Canvas fallback documents and protected input/Redmine authority are preserved; not all SSR is removed.
 
 Explicit terminal `respondHtml` answers now carry `htmlSource: assistant-answer` and render through a bounded parse5-to-React semantic allowlist. No raw HTML injection, handlers, styles, URL attributes, forms, SVG or media are admitted; links become text and the plain-text version remains available. Historical unmarked HTML is not automatically trusted because the same stored field also contains rendered Markdown; those events retain their text fallback. The three frontend HTML security/provenance tests and seven API projection tests passed. This deliberately does not promise pixel-identical historical HTML rendering.
 

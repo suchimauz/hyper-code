@@ -4,7 +4,7 @@ import {Database} from 'bun:sqlite';
 // Isolated SQLite fixture: never mutates the running viewer's preferences.
 async function fixture() {
  const db=new Database(':memory:');
- db.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY,dir TEXT,host TEXT); CREATE TABLE project_members(principal TEXT,project_id TEXT,title TEXT,archived_at INTEGER,icon TEXT); CREATE TABLE kv(key TEXT PRIMARY KEY,value TEXT); CREATE TABLE agents(id TEXT,workspace_dir TEXT,workspace_host TEXT,created_at INTEGER,archived_at INTEGER,run_state TEXT,last_notifiable_at INTEGER,visibility TEXT); CREATE TABLE user_agent_state(agent_id TEXT,user_id TEXT,seen_at INTEGER); CREATE TABLE messages(agent_id TEXT,idx INTEGER,ts INTEGER);`);
+ db.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY,dir TEXT,host TEXT); CREATE TABLE project_members(principal TEXT,project_id TEXT,title TEXT,archived_at INTEGER); CREATE TABLE kv(key TEXT PRIMARY KEY,value TEXT); CREATE TABLE agents(id TEXT,workspace_dir TEXT,workspace_host TEXT,created_at INTEGER,archived_at INTEGER,run_state TEXT,last_notifiable_at INTEGER,visibility TEXT); CREATE TABLE user_agent_state(agent_id TEXT,user_id TEXT,seen_at INTEGER); CREATE TABLE messages(agent_id TEXT,idx INTEGER,ts INTEGER);`);
  let principal='user:alice',events=0;
  const ctx:any={fns:{projects:{principal:async()=>principal},auth:{viewerId:async()=>principal.slice(5),listUsers:async()=>[{},{}]},agent:{teamActivity:async()=>({})},procs:{db:{select:async(o:any)=>db.query(o.sql).all(...(o.params??[])),run:async(o:any)=>db.query(o.sql).run(...(o.params??[]))},events:{emit:()=>{events++;}}}}};
  for (const name of ['list','identity','reorderProjects']) {
@@ -13,7 +13,7 @@ async function fixture() {
  }
  const add=(id:string,title=id,archived:number|null=null,owner='user:alice')=>{
   db.query('INSERT OR IGNORE INTO projects VALUES(?,?,?)').run(id,'/'+id,'');
-  db.query('INSERT INTO project_members VALUES(?,?,?,?,NULL)').run(owner,id,title,archived);
+  db.query('INSERT INTO project_members VALUES(?,?,?,?)').run(owner,id,title,archived);
  };
  const ids=async()=> (await ctx.fns.projects.list({})).map((p:any)=>p.id);
  return {db,ctx,add,ids,as:(p:string)=>{principal=p;},events:()=>events};

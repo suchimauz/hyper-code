@@ -1,8 +1,7 @@
-import { ProjectIconDialog } from './ProjectIconDialog';
 import { ThemeMenu } from './ThemeMenu';
 import type { ThemeMode } from '../../hooks/useTheme';
 import { useEffect, useId, useState } from 'react';
-import { Archive, ArchiveRestore, ChevronDown, Timer, Puzzle, Folder, FolderPlus, LogOut, PanelLeft, Plus, Search, Settings, Users, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ChevronDown, Timer, Puzzle, Folder, FolderOpen, FolderPlus, LogOut, PanelLeft, Plus, Search, Settings, Users, X } from 'lucide-react';
 import { HoverPanel } from '../ui/HoverPanel';
 import { type ProjectAction, type ChatAction, type NavigationProject, type NavigationUser } from '../../lib/navigation';
 import { WorkspaceChatRow } from './WorkspaceChatRow';
@@ -39,28 +38,23 @@ function WorkspaceSection({ project, selected, query, onSelect, archivedView, pe
   const requestedProject = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('workspaceProject');
   const [open, setOpen] = useWorkspaceExpanded(project.id, initiallyOpen || requestedProject === project.id);
   useEffect(() => { if (requestedProject === project.id) setOpen(true); }, [requestedProject, project.id, setOpen]);
-  const [editingIcon, setEditingIcon] = useState(false);
-  const [savedIcon, setSavedIcon] = useState<string | null | undefined>(undefined);
-  const icon = savedIcon === undefined ? project.icon : savedIcon;
   const id = useId();
   const expanded = !!draftRow || !!query.trim() || open;
   return <section className="workspace-section">
     <div className="workspace-heading-row"><NavigationTooltip trigger={<button className={`workspace-heading ${(project.unreadCount ?? 0) > 0 ? 'is-unread' : ''}`} aria-expanded={expanded} aria-controls={id} onClick={() => {
       if (!query.trim()) setOpen(!open);
-    }}>{icon && <img width={16} height={16} alt="" src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(icon)))}`} />}<span>{project.title}</span><ChevronDown size={12} strokeWidth={1} className="workspace-chevron" /></button>}><div className="navigation-tooltip-title">{project.title}</div>{project.dir && <div>{workspaceTooltipPath(project.dir, project.host)}</div>}{workspaceCreatedLabel(project.createdAt) && <div>{workspaceCreatedLabel(project.createdAt)}</div>}</NavigationTooltip>
+    }}>{expanded ? <FolderOpen size={14} strokeWidth={1} className="workspace-folder-icon" aria-hidden="true" /> : <Folder size={14} strokeWidth={1} className="workspace-folder-icon" aria-hidden="true" />}<span>{project.title}</span><ChevronDown size={12} strokeWidth={1} className="workspace-chevron" /></button>}><div className="navigation-tooltip-title">{project.title}</div>{project.dir && <div>{workspaceTooltipPath(project.dir, project.host)}</div>}{workspaceCreatedLabel(project.createdAt) && <div>{workspaceCreatedLabel(project.createdAt)}</div>}</NavigationTooltip>
     {project.runningCount ? <span className="workspace-running" aria-label={`${project.runningCount} в работе`} /> : null}
     {project.dir && <div className="workspace-project-actions">
-      {!project.virtual && onProjectAction && <button className="nav-icon-button" aria-label={`Edit project icon ${project.title}`} title="Edit project icon" onClick={() => setEditingIcon(true)}><Settings size={14} strokeWidth={1} /></button>}
       {!project.archived && onNewSession && <button className="nav-icon-button" aria-label={`New session in ${project.title}`} title="New session" onClick={() => onNewSession(project.id)}><Plus size={14} strokeWidth={1} /></button>}
       {onProjectAction && <button className="nav-icon-button" disabled={pendingProject} aria-label={`${project.archived ? 'Restore workspace' : 'Archive workspace'} ${project.title}`} title={project.archived ? 'Restore workspace' : 'Archive workspace'} onClick={() => onProjectAction(project.id, project.archived ? 'restore' : 'archive')}>{project.archived ? <ArchiveRestore size={14} strokeWidth={1} /> : <Archive size={14} strokeWidth={1} />}</button>}
     </div>}
     </div>
-    <div id={id} hidden={!expanded}>
+    <div id={id} className="workspace-section-chats" hidden={!expanded}>
       {draftRow}
       {project.chats.map(chat => <WorkspaceChatRow key={chat.id} chat={chat} selected={selected === chat.id} archivedView={!!chat.archived} pending={pendingChats?.[chat.id]} onSelect={onSelect} onAction={onAction} />)}
       {!draftRow && !project.chats.length && <p className="workspace-empty">Нет чатов</p>}
     </div>
-    {editingIcon && <ProjectIconDialog projectId={project.id} title={project.title} onClose={() => setEditingIcon(false)} onSaved={setSavedIcon} />}
   </section>;
 }
 
