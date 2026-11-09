@@ -7,7 +7,7 @@
 .welcome-switch button, .welcome-model-more { appearance: none; margin: 0; border: 0; padding: 1px 8px; border-radius: 5px; background: transparent; color: var(--text-tertiary); font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; }
 .welcome-switch button:hover, .welcome-model-more:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
 .welcome-switch button[aria-pressed=true] { background: color-mix(in srgb, var(--text) 10%, var(--surface)); color: var(--text); }
-.welcome-switch button:focus-visible, .welcome-model-more:focus-visible, .welcome-stats-error button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.welcome-switch button:focus-visible, .welcome-model-more:focus-visible, .welcome-stats-error button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .welcome-stat-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; }
 .welcome-stat { display: flex; flex-direction: column; gap: 2px; padding: 5px 8px; min-width: 0; border-radius: 8px; background: color-mix(in srgb, var(--text) 15%, var(--surface)); }
 .welcome-stat-label { color: var(--text-tertiary); font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

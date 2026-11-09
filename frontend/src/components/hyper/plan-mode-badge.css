@@ -2,6 +2,6 @@
 .plan-mode-badge__close { display:none; }
 .plan-mode-badge:not(:disabled):is(:hover,:focus-visible) .plan-mode-badge__icon { display:none; }
 .plan-mode-badge:not(:disabled):is(:hover,:focus-visible) .plan-mode-badge__close { display:block; }
-.plan-mode-badge:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.plan-mode-badge:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 .plan-mode-badge:disabled { opacity:.6; cursor:default; }
 @media(pointer:coarse) { .plan-mode-badge { min-height:44px; } }

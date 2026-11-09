@@ -29,7 +29,7 @@
 .automation-row-line:hover { background: var(--hover); }
 .automation-page .automation-toggle { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 12px 0 12px 6px; text-align: left; border-radius: 8px; }
 .automation-page .automation-toggle:focus:not(:focus-visible) { outline: none; box-shadow: none; }
-.automation-page .automation-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.automation-page .automation-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .automation-chevron { flex: none; color: var(--text-tertiary); transition: transform var(--duration-feedback, .15s); }
 .automation-row.is-open .automation-chevron { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .automation-chevron { transition: none; } }

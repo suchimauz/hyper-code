@@ -14,7 +14,7 @@
 .workspace-brand { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 650; }
 .nav-icon-button { display: inline-grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; }
 .workspace-filter { margin: 2px 12px 12px; min-height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--text-tertiary); background: var(--surface); }
-.workspace-filter:focus-within { border-color: var(--line-strong); outline: 1px solid var(--accent); }
+.workspace-filter:focus-within { border-color: var(--line-strong); outline: 1px solid var(--focus-ring); }
 .workspace-filter input { border: 0; outline: 0; background: transparent; color: var(--text); min-width: 0; width: 100%; height: 28px; font-size: var(--font-sm); }
 .workspace-filter input::placeholder { color: var(--text-tertiary); }
 .workspace-filter button { display: grid; place-items: center; padding: 0; }
@@ -113,7 +113,7 @@
 .workspace-chat-actions button { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0; border:0; border-radius:3px; background:transparent; color:var(--text-tertiary); cursor:pointer; }
 .workspace-chat-actions button:hover { color:var(--text); background:var(--hover); }
 .workspace-chat-actions button:disabled { opacity:.35; cursor:default; }
-.workspace-chat-actions button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.workspace-chat-actions button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 .workspace-chat-row:has(.workspace-chat-actions):is(:hover,:focus-within,[aria-busy=true]) .workspace-chat-actions { display:flex; }
 .workspace-chat-row:has(.workspace-chat-actions):is(:hover,:focus-within,[aria-busy=true]) .workspace-chat { padding-right:52px; }
 .workspace-chat-row:has(.workspace-chat-actions):is(:hover,:focus-within,[aria-busy=true]) time,.workspace-chat-row:is(:hover,:focus-within) .workspace-pin-mark { display:none; }
@@ -140,7 +140,7 @@
 .workspace-heading-row:is(:hover, :focus-within) .workspace-chevron { opacity: 1; }
 .workspace-heading-row:is(:hover, :focus-within) .workspace-running { visibility: hidden; }
 .workspace-project-actions button:hover { background: var(--selected); }
-.workspace-project-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.workspace-project-actions button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 @media (pointer: coarse) {
   .workspace-project-actions, .workspace-heading-row .workspace-chevron { opacity: 1; pointer-events: auto; }
   .workspace-heading-row .workspace-running { visibility: hidden; }

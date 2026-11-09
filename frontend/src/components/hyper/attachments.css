@@ -16,7 +16,7 @@
 .attachment-remove { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; color: white; background: #61666b; opacity: 0; transition: opacity .2s; cursor: pointer; }
 .attachment-item:hover .attachment-remove, .attachment-item:focus-within .attachment-remove { opacity: 1; }
 .attachment-remove:disabled { cursor: default; opacity: .4; }
-.attachment-image:focus-visible, .attachment-file-card:focus-visible, .attachment-remove:focus-visible, .attachment-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.attachment-image:focus-visible, .attachment-file-card:focus-visible, .attachment-remove:focus-visible, .attachment-scroll:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .attachment-scroll { position: absolute; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--text); box-shadow: 0 1px 5px #0002; }
 .attachment-scroll--left { left: 4px; }.attachment-scroll--right { right: 4px; }
 .message-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; max-width: 100%; }
@@ -25,7 +25,7 @@
 .image-viewer { position: fixed; inset: 0; z-index: 1001; display: flex; align-items: center; justify-content: center; padding: 40px; outline: none; }
 .image-viewer > img { display: block; width: auto; height: auto; max-width: min(100%, 1600px); max-height: 100%; object-fit: contain; border-radius: 16px; background: var(--input-bg); box-shadow: 0 8px 32px #0002; }
 .image-viewer-close { position: absolute; top: 20px; right: 20px; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--text); background: var(--surface); cursor: pointer; }
-.image-viewer-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.image-viewer-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 .image-viewer-error { padding: 20px; border-radius: 16px; background: var(--surface); color: var(--text); }
 @media (pointer: coarse) { .attachment-remove { opacity: 1; width: 28px; height: 28px; } .image-viewer-close { width: 44px; height: 44px; } }
 @media (max-width: 480px) { .image-viewer { padding: 16px; } }

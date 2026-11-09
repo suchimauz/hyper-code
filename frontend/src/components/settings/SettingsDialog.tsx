@@ -22,9 +22,13 @@ export function SettingsDialog({ open, tab, onTab, onOpenChange }: { open: boole
           <div className="settings-nav-list">
             {SETTINGS_TABS.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={`settings-nav-cell ${tab === id ? 'is-active' : ''}`} aria-current={tab === id ? 'true' : undefined} onClick={() => onTab(id)}><Icon size={16} strokeWidth={1.5} aria-hidden="true" /><span>{label}</span></button>)}
           </div>
+          <select className="settings-nav-select settings-select" aria-label="Раздел настроек" value={tab} onChange={(event) => onTab(event.target.value as SettingsTab)}>
+            {SETTINGS_TABS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+          </select>
+          <Dialog.Close className="settings-close settings-nav-close" aria-label="Закрыть настройки"><X size={16} strokeWidth={1.5} /></Dialog.Close>
         </nav>
         <div className="settings-content">
-          <div className="settings-header"><Dialog.Close className="settings-close" aria-label="Закрыть настройки"><X size={14} strokeWidth={1.5} /></Dialog.Close></div>
+          <div className="settings-header" aria-hidden="true" />
           <div className="settings-options">{tab === 'llm-connections' && <LlmConnectionsPanel />}{tab === 'ssh-instances' && <SshInstancesPanel onOpenConnections={() => onTab('llm-connections')} />}</div>
         </div>
       </Dialog.Popup>

@@ -23,7 +23,7 @@
   --surface-overlay: #ffffff; --input-bg: #ffffff;
   --user-bubble: #f4f2f3; --hover-solid: #f4f4f4;
   --text: #161616; --text-secondary: #70686a; --text-muted: #70686a;
-  --text-tertiary: #91888a; --text-caption: #b2acad;
+  --text-tertiary: #91888a; --text-caption: #b2acad; --focus-ring: rgba(6, 6, 6, .28);
   --line: #e9e9e9; --line-strong: #dedede; --hover: rgba(6, 6, 6, .08); --selected: rgba(6, 6, 6, .08);
   --accent: #d97757; --accent-hover: #c46343; --accent-soft: #f6ded7; --on-accent: #ffffff;
   --link: #bf6446; --link-hover: #a35035;
@@ -36,7 +36,7 @@
   --surface-overlay: #282828; --input-bg: #141414;
   --user-bubble: rgba(255, 255, 255, .06); --hover-solid: #323232;
   --text: #fdfdfd; --text-secondary: #beb6b8; --text-muted: #beb6b8;
-  --text-tertiary: #9c9395; --text-caption: #776f71;
+  --text-tertiary: #9c9395; --text-caption: #776f71; --focus-ring: rgba(255, 255, 255, .32);
   --line: rgba(255, 255, 255, .09); --line-strong: rgba(255, 255, 255, .18); --hover: rgba(255, 255, 255, .08); --selected: rgba(255, 255, 255, .08);
   --accent: #d97757; --accent-hover: #eb9170; --accent-soft: #48261b; --on-accent: #fbfbfb;
   --link: #eaa088; --link-hover: #ffbea6;
@@ -50,7 +50,7 @@
     --surface-overlay: #282828; --input-bg: #141414;
     --user-bubble: rgba(255, 255, 255, .06); --hover-solid: #323232;
     --text: #fdfdfd; --text-secondary: #beb6b8; --text-muted: #beb6b8;
-    --text-tertiary: #9c9395; --text-caption: #776f71;
+    --text-tertiary: #9c9395; --text-caption: #776f71; --focus-ring: rgba(255, 255, 255, .32);
     --line: rgba(255, 255, 255, .09); --line-strong: rgba(255, 255, 255, .18); --hover: rgba(255, 255, 255, .08); --selected: rgba(255, 255, 255, .08);
     --accent: #d97757; --accent-hover: #eb9170; --accent-soft: #48261b; --on-accent: #fbfbfb;
     --link: #eaa088; --link-hover: #ffbea6;

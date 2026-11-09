@@ -11,7 +11,7 @@
 .composer-cost { color:#4f8a5b; font-variant-numeric:tabular-nums; }
 [data-theme=dark] .composer-cost { color:#7fbf8c; }
 .composer-usage:hover { color:var(--text); }
-.composer-usage:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.composer-usage:focus-visible { outline:2px solid var(--focus-ring); outline-offset:3px; }
 @media(pointer:coarse) { .composer-usage { min-height:44px; padding-inline:8px; } }
 .composer-input-anchor .crab-mascot { right: 0; bottom: 100%; }
 .composer-footer:has(.composer-usage-line) { display:grid; grid-template-columns:minmax(66px,1fr) minmax(0,auto) minmax(66px,1fr); column-gap:8px; align-items:center; padding:0 4px; margin:6px 0 0; min-height:28px; height:28px; width:100%; position:relative; }
