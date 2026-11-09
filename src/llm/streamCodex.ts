@@ -60,6 +60,12 @@ export default async function (
 
     // ChatGPT backend occasionally returns 5xx / "upstream connect error"
     // before any bytes ship. Retry pre-stream with exponential backoff.
+    // Sticky routing like the Codex CLI: the backend returns x-codex-turn-state on the
+    // first response of a turn and expects it replayed on every later request of that
+    // turn. Without it requests land on different backends and miss the prompt cache.
+    // Stored on the run-scoped ctx, so a new run (turn) starts without a stale token.
+    const turnCtx = ctx as Context & { codexTurnState?: { agentId: string; value: string } };
+    const turnState = turnCtx.codexTurnState?.agentId === agent.id ? turnCtx.codexTurnState.value : undefined;
     const headers = {
         "authorization": `Bearer ${apiKey}`,
         ...(accountId ? { "chatgpt-account-id": accountId } : {}),
@@ -69,6 +75,8 @@ export default async function (
         "accept": "text/event-stream",
         "content-type": "application/json",
         "session_id": agent.id,
+        "x-client-request-id": agent.id,
+        ...(turnState ? { "x-codex-turn-state": turnState } : {}),
     };
     const bodyJson = JSON.stringify(body);
     const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
@@ -83,6 +91,8 @@ export default async function (
         throw failure(info);
     }
     await ctx.fns.llm.accountAuthHealth({ action: "clear", provider: ep.provider, account: ep.account });
+    const nextTurnState = res.headers.get("x-codex-turn-state");
+    if (nextTurnState && !turnState && Object.hasOwn(ctx, "goalRequestContext")) turnCtx.codexTurnState = { agentId: agent.id, value: nextTurnState };
     if (!res.body) throw new Error("empty response body");
 
     let text = "";

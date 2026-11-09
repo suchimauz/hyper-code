@@ -77,7 +77,7 @@ export default async function (
          if(o.timeoutMs!==undefined&&(!Number.isFinite(o.timeoutMs)||o.timeoutMs<1||o.timeoutMs>120000))throw Error('deadline range');
          if(o.body&&o.body.byteLength>8*1024*1024)throw Error('POST size');
          if((o.method??'GET')==='GET'&&o.body?.byteLength)throw Error('GET body');
-         const filtered:Record<string,string>={};for(const [key,value] of Object.entries(o.headers??{})){if(!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key)||/[\r\n\0]/.test(value))throw Error('invalid header');if(['authorization','content-type','accept','chatgpt-account-id','openai-beta','originator','version','session_id','conversation_id','user-agent','anthropic-version','anthropic-beta','x-api-key','x-goog-api-key','x-msh-platform','x-msh-version','x-msh-device-id'].includes(key.toLowerCase()))filtered[key.toLowerCase()]=value;}
+         const filtered:Record<string,string>={};for(const [key,value] of Object.entries(o.headers??{})){if(!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key)||/[\r\n\0]/.test(value))throw Error('invalid header');if(['authorization','content-type','accept','chatgpt-account-id','openai-beta','originator','version','session_id','conversation_id','x-client-request-id','x-codex-turn-state','user-agent','anthropic-version','anthropic-beta','x-api-key','x-goog-api-key','x-msh-platform','x-msh-version','x-msh-device-id'].includes(key.toLowerCase()))filtered[key.toLowerCase()]=value;}
          filtered['accept-encoding']='identity';if(o.body)filtered['content-length']=String(o.body.byteLength);o={...o,headers:filtered};
          const deadline=o.timeoutMs??3000,start=Date.now();
          const socket=await tunnel(u.hostname,443,o.proxyPort,o.signal,deadline);
