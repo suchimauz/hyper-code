@@ -1,7 +1,6 @@
-/** List the current viewer's archived projects with native navigation rows and explicit restore controls. */
+/** Redirect legacy personal project archive links to the native React archive filter. Authorized navigation reads and restore actions remain in the React API. */
 export default async function(ctx: Context, session: Session | null, opts: {
- /** Incoming archive page request. */ req: Request;
-}): Promise<{title:string;main:string}> {
- const projects=(await ctx.fns.projects.list({})).filter(p=>p.archived);
- return {title:'Архив проектов',main:await ctx.fns.projects.renderPage({projects})};
+ /** Incoming archive navigation request. */ req: Request;
+}): Promise<Response> {
+ return new Response(null, {status:302, headers:{Location:'/?workspaceFilter=archived', 'Cache-Control':'no-store'}});
 }

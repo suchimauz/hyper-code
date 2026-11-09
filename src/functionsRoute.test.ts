@@ -1,41 +1,27 @@
-import { test, expect } from "bun:test";
-import { testCtx } from "./$test";
-import route from "./$route_functions_GET";
-
-const ctx = await testCtx({ env: { PROCS_PLUGINS: "./plugins" } });   // duckdb is an official plugin
-
-test("GET /functions renders searchable live runtime documentation", async () => {
-    const page: any = await route(ctx, null, {
-        req: new Request("http://localhost/functions?q=read+only+duckdb+sql&namespace=duckdb"),
-        params: {},
-    });
-    expect(page.title).toBe("functions: read only duckdb sql");
-    expect(page.main).toContain("Runtime functions");
-    expect(page.main).toContain("duckdb.query");
-    expect(page.main).toContain("Read-only DuckDB SQL statement.");
-    expect(page.main).toContain("Promise&lt;{ rows: any[]; rowCount: number; truncated: boolean }&gt;");
-    expect(page.main).toContain("Signature");
-    expect(page.main).toContain("class=\"shiki");
-    expect(page.main).toContain("ctx.fns.duckdb.");
-    expect(page.main).toContain(">query<");
-    expect(page.main).toContain("sql: string;");
-    expect(page.main).toContain("returns");
-    expect(page.main).toContain("Search in English");
-    expect(page.main).toContain("BM25");
-    expect(page.main).toContain("bg-base-100");
-    expect(page.main).toContain("text-base-content");
-    expect(page.main).not.toContain("bg-white");
-    expect(page.main).not.toContain("ui-button ui-button--primary");
+import { test, expect } from 'bun:test';
+import functions from './$route_functions_GET';
+import search from './$route_search_GET';
+const session = {user:{id:'reader'}} as unknown as Session;
+const meta = {name:'sample.read',summary:'Read data',doc:'Full docs',optsType:'{ path: string }',returnType:'Promise<string>',paramsSchema:{properties:{path:{type:'string',description:'File path'}},required:['path']},rel:'sample/read.ts',line:1};
+const calls: unknown[]=[];
+const ctx = {fns:{runtime:{docs:{list:()=>[{name:meta.name}],get:()=>meta,search:async(opts:unknown)=>{calls.push(opts);return [{name:meta.name,bm25:3}];}}},session:{searchBm25:async(opts:unknown)=>{calls.push(opts);return [{agentId:'a',idx:2,role:'user',score:1,snippet:'<b>hello</b>'}];}}}} as unknown as Context;
+const req=(path:string,json=true)=>({req:new Request(`http://localhost${path}`,{headers:json?{accept:'application/json'}:{}}),params:{}});
+test('documentation and transcript data require a signed-in visitor',async()=>{
+  for(const route of [functions,search])expect((await route(ctx,null,req('/'))).status).toBe(401);
 });
-
-test("functions page is present in the global navigation", async () => {
-    const items = await ctx.fns.nav.items({ q: "functions", limit: 10 });
-    expect(items).toContainEqual(expect.objectContaining({
-        label: "functions",
-        href: "/functions",
-        hint: "page · searchable runtime API documentation",
-        icon: "ph-function",
-        group: "System",
-        order: 20,
-    }));
+test('legacy browser routes redirect with their filters',async()=>{
+  for(const [route,path,view,filter] of [[functions,'/functions?q=read&namespace=sample','functions','namespace'],[search,'/search?q=read&agent=a','search','agent']] as const){
+    const response=await route(ctx,session,req(path,false));expect(response.status).toBe(303);
+    const url=new URL(response.headers.get('location')!,'http://localhost');expect(url.searchParams.get('view')).toBe(`extension:documentation/${view}`);expect(url.searchParams.get('q')).toBe('read');expect(url.searchParams.has(filter)).toBe(true);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  }
+});
+test('functions JSON preserves complete docs, ranking and namespaces',async()=>{
+  const response=await functions(ctx,session,req('/functions?q=read&namespace=sample'));
+  const data=await response.json();expect(data.docs[0]).toEqual({...meta,ranking:{name:meta.name,bm25:3}});expect(data.namespaces).toEqual(['sample']);expect(response.headers.get('vary')).toBe('Accept');
+  expect((await (await functions(ctx,session,req('/functions?namespace=other'))).json()).docs).toEqual([]);
+});
+test('transcript JSON keeps BM25 snippets and optional agent filter',async()=>{
+  const data=await (await search(ctx,session,req('/search?q=hello&agent=a'))).json();expect(data.hits[0].snippet).toBe('<b>hello</b>');expect(calls).toContainEqual({q:'hello',agentId:'a',limit:30});
+  expect((await (await search(ctx,session,req('/search'))).json()).hits).toEqual([]);
 });

@@ -1,7 +1,5 @@
 import { expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
 import contextRing from './contextRing';
-import header from './header';
 
 const escape = ({ text }: { text: unknown }) => Bun.escapeHTML(String(text));
 const popup = ({ attrs, html }: { attrs: string; html: string }) => `<button type="button" ${attrs}>${html}</button>`;
@@ -42,23 +40,4 @@ test('unknown context capacity shows tokens instead of a misleading percentage; 
     expect(html).not.toContain('≈');
     expect(html).not.toContain('data-context-total');
     expect(await ring(0, 100000)).toBe('');
-});
-
-test('header keeps the custom avatar separate from model selection', async () => {
-    const model = 'vendor:model-"<test>';
-    const calls: Array<Record<string, unknown>> = [];
-    const ctx = { fns: {
-        procs: { ui: { escape } },
-        chat: { renderParts: async () => [], icon: (opts: Record<string, unknown>) => { calls.push(opts); return '<img data-custom-avatar alt="">'; } },
-        ui: { popup, inplacePopup: async () => '<button>More</button>', modelLogo: (opts: Record<string, unknown>) => { calls.push(opts); return '<svg data-selected-model></svg>'; } },
-    } } as unknown as Context;
-    const html = await header(ctx, null, { context: { agent: { id: 'ab', title: 'Chat', model, icon: '<svg>custom</svg>' } } as any });
-    const w = new Window();
-    try {
-        w.document.body.innerHTML = html;
-        expect(w.document.querySelector('[data-chat-avatar] [data-custom-avatar]')).not.toBeNull();
-        expect(w.document.querySelector('[data-chat-model-mark]')).toBeNull();
-        expect(w.document.querySelector('[data-chat-part="icon"]')!.getAttribute('aria-label')).toBe('Изменить иконку агента');
-        expect(calls.some(c => c.model === model && c.icon === '<svg>custom</svg>')).toBe(true);
-    } finally { await w.happyDOM.close(); }
 });

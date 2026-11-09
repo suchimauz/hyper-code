@@ -3,7 +3,6 @@ import { Window } from 'happy-dom';
 import card from './accountsCard';
 import quotaCards from './quotaCards';
 import modelControl from './modelControl';
-import route from './$route__GET';
 
 const escape = ({text}: {text:string}) => Bun.escapeHTML(String(text ?? ''));
 const accounts = ['codex','opencode'].map(provider => ({provider,account:'default',label:provider,model:`${provider}:model`,source:'file' as const,available:true,usedPercent:25,planType:provider==='opencode'?'Go subscription':'plus',resetsAt:null,parkedAgents:0}));
@@ -20,20 +19,19 @@ ctx.fns.llms.modelControl=(opts:any)=>modelControl(ctx,null,opts);
 ctx.fns.llms.accountsCard=(opts:any)=>card(ctx,null,opts);
 ctx.fns.llms.planInstanceSettings=()=>'';
 const script = await Bun.file(new URL('./$script_focus.js',import.meta.url)).text();
-const html = async () => (await route(ctx,null,{req:new Request('http://example.test/llms'),params:{}})).main;
+// The account fragment is still served by /llms/accounts; the full HTML page was removed.
+const html = async () => `<div class="llm-focus-page"><div role="tablist"><button role="tab" id="llm-section-subscriptions" data-llm-tab="subscriptions">Subscriptions</button><button role="tab" id="llm-section-api" data-llm-tab="api">API</button></div><div id="llm-section-content">${card(ctx,null,{accounts,models})}</div></div>`;
 const wait = () => new Promise(resolve => setTimeout(resolve,0));
 
-test('focus surface keeps real model forms and separates API and node management',async()=>{
+test('account fragment keeps model controls and provider sections',async()=>{
  const output=await html();const w=new Window();
  try{w.document.body.innerHTML=output;
-  expect(output).toContain('Модели и лимиты');
   expect(w.document.querySelectorAll('[data-llm-provider]').length).toBe(7);
   expect(w.document.querySelectorAll('.llm-provider-panel:not([hidden])').length).toBe(1);
   expect(w.document.querySelector('.llm-model-table')).not.toBeNull();
   expect(w.document.querySelector('[data-model-policy="opencode:model"] input[name=model]')?.getAttribute('value')).toBe('opencode:model');
   expect(w.document.querySelector('[data-model-policy="opencode:model"]')?.getAttribute('hx-post')).toBe('/llms/model-state');
-  expect(w.document.querySelector('#hyper-nodes')?.closest('[data-llm-section]')?.getAttribute('data-llm-section')).toBe('nodes');
-  expect(w.document.querySelectorAll('[data-llm-section="api"][hidden]').length).toBe(2);
+  expect(w.document.querySelectorAll('[data-llm-section="api"][hidden]').length).toBe(1);
  }finally{await w.happyDOM.close();}
 });
 

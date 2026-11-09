@@ -11,20 +11,11 @@ test("canvas opens and closes per agent, keeps the chat width, and the agent pag
     await r.fns.session.save({ agent: b });
 
     expect(await ctx.fns.canvas.get({ agentId: a.id })).toEqual({ agentId: a.id, open: false, chatWidth: 440, activeItemId: null });
-    const page = async (id: string) => (await ctx.fns.procs.http.dispatch({ method: "GET", url: `http://localhost/agent/${id}` })).text();
-    let html = await page(a.id);
-    expect(html).toContain('data-canvas-panel');
-    expect(html).toContain('data-canvas-toggle="toggle"');
-
     const mobile = await ctx.fns.procs.http.dispatch({ method: "GET", url: `http://localhost/canvas/${a.id}/mobile` });
-    const mobileHtml = await mobile.text();
-    expect(mobile.status).toBe(200);
-    expect(mobileHtml).toContain('data-mobile-canvas');
-    expect(mobileHtml).toContain(`data-canvas-agent="${a.id}"`);
-    expect(mobileHtml).toContain('data-canvas-panel');
-    expect(mobileHtml).toContain('/canvas/canvas.js');
+    expect(mobile.status).toBe(302);
+    expect(mobile.headers.get('location')).toBe(`/?agent=${a.id}`);
+    expect(await mobile.text()).toBe('');
 
-    expect(html).not.toMatch(/data-canvas-agent="[^"]+" data-canvas-open/);
 
     const events: any[] = [];
     const subs: Set<any> = ctx.state.procs.events.subs ??= new Set();
@@ -46,8 +37,6 @@ test("canvas opens and closes per agent, keeps the chat width, and the agent pag
     expect(changedRevision.rev).not.toBe(initialRevision.rev);
 
 
-    html = await page(a.id);
-    expect(html).toMatch(/data-canvas-agent="[^"]+" data-canvas-open style="--chat-w:520px"/);
     // Another agent's canvas is untouched.
     expect((await ctx.fns.canvas.get({ agentId: b.id })).open).toBe(false);
 
@@ -168,7 +157,7 @@ test("html tab runs sandboxed, keeps its state live, and pings wake the agent", 
 
     const it = await ctx.fns.canvas.show({ agentId: a.id, kind: "html", args: { html: "<title>Board</title><canvas id=c></canvas><script>hyper.setState({n:1})</script>", load: "return { rows: [1, 2, 3], tag: '</script>' }" } });
     expect(it.title).toBe("Board");
-    const panel = await ctx.fns.canvas.panelHtml({ agentId: a.id });
+    const panel = await (await ctx.fns.canvas.itemDocument({ req: new Request("http://localhost/?fragment=1"), agentId: a.id, itemId: it.id })).text();
     const sandbox = panel.match(/sandbox="([^"]*)"/)?.[1] ?? "";
     expect(sandbox).toContain("allow-scripts");
     expect(sandbox).not.toContain("allow-same-origin");
@@ -192,7 +181,7 @@ test("html tab runs sandboxed, keeps its state live, and pings wake the agent", 
     const after = await ctx.fns.canvas.revision({ agentId: a.id });
     expect(after.body).toBe(before.body);
     expect(after.panel).not.toBe(before.panel);
-    expect(await ctx.fns.canvas.panelHtml({ agentId: a.id })).toContain(`data-canvas-state="{&quot;n&quot;:2}"`);
+    expect(await (await ctx.fns.canvas.itemDocument({ req: new Request("http://localhost/?fragment=1"), agentId: a.id, itemId: it.id })).text()).toContain(`data-canvas-state="{&quot;n&quot;:2}"`);
 
     // Ping: a user turn for the agent, a card in the chat, and a rate limit.
     expect((await post({ ping: { text: "Done", data: { picked: 3 } } })).status).toBe(200);
@@ -231,7 +220,6 @@ test("closing a tab only marks it: it is listed as recently closed and comes bac
     expect(closed[0].active).toBe(false);
     // A closed tab cannot be made active directly; it has to be reopened.
     await expect(ctx.fns.canvas.update({ agentId: a.id, activeItemId: one.id })).rejects.toThrow();
-    expect(await ctx.fns.canvas.panelHtml({ agentId: a.id })).toContain(`data-canvas-reopen="${one.id}"`);
     // Showing the same thing again brings the old tab back, with its state, at the end of the strip.
     const again = await ctx.fns.canvas.show({ agentId: a.id, kind: "file", args: { path: "package.json" } });
     expect(again.id).toBe(one.id);

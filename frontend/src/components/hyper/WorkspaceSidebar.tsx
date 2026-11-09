@@ -1,6 +1,6 @@
 import { ThemeMenu } from './ThemeMenu';
 import type { ThemeMode } from '../../hooks/useTheme';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Archive, ArchiveRestore, ChevronDown, Timer, Puzzle, Folder, FolderPlus, LogOut, PanelLeft, Plus, Search, Settings, Users, X } from 'lucide-react';
 import { HoverPanel } from '../ui/HoverPanel';
 import { type ProjectAction, type ChatAction, type NavigationProject, type NavigationUser } from '../../lib/navigation';
@@ -35,7 +35,9 @@ export type WorkspaceSidebarProps = {
 };
 
 function WorkspaceSection({ project, selected, query, onSelect, archivedView, pendingChats, onAction, initiallyOpen, draftRow, onNewSession, onProjectAction, pendingProject }: { onNewSession?: (projectId?: string) => void; onProjectAction?: (id: string, action: ProjectAction) => void; pendingProject?: boolean; draftRow?: React.ReactNode; project: NavigationProject; selected: string; query: string; onSelect: (id: string) => void; archivedView: boolean; pendingChats?: Record<string, boolean>; onAction?: (id: string, action: ChatAction) => void; initiallyOpen: boolean }) {
-  const [open, setOpen] = useWorkspaceExpanded(project.id, initiallyOpen);
+  const requestedProject = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('workspaceProject');
+  const [open, setOpen] = useWorkspaceExpanded(project.id, initiallyOpen || requestedProject === project.id);
+  useEffect(() => { if (requestedProject === project.id) setOpen(true); }, [requestedProject, project.id, setOpen]);
   const id = useId();
   const expanded = !!draftRow || !!query.trim() || open;
   return <section className="workspace-section">

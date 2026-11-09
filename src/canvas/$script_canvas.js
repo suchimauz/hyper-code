@@ -1,124 +1,16 @@
-// Canvas beside the chat: open/close, drag the chat width, follow other tabs of the same chat.
-// The agent page root ([data-page="agent"]) carries data-canvas-open and --chat-w; CSS in ui.layout
-// does the rest, so toggling never re-renders the chat (drafts, scroll, streaming stay put).
+// Item-document compatibility only: rich file/plugin content and the sandbox state bridge.
+// Tabs, resizing, mobile presentation and chat navigation belong to React.
 (() => {
     if (window.__hyperCanvasInstalled) return;
     window.__hyperCanvasInstalled = true;
-    const MIN_CHAT = 320, MIN_CANVAS = 360;
-    const page = () => document.querySelector('[data-page="agent"][data-canvas-agent]');
+    const page = () => document.querySelector('[data-canvas-document][data-canvas-agent]');
     const agentOf = root => root?.getAttribute('data-canvas-agent') || '';
-
-    // Mobile is a CSS overlay on the existing panel: never reparent a live iframe.
-    const mobile = window.matchMedia('(max-width: 700px), (max-width: 1023px) and (pointer: coarse)');
-    let modalPanel = null, returnFocus = null, scrollSnapshot = null;
-    const inertBefore = new Map();
-    const restoreBackground = () => {
-        for (const [el, inert] of inertBefore) el.inert = inert;
-        inertBefore.clear();
-    };
-    const popupOpen = () => document.querySelector('dialog[open]');
-    const syncMobile = () => {
-        const root = page();
-        if (scrollSnapshot && !root?.contains(scrollSnapshot.element)) scrollSnapshot = null;
-        if (returnFocus && !returnFocus.isConnected) returnFocus = null;
-        const panel = root?.querySelector(':scope > [data-canvas-panel]');
-        const open = mobile.matches && root?.hasAttribute('data-canvas-open');
-        if (modalPanel && (modalPanel !== panel || !open)) {
-            modalPanel.removeAttribute('aria-modal');
-            modalPanel.removeAttribute('role');
-            modalPanel.removeAttribute('tabindex');
-            restoreBackground();
-            modalPanel = null;
-            if (!open && returnFocus?.isConnected && !returnFocus.matches('input, textarea, [contenteditable="true"]')) returnFocus.focus({ preventScroll: true });
-            if (!open) {
-                returnFocus = null;
-                if (scrollSnapshot?.element.isConnected) scrollSnapshot.element.scrollTop = scrollSnapshot.top;
-                scrollSnapshot = null;
-            }
-        }
-        if (panel) panel.inert = mobile.matches && !open;
-        if (!open || !panel) return;
-        if (!modalPanel) {
-            returnFocus ??= document.activeElement;
-            const messages = root.querySelector('#messages');
-            if (!scrollSnapshot && messages) scrollSnapshot = { element: messages, top: messages.scrollTop };
-            modalPanel = panel;
-            panel.setAttribute('role', 'dialog');
-            panel.setAttribute('aria-modal', 'true');
-            panel.setAttribute('tabindex', '-1');
-        }
-        // Inert siblings at every ancestor, not the ancestor containing Canvas.
-        // This covers chat, navigation and inspectors without touching their DOM or drafts.
-        for (let node = panel; node && node !== document.body; node = node.parentElement) {
-            for (const sibling of node.parentElement?.children || []) {
-                if (sibling === node || !(sibling instanceof HTMLElement) || sibling.tagName === 'DIALOG') continue;
-                if (!inertBefore.has(sibling)) inertBefore.set(sibling, sibling.inert);
-                sibling.inert = true;
-            }
-        }
-        if (!popupOpen() && !panel.contains(document.activeElement)) (panel.querySelector('.canvas-mobile-back') || panel).focus({ preventScroll: true });
-    };
-    const focusable = panel => [...panel.querySelectorAll('button, select, input, textarea, a[href], iframe, [tabindex]')]
-        .filter(el => !el.disabled && el.tabIndex >= 0 && !el.closest('[inert]') && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
-    document.addEventListener('keydown', event => {
-        if (!modalPanel || popupOpen()) return;
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            setOpen(page(), false);
-        } else if (event.key === 'Tab') {
-            const controls = focusable(modalPanel);
-            const first = controls[0], last = controls[controls.length - 1];
-            if (!first || (event.shiftKey && (document.activeElement === first || document.activeElement === modalPanel)) || (!event.shiftKey && document.activeElement === last)) {
-                event.preventDefault();
-                (event.shiftKey ? last : first)?.focus({ preventScroll: true });
-            }
-        }
-    }, true);
-    document.addEventListener('focusin', event => {
-        if (modalPanel && !popupOpen() && !modalPanel.contains(event.target)) (modalPanel.querySelector('.canvas-mobile-back') || modalPanel).focus({ preventScroll: true });
-    });
-    mobile.addEventListener('change', syncMobile);
-
-    // Keep the conversation pinned to the bottom across a reflow, if it was there.
-    const keepBottom = fn => {
-        if (mobile.matches) { fn(); return; }
-        const messages = document.getElementById('messages');
-        const atBottom = messages && messages.scrollHeight - messages.scrollTop - messages.clientHeight < 40;
-        fn();
-        if (atBottom) requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; });
-    };
-    const paintButtons = root => {
-        const open = root.hasAttribute('data-canvas-open');
-        root.querySelectorAll('[data-canvas-toggle="toggle"], [data-chat-panel] [data-canvas-toggle="open"]').forEach(b => {
-            b.setAttribute('aria-pressed', String(open));
-            b.title = b.getAttribute('data-canvas-toggle') === 'open' ? 'Открыть Canvas' : open ? 'Закрыть Canvas' : 'Открыть Canvas';
-            b.setAttribute('aria-label', b.title);
-        });
-    };
-    const apply = (root, state) => {
-        if (!root) return;
-        keepBottom(() => {
-            if (typeof state.open === 'boolean') root.toggleAttribute('data-canvas-open', state.open);
-            if (state.chatWidth) root.style.setProperty('--chat-w', `${state.chatWidth}px`);
-            if (!root.hasAttribute('data-canvas-open')) root.removeAttribute('data-canvas-meta-open');
-        });
-        paintButtons(root);
-        syncMobile();
-    };
-    const save = (root, body) => fetch(`/canvas/${encodeURIComponent(agentOf(root))}`, {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-    }).then(r => r.ok ? r.json() : null).then(state => state && apply(root, state)).catch(() => {});
-    const setOpen = (root, open) => { apply(root, { open }); save(root, { open }); };
-
-    // Tabs changed (opened, switched, closed, retitled, state — here, in another page, or by the agent):
-    // fetch the panel again. Only the latest request may swap, and when the active body is unchanged the
-    // live one is kept (the framed file keeps its scroll and unsaved edits) and only the strip changes.
+    const documentEndpoint = root => `/canvas/${encodeURIComponent(agentOf(root))}/item/${encodeURIComponent(root.getAttribute('data-canvas-document'))}/document?fragment=1`;
     let refreshing = 0;
     const refreshPanel = async (root, force = false) => {
         const ticket = ++refreshing;
         const documentItem = root.getAttribute('data-canvas-document');
-        const endpoint = documentItem ? `/canvas/${encodeURIComponent(agentOf(root))}/item/${encodeURIComponent(documentItem)}/document?fragment=1` : `/canvas/${encodeURIComponent(agentOf(root))}/panel`;
+        const endpoint = documentEndpoint(root);
         const r = await fetch(endpoint, { headers: { accept: 'text/html' } }).catch(() => null);
         if (!r?.ok || ticket !== refreshing) return;
         const html = await r.text();
@@ -135,15 +27,11 @@
             panel.replaceWith(next);
             runBodyScripts(next);
             window.htmx?.process?.(next);
-            syncMobile();
             return;
         }
         // Same body: change only what is around it. Moving an iframe in the DOM reloads it, so the live
         // body never moves — the framed file keeps scroll and edits, an html page keeps running.
         panel.setAttribute('data-canvas-rev', next.getAttribute('data-canvas-rev') || '');
-        const oldHeader = panel.querySelector(':scope > header'), newHeader = next.querySelector(':scope > header');
-        if (oldHeader && newHeader) { oldHeader.replaceWith(newHeader); window.htmx?.process?.(newHeader); }
-        syncMobile();
         // A live-state page (html tab) gets the new state posted in instead of a reload.
         const nextState = newBody.getAttribute('data-canvas-state');
         if (nextState !== null && nextState !== oldBody.getAttribute('data-canvas-state')) {
@@ -194,7 +82,7 @@
                 if (--info.pending) return;
                 // Drained: what the server holds wins — a failed write or another page's change shows up here.
                 if (answer?.state) deliver(frame, answer.state);
-                else fetch(`/canvas/${encodeURIComponent(agentOf(root))}/panel`).then(r => r.ok ? r.text() : '').then(html => {
+                else fetch(documentEndpoint(root)).then(r => r.ok ? r.text() : '').then(html => {
                     const m = html.match(/data-canvas-state="([^"]*)"/);
                     if (!m || info.pending) return;
                     const t = document.createElement('textarea'); t.innerHTML = m[1];
@@ -207,190 +95,18 @@
             console.warn(`canvas tab ${itemId}:`, msg.message);
         }
     });
-    const shownRev = root => root.querySelector(':scope > [data-canvas-panel]')?.getAttribute('data-canvas-rev') || '';
+    const shownRev = root => root.querySelector('[data-canvas-panel]')?.getAttribute('data-canvas-rev') || '';
     const tabAction = (root, body) => fetch(`/canvas/${encodeURIComponent(agentOf(root))}`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     }).then(r => r.ok ? r.json() : null).then(state => {
-        if (!state) return;
-        apply(root, state);
-        // Usually the canvas.changed event already refreshed; this covers a page without the event stream.
-        if (state.rev && state.rev !== shownRev(root)) refreshPanel(root);
-    }).catch(() => {});
-
-    document.addEventListener('click', event => {
-        const root = page();
-        if (!root) return;
-        // The whole tab selects it, except its close button.
-        const tab = event.target.closest?.('[data-canvas-tab]');
-        if (tab && root.contains(tab) && !event.target.closest('[data-canvas-close-item]')) {
-            event.preventDefault();
-            if (tab.hasAttribute('aria-current')) return;
-            // Mark the tab at once; the panel swap that follows the server answer replaces the strip anyway.
-            for (const other of root.querySelectorAll('[data-canvas-tab][aria-current]')) other.removeAttribute('aria-current');
-            tab.setAttribute('aria-current', 'true');
-            tabAction(root, { activeItemId: Number(tab.getAttribute('data-canvas-tab')) });
-            return;
-        }
-        const closeItem = event.target.closest?.('[data-canvas-close-item]');
-        if (closeItem && root.contains(closeItem)) {
-            event.preventDefault();
-            tabAction(root, { closeItemId: Number(closeItem.getAttribute('data-canvas-close-item')) });
-            return;
-        }
-        const reload = event.target.closest?.('[data-canvas-reload]');
-        if (reload && root.contains(reload)) {
-            event.preventDefault();
-            refreshPanel(root, true);
-            return;
-        }
-        const reopen = event.target.closest?.('[data-canvas-reopen]');
-        if (reopen && root.contains(reopen)) {
-            event.preventDefault();
-            reopen.closest('details')?.removeAttribute('open');
-            tabAction(root, { reopenItemId: Number(reopen.getAttribute('data-canvas-reopen')) });
-            return;
-        }
-        // A click elsewhere closes the recently-closed menu.
-        for (const menu of root.querySelectorAll('[data-canvas-history][open]')) if (!menu.contains(event.target)) menu.removeAttribute('open');
-        const toggle = event.target.closest?.('[data-canvas-toggle]');
-        if (toggle && root.contains(toggle)) {
-            event.preventDefault();
-            const mode = toggle.getAttribute('data-canvas-toggle');
-            if (mobile.matches && toggle.closest('[data-chat-panel]') && mode !== 'close') {
-                returnFocus = root.querySelector('.chat-header [data-canvas-toggle="toggle"]') || root.querySelector('[data-chat-menu-trigger]');
-            }
-            setOpen(root, mode === 'open' ? true : mode === 'close' ? false : !root.hasAttribute('data-canvas-open'));
-            return;
-        }
-        // With the canvas open the inspector is forced to a strip; its toggle then peeks it open
-        // over the layout without touching the remembered collapsed state.
-        const meta = event.target.closest?.('[data-agent-meta-toggle]');
-        if (meta && root.hasAttribute('data-canvas-open') && root.contains(meta)) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            root.toggleAttribute('data-canvas-meta-open');
-        }
-    }, true);
-
-    document.addEventListener('change', event => {
-        const select = event.target.closest?.('[data-canvas-mobile-tabs]');
-        const root = page();
-        if (select && root?.contains(select) && select.value) tabAction(root, { activeItemId: Number(select.value) });
-    });
-
-    const clampWidth = (root, width) => {
-        const chat = document.getElementById('chat-panel');
-        const meta = root.querySelector('[data-agent-meta-panel]');
-        const total = root.getBoundingClientRect().width - (meta?.getBoundingClientRect().width ?? 0);
-        return Math.round(Math.max(MIN_CHAT, Math.min(width, total - MIN_CANVAS, 1600)) || chat?.getBoundingClientRect().width || 440);
-    };
-    document.addEventListener('pointerdown', event => {
-        const handle = event.target.closest?.('[data-canvas-resizer]');
-        const root = page();
-        if (!handle || !root || mobile.matches) return;
-        event.preventDefault();
-        const chat = document.getElementById('chat-panel');
-        const right = chat.getBoundingClientRect().right;
-        try { handle.setPointerCapture(event.pointerId); } catch {}
-        root.classList.add('canvas-resizing');
-        let width = 0;
-        // Listen on window, not the handle: the handle can be replaced by a re-render mid-drag, and an
-        // iframe under the cursor swallows events — either way pointerup was lost and the edge stuck to
-        // the cursor. A move with no button pressed also ends the drag.
-        const move = e => {
-            if (!(e.buttons & 1)) return up();
-            width = clampWidth(root, right - e.clientX);
-            root.style.setProperty('--chat-w', `${width}px`);
-        };
-        const up = () => {
-            window.removeEventListener('pointermove', move, true);
-            window.removeEventListener('pointerup', up, true);
-            window.removeEventListener('pointercancel', up, true);
-            window.removeEventListener('blur', up);
-            handle.removeEventListener('lostpointercapture', up);
-            root.classList.remove('canvas-resizing');
-            if (width) save(root, { chatWidth: width });
-            width = 0;
-        };
-        window.addEventListener('pointermove', move, true);
-        window.addEventListener('pointerup', up, true);
-        window.addEventListener('pointercancel', up, true);
-        window.addEventListener('blur', up);
-        handle.addEventListener('lostpointercapture', up);
-    });
-    document.addEventListener('keydown', event => {
-        const handle = event.target.closest?.('[data-canvas-resizer]');
-        const root = page();
-        if (!handle || !root || mobile.matches || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
-        event.preventDefault();
-        const current = document.getElementById('chat-panel').getBoundingClientRect().width;
-        const width = clampWidth(root, current + (event.key === 'ArrowLeft' ? 32 : -32));
-        root.style.setProperty('--chat-w', `${width}px`);
-        save(root, { chatWidth: width });
-    });
-
-    // Another tab (or the agent) changed this chat's canvas: follow it. After a gap in the event stream
-    // (tab hidden on HTTP/1.1, network drop, frozen tab) re-read the canvas instead — the events sent
-    // meanwhile are gone. See docs/live-updates.md.
-    const catchUp = () => {
-        const root = page();
-        if (!root) return;
-        fetch(`/canvas/${encodeURIComponent(agentOf(root))}/state`, { cache: 'no-store' })
-            .then(r => r.ok ? r.json() : null)
-            .then(state => {
-                if (!state || page() !== root) return;
-                apply(root, state);
-                if (state.rev && state.rev !== shownRev(root)) refreshPanel(root);
-            }).catch(() => {});
-    };
-    // An embedding host (the React chat) rebinds this page to another agent without reloading the frame:
-    // the root follows the new agent and the whole panel is drawn again from its /panel.
-    window.hyperCanvas = {
-        setAgent: id => {
-            const root = page();
-            if (!root || !id || agentOf(root) === id) return false;
-            root.setAttribute('data-canvas-agent', id);
-            refreshPanel(root, true);
-            return true;
-        },
-    };
+        if (state) return refreshPanel(root);
+    }).catch(error => console.warn('Canvas navigation failed', error));
+    const catchUp = () => { const root = page(); if (root) return refreshPanel(root); };
     window.hyperLive.subscribe({
-        name: 'canvas',
-        types: ['canvas.changed'],
-        onEvent: ev => {
-            const root = page();
-            if (!root || agentOf(root) !== ev.agentId) return;
-            apply(root, ev);
-            // The event follows every committed change (ours too), so it alone drives the refresh.
-            if (ev.rev && ev.rev !== shownRev(root)) refreshPanel(root);
-        },
+        name: 'canvas-document', types: ['canvas.changed'],
+        onEvent: ev => { const root = page(); if (root && agentOf(root) === ev.agentId && ev.rev !== shownRev(root)) return refreshPanel(root); },
         resync: catchUp,
     });
-    // Links in the chat open beside it instead of navigating the page away: a file link (/files/absolute/…,
-    // what the markdown renderer makes of a path) becomes a file tab, a web link a url tab. A modifier
-    // or middle click keeps the browser's own behaviour, and so does any link the server refuses.
-    document.addEventListener('click', event => {
-        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        const a = event.target.closest?.('#chat-panel .prose a[href]');
-        const root = page();
-        if (!a || !root || a.hasAttribute('download')) return;
-        const url = new URL(a.getAttribute('href'), location.href);
-        let show = null;
-        if (url.origin === location.origin && url.pathname.startsWith('/files/absolute/')) {
-            let path = '';
-            try { path = '/' + url.pathname.slice('/files/absolute/'.length).split('/').map(decodeURIComponent).join('/'); } catch { return; }
-            show = { kind: 'file', args: { path } };
-        } else if (url.origin !== location.origin && /^https?:$/.test(url.protocol)) {
-            show = { kind: 'url', args: { url: url.href } };
-        }
-        if (!show) return;
-        event.preventDefault();
-        fetch(`/canvas/${encodeURIComponent(agentOf(root))}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ show }) })
-            .then(r => r.ok ? r.json() : Promise.reject(r))
-            .then(state => { apply(root, state); if (state.rev && state.rev !== shownRev(root)) refreshPanel(root); })
-            .catch(() => window.open(a.href, '_blank', 'noopener'));
-    });
-
     // A file tab draws the Files viewer in place (files.view), not in a frame. Its links — breadcrumbs,
     // folder entries, Preview/Code/Edit — move this same tab; a modifier click keeps the browser's own
     // behaviour (open the Files page). Raw media and PDF links are left alone.
@@ -444,10 +160,4 @@
         tabAction(root, { navigate: { itemId: Number(form.getAttribute('data-canvas-navigate')), url } });
     });
 
-    const init = () => { const root = page(); if (root) paintButtons(root); syncMobile(); };
-    // HTMX navigation and server-driven attribute changes share the same lifecycle.
-    new MutationObserver(syncMobile).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-canvas-open'] });
-    document.addEventListener('htmx:after:process', init);
-    document.addEventListener('htmx:after:swap', init);
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

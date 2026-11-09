@@ -3,9 +3,7 @@ import setCompaction from './setCompaction';
 import post from './compactionPost';
 import save from '../session/save';
 import load from '../session/load';
-import section from '../ui/agentMetaSection';
 import button from '../procs/ui/button';
-import redraw from '../ui/agentMetaSectionHtml';
 
 function fixture() {
  const live:any={id:'fixture',model:'test:model',createdBy:'owner',messages:[],events:[],scratchpad:{}};
@@ -36,15 +34,4 @@ test('save and load preserve explicit override and null inheritance',async()=>{
  f.ctx.fns.session={syncAgentState:async({agent}:any)=>agent,getMessages:async()=>[],getEvents:async()=>[]};
  const loaded=await load(f.ctx,null,{id:'fixture'});expect(loaded?.autoCompactWindowPercent).toBe(percent);
  }
-});
-test('renderer labels dynamic inherited and explicit values and separate reset form',async()=>{
- const f=fixture();
- for(const globalCompactionPercent of [15,15.5,29,65,80]) {const html=section(f.ctx,null,{agent:f.live,section:'compaction',globalCompactionPercent});expect(html).toContain(`Following global setting: ${globalCompactionPercent}%`);expect(html).toContain('role="alert"');expect(html).toContain('min="15" max="95"');expect(html).toContain('global token limit');}
- f.live.autoCompactWindowPercent=75;
- const html=section(f.ctx,null,{agent:f.live,section:'compaction',globalCompactionPercent:80});expect(html).toContain('Agent override: 75%. Global setting: 80%.');expect(html).toContain('Follow global setting (80%)');expect(html).toContain('>Reset</button>');expect(html.match(/<form/g)).toHaveLength(2);
- f.ctx.fns.ui.agentMetaSection=(o:any)=>section(f.ctx,null,o);
- expect(await redraw(f.ctx,null,{agentId:'fixture',section:'compaction'})).toContain('Global setting: 65%.');
- f.ctx.fns.settings.getNumber=async()=>90;
- f.live.autoCompactWindowPercent=null;
- expect(await redraw(f.ctx,null,{agentId:'fixture',section:'compaction'})).toContain('Following global setting: 90%.');
 });

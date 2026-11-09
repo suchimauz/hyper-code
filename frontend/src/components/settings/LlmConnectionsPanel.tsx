@@ -1,3 +1,4 @@
+import { LlmPolicySettings } from './LlmPolicySettings';
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { ExternalLink, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -185,5 +186,6 @@ export function LlmConnectionsPanel() {
         })}
         {other.length > 0 && <section className="llm-group" aria-labelledby="llm-group-other"><header className="llm-group-head"><NavigationChatIcon /><h3 id="llm-group-other">Other</h3></header><ul className="llm-rows">{other.map(item => <AccountRow key={`${item.provider}/${item.account}`} item={item} instances={instances} run={run} busy={busy} />)}</ul></section>}
       </div>}
+    {accounts !== null && !loadError && <LlmPolicySettings />}
   </div>;
 }

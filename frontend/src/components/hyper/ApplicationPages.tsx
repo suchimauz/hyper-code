@@ -12,7 +12,7 @@ export function applicationLinks(value: unknown): Application[] {
     if (!item || typeof item !== 'object' || typeof item.id !== 'string' || typeof item.label !== 'string' || typeof item.href !== 'string') return false;
     try { safeApiPath(item.href); } catch { return false; }
     // These destinations have native React surfaces; never embed the application shell in itself.
-    return !['/', '/auth/users', '/sshInstance', '/cron', '/plugins', '/llms'].includes(item.href.split('?')[0]) && !/^\/(sber|tbank)(\/|$)/i.test(item.href);
+    return !['/', '/auth/users', '/sshInstance', '/cron', '/plugins', '/llms', '/tasks', '/search', '/functions'].includes(item.href.split('?')[0]) && !/^\/(sber|tbank)(\/|$)/i.test(item.href);
   });
 }
 

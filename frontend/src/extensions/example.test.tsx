@@ -11,7 +11,13 @@ import { ExtensionSurface } from './ExtensionHost';
 
 describe('public-SDK dev/test fixture', () => {
   it('does not register demonstration surfaces in production', () => {
-    expect(installedExtensions).toEqual({ pages: [], navigation: [], panels: [], actions: [], canvasKinds: [] });
+    for (const entries of Object.values(installedExtensions)) {
+      expect(entries.some(entry => entry.key.startsWith('sdk-example/'))).toBe(false);
+    }
+    expect(installedExtensions.pages.map(page => page.key)).toEqual(['tasks/overview', 'documentation/search', 'documentation/functions']);
+    expect(installedExtensions.panels.map(panel => panel.key)).toEqual(['agent-meta/overview']);
+    expect(installedExtensions.actions).toEqual([]);
+    expect(installedExtensions.canvasKinds).toEqual([]);
     expect(exampleExtensions.pages).toHaveLength(1);
     expect(exampleExtensions.navigation).toHaveLength(1);
     expect(exampleExtensions.panels).toHaveLength(1);

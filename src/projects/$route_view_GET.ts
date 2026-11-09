@@ -1,4 +1,4 @@
-/** Restore a project's persisted active tab on default navigation without writes; use list=1 for its index or archive=1 for its archive. */
+/** Redirect authorized legacy project links into React navigation, restoring a persisted active chat only on default navigation. No project or tab data is changed. */
 export default async function(ctx: Context, session: Session | null, opts: {
     /** Incoming project page request. */ req: Request;
 }): Promise<Response | {title:string;main:string;status?:number}> {
@@ -16,10 +16,6 @@ export default async function(ctx: Context, session: Session | null, opts: {
             return new Response(null,{status:302,headers:{Location:location,'Cache-Control':'no-store'}});
         }
     }
-    const [activeChats, archivedChats, tabs] = await Promise.all([
-        ctx.fns.projects.chats({projectId}),
-        ctx.fns.projects.chats({projectId,archived:true}),
-        ctx.fns.projects.tabs({projectId}),
-    ]);
-    return {title:project.title,main:await ctx.fns.projects.renderPage({project,chats:archived?archivedChats:activeChats,archived,tabIds:tabs.tabIds,activeCount:activeChats.length,archiveCount:archivedChats.length})};
+    const location = '/?workspaceProject=' + encodeURIComponent(project.id) + '&workspaceFilter=' + (archived || project.archived ? 'archived' : 'active');
+    return new Response(null, {status:302, headers:{Location:location, 'Cache-Control':'no-store'}});
 }

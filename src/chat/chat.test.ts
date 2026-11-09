@@ -46,62 +46,6 @@ describe("chat header parts", () => {
         await expect(ctx.fns.chat.register({ kind: "button", entries: [{ name: "Bad", moduleDir: "gh", rel: "gh/$chatbutton_Bad.ts", mod: mod({ render: () => null }) }] })).rejects.toThrow("name must");
     });
 
-    test("header draws icon, name, badges, buttons and the panel trigger; a failing part only hides itself", async () => {
-        const { ctx } = await ctxWithAgent();
-        ctx.state.registry.agent.renderStatusBar = () => '<span id="status-bar">idle</span>';
-        ctx.state.chat.parts["test.boom"] = { id: "test.boom", kind: "badge", module: "test", rel: "x", render: () => { throw new Error("boom"); } };
-        ctx.state.chat.parts["test.slow"] = { id: "test.slow", kind: "button", module: "test", rel: "x", render: () => new Promise(() => {}) };
-        ctx.state.chat.parts["test.pr"] = { id: "test.pr", kind: "badge", module: "test", rel: "x", order: 1, render: () => ({ icon: "ph-git-pull-request", label: "PR #12", href: "/pr/12" }) };
-        const view = await ctx.fns.chat.buildRenderContext({ agentId: "a1" });
-        const started = Date.now();
-        const html = await ctx.fns.chat.header({ context: view });
-        expect(Date.now() - started).toBeLessThan(2500);
-        expect(html).toContain('data-chat-part="icon"');
-        expect(html).toContain('hx-popup="chat.iconPopup"');
-        expect(html).not.toContain('hx-popup="agent.modelPicker"');
-        expect(html).toContain('chat-toolbar-label');
-        expect(html).toContain('data-mobile-inspector-open');
-        expect(html).not.toContain('data-chat-model-mark');
-        expect(html).toContain('hx-popup="chat.renamePopup"');
-        expect(html).toContain("Header test");
-        expect(html).toContain('data-chat-id="agent.workspace"');
-        expect(html).toContain("Files · /tmp/proj");
-        expect(html).toContain('data-chat-id="canvas.toggle"');
-        
-        
-        expect(html).toContain('popovertarget="chat-panel-a1"');
-        expect(html).toContain('data-chat-panel="/chat/a1/panel"');
-        expect(html).toContain("PR #12");
-        expect(html).not.toContain("test.boom");
-        expect(html).not.toContain("test.slow");
-        expect(html).not.toContain('data-chat-id="agent.parent"');
-    }, 10_000);
-
-    test("parent badge shows on forks", async () => {
-        const { ctx } = await ctxWithAgent({ parentId: "p1" });
-        ctx.state.agent.p1 = agentRow({ id: "p1", title: "Parent chat" });
-        ctx.state.registry.agent.renderStatusBar = () => "";
-        const html = await ctx.fns.chat.header({ context: await ctx.fns.chat.buildRenderContext({ agentId: "a1" }) });
-        expect(html).toContain('data-chat-id="agent.parent"');
-        expect(html).toContain('href="/agent/p1"');
-        expect(html).toContain("Parent chat");
-    });
-
-    test("panel draws the cards with their rows; danger rows post with confirm", async () => {
-        const { ctx } = await ctxWithAgent({ scratchpad: { plan: { title: "Ship it", tasks: [{ id: "a", title: "first", status: "done" }, { id: "b", title: "second", status: "active" }] } } });
-        ctx.state.registry.agent.team = () => [];
-        ctx.state.registry.agent.triggers = () => [];
-        const html = await ctx.fns.chat.panel({ agentId: "a1" });
-        expect(html).toContain('data-chat-id="appearance"');
-        expect(html).toContain('hx-popup="chat.iconPopup"');
-        expect(html).toContain("Ship it");
-        expect(html).toContain("1/2");
-        expect(html).toContain('action="/agent/a1/fork"');
-        expect(html).toContain('action="/agent/a1/delete"');
-        expect(html).toContain("confirm(");
-        expect(html).not.toContain('data-chat-id="agent.wakeups"');
-        expect(html.lastIndexOf('data-chat-id="danger"')).toBeGreaterThan(html.lastIndexOf('data-chat-id="share"'));
-    });
 
     test("model chip opens the provider picker; context ring estimates the next payload before the first answer", async () => {
         const { ctx } = await ctxWithAgent();
@@ -122,13 +66,10 @@ describe("chat header parts", () => {
         expect(ctx.fns.chat.icon({ model: "anthropic:claude-opus-4-5" })).not.toContain("chat-icon-ring");
     });
 
-    test("GET /chat/:id/panel serves the panel", async () => {
+    test("GET /chat/:id/panel is retired", async () => {
         const { ctx } = await ctxWithAgent();
-        ctx.state.registry.agent.team = () => [];
-        ctx.state.registry.agent.triggers = () => [];
         const res = await ctx.fns.procs.http.dispatch({ method: "GET", url: "/chat/a1/panel" });
-        expect(res.status).toBe(200);
-        expect(await res.text()).toContain("Хранение и удаление");
+        expect(res.status).toBe(404);
     });
 });
 

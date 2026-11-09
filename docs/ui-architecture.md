@@ -14,7 +14,22 @@ React Canvas owns tabs/state, native text-file editing and directory browsing, a
 
 Postgres is authoritative. React owns presentation state; HTTP endpoints own access checks and durable changes. SSE carries invalidation hints, followed by canonical authorized reads, not a second domain-state store.
 
-## Residual compatibility consumers
+## Removed surfaces and native replacements
+
+- Projects no longer has `renderPage`, `pages.js`, or the page-only reorder stylesheet. `/projects/view` and `/projects/archive` redirect into the existing React workspace filter; `workspaceProject` and `workspaceFilter` preserve deep links. Project reads do not mutate the stored active tab.
+- Old inspector/meta fragments, `agentMetaSection`, `agentMetaSectionHtml`, `agentSettingsBlocks`, `parkedCard`, `planTaskRow`, and `meta.js` are removed. The native Meta panel reads an owner-authorized JSON snapshot, edits status injection/context thresholds, and uses the existing Goal CAS endpoint. Plan display is read-only: the old plan write also wakes an agent and is not a harmless settings update.
+- The old chat header/lazy panel renderer chain and `/chat/:id/panel` are removed. Domain actions remain. The historical chat-card/badge registry is not a React extension slot; remaining declarations require migration, not new SSR renderers.
+- `/canvas/:id/panel` and `panelHtml` are removed. The mobile endpoint is an authorized redirect to React, not a second Canvas shell. `canvas.js` retains item-document refresh/navigation and sandbox bridges, not tab/split-pane UI.
+- Tasks list/detail/create/status/start are native React with owner-only JSON and cookie-bound CSRF. `/tasks` and task detail HTML visits redirect to `/?view=extension:tasks/overview`; GET never starts an agent. Global extension pages do not inherit the selected chat's archived/read-only state; server authorization remains authoritative.
+- `/search` and `/functions` negotiate authorized JSON or redirect to native documentation pages. Transcript search retains BM25 and agent filters; function documentation retains schemas and source locations.
+- `/sshInstance` and `/llms` redirect into native Settings. `settings=ssh-instances|llm-connections` opens the appropriate dialog. LLM policy, coding-instance and MiniMax controls have native JSON-backed controls; node add/edit/token workflows and remaining account fragments still need migration.
+- Google/Humanizer `SKILL.md` endpoints serve original Markdown with `nosniff`, not an HTML page.
+
+### Still to migrate (not claimed removed)
+
+Built-in `/settings`, `/settings/declared`, `/controlPlane`, `/shared-agents`, file rich previews and remaining LLM/node fragments still have HTML consumers. Plugin Applications still hosts Knowledge, News/reader, RSS, Hacker News, Substack, Inbox, Calendar, Architecture, Flow gaps, Whisper and Telemetry documents, plus separately mounted user-plugin pages. Canvas plugin kinds without a granted React renderer still use `itemDocument`. These require capability-by-capability native migration before their renderers/assets can be deleted. Shared auth/OAuth pages, secure input documents and Redmine's independent approval authority must not be discarded as shell leftovers. Sber/TBank are outside this migration.
+
+## Remaining HTML consumers
 
 | Consumer | Live path / responsibility |
 | --- | --- |
@@ -30,7 +45,7 @@ The dead `legacyUi.rewriteResponse` and `legacyUi.navigationUrl` helpers were re
 
 `frontend/src/sdk/index.ts` is the public `@hyper/ui` v1 entry. This is a local Vite alias, **not** a published npm package or remote module loader. Read the actual entry and `frontend/src/extensions/{types,registry,installed}.ts`, `ExtensionHost.tsx`, and `frontend/src/ui-plugins/sdk-example.tsx` before extending it.
 
-`extensions/installed.ts` has no SDK demonstration installed in production. `ui-plugins/sdk-example.tsx` remains a dev/test fixture, registered explicitly in the separate registry in `extensions/example.test.tsx`; its presence is not production navigation or action registration.
+`extensions/installed.ts` explicitly grants Tasks (`tasks/overview`), transcript search and function documentation (`documentation/search`, `documentation/functions`), and the agent Meta panel (`agent-meta/overview`). It has no SDK demonstration installed in production. `ui-plugins/sdk-example.tsx` remains a dev/test fixture, registered explicitly in the separate registry in `extensions/example.test.tsx`; its presence is not production navigation or action registration.
 
 - Import UI primitives, API/live helpers and public types from `@hyper/ui`; use React from the host. Vite deduplicates React and React DOM. Do not bundle another React runtime, deep-import `@hyper/ui/*`, or import private host components. The Vite boundary restricts modules under `ui-plugins/` to React and the public entry.
 - Export a `UiExtension` with a valid unique `id` and `apiVersion: 1`. It can declare `pages`, `navigation`, `panels`, `actions`, and `canvasKinds`. Canvas kinds require explicit host grants by kind, receive the authorized item's `args`/`state` and extension context, and must not replace backend authorization. Unregistered kinds retain the document renderer.

@@ -9,6 +9,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 function mockApi(state: { accounts?: unknown[]; logins?: unknown[]; instances?: string[] }, post?: (body: any) => Response) {
   const calls: { method: string; body?: any; headers?: any }[] = [];
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit = {}) => {
+    if (_url === '/llms/settings') return json({models:[],disabledModels:[],instances:[],plans:{},tier:'standard',nodes:[],csrfToken:'csrf'});
     const method = init.method || 'GET';
     if (method === 'GET') { calls.push({ method }); return json({ accounts: [], logins: [], instances: [], ...state, csrfToken: 'csrf' }); }
     const body = JSON.parse(String(init.body)); calls.push({ method, body, headers: init.headers });

@@ -1,21 +1,19 @@
-// GET /canvas/:id/mobile — standalone Canvas surface for native clients.
-/** Renders an agent's existing Canvas panel as a full-page mobile surface. */
-export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
+/** Redirect retired standalone Canvas links to the owner-authorized React agent workspace.
+ * Keeps the existing Canvas state unchanged; the React shell owns its tabs and mobile presentation.
+ * @param opts.req Incoming request used for authentication and ownership checks.
+ * @param opts.params Route parameters containing the target agent id.
+ */
+export default async function (ctx: Context, _session: Session | null, opts: {
+    /** Incoming request used for authentication and ownership checks. */
+    req: Request;
+    /** Route parameters containing the target agent id. */
+    params: Record<string, string>;
+}): Promise<Response> {
     const agentId = String(opts.params.id ?? "");
-    const known = ((await ctx.fns.procs.db.select({ sql: "SELECT 1 FROM agents WHERE id = ?", params: [agentId] })) as any[]).length > 0;
-    if (!known) return new Response("unknown agent", { status: 404 });
-    const id = ctx.fns.procs.ui.escape({ text: agentId });
-    const panel = await ctx.fns.canvas.panelHtml({ agentId });
-    return {
-        currentId: agentId,
-        title: "Canvas",
-        // Embedded beside the React chat: the chat, navigation and quota scripts would only slow the frame down.
-        lean: new URL(opts.req.url).searchParams.get("embed") === "1",
-        headExtra: `<style>
-          #main { overflow:hidden !important; padding:0 !important; }
-          [data-mobile-canvas] > .canvas-panel { display:flex !important; margin:0 !important; border:0 !important; border-radius:0 !important; }
-          [data-mobile-canvas] > .canvas-resizer, [data-mobile-canvas] [data-canvas-toggle="close"] { display:none !important; }
-        </style>`,
-        main: `<div data-page="agent" data-mobile-canvas data-canvas-agent="${id}" data-canvas-open class="flex min-h-0 min-w-0 flex-1 bg-base-200">${panel}</div>`,
-    };
+    const denied = await ctx.fns.canvas.authorizeHttp({ req: opts.req, agentId });
+    if (denied) return denied;
+    return new Response(null, { status: 302, headers: {
+        location: `/?agent=${encodeURIComponent(agentId)}`,
+        "cache-control": "no-store",
+    } });
 }

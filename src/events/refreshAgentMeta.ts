@@ -1,11 +1,11 @@
-// The meta panel is redrawn per section, over RPC: this emits a push event,
-// and the client ($script_meta.js) answers by calling ui.agentMetaSectionHtml
-// for exactly that section and swapping it into its slot. Without a section
-// the whole panel is stale — "all" redraws every slot.
 /**
- * Requests a redraw of one agent meta panel section.
+ * Emits a section-scoped agent metadata invalidation hint for live subscribers.
+ *
+ * Preserves the ui.metaSection event contract for metadata mutations; consumers
+ * must fetch canonical data through authorized APIs. The retired HTML inspector
+ * and its RPC fragment loader are not part of this transport.
  * @param opts.agentId Target agent identifier.
- * @param opts.section Which panel section changed; "all" redraws every section.
+ * @param opts.section Metadata area that changed; "all" invalidates every area.
  * @param opts.reason Human-readable refresh reason, for tracing.
  */
 export default function (ctx: Context, _session: Session | null, opts: {

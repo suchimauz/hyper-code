@@ -12,7 +12,7 @@ async function mkTestCtx() {
  const ctx:any={state:{registry}};
  const proxy=(r:any):any=>new Proxy({}, {get:(_t,k:string)=> typeof r[k]==='function' ? (o:any)=>r[k](ctx,null,o) : proxy(r[k])});
  ctx.fns=proxy(registry);
- for(const name of ['identity','list','get','create','materialize','setArchived','chats','tabs','updateTabs','open','closeTab','reorder','createChat','resolve','renderPage'])registry.projects[name]=(await import('./'+name+'.ts')).default;
+ for(const name of ['identity','list','get','create','materialize','setArchived','chats','tabs','updateTabs','open','closeTab','reorder','createChat','resolve'])registry.projects[name]=(await import('./'+name+'.ts')).default;
  return ctx;
 }
 
@@ -184,10 +184,10 @@ describe('projects persistent backend',()=>{
   const request=(suffix='',hx=false)=>route(ctx,null,{req:new Request('http://localhost/projects/view?projectId='+p.id+suffix,{headers:hx?{'HX-Request':'true'}:{}})});
   const normal=await request();expect(normal).toBeInstanceOf(Response);expect((normal as Response).headers.get('Location')).toBe('/agent/b');
   const htmx=await request('',true) as Response;expect(htmx.status).toBe(200);expect(JSON.parse(htmx.headers.get('HX-Location')!).path).toBe('/agent/b');
-  for(const suffix of ['&list=1','&archive=1'])expect(await request(suffix)).not.toBeInstanceOf(Response);
+  for(const suffix of ['&list=1','&archive=1'])expect(((await request(suffix)) as Response).headers.get('Location')).toContain('/?workspaceProject=');
   available=['a'];expect(((await request()) as Response).headers.get('Location')).toBe('/agent/a');
   expect(await ctx.fns.procs.db.select({sql:'SELECT * FROM project_tabs',params:[]})).toEqual(before);
-  as('user:bob');await ctx.fns.projects.create({dir:'/landing'});expect(await request()).not.toBeInstanceOf(Response);
+  as('user:bob');await ctx.fns.projects.create({dir:'/landing'});expect(((await request()) as Response).headers.get('Location')).toContain('/?workspaceProject=');
   const missing=await route(ctx,null,{req:new Request('http://localhost/projects/view?projectId=missing')});expect(missing).toMatchObject({status:404});
  });
  test('new root chat receives exact project and no parent or generation',async()=>{

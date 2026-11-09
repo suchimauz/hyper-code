@@ -2,10 +2,12 @@ import { filterProjects, type NavigationChat, type NavigationProject } from './n
 import { defaultWorkspaceView, type WorkspaceView } from '../components/hyper/WorkspaceViewMenu';
 const key = 'hyper.workspace-view';
 export function readWorkspaceView(): WorkspaceView {
+  const requestedFilter = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('workspaceFilter');
+  const filter = requestedFilter === 'active' || requestedFilter === 'archived' ? requestedFilter : undefined;
   try {
     const value = JSON.parse(localStorage.getItem(key) || '{}');
-    return { group: ['workspace', 'tree', 'flat'].includes(value.group) ? value.group : defaultWorkspaceView.group, order: ['manual', 'updated'].includes(value.order) ? value.order : defaultWorkspaceView.order, filter: ['active', 'all', 'archived'].includes(value.filter) ? value.filter : defaultWorkspaceView.filter };
-  } catch { return defaultWorkspaceView; }
+    return { group: ['workspace', 'tree', 'flat'].includes(value.group) ? value.group : defaultWorkspaceView.group, order: ['manual', 'updated'].includes(value.order) ? value.order : defaultWorkspaceView.order, filter: filter ?? (['active', 'all', 'archived'].includes(value.filter) ? value.filter : defaultWorkspaceView.filter) };
+  } catch { return { ...defaultWorkspaceView, ...(filter ? { filter } : {}) }; }
 }
 export function saveWorkspaceView(value: WorkspaceView) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Storage may be unavailable; the current view remains usable. */ } }
 /** New empty chats have no reply yet; creation still counts as activity. */
