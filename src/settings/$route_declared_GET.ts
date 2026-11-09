@@ -1,14 +1,8 @@
-/** Handles the HTTP route declared GET endpoint. */
-export default async function (ctx: Context, _session: Session | null, _opts: {
-        /** Incoming HTTP request. */ req: Request;
-        /** Route parameters captured from the request path. */ params: Record<string, string> }) {
-    const items = await ctx.fns.settings.declared({});
-    const form = await ctx.fns.settings.renderDeclaredForm({});
-    const main = `
-<header class="px-6 py-3 border-b border-ui-border flex items-center gap-3 text-sm">
-  <span class="font-semibold text-muted">declared settings</span>
-  <span class="text-xs text-faint">${items.length} declared</span>
-</header>
-${form}`;
-    return { title: 'settings', main };
+/** Serve the native declared settings snapshot or browser navigation. */
+export default async function (ctx: Context, _session: Session | null, opts: {
+ /** Incoming owner settings request. */ req: Request;
+ /** Captured route parameters. */ params: Record<string,string>;
+}): Promise<Response> {
+ if(!opts.req.headers.get('accept')?.includes('application/json')&&new URL(opts.req.url).searchParams.get('format')!=='json')return new Response(null,{status:302,headers:{Location:'/?view=extension:settings/declared'}});
+ return ctx.fns.settings.browserApi({req:opts.req,section:'declared'});
 }

@@ -7,7 +7,7 @@
  */
 export default async function (ctx: Context, session: Session | null, opts: {
     /** Existing agent identifier; ancestors are not included. */ agentId: string;
-}): Promise<types.agent.ContextDetails> {
+}): Promise<types.agent.ContextUsageDetails> {
     const rows = await ctx.fns.procs.db.select({ sql: "SELECT type, payload FROM events WHERE agent_id = ? AND type IN ('context_usage', 'tool_call') ORDER BY idx", params: [opts.agentId] }) as Array<{ type: string; payload: string }>;
     const valid = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
     let requests = 0, input = 0, output = 0, tokenRequests = 0, cached = 0, cacheInput = 0, cacheWrite = 0, cacheRequests = 0;

@@ -69,9 +69,4 @@ test("edit ops: move, size, config, rename, move and remove tabs, reset; POST /n
     expect(Object.keys(JSON.parse(added.headers.get("HX-Trigger")!))).toEqual(["nav-tab"]);
     expect((await ctx.fns.procs.http.dispatch({ method: "POST", url: "/nav/layout", body: new URLSearchParams({ op: "nope" }) })).status).toBe(400);
 
-    const html = await ctx.fns.nav.home({ tab: "home", edit: true });
-    expect(html).toContain("data-nav-edit-controls");
-    expect(html).toContain("data-nav-add");
-    expect(html).toContain('name="op" value="remove"');
-    expect(await ctx.fns.nav.home({ tab: "home" })).not.toContain("data-nav-edit-controls");
 });

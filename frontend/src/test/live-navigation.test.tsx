@@ -14,7 +14,7 @@ const select = vi.fn();
 function setup() {
   vi.mocked(useHyper).mockReturnValue({ selected: 'ab', agents: [], events: [], page: null, loading: false, error: '', liveError: '', select, refresh: vi.fn(), hasOlder: false, loadingOlder: false, loadOlder: vi.fn(), outline: [], loadThrough: vi.fn() });
   vi.mocked(useCanvas).mockReturnValue({ view: null, open: false, activeItemId: null, rev: '', loading: false, error: null, setOpen: vi.fn(), refresh: vi.fn() });
-  vi.mocked(useNavigation).mockReturnValue({ actProject:vi.fn().mockResolvedValue(true),pendingProjects:{},act:vi.fn().mockResolvedValue(true),pendingChats:{},actionError:'', projects: [{ id: 'ui', title: 'UI', dir: '/ui', host: null, chats: [{ id: 'ab', title: 'Chat A', model: '', runState: 'idle', hasUnread: false, lastReplyAt: null }] }], user: { name: 'Test', role: 'owner' }, error: '', profileError: '', loading: false, refresh: vi.fn() });
+  vi.mocked(useNavigation).mockReturnValue({ actProject:vi.fn().mockResolvedValue(true),pendingProjects:{},act:vi.fn().mockResolvedValue(true),pendingChats:{},actionError:'', projects: [{ id: 'ui', title: 'UI', dir: '/ui', host: null, chats: [{ id: 'ab', title: 'Chat A', model: '', runState: 'idle', hasUnread: false, lastReplyAt: null }] }], user: { name: 'Test', role: 'owner' }, canManage: true, error: '', profileError: '', loading: false, refresh: vi.fn() });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ mode: 'home', tabs: [], widgets: [], groups: [], activeTab: null }), { headers: { 'Content-Type': 'application/json' } })));
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear(); });

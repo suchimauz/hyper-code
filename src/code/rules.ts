@@ -1,4 +1,5 @@
-import ts from "typescript";
+// Match the indexer's namespace import so cold and hot loads use the same AST API.
+import * as ts from "typescript";
 
 /**
  * Finds the rule violations that are visible in a single file's syntax.

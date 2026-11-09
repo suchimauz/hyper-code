@@ -3,6 +3,9 @@
  *
  * Available while there are no users, or while the lone user was seeded (from env or the
  * legacy password) without a confirmed name. Otherwise redirects home.
+ * Accept application/json for the public form model, behind the same availability checks.
+ * @param opts.req Incoming request; Accept selects HTML or JSON presentation.
+ * @param opts.params Router parameters (unused).
  */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
     if (await ctx.fns.auth.oidcOnly({})) return new Response(null, { status: 303, headers: { location: "/auth/login", "cache-control": "no-store" } });
@@ -11,17 +14,9 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     if (users.length > 1 || (lone && lone.configuredAt != null)) return new Response(null, { status: 303, headers: { location: "/" } });
     // A legacy shared-password install is switched over with `bun script/multiuser.ts up`, not from the web.
     if (!lone && (await ctx.fns.auth.password({}))) return new Response(null, { status: 303, headers: { location: "/auth/login" } });
-    const esc = (value: string) => ctx.fns.procs.ui.escape({ text: value });
     const guess = lone?.name && lone.name !== "Owner" ? lone.name : String(ctx.env.HYPER_USER ?? ctx.env.USER ?? "");
     const needsCurrent = !!lone?.hasPassword;
     const error = new URL(opts.req.url).searchParams.get("error");
-    const body = `<form method="post" action="/auth/setup"><h1>Welcome to Hyper</h1>
-<p>${needsCurrent ? "Your existing password stays the same. Confirm who you are." : "Tell Hyper who you are."}</p>
-${error ? `<p class="err">${esc(error)}</p>` : ""}
-${needsCurrent ? `<label>Current password<input name="current" type="password" required autocomplete="current-password" autofocus></label>` : ""}
-<label>Your name<input name="name" required value="${esc(guess)}" ${needsCurrent ? "" : "autofocus"}></label>
-<label>Email (optional)<input name="email" type="email" value="${esc(lone?.email ?? "")}" autocomplete="email"></label>
-${needsCurrent ? "" : `<label>Password (optional — without one, Hyper opens without sign-in)<input name="password" type="password" minlength="8" autocomplete="new-password"></label>`}
-<button type="submit">Continue</button></form>`;
-    return ctx.fns.auth.page({ title: "Setup", body });
+    if ((opts.req.headers.get("accept") ?? "").includes("application/json")) return Response.json({ kind: "setup", name: guess, email: lone?.email ?? "", needsCurrent, error }, { headers: { "cache-control": "no-store", vary: "Accept" } });
+    return ctx.fns.auth.reactDocument({});
 }

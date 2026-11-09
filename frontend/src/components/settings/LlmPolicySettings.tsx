@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { requestJson } from '../../lib/hyper';
 import { Button } from '../ui/Button';
+import { NodeSettings } from './NodeSettings';
 
 type State = {
   models: string[]; disabledModels: string[]; instances: string[];
   plans: Record<string, string>; tier: 'standard' | 'priority'; csrfToken: string;
-  nodes: { name: string; enabled: boolean; modelCount: number; catalogAt: number | null; usageAt: number | null }[];
+  clients: { id: string; name: string; providers: string[]; requests: number; tokenHint: string }[];
+  nodes: { name: string; url: string; enabled: boolean; modelCount: number; catalogAt: number | null; usageAt: number | null }[];
 };
 const providers = { 'zai-coding': 'Z.ai', 'minimax-coding': 'MiniMax', opencode: 'OpenCode' };
 
@@ -62,11 +64,7 @@ export function LlmPolicySettings() {
         </li>)}</ul>
         {!data.models.length && <p className="settings-footnote">No models available.</p>}
       </details>
-      <details><summary>Hyper nodes ({data.nodes.length})</summary>
-        <p className="settings-footnote">Cached node catalogue status. Credentials are never displayed here.</p>
-        <ul className="llm-rows">{data.nodes.map(node => <li key={node.name}><strong>{node.name}</strong> · {node.enabled ? 'Enabled' : 'Disabled'} · {node.modelCount} models{node.catalogAt && <> · Catalogue {new Date(node.catalogAt).toLocaleString()}</>}</li>)}</ul>
-        {!data.nodes.length && <p className="settings-footnote">No nodes configured.</p>}
-      </details>
+      <NodeSettings nodes={data.nodes} clients={data.clients} csrfToken={data.csrfToken} reload={load} />
     </>}
   </section>;
 }

@@ -1,7 +1,7 @@
 /**
  * List and manage Hyper cron tasks for the UI Lab Automation tasks page
  *
- * Use for the React "Automation tasks" screen. GET ?runs=<name> returns the ten latest runs of one task (status, times, clipped result and error). Plain GET returns every cron task (name, function, arguments, schedule, enabled status, worker state, next and last run) plus a cookie-bound CSRF token. POST accepts one JSON action — add (name, dotted fn, interval string, optional JSON-object args and run-now flag; refuses existing names), or enable, disable, run or remove for an exact task name after owner, same-origin, CSRF, content-type and size checks, and delegates to the native cron.add, cron.setEnabled, cron.runNow and cron.remove procedures.
+ * Use for the React "Automation tasks" screen. GET ?runs=<name> returns the ten latest runs of one task (status, times, clipped result and error). Plain GET returns every cron task (name, function, arguments, schedule, enabled status, worker state, next and last run) plus a cookie-bound CSRF token. POST accepts one JSON action — defer (one-shot delay in every), add (name, dotted fn, interval string, optional JSON-object args and run-now flag; refuses existing names), or enable, disable, run or remove for an exact task name after owner, same-origin, CSRF, content-type and size checks, and delegates to the native cron.add, cron.setEnabled, cron.runNow and cron.remove procedures.
  * @param opts.req Authenticated owner GET, or CSRF-protected JSON POST with name and action.
  */
 export default async function (
@@ -41,7 +41,7 @@ export default async function (
     if(req.headers.get('content-type')?.split(';')[0]?.trim()!=='application/json')return reply({error:'JSON body required'},415);
     const raw=await req.text();if(raw.length>4096)return reply({error:'Request too large'},413);
     let data:{name?:unknown;action?:unknown;fn?:unknown;every?:unknown;args?:unknown;now?:unknown};try{data=JSON.parse(raw);}catch{return reply({error:'Invalid JSON'},400);}
-    if(data&&typeof data==='object'&&data.action==='add'){
+    if(data&&typeof data==='object'&&(data.action==='add'||data.action==='defer')){
         if(Object.keys(data).some(k=>!['name','action','fn','every','args','now'].includes(k)))return reply({error:'Invalid task fields'},400);
         const name=typeof data.name==='string'?data.name.trim():'';
         const fn=typeof data.fn==='string'?data.fn.trim():'';
@@ -51,7 +51,7 @@ export default async function (
         if(data.args!==undefined&&(!data.args||typeof data.args!=='object'||Array.isArray(data.args)))return reply({error:'Arguments must be a JSON object'},400);
         if(data.now!==undefined&&typeof data.now!=='boolean')return reply({error:'Invalid run-now flag'},400);
         if((await ctx.fns.cron.list({name,limit:1})).length)return reply({error:'A task with this name already exists'},409);
-        try{const task=await ctx.fns.cron.add({name,fn,every:data.every.trim(),args:(data.args??{}) as Record<string,any>,now:data.now===true});return reply({ok:true,task});}
+        try{const task=data.action==='defer'?await ctx.fns.cron.defer({name,fn,in:data.every.trim(),args:(data.args??{}) as Record<string,any>}):await ctx.fns.cron.add({name,fn,every:data.every.trim(),args:(data.args??{}) as Record<string,any>,now:data.now===true});return reply({ok:true,task});}
         catch(error){return reply({error:error instanceof Error?error.message:'Could not create task'},400);}
     }
     if(!data||typeof data!=='object'||Object.keys(data).some(k=>!['name','action'].includes(k))||typeof data.name!=='string'||!data.name||data.name.length>200||!['enable','disable','run','remove'].includes(String(data.action)))return reply({error:'Invalid task action'},400);

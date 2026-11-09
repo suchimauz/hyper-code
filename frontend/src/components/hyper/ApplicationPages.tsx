@@ -5,6 +5,26 @@ import { Button } from '../ui/Button';
 import './application-pages.css';
 
 type Application = { id: string; label: string; href: string; group?: string };
+/** Explicit host-owned destinations; backend registration cannot install browser code. */
+const nativePages: Record<string, string> = {
+  '/tasks': 'tasks/overview', '/search': 'documentation/search', '/functions': 'documentation/functions',
+  '/settings': 'settings/overview', '/settings/declared': 'settings/declared',
+  '/shared-agents': 'shared-agents/overview', '/controlPlane': 'instances/overview',
+  '/hackernews': 'readers/hackernews', '/substack': 'readers/substack', '/inbox': 'readers/inbox',
+  '/news': 'news/overview', '/news/reader': 'news/overview', '/rss': 'news/rss',
+  '/gcal': 'visualizations/calendar', '/architectureMap': 'visualizations/architecture',
+  '/architectureMap/turbulence': 'visualizations/turbulence', '/browser/live': 'browser-live/live',
+  '/whisper': 'whisper/overview', '/knowledge': 'knowledge/overview',
+  '/telemetry': 'operations/telemetry', '/gaps': 'operations/gaps',
+  '/autotext': 'utilities/autotext', '/update': 'utilities/update', '/telegram': 'telegram/overview',
+};
+export function nativeApplicationHref(href: string): string | null {
+  const url = new URL(href, location.origin);
+  const page = nativePages[url.pathname.replace(/\/$/, '')];
+  if (!page) return null;
+  url.pathname = '/'; url.searchParams.set('view', `extension:${page}`);
+  return url.pathname + url.search;
+}
 /** Declared server documents only. Backend registration is not permission: every request is authorized again. */
 export function applicationLinks(value: unknown): Application[] {
   if (!value || typeof value !== 'object' || !('items' in value) || !Array.isArray(value.items)) return [];
@@ -12,7 +32,7 @@ export function applicationLinks(value: unknown): Application[] {
     if (!item || typeof item !== 'object' || typeof item.id !== 'string' || typeof item.label !== 'string' || typeof item.href !== 'string') return false;
     try { safeApiPath(item.href); } catch { return false; }
     // These destinations have native React surfaces; never embed the application shell in itself.
-    return !['/', '/auth/users', '/sshInstance', '/cron', '/plugins', '/llms', '/tasks', '/search', '/functions'].includes(item.href.split('?')[0]) && !/^\/(sber|tbank)(\/|$)/i.test(item.href);
+    return !['/', '/auth/users', '/sshInstance', '/cron', '/plugins', '/llms'].includes(item.href.split('?')[0]) && !/^\/(sber|tbank)(\/|$)/i.test(item.href);
   });
 }
 
@@ -54,7 +74,7 @@ export function ApplicationPages({ theme }: { theme: 'light' | 'dark' }) {
     {/* Reviewed server documents retain authorization and approval transports; this is not the Canvas HTML/URL sandbox. */}
     {active ? <iframe ref={frame} key={`${active.id}:${generation}`} title={active.label} src={active.href} onLoad={applyTheme} /> : <>
       <label className="application-filter">Найти приложение<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
-      {loading ? <p role="status">Загрузка…</p> : <ul>{visible.map(item => <li key={item.id}><button onClick={() => setSelected(item.id)}><strong>{item.label}</strong><span>{item.group}</span></button></li>)}</ul>}
+      {loading ? <p role="status">Загрузка…</p> : <ul>{visible.map(item => <li key={item.id}><button onClick={() => { const native = nativeApplicationHref(item.href); if (native) location.assign(native); else setSelected(item.id); }}><strong>{item.label}</strong><span>{item.group}</span></button></li>)}</ul>}
       {!loading && !visible.length && <p>Нет доступных страниц.</p>}
     </>}
   </section>;

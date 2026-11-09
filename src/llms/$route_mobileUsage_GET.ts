@@ -4,8 +4,5 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     req: Request;
 }): Promise<Response> {
     const { entries, gateway } = await ctx.fns.llms.quotaData({});
-    return Response.json({
-        entries: entries.map(entry => ({ ...entry, logoHtml: ctx.fns.ui.modelLogo({ model: entry.model, bare: true, compact: true }) })),
-        gateway: gateway ? { ...gateway, logoHtml: ctx.fns.ui.modelLogo({ model: 'oneapi:', bare: true, compact: true }) } : null,
-    }, { headers: { 'cache-control': 'no-store' } });
+    return Response.json({ entries, gateway }, { headers: { 'cache-control': 'no-store' } });
 }

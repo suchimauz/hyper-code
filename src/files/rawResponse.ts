@@ -36,5 +36,5 @@ export default async function (
       pdf: "application/pdf", css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", mjs: "text/javascript; charset=utf-8", json: "application/json; charset=utf-8", html: "text/html; charset=utf-8", htm: "text/html; charset=utf-8", txt: "text/plain; charset=utf-8", xml: "application/xml; charset=utf-8", woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf"
     };
     const type = mime[extname(absolute).slice(1).toLowerCase()] || (file as any).type || "application/octet-stream";
-    return new Response((opts.method ?? "GET").toUpperCase() === "HEAD" ? null : file, { headers: { "content-type": type, "content-length": String(info.size), "cache-control": "private, max-age=0, must-revalidate", "x-content-type-options": "nosniff" } });
+    return new Response((opts.method ?? "GET").toUpperCase() === "HEAD" ? null : file, { headers: { "content-type": type, "content-length": String(info.size), "cache-control": "private, max-age=0, must-revalidate", "x-content-type-options": "nosniff", "content-security-policy": "sandbox; default-src 'none'; img-src 'self' data: blob:; media-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'", "referrer-policy": "no-referrer" } });
 }

@@ -15,7 +15,7 @@
 // another module's schema, dynamic dispatch and anything reached only by string
 // are invisible here, and a checker that implies otherwise is worse than none.
 
-import ts from "typescript";
+import * as ts from "typescript";
 
 type Finding = {
     kind: "boundary" | "unresolved" | "dead" | "test-only" | "floating-promise" | string;

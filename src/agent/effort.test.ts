@@ -20,20 +20,6 @@ describe("agent reasoning effort", () => {
         expect((await ctx.fns.session.load({ id: two.id })).reasoningEffort).toBe("auto");
     });
 
-    test("picker shows only model-supported levels", async () => {
-        const ctx:any = await mkTestCtx();
-        const agent = await ctx.fns.agent.start({ model: "anthropic-oauth:claude-sonnet-4-6" });
-        const html = await (await ctx.fns.agent.effortPicker({ agentId: agent.id })).text();
-        expect(html).toContain("Reasoning effort");
-        expect(html).toContain('value="high"');
-        expect(html).not.toContain('value="xhigh"');
-        expect(html).toContain(`/agent/${agent.id}/effort`);
-        const selected = /<button\b[^>]*aria-current="true"[^>]*>/.exec(html)?.[0];
-        expect(selected).toBeDefined();
-        expect(selected).toContain("ui-button--active");
-        expect(selected).not.toContain("disabled");
-    });
-
     test("Claude 5 offers low…max without off; auto keeps the model's own thinking", async () => {
         const ctx:any = await mkTestCtx();
         const caps = await ctx.fns.llm.reasoningCapabilities({ model: "claude-code:claude-opus-5-5" });

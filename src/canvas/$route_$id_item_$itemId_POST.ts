@@ -6,6 +6,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     const agentId = String(opts.params.id ?? "");
     const denied = await ctx.fns.canvas.authorizeHttp({ req: opts.req, agentId });
     if (denied) return denied;
+    if (!(await ctx.fns.auth.verifyCsrf({ req: opts.req, token: opts.req.headers.get('x-csrf-token') ?? '' }))) return new Response('Invalid CSRF token', { status: 403 });
     const itemId = Number(opts.params.itemId);
     if (!Number.isInteger(itemId)) return new Response("invalid item id", { status: 400 });
     const body: any = await opts.req.json().catch(() => null);
@@ -14,7 +15,6 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         const out: Record<string, unknown> = {};
         // Native React file transport: the target comes only from this agent's open item.
         if (body.fileAction === 'read' || body.fileAction === 'save') {
-            if (!(await ctx.fns.auth.verifyCsrf({ req: opts.req, token: opts.req.headers.get('x-csrf-token') ?? '' }))) return new Response('Invalid CSRF token', { status: 403 });
             const item = (await ctx.fns.canvas.list({ agentId })).find(i => i.id === itemId && i.kind === 'file');
             if (!item) return new Response('No such file item', { status: 404 });
             const path = String(item.args.path);
@@ -24,18 +24,35 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
             if (!info) return new Response('File unavailable', { status: 404 });
             if (info.isDir) {
                 if (body.fileAction === 'save') return new Response('Cannot save directory', { status: 400 });
-                return Response.json({ path, isDir: true, entries: await ctx.fns.files.list({ path, host }) });
+                const entries = [];
+                for (const entry of await ctx.fns.files.list({ path, host })) {
+                    const child = path.replace(/\/$/, '') + '/' + entry.name;
+                    if (!await ctx.fns.files.isPrivateResult({ path: child, host })) entries.push(entry);
+                }
+                return Response.json({ path, isDir: true, entries });
             }
-            if (info.size > 1024 * 1024) return Response.json({ path, preview: true });
+            const extension = path.split('.').pop()?.toLowerCase() ?? '';
+            const previewKind = /^(png|jpe?g|gif|webp|avif|bmp|ico|svg)$/.test(extension) ? 'image'
+                : /^(mp4|webm|mov|m4v|ogv)$/.test(extension) ? 'video'
+                : /^(mp3|wav|ogg|oga|m4a|aac|flac|opus)$/.test(extension) ? 'audio'
+                : extension === 'pdf' ? 'pdf' : /^(html?|svg)$/.test(extension) ? 'html'
+                : /^(md|markdown)$/.test(extension) ? 'markdown' : 'text';
+            if (['image', 'video', 'audio', 'pdf'].includes(previewKind) || info.size > 1024 * 1024) {
+                if (body.fileAction === 'save') return new Response('File is not editable text', { status: 400 });
+                return Response.json({ path, preview: true, previewKind: previewKind === 'text' || previewKind === 'markdown' || previewKind === 'html' ? 'download' : previewKind, size: info.size });
+            }
             const content = await ctx.fns.files.read({ path, host });
-            if (content.includes('\u0000')) return Response.json({ path, preview: true });
+            if (content.includes('\u0000')) {
+                if (body.fileAction === 'save') return new Response('File is not editable text', { status: 400 });
+                return Response.json({ path, preview: true, previewKind: 'download', size: info.size });
+            }
             if (body.fileAction === 'save') {
                 if (typeof body.content !== 'string' || body.content.length > 1024 * 1024) return new Response('Invalid text content', { status: 400 });
                 if (body.expectedContent !== content) return new Response('File changed on disk; reload before saving', { status: 409 });
                 await ctx.fns.files.write({ path, host, content: body.content, expectedContent: content });
-                return Response.json({ path, content: body.content });
+                return Response.json({ path, content: body.content, previewKind });
             }
-            return Response.json({ path, content });
+            return Response.json({ path, content, previewKind });
         }
         if (body.state && typeof body.state === "object" && !Array.isArray(body.state)) out.state = (await ctx.fns.canvas.setState({ agentId, itemId, state: body.state })).state;
         if (body.ping) out.ping = await ctx.fns.canvas.ping({ agentId, itemId, text: String(body.ping.text ?? ""), data: body.ping.data });

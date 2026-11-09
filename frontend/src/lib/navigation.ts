@@ -5,7 +5,8 @@ export type NavigationChat = { colorHue?: number | null; pinned?: boolean; pinne
 export type NavigationProject = { createdAt?: number | null; id: string; title: string; dir: string; host: string | null; virtual?: boolean; archived?: boolean; runningCount?: number; unreadCount?: number; chats: NavigationChat[] };
 export type NavigationData = { projects: NavigationProject[] };
 export type NavigationUser = { id?: number | string; name: string; email?: string; picture?: string | null; role: 'owner' | 'member' };
-export type AuthSession = { authenticated: boolean; user: NavigationUser | null };
+/** Server-computed native owner capability; never infer it from missing user/profile data. */
+export type AuthSession = { authenticated: boolean; canManage: boolean; user: NavigationUser | null };
 export const getNavigation = (signal?: AbortSignal) => requestJson<NavigationData>('/ui-lab-api/navigation', { signal });
 export type ProjectAction = 'archive' | 'restore';
 /** Native personal project archive; never rewrites chat flags. */

@@ -11,7 +11,7 @@ function fixture(options: { missing?: boolean; private?: boolean; directory?: bo
   let written: unknown;
   const ctx = { fns: {
     canvas: { authorizeHttp: (opts: any) => authorizeHttp(ctx, null, opts), get: async () => ({}), revision: async () => ({panel:'rev'}), itemDocument: async () => new Response('document'), list: async ({ agentId }: { agentId: string }) => agentId === 'owner' && !options.missing ? [{ id: 7, kind: 'file', args: { path: '/safe/file', host: 'local' } }] : [] },
-    files: { isPrivateResult: async () => !!options.private, stat: async () => ({ size: 12, isDir: !!options.directory }), list: async () => [{ name: 'hello', isDir: false }], read: async () => options.binary ? '\0binary' : 'original', write: async (opts: unknown) => { written = opts; } },
+    files: { rawResponse: async ({path}: {path:string}) => { expect(path).toBe('/safe/file'); return new Response('raw', {headers:{'content-type':'text/html'}}); }, isPrivateResult: async () => !!options.private, stat: async () => ({ size: 12, isDir: !!options.directory }), list: async () => [{ name: 'hello', isDir: false }], read: async () => options.binary ? '\0binary' : 'original', write: async (opts: unknown) => { written = opts; } },
   } } as any;
   const user = {id: options.user ?? 'alice', role: options.role ?? 'member', canSignIn:true};
   ctx.state = {};
@@ -42,6 +42,13 @@ function fixture(options: { missing?: boolean; private?: boolean; directory?: bo
   return { call, state, document, written: () => written };
 }
 describe('React Canvas file transport', () => {
+  test('raw file responses cannot execute as the application origin', async () => {
+    const response = await fixture().document();
+    expect(await response.text()).toBe('raw');
+    expect(response.headers.get('content-security-policy')).toContain('sandbox;');
+    expect(response.headers.get('content-security-policy')).not.toContain('allow-same-origin');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+  });
   test('authenticated member can access their own agent', async () => {
     const f = fixture(); expect((await f.state()).status).toBe(200); expect((await f.document()).status).toBe(200);
   });
@@ -60,7 +67,7 @@ describe('React Canvas file transport', () => {
   });
   test('reads only stored target and refuses other agents', async () => {
     const f = fixture();
-    expect(await (await f.call({ fileAction: 'read', path: '/attacker' })).json()).toEqual({ path: '/safe/file', content: 'original' });
+    expect(await (await f.call({ fileAction: 'read', path: '/attacker' })).json()).toEqual({ path: '/safe/file', content: 'original', previewKind: 'text' });
     expect((await f.call({ fileAction: 'read' }, 'other')).status).toBe(404);
   });
   test('private results are not exposed', async () => { expect((await fixture({ private: true }).call({ fileAction: 'read' })).status).toBe(404); });

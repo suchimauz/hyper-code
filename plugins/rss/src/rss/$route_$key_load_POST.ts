@@ -1,2 +1,2 @@
-/** POST /rss/:key/load — explicitly loads one subscription and renders the outcome. */
-export default async function(ctx:Context,_session:Session|null,opts:{req:Request;params:{key:string}}){try{const r=await ctx.fns.rss.load({key:opts.params.key});return ctx.fns.procs.ui.notice({title:`Loaded ${r.key}`,message:`Fetched ${r.fetched}: ${r.added} new, ${r.updated} changed, ${r.unchanged} unchanged; published ${r.published}.`,tone:"success"})}catch(error:any){return ctx.fns.procs.ui.notice({title:"RSS load failed",message:String(error?.message??error),tone:"danger"})}}
+/** Accept confirmed native RSS management JSON; authorize owner and CSRF before any operation. */
+export default async function(ctx:Context,_session:Session|null,opts:{/** Browser JSON request. */req:Request;/** Legacy route parameters. */params:Record<string,string>}):Promise<Response>{return ctx.fns.rss.browserData({req:opts.req});}

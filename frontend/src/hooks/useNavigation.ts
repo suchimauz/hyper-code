@@ -6,6 +6,7 @@ import { getNavigation, getProfile, updateChat, updateProject, type ProjectActio
 export function useNavigation() {
   const [data, setData] = useState<NavigationData>({ projects: [] });
   const [user, setUser] = useState<NavigationUser | null>(null);
+  const [canManage, setCanManage] = useState(false);
   const [error, setError] = useState('');
   const [profileError, setProfileError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -44,7 +45,7 @@ export function useNavigation() {
   }, []);
   useEffect(() => {
     const controller = new AbortController();
-    void getProfile(controller.signal).then(session => { if (!controller.signal.aborted) { setUser(session.user); setProfileError(''); } }).catch(err => { if (!controller.signal.aborted) setProfileError(err instanceof Error ? err.message : String(err)); });
+    void getProfile(controller.signal).then(session => { if (!controller.signal.aborted) { setUser(session.user); setCanManage(session.canManage === true); setProfileError(''); } }).catch(err => { if (!controller.signal.aborted) setProfileError(err instanceof Error ? err.message : String(err)); });
     return () => controller.abort();
   }, []);
   const act = async (id: string, action: ChatAction) => {
@@ -70,5 +71,5 @@ export function useNavigation() {
     } catch (err) { setActionError(err instanceof Error ? err.message : String(err)); return false; }
     finally { locks.current.delete(lock); setPendingProjects(old => ({...old,[id]:false})); }
   };
-  return { actProject, pendingProjects, ...data, user, error, profileError, loading, refresh, act, pendingChats, actionError };
+  return { actProject, pendingProjects, ...data, user, canManage, error, profileError, loading, refresh, act, pendingChats, actionError };
 }

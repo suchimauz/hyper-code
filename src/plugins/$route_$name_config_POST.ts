@@ -1,30 +1,25 @@
-/** Saves only declared configuration fields of an already mounted plugin after same-origin and bounded-form checks. */
-export default async function(ctx: Context, _session: Session | null, opts: {
-    /** Incoming URL-encoded same-origin browser request; limited to 32 KiB. */ req: Request;
-    /** Route parameters containing the mounted plugin name. */ params: Record<string,string>;
-}): Promise<Response> {
-    const req = opts.req;
-    if (req.headers.get('origin') !== new URL(req.url).origin || req.headers.get('sec-fetch-site') === 'cross-site') return new Response('Same-origin request required', {status:403});
-    if (req.headers.get('content-type')?.split(';')[0]?.trim() !== 'application/x-www-form-urlencoded') return new Response('URL-encoded form required', {status:415});
-    const max = 32768;
-    if (Number(req.headers.get('content-length')) > max) return new Response('Form too large', {status:413});
-    let text = '';
-    if (req.body) {
-        const reader = req.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
-        try {
-            while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > max) { await reader.cancel(); return new Response('Form too large',{status:413}); } chunks.push(part.value); }
-        } catch { return new Response('Invalid request body',{status:400}); }
-        finally { reader.releaseLock(); }
-        const bytes = new Uint8Array(size); let offset=0; for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;} text=new TextDecoder().decode(bytes);
-    }
-    const form = new URLSearchParams(text); const values: Record<string,string> = Object.create(null); let reset: string|undefined;
-    for (const [key,value] of form) {
-        if (key === 'reset') { if (reset !== undefined) return new Response('Duplicate form field',{status:400}); reset=value; }
-        else { if(Object.hasOwn(values,key)) return new Response('Duplicate form field',{status:400}); values[key]=value; }
-    }
-    if(reset !== undefined && Object.keys(values).length) return new Response('Reset must be submitted alone',{status:400});
-    try {
-        await ctx.fns.plugins.saveConfiguration({name:opts.params.name!,...(reset !== undefined ? {reset} : {values})});
-        return new Response(null,{status:303,headers:{Location:'/plugins/'+encodeURIComponent(opts.params.name!)+'?tab=settings&saved=1','Cache-Control':'no-store'}});
-    } catch { return new Response('Configuration could not be saved. Use only declared editable fields with valid values; secrets must be managed in Secrets.',{status:400,headers:{'Cache-Control':'no-store'}}); }
+/** Save owner-approved declared plugin fields with cookie-bound CSRF; never echo submitted secrets.
+ * @param opts.req JSON configuration mutation.
+ * @param opts.params Mounted plugin route parameters.
+ */
+export default async function(ctx:Context, session:Session|null, opts:{
+ /** JSON configuration mutation. */ req:Request;
+ /** Mounted plugin route parameters. */ params:Record<string,string>;
+}):Promise<Response>{
+ const req=opts.req;const reply=(body:object,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store','Vary':'Cookie'}});
+    const who = await ctx.fns.auth.currentUser({req:opts.req});
+    const { user } = who;
+ if (who.required && !user && !who.legacy)return reply({error:'Unauthorized'},401);
+ if (user && user.role !== 'owner')return reply({error:'Owner access required'},403);
+ if(req.headers.get('sec-fetch-site')==='cross-site'||(req.headers.has('origin')&&req.headers.get('origin')!==await ctx.fns.http.publicOrigin({req})))return reply({error:'Same origin required'},403);
+ if(!await ctx.fns.auth.verifyCsrf({req,token:req.headers.get('x-csrf-token')??''}))return reply({error:'Invalid request token'},403);
+ if(req.headers.get('content-type')?.split(';')[0]!=='application/json')return reply({error:'JSON required'},415);
+ const raw=await req.text();if(raw.length>32768)return reply({error:'Request too large'},413);
+ try{
+ const data=JSON.parse(raw);
+ if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).some(k=>!['values','reset'].includes(k)))return reply({error:'Invalid fields'},400);
+ if(data.reset!==undefined&&typeof data.reset!=='string')return reply({error:'Invalid reset'},400);
+ await ctx.fns.plugins.saveConfiguration({name:opts.params.name!,...data});
+ return reply({ok:true});
+ }catch{return reply({error:'Configuration could not be saved. Check declared fields and values.'},400);}
 }

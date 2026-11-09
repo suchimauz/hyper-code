@@ -9,8 +9,6 @@ import prune from "./prune";
 import storage from "./storage";
 import stats from "./stats";
 import duck from "./duck";
-import chart from "./chart";
-import dashboard from "./dashboard";
 import pgStats from "./pgStats";
 import { mkdtemp, mkdir, writeFile, readdir, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -54,7 +52,7 @@ async function makeCtx() {
         paths: bind(paths), pageName: bind(pageName), humanBytes: bind(humanBytes),
         spanSource: bind(spanSource), rotate: bind(rotate), compact: bind(compact),
         prune: bind(prune), storage: bind(storage), stats: bind(stats), duck: bind(duck),
-        chart: bind(chart), dirBytes: bind((await import("./dirBytes")).default), pgStats: bind(pgStats),
+        dirBytes: bind((await import("./dirBytes")).default), pgStats: bind(pgStats),
     });
     return { ctx, runtime };
 }
@@ -244,73 +242,4 @@ describe("telemetry postgres statements", () => {
         expect(result.rows[0]).toMatchObject({ query: "SELECT * FROM agents", calls: 22, totalSec: 27.3, hitPercent: 47.2 });
     });
 
-    test("dashboard shows the postgres panel and its diagnosis when unavailable", async () => {
-        const { ctx } = await makeCtx();
-        ctx.fns.telemetry.stats = async () => ({
-            ok: true, error: null, hours: 1, tiers: { hot: true, cold: false },
-            totals: { spans: 1, errors: 0, traces: 1, from: "a", to: "b" },
-            kinds: [], routes: [], queries: [], slow: [], traffic: [],
-        });
-        ctx.fns.telemetry.pgStats = async () => ({ available: false, reason: "pg_stat_statements is not installed", since: null, rows: [] });
-        const html = await dashboard(ctx, null, { hours: 1 });
-        expect(html).toContain("Postgres statements");
-        expect(html).toContain("pg_stat_statements is not installed");
-    });
-});
-
-describe("telemetry dashboard", () => {
-    test("chart falls back to a sparkline when vega-lite is absent", async () => {
-        const { ctx } = await makeCtx();
-        const points = [
-            { bucket: "10-04 10:00", count: 5, errors: 0, p95: 10 },
-            { bucket: "10-04 10:30", count: 9, errors: 1, p95: 40 },
-        ];
-        expect(await ctx.fns.telemetry.chart({ points })).toBe("<svg></svg>");
-    });
-
-    test("chart says so rather than drawing a line through one point", async () => {
-        const { ctx } = await makeCtx();
-        const html = await ctx.fns.telemetry.chart({ points: [{ bucket: "a", count: 1, errors: 0, p95: 1 }] });
-        expect(html).toContain("not enough data");
-    });
-
-    test("dashboard explains itself when the query layer is unavailable", async () => {
-        const { ctx } = await makeCtx();
-        ctx.fns.telemetry.stats = async () => ({ ok: false, error: "duckdb missing", hours: 24, tiers: { hot: false, cold: false }, totals: { spans: 0, errors: 0, traces: 0, from: null, to: null }, kinds: [], routes: [], queries: [], slow: [], traffic: [] });
-        const html = await dashboard(ctx, null, { hours: 24 });
-        expect(html).toContain("Cannot read span storage");
-        expect(html).toContain("duckdb missing");
-    });
-
-    test("dashboard renders every section from statistics", async () => {
-        const { ctx } = await makeCtx();
-        ctx.fns.telemetry.stats = async () => ({
-            ok: true, error: null, hours: 24, tiers: { hot: true, cold: true },
-            totals: { spans: 1000, errors: 3, traces: 400, from: "10-03 20:00", to: "10-04 20:00" },
-            kinds: [{ name: "db.query", count: 900, errors: 1, p50: 1, p95: 9, max: 200, totalSec: 12 }],
-            routes: [{ route: "/llms/usage", count: 500, p50: 1, p95: 700, max: 900, totalSec: 60 }],
-            queries: [{ query: "SELECT ? FROM agents", count: 40, p95: 800, totalSec: 30 }],
-            slow: [{ ts: "10-04 20:00:01", name: "llm.request", ms: 9000, status: "error", detail: "boom", traceId: "t9" }],
-            traffic: [{ bucket: "a", count: 1, errors: 0, p95: 2 }, { bucket: "b", count: 4, errors: 1, p95: 9 }],
-        });
-        const html = await dashboard(ctx, null, { hours: 24 });
-        expect(html).toContain("Span volume");
-        expect(html).toContain("/llms/usage");
-        expect(html).toContain("SELECT ? FROM agents");
-        expect(html).toContain("llm.request");
-        expect(html).toContain("1,000");
-    });
-
-    test("dashboard escapes attacker-controlled attribute text", async () => {
-        const { ctx } = await makeCtx();
-        ctx.fns.telemetry.stats = async () => ({
-            ok: true, error: null, hours: 1, tiers: { hot: true, cold: false },
-            totals: { spans: 1, errors: 0, traces: 1, from: "a", to: "b" },
-            kinds: [], routes: [{ route: "/<script>alert(1)</script>", count: 1, p50: 1, p95: 1, max: 1, totalSec: 1 }],
-            queries: [], slow: [], traffic: [],
-        });
-        const html = await dashboard(ctx, null, { hours: 1 });
-        expect(html).not.toContain("<script>alert(1)</script>");
-        expect(html).toContain("&lt;script&gt;");
-    });
 });

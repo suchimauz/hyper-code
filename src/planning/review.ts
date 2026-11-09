@@ -43,7 +43,7 @@ export default async function (
     if(opts.decision==='approve') {
     const text='Implement the explicitly approved plan below. This approves this plan, not unrelated destructive or outward actions; existing specific confirmation requirements remain.\n\n'+proposal.plan;
     const message=await ctx.fns.session.appendMessage({id:opts.agentId,message:{role:'user',content:text,message_type:'planning_approval'}});
-    const event={type:'user',text,messageIdx:message.idx,ts:now,actor,html:''}; event.html=await ctx.fns.agent.renderEventHtml({event,agentId:opts.agentId}); await ctx.fns.session.appendEvent({id:opts.agentId,event,ts:now});
+    const event={type:'user',text,messageIdx:message.idx,ts:now,actor};  await ctx.fns.session.appendEvent({id:opts.agentId,event,ts:now});
     await ctx.fns.procs.db.run({sql:'UPDATE agents SET stopped_at=NULL,last_error=NULL,next_run_at=?,updated_at=? WHERE id=?',params:[now,now,opts.agentId]});
     }
     return {ok:true,scheduled:opts.decision==='approve',planning:await ctx.fns.planning.read({agentId:opts.agentId})};

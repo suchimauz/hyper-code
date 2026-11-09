@@ -6,7 +6,7 @@ it('renders model, egress, tier and node controls and sends explicit CSRF protec
  const calls: RequestInit[] = [];
  vi.stubGlobal('fetch',vi.fn(async (_url: string, init: RequestInit = {}) => {
   if (init.method === 'POST') calls.push(init);
-  return Response.json(init.method === 'POST' ? {ok:true} : {models:['codex:a'],disabledModels:[],instances:['box'],plans:{},tier:'standard',nodes:[{name:'relay',enabled:true,modelCount:3,catalogAt:null}],csrfToken:'csrf'});
+  return Response.json(init.method === 'POST' ? {ok:true} : {models:['codex:a'],disabledModels:[],instances:['box'],plans:{},tier:'standard',nodes:[{name:'relay',url:'https://relay.example/node/v1',enabled:true,modelCount:3,catalogAt:null}],clients:[],csrfToken:'csrf'});
  }));
  render(<LlmPolicySettings />);
  fireEvent.change(await screen.findByLabelText('MiniMax admission tier'),{target:{value:'priority'}});

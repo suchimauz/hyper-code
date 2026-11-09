@@ -24,7 +24,7 @@ The shell owns theme selection and supplies the resolved light/dark theme in `Ex
 
 ## Compatibility SSR design layer
 
-Some server-rendered surfaces remain, including approval and Canvas content consumers. Their styles live in `src/procs/styles/$style_app.css` and use `--theme-*`, `--ui-*`, semantic Tailwind utilities and classes such as `btn`, `input`, `card`, `badge` and `alert`. Existing runtime renderers (`ui.inspectorSection`, `ui.statusBadge`, `ui.progressBar`, `ui.chatEventCard`, `procs.ui.*`) remain valid for those consumers only. Preserve their theme restoration, accessible labels, popup behavior and stronger input borders when changing them.
+Some server-rendered surfaces remain, including approval and Canvas content consumers. Their styles live in `src/procs/styles/$style_app.css` and use `--theme-*`, `--ui-*`, semantic Tailwind utilities and classes such as `btn`, `input`, `card`, `badge` and `alert`. Existing runtime renderers (`ui.statusBadge`, `ui.chatEventCard`, `procs.ui.*`) remain valid for those consumers only. The former inspector-only `ui.inspectorSection` and `ui.progressBar` renderers are retired. Preserve their theme restoration, accessible labels, popup behavior and stronger input borders when changing them.
 
 Do not delete shared styles or SSR renderers merely because `/old-ui` redirects. Do not use this compatibility layer as the default recipe for new React extensions.
 

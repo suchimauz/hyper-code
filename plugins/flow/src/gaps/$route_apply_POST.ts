@@ -1,12 +1,6 @@
-/** Applies one revision-bound target after cookie-bound CSRF validation, then refreshes all checks. */
-export default async function(ctx:Context,_session:Session|null,opts:{req:Request;params:Record<string,string>}) {
- const form=await opts.req.formData();
- const csrf=form.get('_csrf');
- if(typeof csrf!=='string'||!await ctx.fns.auth.verifyCsrf({req:opts.req,token:csrf}))return new Response('Invalid CSRF token',{status:403});
- const value=(name:string)=>{const all=form.getAll(name);if(all.length!==1 || typeof all[0]!=='string')throw new Error('Invalid form field: '+name);return all[0];};
- let notice:string;
- try {const result=await ctx.fns.flow.reconcile({flow:value('flow'),mode:'apply',target:{id:value('id'),revision:value('revision')}});notice=`${result.status}; receipt ${result.id}${result.error?': '+result.error:''}`;}
- catch(error){notice='Action not confirmed: '+String(error instanceof Error?error.message:error);}
- await ctx.fns.flow.refreshCount({force:true});
- return {title:'Gaps',main:await ctx.fns.auth.csrfForms({req:opts.req,html:await ctx.fns.flow.page({notice})})};
+/** Apply one explicitly confirmed revision-bound target with owner and CSRF checks. */
+export default async function(ctx:Context,_session:Session|null,opts:{/** Browser action request. */req:Request}):Promise<Response>{
+const denied=await ctx.fns.flow.authorize({req:opts.req,write:true});if(denied)return denied;
+const body=await opts.req.json().catch(()=>null);if(!body||body.confirm!==true||typeof body.flow!=='string'||typeof body.id!=='string'||typeof body.revision!=='string')return Response.json({error:'Confirmed target required'},{status:400});
+try{const result=await ctx.fns.flow.reconcile({flow:body.flow,mode:'apply',target:{id:body.id,revision:body.revision}});await ctx.fns.flow.refreshCount({force:true});return Response.json({result},{headers:{'Cache-Control':'no-store'}});}catch(error){return Response.json({error:String(error instanceof Error?error.message:error)},{status:400});}
 }

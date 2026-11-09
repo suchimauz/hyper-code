@@ -1,15 +1,11 @@
-/** Open the existing model-and-instructions creation popup without creating an agent; optionally bind it to a visible project. */
-export default async function (ctx: Context, session: Session | null, opts: {
-    /** Visible project identifier to preselect; omitted keeps the ordinary workspace picker. */
-    projectId?: string;
+/** Redirect legacy popup triggers to native NewSession without creating or sending anything.
+ * @param opts.projectId Visible project to preselect in the native creation draft.
+ */
+export default async function (ctx: Context, _session: Session | null, opts: {
+    /** Visible project identifier to preselect. */ projectId?: string;
 }): Promise<Response> {
-    const url = new URL(session?.req?.url ?? 'http://localhost/');
-    url.pathname = '/agent/new';
-    url.search = '?popup=1';
-    if (opts.projectId) url.searchParams.set('projectId', opts.projectId);
-    const req = new Request(url.toString(), { headers: session?.req?.headers });
-    const route = (ctx.state.procs.http.routes as any)?.['/agent/new']?.GET;
-    if (typeof route !== 'function') return new Response('new agent popup unavailable', { status: 404 });
-    const value = await route(ctx, session, { req, params: {} });
-    return value instanceof Response ? value : new Response(String(value), { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    if (opts.projectId && !await ctx.fns.projects.get({ projectId: opts.projectId })) return new Response('Project not found', { status: 404 });
+    const query = new URLSearchParams({ newSession: '1' });
+    if (opts.projectId) query.set('projectId', opts.projectId);
+    return new Response(null, { status: 204, headers: { 'HX-Redirect': `/?${query}`, 'cache-control': 'no-store' } });
 }

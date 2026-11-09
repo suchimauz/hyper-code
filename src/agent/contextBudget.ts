@@ -14,7 +14,7 @@ export default async function (
         /** Include aggregate component estimates without building another preview. @default false */
         breakdown?: boolean;
     },
-): Promise<{ estimatedTokens: number; contextWindow: number | null; mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null; messageCount: number; lastReportedTokens: number | null; lastReportedAt: number | null; breakdown?: NonNullable<types.agent.ContextDetails['breakdown']> }> {
+): Promise<{ estimatedTokens: number; contextWindow: number | null; mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null; messageCount: number; lastReportedTokens: number | null; lastReportedAt: number | null; breakdown?: NonNullable<types.agent.ContextUsageDetails['breakdown']> }> {
     const agent = ctx.state.agent[opts.agentId] ?? await ctx.fns.session.load({ id: opts.agentId });
     if (!agent) throw new Error("Agent not found");
     const rows = await ctx.fns.procs.db.select({ sql: "SELECT model, sleep_context FROM agents WHERE id = ?", params: [opts.agentId] }) as Array<{ model: string; sleep_context: Record<string, unknown> | null }>;
@@ -29,7 +29,7 @@ export default async function (
         ...(request.system ? [{ role: "system", content: request.system }] : []),
         ...(tools.length ? [{ role: "system", content: JSON.stringify(tools) }] : []),
     ] });
-    let breakdown: NonNullable<types.agent.ContextDetails['breakdown']> | undefined;
+    let breakdown: NonNullable<types.agent.ContextUsageDetails['breakdown']> | undefined;
     if (opts.breakdown) {
         // Partition system-role messages too: providers may inline the system prompt.
         const [systemPrompt, toolDefinitions, messages] = await Promise.all([

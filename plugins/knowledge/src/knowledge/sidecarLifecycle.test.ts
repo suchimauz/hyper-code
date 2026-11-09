@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import update from './updateSidecar';
 import page from '../../../../src/agent/sourceMessagePage';
-import detail from './$route_$type_$slug_GET';
 
 // No runtime bootstrap or DB connection: every dependency is an in-memory mock.
 function fixture(failSave = false) {
@@ -55,11 +54,4 @@ test('persisted source page uses parameterized lookup and escapes source HTML', 
     expect(params).toEqual(['chat',7]);
     expect((result as any).main).toContain('&lt;script&gt;');
     expect((result as any).main).toContain('href="/agent/chat"');
-});
-test('entity provenance uses accessible real source links and rejects unsafe schemes', async () => {
-    const ctx: any = {fns:{procs:{ui:{escape:esc}},knowledge:{renderHistory:async()=>({html:'',count:0}),renderBacklinks:async()=>({html:'',count:0}),get:async()=>({type:'Organization',data:{title:'Alpha'},relations:{incoming:[],outgoing:[]},provenance:[{url:'hyper://agent/chat/message/7'},{url:'javascript:alert(1)'}]})}}};
-    const result = await detail(ctx,null,{req:new Request('http://localhost'),params:{type:'Organization',slug:'alpha'}});
-    expect(result.main).toContain('href="/agent/chat/message/7"');
-    expect(result.main).toContain('Source chat · message 7');
-    expect(result.main).not.toContain('href="javascript:');
 });

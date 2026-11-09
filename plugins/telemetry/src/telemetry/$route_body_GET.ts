@@ -1,17 +1,7 @@
-// Just the data part of the dashboard, for HTMX swaps and for polling.
-/**
- * Renders the telemetry dashboard body fragment.
- *
- * @param ctx - Runtime context used to read span statistics.
- * @param _session - Unused request session.
- * @param opts - HTTP route options.
- * @param opts.req - Incoming request whose `hours` and `limit` queries shape the result.
- * @returns An HTML fragment response.
- */
-export default async function (ctx: Context, _session: Session | null, opts: { req: Request }) {
-    const url = new URL(opts.req.url);
-    const hours = Math.max(1, Math.min(Number(url.searchParams.get("hours") ?? 24) || 24, 8760));
-    const limit = Math.max(1, Math.min(Number(url.searchParams.get("limit") ?? 10) || 10, 100));
-    const html = await ctx.fns.telemetry.dashboard({ hours, limit });
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+/** Return owner-authorized telemetry data for native charts and inspection. */
+export default async function(ctx:Context,_session:Session|null,opts:{/** Incoming query and identity. */ req:Request}):Promise<Response>{
+const denied=await ctx.fns.telemetry.authorize({req:opts.req});if(denied)return denied;
+const url=new URL(opts.req.url),hours=Math.max(1,Math.min(Number(url.searchParams.get('hours'))||24,8760)),limit=Math.max(1,Math.min(Number(url.searchParams.get('limit'))||10,100));
+const [stats,storage,pg,csrfToken]=await Promise.all([ctx.fns.telemetry.stats({hours,limit}),ctx.fns.telemetry.storage({}),ctx.fns.telemetry.pgStats({limit}),ctx.fns.auth.csrfToken({req:opts.req})]);
+return Response.json({stats,storage,pg,csrfToken},{headers:{'Cache-Control':'no-store'}});
 }

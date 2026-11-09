@@ -15,6 +15,7 @@ function fixture() {
  let measured:any[]=[];
  const tools=[{name:'test',description:'schema '.repeat(100)}];
  const ctx:any={state:{agent:{root:agent}},fns:{
+  planning:{prompt:async()=> 'Current mode: execute'},
   procs:{db:{select:async({sql}:any)=>sql.includes('FROM agents')?[{model:'test:model',sleep_context:sleep}]:[{payload:JSON.stringify({usage:{prompt_tokens:200000}}),ts:10}]},log:{warn:()=>{throw Error('preview must not log repair');}}},
   session:{getMessages:async({id}:any)=>id==='root'?messages:checkpoint,repairToolPairs:({messages}:any)=>({messages:structuredClone(messages),repaired:[]}),load:()=>{throw Error('unexpected load');}},
   agent:{normalizeSleepContext:(o:any)=>normalize(ctx,null,o),getSleepGeneration:(o:any)=>generation(ctx,null,o),fullSystemPrompt:async()=> 'bootstrap '.repeat(100),selectJevContext:async({messages,cachedOnly}:any)=>{expect(cachedOnly).toBe(true);return messages;},buildLlmRequest:(o:any)=>{expect(o.preview).toBe(true);expect(o.agent.model).toBe('test:model');return build(ctx,null,o);},wireTools:()=>tools},
@@ -27,7 +28,7 @@ function fixture() {
 }
 test('missing checkpoint measures massive outgoing history rather than stale 200k usage',async()=>{
  const f=fixture();const before=structuredClone({agent:f.agent,messages:f.messages,sleep:f.sleep});
- const r=await f.call();expect(r.estimatedTokens).toBeGreaterThan(300000);expect(r.lastReportedTokens).toBe(200000);expect(r.lastReportedAt).toBe(10);expect(r.fallback).toBe('missing_checkpoint');expect(r.mode).toBe('full');expect(r.messageCount).toBe(4);
+ const r=await f.call();expect(r.estimatedTokens).toBeGreaterThan(300000);expect(r.lastReportedTokens).toBe(200000);expect(r.lastReportedAt).toBe(10);expect(r.fallback).toBe('missing_checkpoint');expect(r.mode).toBe('full');expect(r.messageCount).toBe(5);
  expect({agent:f.agent,messages:f.messages,sleep:f.sleep}).toEqual(before);
  expect(f.measured().at(-1).content).toBe(JSON.stringify(f.tools));expect(f.measured()[0].content).toContain('bootstrap');
 });
@@ -35,7 +36,8 @@ test('actual request uses the shared projection, full mode bypasses it without m
  const f=fixture();f.setCheckpoint([{role:'user',content:'summary'}]);
  const projected=await project(f.ctx,null,{model:'test:model',messages:f.messages,sleepContext:f.sleep});
  const request=await build(f.ctx,null,{agent:{...f.agent,model:'test:model',messages:f.messages,sleepContext:f.sleep},preview:true});
- expect(request.messages.slice(2)).toEqual(projected.messages);
+ expect(request.messages.slice(2,-1)).toEqual(projected.messages);
+ expect(request.messages.at(-1)).toEqual({role:'user',content:'Current mode: execute',excluded_from_cursor:true});
  const compact=await f.call();expect(compact.mode).toBe('compact');expect(compact.fallback).toBeNull();expect(compact.estimatedTokens).toBeLessThan(2000);
  f.sleep.mode='full';const full=await f.call();expect(full.mode).toBe('full');expect(full.fallback).toBeNull();expect(full.estimatedTokens).toBeGreaterThan(300000);
 });

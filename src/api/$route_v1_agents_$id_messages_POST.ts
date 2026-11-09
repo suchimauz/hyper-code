@@ -67,7 +67,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     if (uploads.length) await ctx.fns.attachments.commitUploads({ agentId: id, messageIdx: appended.idx, uploads });
     const event: any = { type: "user", text, attachments: uploads.map(upload => upload.meta), messageIdx: appended.idx, ts };
     event.actor = await ctx.fns.auth.actorId({ agentId: id }) ?? undefined;
-    event.html = await ctx.fns.agent.renderEventHtml({ event, agentId: id });
+
     const eventIdx = await ctx.fns.session.appendEvent({ id, event, ts });
     await ctx.fns.procs.db.run({ sql: "UPDATE agents SET stopped_at=NULL, last_error=NULL, next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=?", params: [sendAt, ts, id] });
     return { appended, eventIdx };

@@ -136,8 +136,10 @@ test('desktop and mobile quota routes use the canonical quota source',async()=>{
  const {default:mobile}=await import('../llms/$route_mobileUsage_GET');
  let reads=0;
  const entries=[base];const gateway={status:'available',models:[]};
- const routeCtx:any={fns:{llms:{quotaData:async()=>{reads++;return {updatedAt:now,accounts:[],entries,gateway};}},ui:{live:({html}:any)=>html,usageDial:({entries:actual,gateway:gate}:any)=>{expect(actual).toBe(entries);expect(gate).toBe(gateway);return 'quota';},modelLogo:()=>'<svg></svg>'}}};
- expect(await (await desktop(routeCtx,null,{})).text()).toBe('quota');
+ const routeCtx:any={fns:{llms:{quotaData:async()=>{reads++;return {updatedAt:now,accounts:[],entries,gateway};}}}};
+ const desktopResponse=await desktop(routeCtx,null,{});
+ expect(desktopResponse.headers.get('Content-Type')).toContain('application/json');
+ expect(await desktopResponse.json()).toEqual({entries,gateway});
  const response=await mobile(routeCtx,null,{req:new Request('http://localhost/llms/mobileUsage')});
  const body=await response.json();expect(body.entries[0].provider).toBe(base.provider);expect(body.gateway.status).toBe('available');expect(reads).toBe(2);
 });

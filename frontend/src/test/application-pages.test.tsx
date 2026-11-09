@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ApplicationPages, applicationLinks } from '../components/hyper/ApplicationPages';
+import { ApplicationPages, applicationLinks, nativeApplicationHref } from '../components/hyper/ApplicationPages';
 const live = vi.hoisted(() => ({ options: null as any, stop: vi.fn() }));
 vi.mock('../sdk/live', () => ({ subscribeLive: (options: unknown) => { live.options = options; return live.stop; } }));
 afterEach(() => { vi.restoreAllMocks(); live.stop.mockClear(); });
@@ -9,13 +9,18 @@ describe('declared application documents', () => {
   it('rejects arbitrary origins, unsafe paths, native shell and disabled banking surfaces', () => {
     expect(applicationLinks({ items: ['/news', '/files', '//evil.test', '/%2f%2fevil.test', '/a/../b', '/%0aevil', '/', '/auth/users', '/sber/login', '/tbank', 'https://example.com'].map(item) }).map(x => x.href)).toEqual(['/news', '/files']);
     expect(applicationLinks(null)).toEqual([]);
+    expect(nativeApplicationHref('/news?source=rss')).toBe('/?source=rss&view=extension%3Anews%2Foverview');
+    expect(nativeApplicationHref('/gcal/')).toBe('/?view=extension%3Avisualizations%2Fcalendar');
+    expect(nativeApplicationHref('/architectureMap/turbulence?days=7')).toBe('/?days=7&view=extension%3Avisualizations%2Fturbulence');
+    expect(nativeApplicationHref('/browser/live?target=tab')).toBe('/?target=tab&view=extension%3Abrowser-live%2Flive');
+    expect(nativeApplicationHref('/custom-plugin')).toBeNull();
   });
   it('loads only declared pages, hosts the chosen document and disposes live subscription', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ items: [{ id: 'news', label: 'Новости', href: '/news', group: 'Приложения' }] })));
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ items: [{ id: 'custom', label: 'Custom', href: '/custom-plugin', group: 'Приложения' }] })));
     const view = render(<ApplicationPages theme="light" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Новости Приложения' }));
-    expect(view.container.querySelector('iframe')?.getAttribute('src')).toBe('/news');
-    expect(view.container.querySelector('iframe')?.title).toBe('Новости');
+    fireEvent.click(await screen.findByRole('button', { name: 'Custom Приложения' }));
+    expect(view.container.querySelector('iframe')?.getAttribute('src')).toBe('/custom-plugin');
+    expect(view.container.querySelector('iframe')?.title).toBe('Custom');
     expect(fetch.mock.calls[0]?.[0]).toBe('/nav/items');
     expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('Accept')).toBe('application/json');
     expect(view.container.querySelector('[data-live-topic="plugins"]')).not.toBeNull();

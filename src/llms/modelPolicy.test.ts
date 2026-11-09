@@ -1,56 +1,86 @@
-import {test,expect} from 'bun:test';
-import control from './modelControl';
-import route from './$route_model-state_POST';
-const ctx=()=>{const writes:any[]=[];const c:any={fns:{procs:{ui:{escape:({text}:any)=>Bun.escapeHTML(String(text))}},llm:{modelPolicy:async(o:any)=>{writes.push(o);return {disabledModels:o.disabled?[o.model]:[]};}},llms:{modelControl:(o:any)=>control(c,null,o)}}};return {c,writes};};
-test('model control escapes routes and exposes explicit reversible state',()=>{
- const {c}=ctx();const html=control(c,null,{model:'openai:a"<bad>',disabled:true});
- expect(html).toContain('name="disabled" value="false"');expect(html).not.toContain('disabled</span>');
- expect(html).toContain('role="switch"');expect(html).toContain('llm-model-switch-track');expect(html).not.toContain('toggle-sm');expect(html).toContain('hx-trigger="change"');
- expect(html).toContain('aria-hidden="true"');expect(html).toContain('<label class="llm-model-switch">');
- expect(html).toContain('hx-disabled-elt="find input[type=checkbox]"');expect(html).not.toContain(' checked');expect(html).not.toContain('<button');
- expect(html).toContain('Enable');expect(html).not.toContain('a"<bad>');expect(html).toContain('&lt;bad&gt;');
-});
-test('enabled model switch is checked and submits an explicit disable state',()=>{
- const {c}=ctx();const html=control(c,null,{model:'openai:a',disabled:false});
- expect(html).toContain(' checked');expect(html).toContain('name="disabled" value="true"');
- expect(html).toContain('aria-label="Disable openai:a"');expect(html).not.toContain('disabled</span>');
-});
-test('Connections shows only complete model names and keeps full routes for tooltip and policy',()=>{
- const {c}=ctx();
- for(const [model,prefix,name] of [
-  ['ssh/aeza-criminal-amarant:codex/su4imauz:gpt-6.1-sol','ssh/aeza-criminal-amarant:codex/su4imauz:','gpt-6.1-sol'],
-  ['hyper/mini:codex/pro:gpt-6.1-sol','hyper/mini:codex/pro:','gpt-6.1-sol'],
-  ['openrouter:meta-llama/llama:free','openrouter:','meta-llama/llama:free'],
-  ['lmstudio:qwen:latest','lmstudio:','qwen:latest'],
-  ['bare-model','','bare-model'],
- ]){
-  const html=control(c,null,{model,disabled:false});
-  expect(html).toContain(`title="${model}">${name}</span>`);
-  if(prefix) expect(html).not.toContain(`>${prefix}`);
-  expect(html).toContain(`name="model" value="${model}"`);
- }
-});
-function request(fields:Record<string,string>,hx=true){return new Request('http://local/llms/model-state',{method:'POST',headers:hx?{'HX-Request':'true'}:{},body:new URLSearchParams(fields)});}
-test('explicit disable POST persists once and returns updated control; enable and ordinary redirect work',async()=>{
- const {c,writes}=ctx();const r=await route(c,null,{req:request({model:'opencode:glm',disabled:'true'})});
- expect(r.status).toBe(200);expect(await r.text()).toContain('data-model-disabled="true"');expect(writes).toEqual([{action:'set',model:'opencode:glm',disabled:true}]);
- expect((await route(c,null,{req:request({model:'opencode:glm',disabled:'false'},false)})).status).toBe(303);
- expect(writes[1].disabled).toBe(false);
-});
-test('invalid desired state and missing route never write policy',async()=>{
- const {c,writes}=ctx();for(const fields of [{model:'openai:a',disabled:'toggle'},{model:'',disabled:'true'},{model:'openai:a'}])expect((await route(c,null,{req:request(fields as Record<string,string>)})).status).toBe(400);
- expect(writes).toHaveLength(0);
-});
+import { test, expect } from 'bun:test';
+import model from './$route_model-state_POST';
+import tier from './$route_minimax_settings_POST';
+import instance from './$route_plan_instance_POST';
 
-test('table disabled-row styling follows persisted state after disable and re-enable HTMX replacements',async()=>{
- const css=await Bun.file(new URL('../procs/styles/$style_app.css',import.meta.url)).text();
- expect(css).toContain('tr:has([data-model-policy][data-model-disabled="true"]) > :not(.llm-model-enabled) { opacity:.5; }');
- expect(css).toContain('tr:has([data-model-policy][data-model-disabled="true"]) .llm-model-name { color:var(--color-muted); }');
- const {c}=ctx();const html=control(c,null,{model:'openai:model',disabled:false,switchOnly:true});
- expect(html).toContain('name="switchOnly" value="true"');expect(html).not.toContain('font-mono');
- const r=await route(c,null,{req:request({model:'openai:model',disabled:'true',switchOnly:'true'})});
- const replaced=await r.text();expect(replaced).toContain('name="switchOnly" value="true"');expect(replaced).not.toContain('font-mono');expect(replaced).not.toContain(' checked');
- expect(replaced).toContain('data-model-disabled="true"');
- const enabled=await route(c,null,{req:request({model:'openai:model',disabled:'false',switchOnly:'true'})});
- const enabledHtml=await enabled.text();expect(enabledHtml).toContain('data-model-disabled="false"');expect(enabledHtml).toContain(' checked');
+// All persistence/auth are stubs: this suite never writes runtime configuration.
+function harness(role: string | null = 'owner', csrf = true) {
+ const writes: object[] = [];
+ const c: any = { fns: {
+  auth: { currentUser: async () => ({required:true,user:role ? {role} : null}), verifyCsrf: async ({token}: any) => csrf && token === 'token' },
+  http: { publicOrigin: async () => 'http://local' },
+  llm: { modelPolicy: async (o: any) => { if (o.model === 'invalid') throw new Error('bad route'); writes.push(o); } },
+  settings: { set: async (o: object) => { writes.push(o); } },
+  sshInstance: { list: async () => [{name:'trusted',pinnedHostKey:'key'}, {name:'untrusted'}] },
+ } };
+ return { c, writes };
+}
+const cases = [
+ { route:model, path:'model-state', data:{model:'openai:model',disabled:true} },
+ { route:tier, path:'minimax/settings', data:{minimaxCodingServiceTier:'priority'} },
+ { route:instance, path:'plan/instance', data:{provider:'opencode',instance:'trusted'} },
+];
+function request(path: string, data: unknown, headers: Record<string,string> = {}) {
+ return new Request(`http://local/llms/${path}`, {method:'POST',headers:{'content-type':'application/json','x-csrf-token':'token',origin:'http://local',...headers},body:JSON.stringify(data)});
+}
+for (const item of cases) {
+ test(`${item.path}: owner-only, same-origin, cookie-CSRF JSON`, async () => {
+  for (const [role, csrf, headers, status] of [
+   [null,true,{},401], ['member',true,{},403], ['owner',false,{},403],
+   ['owner',true,{origin:'http://evil'},403], ['owner',true,{'sec-fetch-site':'cross-site'},403],
+   ['owner',true,{'x-csrf-token':''},403], ['owner',true,{'content-type':'application/x-www-form-urlencoded'},415],
+  ] as const) {
+   const {c,writes} = harness(role,csrf);
+   const res = await item.route(c,null,{req:request(item.path,item.data,headers)});
+   expect(res.status).toBe(status); expect(res.headers.get('content-type')).toContain('application/json');
+   expect(res.headers.get('cache-control')).toBe('no-store'); expect(writes).toEqual([]);
+  }
+ });
+ test(`${item.path}: malformed JSON and oversized payloads never mutate`, async () => {
+  const {c,writes} = harness();
+  for (const data of [null,[],{},'value']) expect((await item.route(c,null,{req:request(item.path,data)})).status).toBe(400);
+  const bad = new Request(`http://local/llms/${item.path}`, {method:'POST',headers:{'content-type':'application/json','x-csrf-token':'token'},body:'{'});
+  expect((await item.route(c,null,{req:bad})).status).toBe(400);
+  expect((await item.route(c,null,{req:request(item.path,{padding:'x'.repeat(8200)})})).status).toBe(413);
+  expect(writes).toEqual([]);
+ });
+ test(`${item.path}: returns JSON even with legacy HTMX header`, async () => {
+  const {c,writes} = harness();
+  const res = await item.route(c,null,{req:request(item.path,item.data,{'HX-Request':'true'})});
+  expect(res.status).toBe(200); expect(res.headers.get('location')).toBeNull();
+  expect(res.headers.get('content-type')).toContain('application/json'); expect((await res.json()).ok).toBe(true);
+  expect(writes).toHaveLength(1);
+ });
+}
+test('exact route disable and enable preserve explicit desired state', async () => {
+ const {c,writes} = harness();
+ for (const disabled of [true,true,false]) {
+  const res=await model(c,null,{req:request('model-state',{model:'ssh/remote:openai/model:id',disabled})});
+  expect(await res.json()).toEqual({ok:true,model:'ssh/remote:openai/model:id',disabled});
+ }
+ expect(writes).toEqual([true,true,false].map(disabled=>({action:'set',model:'ssh/remote:openai/model:id',disabled})));
+ for (const data of [{model:'',disabled:true},{model:'openai:x',disabled:'true'},{model:'invalid',disabled:true}]) expect((await model(c,null,{req:request('model-state',data)})).status).toBe(400);
+ expect(writes).toHaveLength(3);
+});
+test('tier validation and obsolete budget fields cannot write other settings',async()=>{
+ const {c,writes}=harness();
+ for(const value of ['standard','priority']) {
+  const res=await tier(c,null,{req:request('minimax/settings',{minimaxCodingServiceTier:value,minimaxCodingMaxTokens:42})});
+  expect(await res.json()).toEqual({ok:true,serviceTier:value});
+ }
+ for(const value of ['fast',{},null]) expect((await tier(c,null,{req:request('minimax/settings',{minimaxCodingServiceTier:value})})).status).toBe(400);
+ expect(writes).toEqual(['standard','priority'].map(value=>({module:'llm',scopeType:'global',key:'minimaxCodingServiceTier',value})));
+});
+test('all plan providers support local and trusted egress only',async()=>{
+ const {c,writes}=harness();
+ for(const [provider,key] of Object.entries({'zai-coding':'zaiCodingInstance','minimax-coding':'minimaxCodingInstance',opencode:'opencodeInstance'})) {
+  for(const selected of ['','local',' trusted ']) {
+   const value=selected.trim()==='trusted'?'trusted':'';
+   const res=await instance(c,null,{req:request('plan/instance',{provider,instance:selected})});
+   expect(await res.json()).toEqual({ok:true,provider,instance:value});
+   expect(writes.at(-1)).toEqual({module:'llm',scopeType:'global',key,value});
+  }
+ }
+ for(const data of [{provider:'other',instance:''},{provider:'opencode',instance:'untrusted'},{provider:'opencode',instance:'missing'},{provider:'opencode',instance:{}}]) expect((await instance(c,null,{req:request('plan/instance',data)})).status).toBe(400);
+ expect(writes).toHaveLength(9);
 });

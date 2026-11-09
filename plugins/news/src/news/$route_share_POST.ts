@@ -1,2 +1,8 @@
-/** POST /news/share — dispatches one external share and refreshes the picker with durable shared destinations. */
-export default async function(ctx:Context,_session:Session|null,opts:{req:Request;params:Record<string,string>}){const form=await opts.req.formData(),id=String(form.get("id")??""),target=String(form.get("target")??""),destination=String(form.get("destination")??""),text=String(form.get("text")??"")||undefined,esc=(v:any)=>ctx.fns.procs.ui.escape({text:String(v??"")});try{await ctx.fns.news.share({id,target,destination,text,confirm:true});const req=new Request(`http://localhost/news/share/picker?id=${encodeURIComponent(id)}&target=${encodeURIComponent(target)}&destination=${encodeURIComponent(destination)}`,{headers:{accept:"text/html","hx-request":"true"}});const picker=await (ctx.state.procs.http.routes as any)["/news/share/picker"].GET(ctx,_session,{req,params:{}});return `${picker}<div class="mt-2 text-xs font-medium text-success"><i class="ph ph-check-circle"></i> Shared</div>`}catch(error:any){return `<div class="alert alert-error text-sm"><i class="ph ph-warning-circle"></i><span>${esc(error?.message??error)}</span></div>`}}
+/** Accept explicitly confirmed native JSON sharing with URL-shaped News identifiers. */
+export default async function(ctx:Context,_session:Session|null,opts:{/** Owner browser request with cookie CSRF. */req:Request;/** Route parameters. */params:Record<string,string>}):Promise<Response>{
+ const denied=await ctx.fns.news.authorizeUi({req:opts.req});if(denied)return denied;
+ if(!opts.req.headers.get('content-type')?.startsWith('application/json'))return Response.json({error:'JSON required'},{status:415});
+ const body=await opts.req.json() as {id?:string;target?:string;destination?:string;text?:string;confirmed?:boolean};
+ if(!body.id||!body.target||!body.destination||body.confirmed!==true)return Response.json({error:'Explicit item, target, destination and confirmation required'},{status:400});
+ return Response.json(await ctx.fns.news.share({id:body.id,target:body.target,destination:body.destination,text:body.text,confirm:true}));
+}

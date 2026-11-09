@@ -1,8 +1,9 @@
 import { test, expect } from "bun:test";
 import listAccounts from "./listAccounts";
 import usageOverview from "./usageOverview";
+import normalizeQuotaWindows from "./normalizeQuotaWindows";
 import usageData from "../llms/usageData";
-import accountsCard from "../llms/accountsCard";
+import accountsRoute from "../llms/$route_accounts_GET";
 
 test("SSH inventory uses recorded normal-provider synthetic quota identities without credentials", async () => {
     const ctx = { env: { HOME: "" }, fns: { llm: {
@@ -22,7 +23,7 @@ test("SSH inventory uses recorded normal-provider synthetic quota identities wit
 });
 
 test("connected-only quota retains SSH Codex snapshots without local auth files", async () => {
-    const ctx = { fns: { settings: { getNumber: async () => 75 }, procs: { db: { select: async () => [{ value: JSON.stringify({ provider: "codex", account: "ssh.alpha.main", windows: { primary: { usedPercent: 42 } } }) }] } } } } as unknown as Context;
+    const ctx = { fns: { llm: { normalizeQuotaWindows: (opts: Parameters<typeof normalizeQuotaWindows>[2]) => normalizeQuotaWindows({} as Context, null, opts) }, settings: { getNumber: async () => 75 }, procs: { db: { select: async () => [{ value: JSON.stringify({ provider: "codex", account: "ssh.alpha.main", windows: { primary: { usedPercent: 42 } } }) }] } } } } as unknown as Context;
     expect(await usageOverview(ctx, null, { connectedOnly: true })).toHaveLength(1);
 });
 
@@ -37,12 +38,10 @@ test("quota UI maps synthetic SSH identities back to full remote routes, never l
     expect(result.entries[0]?.model).toBe("ssh/alpha.dev:codex/main:");
 });
 
-test("account UI includes SSH rows without local reconnect/unlink actions", () => {
-    const ctx = { state: {}, fns: { ui: { modelLogo: () => "", popup: (opts: object) => JSON.stringify(opts), live: ({html}: {html: string}) => html }, procs: { ui: { row: (opts: object) => JSON.stringify(opts), escape: ({text}: {text: string}) => Bun.escapeHTML(text), button: () => "", input: () => "", heading: () => "", empty: () => "" } } } } as unknown as Context;
-    const html = accountsCard(ctx, null, { accounts: [{ provider: "codex", account: "ssh.alpha.main", label: "REMOTE-SENTINEL", model: "ssh/alpha:codex/main:", source: "ssh", available: false, usedPercent: null, planType: null, resetsAt: null, parkedAgents: 0, needsReconnect: true }], models: { "ssh/alpha": ["ssh/alpha:codex/main:gpt-test"] } });
-    expect(html).toContain("SSH · alpha");
-    expect(html).toContain("ssh/alpha:codex/main:gpt-test");
-    expect(html).toContain('\\"instance\\":\\"alpha\\"');
-    expect(html).not.toContain("llms.removeAccount");
-    expect(html).not.toContain("/llms/codex/reset");
+test("retired account fragment redirects SSH management to native connections without actions", () => {
+    const response = accountsRoute({} as Context, null, {});
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe("/?settings=llm-connections");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.body).toBeNull();
 });

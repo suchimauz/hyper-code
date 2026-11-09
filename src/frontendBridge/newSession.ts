@@ -2,13 +2,13 @@
  * Read new-chat model defaults or create and submit one project chat exactly once
  *
  * Use for UI Lab drafts without an agent. Authenticated JSON or multipart POST binds a durable owner-scoped request key before native creation and message acceptance; interrupted creation fails closed; a durably bound and configured agent can retry native message acceptance with the same idempotency key, never creation. GET returns model choices and a cookie-bound CSRF token without creating an agent.
- * @param opts.req Authenticated GET defaults request or CSRF-protected POST with requestKey, projectId, optional model, mascot (omitted or random keeps SQL DEFAULT; otherwise crab/deepy/whalegirl/desksprite/bitty/tmuxai/planet/rainbow-terminal-cat), text, and up to 10 files (40 MiB each, 80 MiB total).
+ * @param opts.req Authenticated GET defaults request or CSRF-protected POST with requestKey, projectId, optional title, workspaceDir (without projectId), createWorkspaceDir (explicit 1 authorizes directory creation), promptPreset IDs, systemPrompt, model, mascot (omitted or random keeps SQL DEFAULT; otherwise crab/deepy/whalegirl/desksprite/bitty/tmuxai/planet/rainbow-terminal-cat), text, and up to 10 files (40 MiB each, 80 MiB total).
  */
 export default async function (
     ctx: Context,
     session: Session | null,
     opts: {
-        /** Authenticated GET defaults request or CSRF-protected POST with requestKey, projectId, optional model, mascot (omitted or random keeps SQL DEFAULT; otherwise crab/deepy/whalegirl/desksprite/bitty/tmuxai/planet/rainbow-terminal-cat), text, and up to 10 files (40 MiB each, 80 MiB total). */
+        /** Authenticated GET defaults request or CSRF-protected POST with requestKey, projectId, optional title, workspaceDir (without projectId), createWorkspaceDir (explicit 1 authorizes directory creation), promptPreset IDs, systemPrompt, model, mascot (omitted or random keeps SQL DEFAULT; otherwise crab/deepy/whalegirl/desksprite/bitty/tmuxai/planet/rainbow-terminal-cat), text, and up to 10 files (40 MiB each, 80 MiB total). */
         req: Request;
     },
 ): Promise<Response> {
@@ -29,10 +29,10 @@ export default async function (
         const url=new URL(req.url),model=url.searchParams.get('model')||enabledDefault,requested=url.searchParams.get('effort')||'auto';
         if(!models.some(m=>m.model===model&&!m.disabled)||!efforts.includes(requested))return reply({error:'Invalid model or effort'},400);
         const [profile,resolved]=await Promise.all([ctx.fns.llm.reasoningCapabilities({model}),ctx.fns.llm.resolveReasoningEffort({model,effort:requested as types.llm.ReasoningEffort})]);
-        return reply({version:1,model,label:model.slice(model.lastIndexOf(':')+1),icon:await ctx.fns.frontendBridge.iconData({model}),defaultModel:enabledDefault,models,effort:{requested,applied:resolved.applied,supported:profile.supported,defaultEffort:profile.defaultEffort,mode:profile.mode,downgraded:resolved.downgraded},csrfToken:await ctx.fns.auth.csrfToken({req})});
+        return reply({promptPresets:await ctx.fns.agent.listPromptPresets({}),version:1,model,label:model.slice(model.lastIndexOf(':')+1),icon:await ctx.fns.frontendBridge.iconData({model}),defaultModel:enabledDefault,models,effort:{requested,applied:resolved.applied,supported:profile.supported,defaultEffort:profile.defaultEffort,mode:profile.mode,downgraded:resolved.downgraded},csrfToken:await ctx.fns.auth.csrfToken({req})});
     }
     const contentType=req.headers.get('content-type')?.split(';')[0]?.trim();
-    let data:{requestKey?:string;projectId?:string;model?:string;effort?:string;mascot?:string;text?:string};
+    let data:{requestKey?:string;projectId?:string;model?:string;effort?:string;mascot?:string;text?:string;title?:string;workspaceDir?:string;createWorkspaceDir?:string;promptPreset?:string[];systemPrompt?:string};
     let files:File[]=[];
     if(contentType==='multipart/form-data'){
         // Reject oversized declared bodies before parsing; actual file sizes are checked below.
@@ -42,10 +42,10 @@ export default async function (
             const fields:Record<string,string>={};
             for(const [name,value] of form.entries()){
                 if(name==='files'&&value instanceof File){files.push(value);continue;}
-                if(!['requestKey','projectId','model','effort','mascot','text'].includes(name)||typeof value!=='string'||Object.hasOwn(fields,name))return reply({error:'Invalid multipart field'},400);
+                if(!['requestKey','projectId','model','effort','mascot','text','title','workspaceDir','createWorkspaceDir','promptPreset','systemPrompt'].includes(name)||typeof value!=='string'||Object.hasOwn(fields,name))return reply({error:'Invalid multipart field'},400);
                 fields[name]=value;
             }
-            data=fields;
+            data={...fields, ...(fields.promptPreset ? {promptPreset:JSON.parse(fields.promptPreset)} : {})};
         }catch{return reply({error:'Invalid multipart body'},400);}
     }else if(contentType==='application/json'){
         const raw=await req.text();if(raw.length>100000)return reply({error:'Request too large'},413);
@@ -53,13 +53,17 @@ export default async function (
     }else return reply({error:'JSON or multipart body required'},415);
     if(files.length>10||files.some(file=>file.size>40*1024*1024)||files.reduce((sum,file)=>sum+file.size,0)>80*1024*1024)return reply({error:'Не более 10 файлов, до 40 МБ каждый и 80 МБ суммарно.'},413);
     files=files.filter(file=>file.size>0);
-    if(!data||Object.keys(data).some(k=>!['requestKey','projectId','model','effort','mascot','text'].includes(k))||typeof data.requestKey!=='string'||! /^[A-Za-z0-9_-]{16,128}$/.test(data.requestKey)||typeof data.projectId!=='string'||!data.projectId||typeof data.text!=='string'||(!data.text.trim()&&!files.length)||data.text.length>64000||(data.model!==undefined&&typeof data.model!=='string'))return reply({error:'Invalid draft submission'},400);
+    if(!data||Object.keys(data).some(k=>!['requestKey','projectId','model','effort','mascot','text','title','workspaceDir','createWorkspaceDir','promptPreset','systemPrompt'].includes(k))||typeof data.requestKey!=='string'||! /^[A-Za-z0-9_-]{16,128}$/.test(data.requestKey)||typeof data.projectId!=='string'||(!data.projectId&&!data.workspaceDir)||typeof data.text!=='string'||(!data.text.trim()&&!files.length)||data.text.length>64000||(data.model!==undefined&&typeof data.model!=='string'))return reply({error:'Invalid draft submission'},400);
+    if((['title','workspaceDir','createWorkspaceDir','systemPrompt'] as const).some(k=>data[k]!==undefined&&typeof data[k]!=='string')||(data.promptPreset!==undefined&&(!Array.isArray(data.promptPreset)||data.promptPreset.some(id=>typeof id!=='string'))))return reply({error:'Invalid advanced fields'},400);
+    if(data.projectId&&data.workspaceDir)return reply({error:'Choose either a project or a custom local workspace'},400);
+    const advanced={title:data.title||'',workspaceDir:data.workspaceDir||'',createWorkspaceDir:data.createWorkspaceDir||'',promptPreset:data.promptPreset||[],systemPrompt:data.systemPrompt||''};
+    const hasAdvanced=Object.values(advanced).some(value=>value.length>0);
     const mascots=['crab','deepy','whalegirl','desksprite','bitty','tmuxai','planet','rainbow-terminal-cat'];
     if(data.mascot!==undefined&&(typeof data.mascot!=='string'||(data.mascot!=='random'&&!mascots.includes(data.mascot))))return reply({error:'Invalid mascot'},400);
     const mascot=data.mascot==='random'?undefined:data.mascot;
     const digests=await Promise.all(files.map(async file=>({name:file.name,type:file.type,hash:new Bun.CryptoHasher('sha256').update(await file.arrayBuffer()).digest('hex')})));
     // Preserve existing default/random fingerprints; explicit mascot and file bytes bind retries.
-    const fingerprint=new Bun.CryptoHasher('sha256').update(JSON.stringify([data.projectId,data.model??null,data.effort??'auto',data.text,...(files.length?[digests]:[]),...(mascot?[{mascot}]:[])])).digest('hex');
+    const fingerprint=new Bun.CryptoHasher('sha256').update(JSON.stringify([data.projectId,data.model??null,data.effort??'auto',data.text,...(files.length?[digests]:[]),...(mascot?[{mascot}]:[]),...(hasAdvanced?[advanced]:[])])).digest('hex');
     const messageRequest=()=>{
         if(!files.length)return new Request(req.url,{method:'POST',headers:{'content-type':'text/plain','idempotency-key':data.requestKey!},body:data.text});
         const body=new FormData();body.set('text',data.text!);
@@ -84,7 +88,8 @@ export default async function (
             return replay(prior);
         }catch(error){console.error('UI first submission recovery failed',error);return reply({error:'Unable to confirm message; retry the same request key.',status:prior.status,agentId:prior.agentId,projectId:prior.projectId},409);}
     }
-    const project=await ctx.fns.projects.get({projectId:data.projectId});if(!project)return reply({error:'Project not found'},404);
+    const project=data.projectId?await ctx.fns.projects.get({projectId:data.projectId}):null;if(data.projectId&&!project)return reply({error:'Project not found'},404);
+    if(!data.projectId&&advanced.createWorkspaceDir!=='1'){try{await ctx.fns.workspace.normalize({dir:advanced.workspaceDir,create:false});}catch(error){return reply({error:String(error instanceof Error?error.message:error)},422);}}
     const model=data.model||enabledDefault;if(!models.some(m=>m.model===model&&!m.disabled))return reply({error:'Model unavailable'},400);
     if(data.effort!==undefined&&(typeof data.effort!=='string'||!efforts.includes(data.effort)))return reply({error:'Invalid effort'},400);
     const effort=(data.effort??'auto') as types.llm.ReasoningEffort;
@@ -95,7 +100,7 @@ export default async function (
     if(!inserted.length){const existing=await read();return existing?replay(existing):reply({error:'Request state unavailable'},409);}
     const save=()=>ctx.fns.procs.db.run({sql:'UPDATE kv SET value=? WHERE key=?',params:[JSON.stringify(claim),key]});
     try{
-     const created=await ctx.fns.agent.createFromValues({projectId:data.projectId,model});
+     const created=await ctx.fns.agent.createFromValues({...advanced,projectId:data.projectId,model});
      if(!created.agent)throw new Error(created.error||'Agent creation failed');
      claim.agentId=created.agent.id;await save();
      // Creation persists SQL DEFAULT; override only a newly created agent before its first message.

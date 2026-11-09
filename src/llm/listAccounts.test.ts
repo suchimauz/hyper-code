@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import listAccounts from './listAccounts';
 import mobileRoute from '../llms/$route_mobileUsage_GET';
 import usageData from '../llms/usageData';
+import quotaData from '../llms/quotaData';
 
 function fixture(measured: boolean) {
  const snapshot = { provider: 'zai-coding', account: 'default', label: 'Z.ai', model: 'zai-coding:', usedPercent: 32, resetsAt: null, planType: 'lite', parkedAgents: 0, tone: 'neutral', updatedAt: Date.now(), thresholds: { warnAt: 40, criticalAt: 70, alertAt: 80 } };
@@ -12,13 +13,14 @@ function fixture(measured: boolean) {
    refreshUsage: async () => [],
    listModels: async () => ({ 'zai-coding': ['zai-coding:glm-5.3'] }),
   },
-  settings: { get: async ({ key }: { key: string }) => key === 'zaiCodingApiKey' ? 'secret://test/reference' : null },
+  settings: { get: async ({ key }: { key: string }) => key === 'zaiCodingApiKey' ? 'secret://test/reference' : null, getNumber: async ({fallback}: {fallback:number}) => fallback },
+  procs: { db: { select: async () => [], run: async () => {} } },
   node: { list: async () => [] },
   ui: { modelLogo: () => '<svg></svg>' },
  } };
  // Real inventory helper: do not mock away the scope error that broke mobile.
  ctx.fns.llm.listAccounts = () => listAccounts(ctx, null, { provider: 'zai-coding' });
- ctx.fns.llms = { usageData: (opts: any) => usageData(ctx, null, opts) };
+ ctx.fns.llms = { usageData: (opts: any) => usageData(ctx, null, opts), quotaData: () => quotaData(ctx, null, {}) };
  return ctx;
 }
 

@@ -70,7 +70,7 @@
         if (!frame) return;
         const itemId = frame.getAttribute('data-canvas-frame');
         const url = `/canvas/${encodeURIComponent(agentOf(root))}/item/${encodeURIComponent(itemId)}`;
-        const post = body => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        const post = body => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify(body) })
             .then(async r => { if (!r.ok) console.warn(`canvas tab ${itemId}:`, await r.text()); return r.ok ? r.json() : null; }).catch(() => null);
         if (msg.type === 'state' && msg.state && typeof msg.state === 'object' && !Array.isArray(msg.state)) {
             const info = frameInfo(frame);
@@ -97,7 +97,7 @@
     });
     const shownRev = root => root.querySelector('[data-canvas-panel]')?.getAttribute('data-canvas-rev') || '';
     const tabAction = (root, body) => fetch(`/canvas/${encodeURIComponent(agentOf(root))}`, {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify(body),
     }).then(r => r.ok ? r.json() : null).then(state => {
         if (state) return refreshPanel(root);
     }).catch(error => console.warn('Canvas navigation failed', error));

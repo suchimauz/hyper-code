@@ -2,7 +2,7 @@ import { describe, test, expect } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 
 describe("POST /agent/:id/compact", () => {
-  test("dispatches manual compaction and offers the compact form from the context ring", async () => {
+  test("dispatches manual compaction", async () => {
     const ctx = await mkTestCtx();
     const agent: any = { id: "a1", model: "test:model", messages: [], events: [], scratchpad: {}, workspaceDir: process.cwd(), systemPrompt: "" };
     (ctx.state as any).agent = { a1: agent };
@@ -13,12 +13,7 @@ describe("POST /agent/:id/compact", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("hx-trigger")).toBe("hyper-popup-close");
     await Bun.sleep(10);
-    ctx.state.registry.session.getMaxEventIdx = () => -1;
-    ctx.state.registry.session.getEvents = () => [];
-    ctx.state.registry.session.getFullMessages = () => [];
-    const form = ctx.fns.chat.compactForm({ agentId: "a1" });
-    expect(form).toContain("Compact context");
-    expect(form).toContain('hx-post="/agent/a1/compact"');
+
   });
 
   test("background compaction failure is reported, not swallowed", async () => {

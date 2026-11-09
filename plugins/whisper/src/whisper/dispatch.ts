@@ -13,6 +13,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     focusAgentId?: string;
     /** The text is a running partial transcript; only unambiguous complete commands are marked confident. @default false */
     partial?: boolean;
+    /** Restrict HTTP previews to agents owned by this authenticated user. Internal calls may omit it. */
+    ownerId?: string;
 }): Promise<{
     kind: "command" | "dictation" | "cancel" | "none";
     command: string | null;
@@ -41,7 +43,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     };
     const sim = (a: string, b: string) => { if (!a || !b) return 0; if (a === b) return 1; if (b.length >= 3 && a.includes(b)) return 0.9; return 1 - lev(a, b) / Math.max(a.length, b.length); };
 
-    const list: any = await ctx.fns.session.list({});
+    const list = (await ctx.fns.session.list(opts.ownerId ? {owner: opts.ownerId} : {})).filter(a => !opts.ownerId || a.createdBy === opts.ownerId);
     const agents: { id: string; title: string }[] = (Array.isArray(list) ? list : []).filter((s: any) => !s.archivedAt && !s.parentId && s.visibility !== "hidden").map((s: any) => ({ id: s.id, title: String(s.title || s.id) }));
     type Match = { id: string; title: string; score: number };
     const findAgent = (q: string): Match[] => {
@@ -63,7 +65,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     async function run() {
         if (CANCEL.test(text)) return { kind: "cancel" as const, command: null, opts: {}, reason: "cancel pending dictation", confident: true };
         if (WAITING.test(text)) {
-            const preview = await ctx.fns.whisper.waiting({});
+            const preview = opts.ownerId ? {agents: list.filter(a => a.unread || a.runState === 'running').map(a => ({id:a.id,title:a.title,unread:a.unread}))} : await ctx.fns.whisper.waiting({});
             return { kind: "command" as const, command: "whisper.waiting", opts: {}, reason: "who needs attention", confident: true, preview };
         }
         let m = text.match(NEW);

@@ -5,7 +5,6 @@ import endpoint from "./resolveEndpoint";
 import stream from "./streamCodex";
 import parseSSE from "./parseSSE";
 import toCodexInput from "./toCodexInput";
-import picker from "../agent/effortPicker";
 import relay from "../node/relay";
 
 const entry = (account = "su4imauz") => ({ id: `codex/${account}:gpt-6-astra`, provider: "codex", account, api: "responses", kind: "subscription" });
@@ -31,16 +30,12 @@ function context(catalog: any[] = [entry(), entry("second")]) {
     return { ctx, node };
 }
 
-describe("node reasoning identity and picker", () => {
-    for (const account of ["su4imauz", "second"]) test(`canonical ${account}: real picker and policy`, async () => {
+describe("node reasoning identity and policy", () => {
+    for (const account of ["su4imauz", "second"]) test(`canonical ${account}: capabilities and policy`, async () => {
         const { ctx } = context();
         const model = `hyper/mini6:codex/${account}:gpt-6-astra`;
         ctx.state.agent.test = { id: "test", model, reasoningEffort: "high" };
         expect(await capabilities(ctx, null, { model })).toEqual({ supported: ["auto", "low", "medium", "high", "xhigh"], defaultEffort: "medium", mode: "openai-effort" });
-        const html = await (await picker(ctx, null, { agentId: "test" })).text();
-        const values = [...html.matchAll(/name="effort" value="(.*?)"/g)].map(m => m[1]);
-        expect(values).toEqual(["auto", "low", "medium", "high", "xhigh"]);
-        expect(html).toContain(model);
         expect(await resolve(ctx, null, { model, effort: "auto" })).toMatchObject({ applied: "medium", downgraded: false });
         for (const effort of ["off", "minimal"] as const) expect(await resolve(ctx, null, { model, effort })).toMatchObject({ applied: "low", downgraded: true, requested: effort });
     });

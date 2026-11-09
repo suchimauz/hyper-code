@@ -2,22 +2,25 @@ import { describe, expect, test } from 'bun:test';
 import api from './settingsApi';
 const owner = {user:{role:'owner'}} as any;
 function setup() {
+ let user: {role:string}|null = {role:'owner'};
  const writes: object[] = [];
  const ctx: any = {fns:{
-  auth:{csrfToken:async()=> 'csrf',verifyCsrf:async({token}:any)=>token==='csrf'},
+  auth:{currentUser:async()=>({required:true,user}),csrfToken:async()=> 'csrf',verifyCsrf:async({token}:any)=>token==='csrf'},
   http:{publicOrigin:async()=> 'https://hyper.test'},
   llm:{listModels:async()=>({codex:['codex:a']}),modelPolicy:async(o:any)=>{if(o.action==='set')writes.push(o);return {disabledModels:['codex:b']};},codingInstance:async()=>({instance:null})},
   sshInstance:{list:async()=>[{name:'trusted',pinnedHostKey:'pin'},{name:'untrusted'}]},
   settings:{getString:async()=> 'standard',set:async(o:any)=>{writes.push(o);}},
-  node:{list:async()=>[{name:'node',url:'https://user:secret@node',token:'SECRET',enabled:true,catalog:[],catalogAt:null,usageAt:null}]}
+  node:{clients:async()=>[],add:async(o:any)=>{writes.push(o);},refresh:async(o:any)=>{writes.push(o);},issueClient:async(o:any)=>{writes.push(o);return {token:'ONCE',url:'https://node/node/v1'};},revokeClient:async(o:any)=>{writes.push(o);return {revoked:true};},list:async()=>[{name:'node',url:'https://user:secret@node',token:'SECRET',enabled:true,catalog:[],catalogAt:null,usageAt:null}]}
  }};
- return {ctx,writes};
+ return {ctx,writes,setUser:(next:{role:string}|null)=>{user=next;}};
 }
 const post=(body:object, token='csrf', origin='https://hyper.test')=>new Request('https://hyper.test/llms/settings',{method:'POST',headers:{'content-type':'application/json','x-csrf-token':token,origin},body:JSON.stringify(body)});
 describe('native model settings security and writes',()=>{
  test('requires owner before data reads or writes',async()=>{
-  const {ctx,writes}=setup();
+  const {ctx,writes,setUser}=setup();
+  setUser(null);
   expect((await api(ctx,null,{req:post({action:'tier',tier:'priority'})})).status).toBe(401);
+  setUser({role:'member'});
   expect((await api(ctx,{user:{role:'member'}} as any,{req:post({action:'tier',tier:'priority'})})).status).toBe(403);
   expect(writes).toEqual([]);
  });

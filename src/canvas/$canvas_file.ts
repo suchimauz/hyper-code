@@ -1,8 +1,4 @@
-// The built-in file tab: the Files viewer (preview, code, edit, directory listing) drawn straight into the
-// canvas by files.view — the same renderer as the /files page, no iframe, so it needs no second page load
-// and no second sign-in (behind a sign-in gateway a framed page could fall to a login it cannot show).
-// Links inside it (breadcrumbs, folder entries, Preview/Code/Edit) are caught by canvas.js and move this
-// same tab (canvas.navigate), so the tab is a small file browser.
+// File tabs use the native React CanvasFile surface. This kind only pins paths and describes items.
 
 export const hint = "a file or directory from the workspace (or an SSH host) in the full Files viewer — args `{ path, host?, mode?: \"auto\"|\"preview\"|\"source\" }`";
 
@@ -26,19 +22,8 @@ export default {
         const name = at.path.split("/").filter(Boolean).pop() || at.path;
         return { args: { path: at.path, host: at.host ?? "local", mode, ...(tab ? { tab } : {}) }, title: at.host ? `${at.host}:${name}` : name };
     },
-    async render(ctx: Context, opts: { agentId: string; item: types.canvas.Item }) {
-        const esc = (text: string) => ctx.fns.procs.ui.escape({ text });
-        const a = opts.item.args;
-        try {
-            const host = a.host && a.host !== "local" ? String(a.host) : undefined;
-            const info = await ctx.fns.files.stat({ path: String(a.path), host });
-            if (!info) throw new Error(`file not found: ${host ? host + ":" : ""}${a.path}`);
-            const tab = ["preview", "code", "edit"].includes(a.tab) ? a.tab : a.mode === "preview" ? "preview" : a.mode === "source" ? "code" : "";
-            const view = await ctx.fns.files.view({ path: String(a.path), host, isDir: info.isDir, tab, wide: true, assetsBase: true });
-            return `<div data-canvas-files class="flex h-full min-h-0 flex-col">${view.html}</div>`;
-        } catch (error: any) {
-            return `<div class="flex h-full items-center justify-center p-6 text-sm text-faint">${esc(String(error?.message ?? error))}</div>`;
-        }
+    render() {
+        return '<p>Open this file in the native Canvas file tab.</p>';
     },
     describe(_ctx: Context, opts: { item: types.canvas.Item }) {
         const a = opts.item.args;

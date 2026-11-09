@@ -5,7 +5,7 @@ import budget from './contextBudget';
 test('durable usage sums real counters and never invents cache or timing', async () => {
     const ctx: any = { fns: { procs: { db: { select: async () => [ { payload: JSON.stringify({ usage: { prompt_tokens: 100, completion_tokens: 20 } }) }, { payload: JSON.stringify({ usage: { prompt_tokens: 200, completion_tokens: 40 } }) } ] } } } };
     const result = await details(ctx, null, { agentId: 'test' });
-    expect(result.usage).toEqual({ requests: 2, inputTokens: 300, outputTokens: 60, uncachedInputTokens: null, cachedInputTokens: null, cacheHitRatio: null, cacheWriteTokens: null });
+    expect(result.usage).toEqual({ requests: 2, inputTokens: 300, outputTokens: 60, uncachedInputTokens: null, cachedInputTokens: null, cacheHitRatio: null, cacheWriteTokens: null, costUsd: null, price: null });
     expect(Object.values(result.session)).toEqual([null, 0, null, null]);
     ctx.fns.procs.db.select = async () => [{ payload: 'bad json' }];
     expect((await details(ctx, null, { agentId: 'test' })).usage.inputTokens).toBeNull();

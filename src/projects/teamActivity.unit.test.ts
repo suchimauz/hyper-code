@@ -1,7 +1,6 @@
 import {test,expect} from 'bun:test';
 import chats from './chats.ts';
 import list from './list.ts';
-import dock from '../dock/runningAgents.ts';
 import menu from '../nav/chatItems.ts';
 
 function fixture(){
@@ -23,9 +22,8 @@ test('project counts idle team roots once, not each worker or already running ro
  };
  const out=await list(ctx,null,{});expect(out[0]?.runningCount).toBe(2);
 });
-test('idle ancestors appear active in dock and menu without altering state',async()=>{
+test('idle ancestors appear active in menu without altering state',async()=>{
  const {ctx}=fixture();ctx.fns.procs.db.select=async()=>[{id:'root',title:'Parent',run_state:'idle'},{id:'idle',title:'Idle',run_state:'idle'}];
- const out=await dock(ctx,null,{});expect(out).toContain('Ожидает · Подагенты: 2');expect(out).toContain('/agent/root');expect(out).not.toContain('/agent/idle');
  const cards=[{id:'root',runState:'idle'},{id:'idle',runState:'idle'},{id:'own',runState:'running'}];
  const items=await menu(ctx,null,{agents:cards});expect(items.map(x=>x.active)).toEqual([true,false,true]);expect(cards[0]?.runState).toBe('idle');expect(items[0]?.detail).toBeUndefined();
 });

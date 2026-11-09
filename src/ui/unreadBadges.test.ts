@@ -1,10 +1,9 @@
 import {expect,test} from 'bun:test';
 import {Window} from 'happy-dom';
-import home from '../home/render';
 import mentions from '../mentions/badge';
 
 // Counter colors are deliberately opaque: contrast must not depend on the surface behind them.
-test('home and mention counts share accessible, non-translucent unread styling',async()=>{
+test('mention counts retain accessible, non-translucent unread styling',async()=>{
  const ctx:any={fns:{
   procs:{ui:{escape:({text}:any)=>Bun.escapeHTML(text)}},
   session:{list:async()=>[{id:'a',title:'Chat',runState:'idle',unread:12}]},
@@ -14,15 +13,13 @@ test('home and mention counts share accessible, non-translucent unread styling',
   ui:{inplacePopup:async(o:any)=>`<button ${o.triggerAttrs}>${o.triggerHtml}</button>`},
  }};
  const w=new Window();
- w.document.body.innerHTML=(await home(ctx,null,{})).main+await mentions(ctx,null,{});
+ w.document.body.innerHTML=await mentions(ctx,null,{});
  const badges=[...w.document.querySelectorAll('.ui-unread-badge')];
- expect(badges.length).toBe(2);
+ expect(badges.length).toBe(1);
  for(const badge of badges){expect(badge.textContent).toContain('12');expect(badge.className).not.toMatch(/text-white|bg-success|bg-primary/);}
- expect(badges[0]!.getAttribute('aria-label')).toBe('12 new messages');
- expect(badges[1]!.closest('button')!.getAttribute('aria-label')).toBe('12 unread mentions');
+ expect(badges[0]!.closest('button')!.getAttribute('aria-label')).toBe('12 unread mentions');
  ctx.fns.session.list=async()=>[{id:'a',title:'Chat',unread:0}];
  ctx.fns.mentions.unreadCount=async()=>0;
- expect((await home(ctx,null,{})).main).not.toContain('ui-unread-badge');
  expect(await mentions(ctx,null,{})).not.toContain('ui-unread-badge');
  w.happyDOM.abort();
 });

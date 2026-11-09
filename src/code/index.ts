@@ -16,7 +16,9 @@
 // Still honest about the one thing no parser can resolve: a dynamic
 // `ctx.fns[name]` dispatch is counted and returned, so the blind spot is
 // reported rather than hidden.
-import ts from "typescript";
+// Use the compiler namespace rather than the CommonJS default wrapper:
+// hot-reloaded modules must resolve the AST exports directly.
+import * as ts from "typescript";
 
 // The fields of procs.project.scan this file actually reads. Named once so the
 // compiler checks them, instead of `any` hiding a typo until a query comes back

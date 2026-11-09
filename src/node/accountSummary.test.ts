@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
 import accountSummary from "./accountSummary";
-import card from "./card";
 
 const model = (provider: string, account: string, suffix = "a") => ({ id: `${provider}/${account}:${suffix}`, provider, account, api: "responses" as const, kind: "subscription" as const });
 const base = (): types.node.NodeEntry => ({ name: "test", url: "https://node.test", enabled: true, catalog: [model("codex", "same"), model("codex", "same", "b"), model("claude-code", "same")], catalogAt: 1, usage: null, usageAt: null, lastError: null });
@@ -32,13 +31,4 @@ test("unknown, stale, exhausted and non-catalogue quota snapshots cannot change 
 test("absent and empty catalogues have no accounts", async () => {
     expect((await summarize({...base(),catalogAt:null})).count).toBe(0);
     for (const catalog of [null, []]) expect(await summarize({ ...base(), catalog })).toMatchObject({ count: 0, total: 0, status: "empty" });
-});
-test("node card renders account count instead of worst quota and preserves errors", async () => {
-    const rows: any[] = [];
-    const nodes = [base(), { ...base(), name: "denied", lastError: "models 403: forbidden" }];
-    const ctx: any = { fns: { llm: { listModels: async () => Object.fromEntries(nodes.map(n=>['hyper/'+n.name,n.catalog!.map(m=>'hyper/'+n.name+':'+m.id)])) }, node: { list: async () => nodes, clients: async () => [], accountSummary: (opts: any) => accountSummary(ctx, null, opts) }, ui: { popup: () => "", live: ({ html }: any) => html }, procs: { ui: { escape: ({ text }: any) => text, row: (opts: any) => { rows.push(opts); return "row"; }, heading: () => "", empty: () => "" } } } };
-    await card(ctx, null, {});
-    expect(rows[0].cells.find((c: any) => c.role === "accounts").text).toBe("2 accounts in catalogue");
-    expect(rows[0].cells.some((c: any) => c.role === "quota")).toBe(false);
-    expect(rows[1].cells.find((c: any) => c.role === "accounts").text).toContain("403: forbidden");
 });

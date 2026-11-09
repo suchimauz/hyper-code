@@ -76,10 +76,9 @@ export default async function (
 
     const event = { type: 'user', text: content, actor: 'agent:' + sender.id,
         agentMessage: { from: sender.id, title, hop, body: text, onBehalfOf } };
-    const html = await ctx.fns.agent.renderEventHtml({ event, agentId: to });
     const out = await ctx.fns.session.deliverInbound({ id: to, delivery: {
         key: crypto.randomUUID(), text: content, author: 'agent:' + sender.id,
-        messageType: 'agent_message', event: { ...event, html }, wake: opts.wake !== false,
+        messageType: 'agent_message', event, wake: opts.wake !== false,
         outgoing: { from: sender.id, title: String(target.title ?? to), body: text, hop },
     } });
     return { delivered: !out.queued, queued: out.queued, to, messageIdx: out.messageIdx, hop };

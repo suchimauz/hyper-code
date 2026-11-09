@@ -39,3 +39,22 @@ describe('Plugins page', () => {
     expect(screen.getByText('browser.open')).toBeTruthy();
   });
 });
+
+it('shows offline source provenance and opens only a CSRF protected rollback review', async () => {
+  const selection = { provider: 'mock', name: 'demo', revision: 'previous', source: { repo: 'local' } };
+  const onOpenAgent = vi.fn();
+  const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    if (init?.method === 'POST') return json({ ok: true, agentId: 'review' });
+    if (String(url).includes('sources=1')) return json({ sources: [{ name: 'demo', managed: true, modified: false, status: 'managed', mounted: false, previousSelection: selection }], providers: [{ id: 'mock', label: 'Mock source', description: 'Local', configurationHref: '/source/config' }], errors: [] });
+    return json({ plugins: [], csrfToken: 'tok' });
+  });
+  render(<PluginsPage onOpenAgent={onOpenAgent} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Sources' }));
+  expect(await screen.findByText(/managed · Not mounted/)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Configure source' }).getAttribute('href')).toBe('/source/config');
+  fireEvent.click(screen.getByRole('button', { name: 'Review rollback' }));
+  await waitFor(() => expect(onOpenAgent).toHaveBeenCalledWith('review'));
+  const call = fetchMock.mock.calls.find(([,init]) => init?.method === 'POST')!;
+  expect(JSON.parse(String(call[1]?.body))).toEqual({ action: 'review', selection, operation: 'rollback' });
+  expect(new Headers(call[1]?.headers).get('X-CSRF-Token')).toBe('tok');
+});

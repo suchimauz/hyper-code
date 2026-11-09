@@ -29,10 +29,10 @@ export function runCronAction(name: string, action: CronAction, csrfToken: strin
   return requestJson<{ ok: boolean }>(PATH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ name, action }) });
 }
 
-export type NewCronTask = { name: string; fn: string; every: string; args: Record<string, unknown>; now: boolean };
+export type NewCronTask = { name: string; fn: string; every: string; args: Record<string, unknown>; now: boolean; once?: boolean };
 
 export function addCronTask(task: NewCronTask, csrfToken: string) {
-  return requestJson<{ ok: boolean }>(PATH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ action: 'add', ...task }) });
+  return requestJson<{ ok: boolean }>(PATH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ action: task.once ? 'defer' : 'add', name:task.name,fn:task.fn,every:task.every,args:task.args,now:task.now }) });
 }
 
 /** "5m", "1h 30m", "2d" — the interval grammar cron.add accepts. */

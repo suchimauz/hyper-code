@@ -1,4 +1,6 @@
-/** Renders provider-neutral plugin source configuration links. */
-export default async function(ctx:Context,_session:Session|null,_opts:{/** Incoming HTTP request. */req:Request}) {
- return {title:'Plugin sources',main:await ctx.fns.plugins.configPage({})};
+/** Redirect legacy provider configuration navigation to React source inventory.
+ * @param opts.req Incoming browser request.
+ */
+export default async function(_ctx:Context,_session:Session|null,_opts:{/** Incoming browser request. */req:Request}):Promise<Response>{
+ return new Response(null,{status:302,headers:{Location:'/?view=plugins&catalogTab=sources','Cache-Control':'no-store'}});
 }

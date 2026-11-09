@@ -3,6 +3,11 @@
 // own CDP connection, closed with the socket.
 export default {
     async upgrade(ctx: Context, _session: Session | null, opts: { req: Request }) {
+        if (_session?.user?.role !== "owner") return new Response("Owner access required", { status: 403 });
+        // A browser control socket is cookie-authenticated: require an exact public origin,
+        // including its scheme, before resolving or attaching to any CDP target.
+        const origin = opts.req.headers.get("origin");
+        if (!origin || origin !== await ctx.fns.http.publicOrigin({ req: opts.req })) return new Response("Cross-origin WebSocket rejected", { status: 403 });
         const url = new URL(opts.req.url);
         try {
             const { browserUrl } = await ctx.fns.browser.liveCdp({ requested: url.searchParams.get("cdp") ?? undefined });

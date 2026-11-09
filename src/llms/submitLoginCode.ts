@@ -5,8 +5,7 @@
 /**
  * Write the browser-provided one-time code into a pending Claude Code process.
  *
- * The value is consumed immediately and never persisted. Returns safe popup
- * progress after submission.
+ * The value is consumed immediately and never persisted. Returns a safe acknowledgement after submission; React reads login status separately.
  *
  * @param opts.provider Login provider; currently only claude-code needs a code.
  * @param opts.account Pending account slot.
@@ -28,10 +27,5 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     flow.needsCode = false;
     flow.codeSubmitted = true;
     await Bun.sleep(150);
-    const safe = ctx.fns.llm.accountLoginStatus({}).find((f: any) => f.provider === opts.provider && f.account === opts.account) ?? null;
-    return ctx.fns.ui.popupContent({
-        title: "Claude Code login",
-        kind: "login-progress",
-        html: ctx.fns.llms.loginPopup({ provider: opts.provider, flow: safe }),
-    });
+    return "Authorization code submitted.";
 }

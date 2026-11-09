@@ -1,4 +1,4 @@
-/** GET /cron/jobs — live htmx jobs table fragment. */
-export default async function (ctx: Context, _session: Session | null, _opts: { req: Request }) {
-    return new Response(await ctx.fns.cron.panel({}), { headers: { "content-type": "text/html; charset=utf-8" } });
-}
+/** Return the owner-only native cron task snapshot.
+ * @param opts.req Incoming task list request.
+ */
+export default async function(ctx:Context,_session:Session|null,opts:{/** Incoming task list request. */ req:Request}):Promise<Response>{return ctx.fns.frontendBridge.cronTasks({req:opts.req});}

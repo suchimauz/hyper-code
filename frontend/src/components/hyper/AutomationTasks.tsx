@@ -71,6 +71,7 @@ function AddTaskForm({ csrf, onDone, onCancel }: { csrf: string; onDone: () => v
   const [name, setName] = useState('');
   const [fn, setFn] = useState('');
   const [every, setEvery] = useState('5m');
+  const [once,setOnce] = useState(false);
   const [args, setArgs] = useState('{}');
   const [now, setNow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -84,15 +85,16 @@ function AddTaskForm({ csrf, onDone, onCancel }: { csrf: string; onDone: () => v
     try { parsed = JSON.parse(args.trim() || '{}'); } catch { return setError('Аргументы — некорректный JSON'); }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return setError('Аргументы должны быть JSON-объектом');
     setBusy(true); setError('');
-    try { await addCronTask({ name: name.trim(), fn: fn.trim(), every: every.trim(), args: parsed as Record<string, unknown>, now }, csrf); onDone(); }
+    try { await addCronTask({ name: name.trim(), fn: fn.trim(), every: every.trim(), args: parsed as Record<string, unknown>, now, once }, csrf); onDone(); }
     catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setBusy(false); }
   };
   return <form className="automation-form" aria-label="New cron task" onSubmit={e => void submit(e)}>
+    <label><input type="checkbox" checked={once} onChange={e=>setOnce(e.target.checked)} />One-shot task</label>
     <div className="automation-form-grid">
       <label>Name<input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="nightly-sync" maxLength={200} /></label>
       <label>Function<input value={fn} onChange={e => setFn(e.target.value)} placeholder="module.fn" spellCheck={false} /></label>
-      <label>Every<input value={every} onChange={e => setEvery(e.target.value)} placeholder="5m, 1h 30m, 1d" /></label>
+      <label>{once ? 'Run in' : 'Every'}<input value={every} onChange={e => setEvery(e.target.value)} placeholder="5m, 1h 30m, 1d" /></label>
     </div>
     <label className="automation-form-args">Arguments (JSON)<textarea rows={3} value={args} onChange={e => setArgs(e.target.value)} spellCheck={false} /></label>
     <label className="automation-form-check"><input type="checkbox" checked={now} onChange={e => setNow(e.target.checked)} />Run first time immediately</label>

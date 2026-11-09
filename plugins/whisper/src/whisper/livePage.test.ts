@@ -1,0 +1,15 @@
+import {test,expect} from 'bun:test';
+import page from './$route__GET';
+import dispatchRoute from './$route_dispatch_POST';
+import live from './$route_live_POST';
+import dispatch from './dispatch';
+const request=(body:unknown)=>new Request('http://localhost/whisper/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+test('legacy page redirects without models or microphone work',async()=>{const r=await page({} as any,null,{req:new Request('http://localhost/whisper'),params:{}});expect(r.status).toBe(302);expect(r.headers.get('Location')).toBe('/?view=extension:whisper/overview');});
+test('live and dispatch reject unauthenticated requests before work',async()=>{const ctx={fns:{auth:{currentUser:async()=>({user:null})}}} as any;for(const fn of [dispatchRoute,live])expect((await fn(ctx,null,{req:request({text:'stop'}),params:{}})).status).toBe(401);});
+test('dispatch rejects csrf and foreign focus, forwards partial and owner without executing',async()=>{let csrf=false,denied=true,calls=0;const ctx={fns:{auth:{currentUser:async()=>({user:{id:'u'}}),verifyCsrf:async()=>csrf},canvas:{authorizeHttp:async()=>denied?new Response('',{status:404}):null},whisper:{dispatch:async(o:unknown)=>{calls++;return o;}}}} as any;
+expect((await dispatchRoute(ctx,null,{req:request({text:'stop'}),params:{}})).status).toBe(403);csrf=true;
+expect((await dispatchRoute(ctx,null,{req:request({text:'stop',focusAgentId:'other'}),params:{}})).status).toBe(404);denied=false;
+const r=await dispatchRoute(ctx,null,{req:request({text:'stop',focusAgentId:'mine',partial:true}),params:{}});expect(await r.json()).toEqual({text:'stop',focusAgentId:'mine',partial:true,ownerId:'u'});expect(calls).toBe(1);
+});
+test('owner-scoped waiting preview never reads global waiting',async()=>{const ctx={fns:{session:{list:async()=>[{id:'mine',title:'Mine',createdBy:'u',unread:1},{id:'other',title:'Private',createdBy:'v',unread:1}]}}} as any;const r=await dispatch(ctx,null,{text:'unread',ownerId:'u'});expect(r.preview).toEqual({agents:[{id:'mine',title:'Mine',unread:1}]});});
+test('React page uses native UI with explicit start, abort/track/timer cleanup and no executable command dispatch',async()=>{const text=await Bun.file('frontend/src/ui-plugins/whisper.tsx').text();expect(text).toContain("from '@hyper/ui'");expect(text).toContain('Start microphone');expect(text).toContain('stream?.getTracks().forEach(t=>t.stop())');expect(text).toContain('node.onaudioprocess=null');expect(text).toContain('r.abort()');expect(text).toContain('clearTimeout(pendingTimer.current)');expect(text).toContain('X-CSRF-Token');expect(text).not.toContain('dangerouslySetInnerHTML');expect(text).not.toContain('/agents/');});

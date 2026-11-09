@@ -27,3 +27,8 @@ describe('new session preferences', () => {
     sessionStorage.setItem('hyper-ui-new-session', '{broken'); expect(readNewSessionDraft().text).toBe('');
   });
 });
+it('explicit creation links preserve advanced domain fields and repeated presets', () => {
+  history.replaceState(null, '', '/?newSession=1&agent=old&title=Named&workspaceDir=%2Ftmp%2Fwork&promptPreset=review-mode&promptPreset=validation&systemPrompt=Extra');
+  expect(readNewSessionDraft()).toMatchObject({ title: 'Named', workspaceDir: '/tmp/work', promptPreset: ['review-mode', 'validation'], systemPrompt: 'Extra' });
+  history.replaceState(null, '', '/');
+});

@@ -40,8 +40,8 @@ export default async function (
      const ts=Date.now();
      const message=await ctx.fns.session.appendMessage({id:child.id,message:{role:'user',content:opts.prompt,author:'agent:'+a.sourceAgentId,message_type:'delegation_task'},ts});
      await ctx.fns.goal.delegationPublish({reservationId:reservation.reservationId,delegatorRunToken:a.runToken,authorizedThroughIdx:message.idx});
-     const event={type:'user',text:opts.prompt,messageIdx:message.idx,ts,actor:'agent:'+a.sourceAgentId,html:''};
-     event.html=await ctx.fns.agent.renderEventHtml({event,agentId:child.id});
+     const event={type:'user',text:opts.prompt,messageIdx:message.idx,ts,actor:'agent:'+a.sourceAgentId};
+
      await ctx.fns.session.appendEvent({id:child.id,event,ts,deferPublication:true});
      await ctx.fns.procs.db.run({sql:'UPDATE agents SET next_run_at=?,updated_at=? WHERE id=?',params:[ts,ts,child.id]});
      return child;

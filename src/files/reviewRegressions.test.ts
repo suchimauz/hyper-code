@@ -6,20 +6,30 @@ import { tmpdir } from "node:os";
 import { mkTestCtx } from "../_testCtx.entry";
 
 describe("Files UI: untrusted file contents", () => {
-    test("the editor bootstrap cannot be closed by a file containing </script>", async () => {
+    test("native editor content is transported as JSON, never inline executable HTML", async () => {
         const ctx: any = await mkTestCtx();
         await ctx.fns.procs.http.loadRoutes({});
         const dir = await mkdtemp(join(tmpdir(), "hyper-xss-"));
         try {
-            await writeFile(join(dir, "evil.ts"), "const a = 1;\n</script><script>window.__pwned = 1</script><!--\n\u2028\n");
-            const r = await ctx.fns.procs.http.dispatch({ url: `/files?path=${encodeURIComponent(join(dir, "evil.ts"))}&tab=edit`, headers: { accept: "text/html" } });
+            const content = "const a = 1;\n</script><script>window.__pwned = 1</script><!--\n\u2028\n";
+            const path = join(dir, "evil.ts");
+            await writeFile(path, content);
+            ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
+            ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => {
+                expect(new URL(req.url).pathname).toBe('/ui-lab/');
+                return new Response('<div id="root"></div>', {headers:{'content-type':'text/html'}});
+            };
+            const r = await ctx.fns.procs.http.dispatch({ url: `/files?path=${encodeURIComponent(path)}&tab=edit`, headers: { accept: "text/html" } });
             const html = await r.text();
             expect(r.status).toBe(200);
-            expect(html).not.toContain("</script><script>window.__pwned");
-            expect(html).not.toContain("<!--\n");
-            // the content survives as data: the escaped form decodes back to the original
-            const m = /window\.__editor = (\{[\s\S]*?\});<\/script>/.exec(html);
-            expect(JSON.parse(m![1]!).content).toContain("</script><script>window.__pwned = 1</script>");
+            expect(html).not.toContain('</script><script>window.__pwned');
+            expect(html).not.toContain('<!--\n');
+            expect(html).not.toContain('window.__editor');
+            const data = await ctx.fns.procs.http.dispatch({ url: `/files?format=json&path=${encodeURIComponent(path)}` });
+            expect(data.status).toBe(200);
+            expect(data.headers.get('content-type')).toContain('application/json');
+            expect(data.headers.get('cache-control')).toBe('no-store');
+            expect(await data.json()).toMatchObject({path,content,previewKind:'text'});
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

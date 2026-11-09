@@ -1,7 +1,14 @@
 /** POST /whisper/live — raw 16 kHz mono WAV body (?model=&language=&prompt=) → fast JSON transcription via the resident whisper-server. */
-export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
+export default async function (ctx: Context, _session: Session | null, opts: {
+    /** Incoming raw 16 kHz mono WAV request with model, language and prompt query parameters. */ req: Request;
+    /** HTTP route parameters (unused). */ params: Record<string, string>;
+}) {
     const req = opts.req;
     try {
+        const who = await ctx.fns.auth.currentUser({req});
+        if (!who.user) return Response.json({error:'authentication_required'}, {status:401});
+        if (!await ctx.fns.auth.verifyCsrf({req,token:req.headers.get('X-CSRF-Token') ?? ''})) return Response.json({error:'invalid_csrf'}, {status:403});
+        if (!(req.headers.get('content-type') ?? '').startsWith('audio/wav')) return Response.json({error:'unsupported_audio_type'}, {status:415});
         const q = new URL(req.url).searchParams;
         const srv = await ctx.fns.whisper.ensureServer({ model: q.get("model") || undefined });
         const fd = new FormData();

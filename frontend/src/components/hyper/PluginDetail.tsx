@@ -1,5 +1,6 @@
+import { PluginConfiguration } from './PluginConfiguration';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, KeyRound, X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import { getPluginDetail, stripFrontMatter, type PluginDetail as Detail } from '../../lib/plugins';
 import { ChatMarkdown } from './ChatMarkdown';
 import { CodeBlock } from './CodeBlock';
@@ -10,7 +11,7 @@ type DetailTab = 'overview' | 'functions' | 'settings';
 export function PluginDetail({ name, icon, onBack }: { name: string; icon: React.ReactNode; onBack: () => void }) {
   const [plugin, setPlugin] = useState<Detail | null>(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<DetailTab>('overview');
+  const [tab, setTab] = useState<DetailTab>(()=>new URL(location.href).searchParams.get('tab')==='settings'?'settings':'overview');
   const [query, setQuery] = useState('');
   useEffect(() => {
     const controller = new AbortController();
@@ -60,16 +61,7 @@ export function PluginDetail({ name, icon, onBack }: { name: string; icon: React
           </details>
         </li>)}</ul>}
       </>}
-      {tab === 'settings' && (!settingsCount ? <p className="plugins-muted">This plugin declares no settings or secrets.</p> : <ul className="plugin-detail-settings">
-        {plugin.settings.map(s => <li key={s.key}>
-          <div><strong>{s.title}</strong> <code>{s.key}</code>{s.description && <p>{s.description}</p>}</div>
-          <span className="plugins-badge">{s.secret ? (s.configured ? 'set' : 'not set') : s.value == null ? '—' : String(s.value)}{!s.secret && <> · {s.source}</>}</span>
-        </li>)}
-        {plugin.secrets.map(s => <li key={s.name}>
-          <div><strong><KeyRound size={12} strokeWidth={1.5} aria-hidden="true" /> {s.title}</strong>{s.required && <span className="plugins-muted"> · required</span>}{s.description && <p>{s.description}</p>}</div>
-          <span className={`plugins-badge ${s.configured ? 'is-installed' : ''}`}>{s.configured ? <><Check size={11} /> configured</> : 'missing'}</span>
-        </li>)}
-      </ul>)}
+      {tab === 'settings' && <PluginConfiguration name={name} />}
     </>}
   </div>;
 }

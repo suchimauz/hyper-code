@@ -13,9 +13,9 @@ test('React application catalogue includes declared pages only, without chats or
     expect(await response.json()).toEqual({items:[{id:'news',label:'News',href:'/news'}]});
 });
 
-test('HTML fragments retain the existing widget transport without becoming the React shell', async () => {
+test('HTML visits redirect to native Applications', async () => {
     const ctx = {fns:{nav:{home:async()=>'<p>Widget</p>'}}} as unknown as Context;
     const response = await route(ctx,null,{req:new Request('http://localhost/nav/items'),params:{}});
-    expect(response.headers.get('content-type')).toContain('text/html');
-    expect(await response.text()).toBe('<p>Widget</p>');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('/?view=applications');
 });

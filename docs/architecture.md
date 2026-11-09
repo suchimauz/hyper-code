@@ -52,7 +52,7 @@ graph TB
     subgraph DataPlane[Data plane — HTTP]
         POST["POST /agent/:id"]
         LP["GET /agent/:id/events.html<br/>(short delta fetch · SSE-triggered)"]
-        SB["GET /agent/:id/statusbar<br/>(SSE + 5s watchdog)"]
+        SB["React chat status<br/>(authorized JSON)"]
         SF["live regions<br/>(topic SSE + watchdog)"]
     end
     subgraph SignalPlane[Signal plane — invalidation and worker wake]
@@ -75,21 +75,11 @@ graph TB
 
 ---
 
-## Compatibility SSR: chat parts, header, panel and composer
+## Chat UI ownership
 
-The chat column (`ui.chatColumn`) is assembled from small part files, the same way the Dock is. The `chat` module owns the frame — the icon, the name, order, hiding, timeouts and the look — and every module may add parts:
+React owns the chat toolbar, Meta panel and Composer. The former SSR chat header/panel, `$chatbadge_`/`$chatbutton_`/`$chatcard_` declarations, loaders and `chat.layout` registry are removed, not extension points. The old model chip, context ring and statusbar HTML routes/renderers are also removed. New trusted UI contributions use the reviewed React SDK registration contract described in [UI architecture](ui-architecture.md).
 
-| File | Type | Where it shows | Example |
-|---|---|---|---|
-| `$chatbadge_<name>.ts` | `types.chat.Badge` | left of the header, after the name: a fact about the chat | `agent/$chatbadge_workspace.ts` (folder), `agent/$chatbadge_status.ts` (run ring) |
-| `$chatbutton_<name>.ts` | `types.chat.Button` | right of the header, before ⋯: an action | `canvas/$chatbutton_toggle.ts` |
-| `$chatcard_<name>.ts` | `types.chat.Card` | a card in the ⋯ panel (GET `/chat/:id/panel`, 2-column grid, `size: "S"\|"L"`) | `agent/$chatcard_team.ts`, `chat/$chatcard_danger.ts` |
-
-The loaders (`chat/$loader_chat{badge,button,card}.ts` → `chat.register`) collect them into `ctx.state.chat.parts` under the id `<module>.<name>`. Each part default-exports `{ order?, render(ctx, session, context) }`, where `context` is `types.chat.RenderContext` (`{ agent, parent, inheritedCount }`, built once per render by `chat.buildRenderContext`). A badge or button returns trusted HTML or a `types.chat.Item` (`{ icon, label?, title?, href?, popup?, tone? }`) drawn by `chat.renderItem`; a card returns `types.chat.CardRow[]` (drawn by `chat.renderCardRows`), HTML, or both. Every render runs under `chat.withTimeout` (1.5 s): a throw, a timeout or null hides only that part. Keep header renders to cached reads — they run on every chat render; cards run only when the panel opens.
-
-Order and hiding come from the `chat.layout` setting (instance scope, usually `~/.hyper/settings/$settings_chat.json`): `{ "badges": [ids], "buttons": [ids], "cards": [ids], "hidden": [ids] }`. Listed ids go first, the rest follow by their `order`; `chat.listParts({ kind })` shows the result. The icon, the name and the danger card (Archive, Delete; always last) cannot be hidden.
-
-The chat icon is `agents.icon` (sanitized SVG, `chat.sanitizeSvg`; set with `chat.setIcon` or the icon popup), drawn by `chat.icon` everywhere a chat appears (header, Dock pins, lists), with the model logo as fallback. In the header it carries a turning ring while the agent runs (CSS `:has([data-agent-running])`, no re-render). The composer (`ui.chatComposer`) holds attach, the model and effort chips (`chat.modelChip` → `agent.modelPicker` / `agent.effortPicker`, effort only for models with levels), the context ring (`chat.contextRing`, live via GET `/chat/:id/ring`, opens compact) and send/stop. Composer slots for plugins (`$chatcomposer_`) are planned, not built.
+Domain operations remain independent of rendering: `session.setTitle`, `chat.setIcon`, `chat.sanitizeSvg` and `agent.compactContext`. Icons are stored in `agents.icon`; `chat.icon` remains for existing compatibility list/Dock consumers. Removing the chat registry does not remove secure input transports or shared document rendering.
 
 ## Principles
 
@@ -109,7 +99,7 @@ The route/form examples below describe the compatibility SSR transport. The prim
 |----------------------|---------------------------------------------------|---------------------------------------|
 | Initial render       | SSR HTML from `GET /agent/:id`                    | server-rendered                       |
 | New events appear    | short `GET /agent/:id/events.html?offset=N`       | `agent:<id>` SSE invalidation + 30s watchdog |
-| Status & exec time   | `GET /agent/:id/statusbar`                        | `agent:<id>` SSE invalidation + 5s watchdog |
+| Status & exec time   | React authorized chat JSON                       | live invalidation + refetch |
 | Navigation refresh   | server fragment/live region                       | `agents` invalidation + watchdog      |
 | User submits message | `POST /agent/:id?debounceSeconds=0.1`             | HTMX form submit                      |
 | Delete a message     | `POST /agent/:id/messages/delete`                 | HTMX confirmation + POST              |

@@ -1,5 +1,6 @@
 /** POST /autotext/suggest — bounded, model-allowlisted prose continuation experiment. */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request }) {
+    if (!await ctx.fns.auth.verifyCsrf({req:opts.req,token:opts.req.headers.get('X-CSRF-Token')??''})) return Response.json({error:'Invalid CSRF token'},{status:403});
     const json = { "content-type": "application/json; charset=utf-8" };
     try {
         if (Number(opts.req.headers.get("content-length") ?? 0) > 24000) return Response.json({ error: "Text is too long" }, { status: 413, headers: json });

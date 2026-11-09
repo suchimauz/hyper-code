@@ -1,101 +1,33 @@
-import { test, expect, describe } from "bun:test";
-import { mkTestCtx } from "../_testCtx.entry";
+import { test, expect } from 'bun:test';
+import get from './$route_GET';
+import put from './$route__PUT';
+import raw from './$route_raw_GET';
+import data from './browserData';
 
-// The rail links a workdir by its ABSOLUTE path, so the file browser has to be
-// navigable from one. The old breadcrumbs split "/a/b" into ["", "a", "b"] and
-// rendered the empty segment as a link with no label — and every crumb below it
-// lost the leading slash, pointing at a relative path resolved against another
-// base.
-describe("GET /files — breadcrumbs", () => {
-    test("a relative path is anchored at 'workspace'", async () => {
-        const ctx = await mkTestCtx();
-        const res = await ctx.fns.procs.http.dispatch({ url: "/files?path=src" });
-        expect(res.status).toBe(200);
-        const html = await res.text();
-        expect(html).toContain(`<a href="${await ctx.fns.files.browserUrl({ path: "" })}" class="font-semibold text-primary hover:underline">workspace</a>`);
-        expect(html).toContain(`href="${await ctx.fns.files.browserUrl({ path: "src" })}"`);
-    });
-
-    test("an absolute path keeps the leading slash in every crumb", async () => {
-        const ctx = await mkTestCtx();
-        const dir = process.cwd() + "/src";
-        const res = await ctx.fns.procs.http.dispatch({ url: `/files?path=${encodeURIComponent(dir)}` });
-        expect(res.status).toBe(200);
-        const html = await res.text();
-
-        // Root crumb is "/", not an unlabelled link.
-        expect(html).toContain(`<a href="${await ctx.fns.files.browserUrl({ path: "/" })}" class="font-semibold text-primary hover:underline">/</a>`);
-        expect(html).not.toContain(`hover:underline"></a>`);
-        // Every intermediate crumb is absolute too.
-        for (const part of dir.split("/").filter(Boolean).map((_, i, all) => "/" + all.slice(0, i + 1).join("/"))) {
-            expect(html).toContain(`href="${await ctx.fns.files.browserUrl({ path: part })}"`);
-        }
-    });
-
-    test("a directory listing joins an absolute parent without doubling the slash", async () => {
-        const ctx = await mkTestCtx();
-        const res = await ctx.fns.procs.http.dispatch({ url: `/files?path=${encodeURIComponent(process.cwd())}` });
-        const html = await res.text();
-        expect(html).toContain(`href="${await ctx.fns.files.browserUrl({ path: process.cwd() + "/src" })}"`);
-        // Not a blanket search: the page's favicon is a data: URI full of %2F.
-        expect(html).not.toContain(`/files?path=${encodeURIComponent(process.cwd())}%2F%2F`);
-        // Phosphor icons, like the rest of the UI.
-        expect(html).toContain("ph-folder");
-        expect(html).not.toContain("📁");
-    });
+function mock() {
+ const calls: string[]=[];
+ const ctx:any={fns:{auth:{currentUser:async()=>({required:true,user:{id:'u'}}),verifyCsrf:async()=>true},remote:{servers:async()=>[{name:'box'}]},files:{isPrivateResult:async()=>false,resolveSafe:({path}:any)=>path.startsWith('/')?path:'/workspace/'+path,stat:async()=>({isDir:false,size:4}),read:async()=> 'text',list:async()=>[],write:async()=>{calls.push('write');},rawResponse:async()=>new Response('file')},frontendBridge:{proxy:async({req}:any)=>{calls.push(req.url);return new Response('React entry');}}}};
+ ctx.fns.files.browserData=(opts:any)=>data(ctx,null,opts);
+ return {ctx,calls};
+}
+const request=(url='/files?path=/work/a.txt',init?:RequestInit)=>({req:new Request('https://hyper.test'+url,init),params:{}});
+test('Files document serves React, JSON serves bounded text',async()=>{
+ const {ctx,calls}=mock();expect(await (await get(ctx,null,request())).text()).toBe('React entry');expect(calls[0]).toContain('/ui-lab/');
+ const response=await get(ctx,null,request('/files?path=/work/a.txt&format=json'));expect(await response.json()).toMatchObject({path:'/work/a.txt',content:'text'});expect(response.headers.get('cache-control')).toBe('no-store');
 });
-
-// The rail swaps a page into #main, so /files is now reached as a FRAGMENT far
-// more often than as a whole document. Anything the page needs in order to work
-// has to travel inside `main` — an htmx request never receives <head>.
-describe("GET /files — reachable as an htmx fragment", () => {
-    const hx = { "hx-request": "true" };
-
-    test("a directory listing swaps in without the document shell", async () => {
-        const ctx = await mkTestCtx();
-        const res = await ctx.fns.procs.http.dispatch({ url: "/files?path=src", headers: hx });
-        const html = await res.text();
-        expect(res.status).toBe(200);
-        expect(html).not.toContain("<!doctype");
-        expect(html).toContain("/files/absolute/");
-    });
-
-    test("the editor boots from inside main, not from head", async () => {
-        const ctx = await mkTestCtx();
-        const url = `/files?path=${encodeURIComponent("src/files/read.ts")}&tab=edit`;
-
-        const frag = await (await ctx.fns.procs.http.dispatch({ url, headers: hx })).text();
-        expect(frag).not.toContain("<!doctype");
-        expect(frag).toContain('id="cm-editor"');
-        expect(frag).toContain("window.__editor");
-        expect(frag).toContain("/files/editor.js");
-        // `defer` is meaningless on a swapped-in script and would only delay it
-        // past the config it depends on.
-        expect(frag).not.toContain('src="/files/editor.js" defer');
-
-        // The whole-document path must carry exactly the same bootstrap.
-        const full = await (await ctx.fns.procs.http.dispatch({ url })).text();
-        expect(full).toContain("<!doctype");
-        expect(full).toContain("window.__editor");
-        expect(full).toContain("/files/editor.js");
-    });
-
-    test("a markdown preview needs no head either", async () => {
-        const ctx = await mkTestCtx();
-        const res = await ctx.fns.procs.http.dispatch({ url: "/files?path=README.md&tab=preview", headers: hx });
-        const html = await res.text();
-        expect(res.status).toBe(200);
-        expect(html).toContain("prose");
-    });
-
-    test("a file view uses the same centered GitHub-width container as a directory", async () => {
-        const ctx = await mkTestCtx();
-        const res = await ctx.fns.procs.http.dispatch({ url: "/files?path=README.md&tab=preview", headers: hx });
-        const html = await res.text();
-        expect(res.status).toBe(200);
-        expect(html).toContain("mx-auto flex min-h-full w-full max-w-5xl flex-col");
-        expect(html).toContain("rounded-md border border-ui-border bg-base-100 shadow-sm");
-        expect(html).toContain("dot-grid-surface");
-    });
-
+test('private results and unknown SSH hosts cannot be read',async()=>{
+ const {ctx}=mock();expect((await get(ctx,null,request('/files?host=unknown'))).status).toBe(400);ctx.fns.files.isPrivateResult=async()=>true;expect((await get(ctx,null,request())).status).toBe(404);
+});
+test('save requires auth, CSRF and matching old content; never writes binary',async()=>{
+ const {ctx,calls}=mock();const req=()=>request('/files?path=/work/a.txt',{method:'PUT',body:JSON.stringify({content:'next',expectedContent:'text'})});
+ ctx.fns.auth.verifyCsrf=async()=>false;expect((await put(ctx,null,req())).status).toBe(403);expect(calls).toEqual([]);
+ ctx.fns.auth.verifyCsrf=async()=>true;ctx.fns.files.read=async()=> 'changed';expect((await put(ctx,null,req())).status).toBe(409);expect(calls).toEqual([]);
+ ctx.fns.files.read=async()=> 'text';expect((await put(ctx,null,req())).status).toBe(200);expect(calls).toEqual(['write']);
+ ctx.fns.files.read=async()=> '\u0000';expect((await put(ctx,null,req())).status).toBe(400);expect(calls).toEqual(['write']);
+ ctx.fns.auth.currentUser=async()=>({required:true});expect((await put(ctx,null,req())).status).toBe(401);
+});
+test('large files skip text decode and raw active previews are sandboxed',async()=>{
+ const {ctx}=mock();ctx.fns.files.stat=async()=>({size:2000000,isDir:false});ctx.fns.files.read=async()=>{throw Error('must not decode');};
+ expect(await (await data(ctx,null,{path:'/large.txt'})).json()).toMatchObject({preview:true,previewKind:'download'});
+ const response=await raw(ctx,null,request('/files/raw?path=/file.html&download=1'));expect(response.headers.get('content-security-policy')).toContain('sandbox;');expect(response.headers.get('content-disposition')).toBe('attachment');
 });

@@ -1,2 +1,2 @@
-/** POST /rss/load-all — explicitly loads every enabled feed and renders a summary. */
-export default async function(ctx:Context,_session:Session|null,_opts:{req:Request;params:Record<string,string>}){const rows=await ctx.fns.rss.loadAll({});const ok=rows.filter((r:any)=>!r.error),failed=rows.length-ok.length;return ctx.fns.procs.ui.notice({title:"RSS load complete",message:`Loaded ${ok.length} feeds; ${failed} failed; published ${ok.reduce((n:number,r:any)=>n+Number(r.published??0),0)} entries.`,tone:failed?"warning":"success"})}
+/** Accept confirmed native RSS management JSON; authorize owner and CSRF before any operation. */
+export default async function(ctx:Context,_session:Session|null,opts:{/** Browser JSON request. */req:Request;/** Legacy route parameters. */params:Record<string,string>}):Promise<Response>{return ctx.fns.rss.browserData({req:opts.req});}

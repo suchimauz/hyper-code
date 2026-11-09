@@ -1,2 +1,18 @@
-/** GET /substack/:key — mirrored publication posts. */
-export default async function(ctx:Context,_session:Session|null,opts:{req:Request;params:{key:string}}){const esc=(v:any)=>ctx.fns.procs.ui.escape({text:String(v??"")}),pub=(await ctx.fns.substack.list({})).find((p:any)=>p.key===opts.params.key);if(!pub)return{status:404,main:"Publication not found"};const posts=await ctx.fns.substack.posts({key:pub.key,limit:100}),rows=posts.map((p:any)=>`<article class="border-t border-base-200 px-4 py-3 first:border-t-0"><a href="${esc(p.url)}" target="_blank" rel="noreferrer" class="font-medium hover:text-primary">${esc(p.title)}</a><div class="mt-1 text-xs text-faint">${esc(p.published_at)} · ${esc(p.audience)} · ${p.body_length??0} chars</div></article>`).join("");return{title:`Substack · ${pub.name}`,main:`<div class="mx-auto w-full max-w-5xl p-5 sm:p-8">${ctx.fns.procs.ui.breadcrumb({items:[{label:"Substack",href:"/substack"},{label:pub.name}]})}<h1 class="mt-5 text-2xl font-semibold">${esc(pub.name)}</h1><a href="https://${esc(pub.host)}" class="text-xs text-primary">${esc(pub.host)}</a><section class="mt-5 overflow-hidden rounded-xl border border-base-300 bg-base-100">${rows||`<div class="p-8 text-sm text-faint">No posts mirrored</div>`}</section></div>`};}
+/** Read a mirrored Substack publication with authenticated JSON or the React reader.
+ * @param opts.req Request; Accept application/json selects read-only JSON.
+ * @param opts.params Decoded path parameters.
+ */
+export default async function (ctx: Context, session: Session | null, opts: { req: Request; params: Record<string, string> }) {
+    const headers = { 'cache-control': 'no-store', vary: 'Accept' };
+    if (!(session as Session & { user?: { id: string } })?.user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers });
+    const url = new URL(opts.req.url);
+    const key = opts.params.key!;
+    if (!opts.req.headers.get('accept')?.includes('application/json')) {
+        const query = new URLSearchParams({ view: 'extension:readers/substack' });
+        query.set('key', key);
+        return new Response(null, { status: 303, headers: { ...headers, location: '/?' + query } });
+    }
+    const publication = (await ctx.fns.substack.list({})).find(p => p.key === key);
+    if (!publication) return Response.json({ error: 'Publication not found' }, { status: 404, headers });
+    return Response.json({ publication, posts: await ctx.fns.substack.posts({ key, limit: 100 }) }, { headers });
+}

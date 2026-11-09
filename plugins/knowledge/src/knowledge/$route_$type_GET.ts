@@ -1,10 +1,16 @@
-/** GET /knowledge/:type — browse entities of one canonical type. */
-export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: { type: string } }) {
-    const esc=(value:any)=>ctx.fns.procs.ui.escape({text:String(value??"")});
-    const type=opts.params.type;
-    const rows=await ctx.fns.procs.db.select({sql:"SELECT id,data,updated_at FROM knowledge.entities WHERE type=? ORDER BY coalesce(data->>'title',id)",params:[type]});
-    if(!rows.length && !(await ctx.fns.knowledge.types({})).some((item:any)=>item.type===type)) return {status:404,main:"Unknown knowledge type"};
-    const items=rows.map((row:any)=>`<a href="/knowledge/${row.id.split('/').map(encodeURIComponent).join('/')}" class="group flex items-center gap-3 border-t border-base-200 px-4 py-3 first:border-t-0 hover:bg-base-200/50"><div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><i class="ph ${icon(type)}"></i></div><div class="min-w-0 flex-1"><div class="truncate text-sm font-medium group-hover:text-primary">${esc(row.data?.title??row.id.split("/")[1])}</div><div class="mt-0.5 truncate font-mono text-3xs text-faint">${esc(row.id)}</div></div><i class="ph ph-caret-right text-faint"></i></a>`).join("");
-    return {title:`Knowledge · ${type}`,main:`<div class="mx-auto w-full max-w-4xl p-5 sm:p-8"><nav class="mb-5 flex items-center gap-2 text-xs text-faint"><a href="/knowledge" class="hover:text-primary">Knowledge</a><i class="ph ph-caret-right"></i><span>${esc(type)}</span></nav><div class="mb-5 flex items-end justify-between gap-3"><div><h1 class="text-2xl font-semibold tracking-tight">${esc(type)}</h1><p class="mt-1 text-sm text-subtle">${rows.length} canonical entities</p></div><a href="/knowledge?q=*&type=${encodeURIComponent(type)}" class="rounded-lg border border-base-300 px-3 py-2 text-xs hover:bg-base-200">Search this type</a></div><section class="overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-sm">${items||`<div class="p-8 text-center text-sm text-faint">Empty</div>`}</section></div>`};
+/** Serve a bounded entity list to React or redirect legacy type navigation. */
+export default async function (ctx: Context, _session: Session | null, opts: {
+    /** Incoming authenticated HTTP request. */ req: Request;
+    /** Canonical entity type. */ params: { type: string };
+}) {
+    if (!_session?.user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const url = new URL(opts.req.url), type = opts.params.type;
+    if (url.searchParams.get('format') !== 'json') {
+        url.pathname = '/'; url.searchParams.set('view', 'extension:knowledge/overview'); url.searchParams.set('type', type);
+        return Response.redirect(url.toString(), 302);
+    }
+    await ctx.fns.knowledge.ensure({});
+    const rows = await ctx.fns.procs.db.select({ sql: "SELECT id,type,data,updated_at FROM knowledge.entities WHERE type=? ORDER BY coalesce(data->>'title',id) LIMIT 501", params: [type] });
+    if (!rows.length && !(await ctx.fns.knowledge.types({})).some(item => item.type === type)) return Response.json({ error: 'Unknown knowledge type' }, { status: 404 });
+    return Response.json({ rows: rows.slice(0, 500), hasMore: rows.length > 500 }, { headers: { 'Cache-Control': 'no-store' } });
 }
-function icon(type:string){return ({Person:"ph-user",Organization:"ph-buildings",Product:"ph-package",Concept:"ph-lightbulb",Standard:"ph-seal-check",Attribute:"ph-tag",Entity:"ph-cube"} as Record<string,string>)[type]??"ph-node";}

@@ -7,6 +7,9 @@ import { tmpdir } from "node:os";
 describe("GET /files/absolute — path-based Files URLs", () => {
     test("renders a Markdown page and lets a relative image resolve as raw bytes", async () => {
         const ctx = await mkTestCtx();
+        // Native document delivery is isolated from the frontend dev server and login.
+        ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
+        ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
         const dir = await mkdtemp(join(tmpdir(), "hyper-files-absolute-"));
         try {
             await mkdir(join(dir, "images"));
@@ -19,7 +22,10 @@ describe("GET /files/absolute — path-based Files URLs", () => {
             const page = await ctx.fns.procs.http.dispatch({ url: pageUrl, headers: { accept: "text/html" } });
             const html = await page.text();
             expect(page.status).toBe(200);
-            expect(html).toContain("diagram.png");
+            expect(new URL(JSON.parse(html).nativeUrl).pathname).toBe('/ui-lab/');
+            expect(new URL(JSON.parse(html).nativeUrl).searchParams.get('path')).toBe(join(dir, 'readme.md'));
+            const data = await (await ctx.fns.files.browserData({path:join(dir,'readme.md')})).json();
+            expect(data.content).toContain('./images/diagram.png');
 
             const image = await ctx.fns.procs.http.dispatch({
                 url: new URL("./images/diagram.png", "http://localhost" + pageUrl).pathname,
@@ -35,6 +41,9 @@ describe("GET /files/absolute — path-based Files URLs", () => {
 
     test("opens relative Markdown links as Files pages", async () => {
         const ctx = await mkTestCtx();
+        // Native document delivery is isolated from the frontend dev server and login.
+        ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
+        ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
         const dir = await mkdtemp(join(tmpdir(), "hyper-files-absolute-"));
         try {
             await writeFile(join(dir, "one.md"), "[next](./two.md)");
@@ -44,7 +53,10 @@ describe("GET /files/absolute — path-based Files URLs", () => {
             const two = new URL("./two.md", "http://localhost" + one).pathname;
             const response = await ctx.fns.procs.http.dispatch({ url: two, headers: { accept: "text/html" } });
             expect(response.status).toBe(200);
-            expect(await response.text()).toContain("Two");
+            const native = new URL((await response.json()).nativeUrl);
+            expect(native.pathname).toBe('/ui-lab/');
+            expect(native.searchParams.get('path')).toBe(join(dir,'two.md'));
+            expect(await (await ctx.fns.files.browserData({path:join(dir,'two.md')})).json()).toMatchObject({content:'# Two',previewKind:'markdown'});
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -52,6 +64,9 @@ describe("GET /files/absolute — path-based Files URLs", () => {
 
     test("preserves embed mode while internally dispatching the Files page", async () => {
         const ctx = await mkTestCtx();
+        // Native document delivery is isolated from the frontend dev server and login.
+        ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
+        ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
         const dir = await mkdtemp(join(tmpdir(), "hyper-files-absolute-"));
         try {
             await writeFile(join(dir, "readme.md"), "# Embedded");
@@ -60,9 +75,11 @@ describe("GET /files/absolute — path-based Files URLs", () => {
             const response = await ctx.fns.procs.http.dispatch({ url: `${url}?embed=1&wide=1`, headers: { accept: "text/html" } });
             const html = await response.text();
             expect(response.status).toBe(200);
-            expect(html).toContain("Embedded");
-            expect(html).not.toContain('id="dock"');
-            expect(html).toContain("max-w-none");
+            const native = new URL(JSON.parse(html).nativeUrl);
+            expect(native.pathname).toBe('/ui-lab/');
+            expect(native.searchParams.get('path')).toBe(join(dir,'readme.md'));
+            expect(native.searchParams.get('embed')).toBe('1');
+            expect(native.searchParams.get('wide')).toBe('1');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -70,6 +87,9 @@ describe("GET /files/absolute — path-based Files URLs", () => {
 
     test("embed namespace survives relative navigation without query propagation", async () => {
         const ctx = await mkTestCtx();
+        // Native document delivery is isolated from the frontend dev server and login.
+        ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
+        ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
         const dir = await mkdtemp(join(tmpdir(), "hyper-files-embed-"));
         try {
             await writeFile(join(dir, "one.md"), "[next](./two.md)");
@@ -80,14 +100,19 @@ describe("GET /files/absolute — path-based Files URLs", () => {
             const page = await ctx.fns.procs.http.dispatch({ url: one, headers: { accept: "text/html" } });
             const html = await page.text();
             expect(page.status).toBe(200);
-            expect(html).not.toContain('id="dock"');
-            expect(html).toContain("/files/embed/");
+            const native = new URL(JSON.parse(html).nativeUrl);
+            expect(native.pathname).toBe('/ui-lab/');
+            expect(native.searchParams.get('embed')).toBe('1');
+            expect(native.searchParams.get('path')).toBe(join(dir,'one.md'));
 
             const two = new URL("./two.md", "http://localhost" + one).pathname;
             expect(two).toContain("/files/embed/");
             const next = await ctx.fns.procs.http.dispatch({ url: two, headers: { accept: "text/html" } });
             expect(next.status).toBe(200);
-            expect(await next.text()).toContain("Embedded two");
+            const nextNative = new URL((await next.json()).nativeUrl);
+            expect(nextNative.searchParams.get('embed')).toBe('1');
+            expect(nextNative.searchParams.get('path')).toBe(join(dir,'two.md'));
+            expect(await (await ctx.fns.files.browserData({path:join(dir,'two.md')})).json()).toMatchObject({content:'# Embedded two'});
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

@@ -10,7 +10,7 @@ async function harness() {
             return { id: opts.id ?? "current-chat", icon: opts.svg };
         },
     } } };
-    for (const name of ["search", "get", "set", "browserHtml"]) {
+    for (const name of ["search", "get", "set"]) {
         const { default: fn } = await import(new URL(`./${name}.ts`, import.meta.url).href);
         ctx.fns.icons[name] = opts => fn(ctx, null, opts);
     }
@@ -45,12 +45,10 @@ test("set passes padded SVG and target to core persistence", async () => {
     expect((await ctx.fns.icons.set({name:"shapes"})).id).toBe("current-chat");
 });
 
-test("browser bundles escaped data and syntactically valid JavaScript", async () => {
-    const {ctx} = await harness();
-    const html = await ctx.fns.icons.browserHtml({});
-    expect(html).not.toContain("__ICON_DATA__");
-    expect(html).toContain("\\u003csvg");
-    const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-    expect(script).toBeDefined();
-    expect(() => new Function(script!)).not.toThrow();
+test("native catalogue endpoint returns local metadata, not executable HTML", async () => {
+    const { default: route } = await import("./$route_catalog_GET.ts");
+    const response = await route({} as any, null, { req: new Request("http://localhost/icons/catalog") });
+    const rows = await response.json();
+    expect(rows.some((row: {name:string}) => row.name === "shapes")).toBe(true);
+    expect(response.headers.get("content-type")).toContain("application/json");
 });

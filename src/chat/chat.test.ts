@@ -14,49 +14,7 @@ async function ctxWithAgent(over: Record<string, any> = {}) {
     return { ctx, agent };
 }
 
-describe("chat header parts", () => {
-    test("core badges, buttons and cards are registered in their declared order, danger last", async () => {
-        const { ctx } = await ctxWithAgent();
-        const ids = async (kind: string) => (await ctx.fns.chat.listParts({ kind, layout: {} })).map((p: any) => p.id);
-        expect(await ids("badge")).toEqual(["agent.workspace", "agent.parent", "agent.status"]);
-        expect(await ids("button")).toEqual(["canvas.toggle"]);
-        const cards = await ids("card");
-        expect(cards[0]).toBe("appearance");
-        expect(cards.at(-1)).toBe("danger");
-    });
-
-    test("layout reorders and hides parts, skips unknown ids and never hides danger", async () => {
-        const { ctx } = await ctxWithAgent();
-        ctx.state.chat.parts["x.b"] = { id: "x.b", kind: "button", module: "x", rel: "x", order: 1, render: () => null };
-        const layout = { buttons: ["canvas.toggle", "nope.missing"], cards: ["danger", "share"], hidden: ["danger", "agent.work"] };
-        expect((await ctx.fns.chat.listParts({ kind: "button", layout })).map((p: any) => p.id)).toEqual(["canvas.toggle", "x.b"]);
-        expect((await ctx.fns.chat.listParts({ kind: "button", layout: { hidden: ["canvas.toggle"] } })).map((p: any) => p.id)).toEqual(["x.b"]);
-        const cards = (await ctx.fns.chat.listParts({ kind: "card", layout })).map((p: any) => p.id);
-        expect(cards[0]).toBe("share");
-        expect(cards).not.toContain("agent.work");
-        expect(cards.at(-1)).toBe("danger");
-    });
-
-    test("register validates files and namespaces ids by module", async () => {
-        const { ctx } = await ctxWithAgent();
-        const mod = (def: any) => ({ default: def });
-        await ctx.fns.chat.register({ kind: "badge", entries: [{ name: "pr", moduleDir: "gh", rel: "gh/$chatbadge_pr.ts", mod: mod({ order: 5, render: () => null }) }] });
-        expect(ctx.state.chat.parts["gh.pr"].kind).toBe("badge");
-        await expect(ctx.fns.chat.register({ kind: "card", entries: [{ name: "x", moduleDir: "gh", rel: "gh/$chatcard_x.ts", mod: mod({ render: () => [] }) }] })).rejects.toThrow("needs a title");
-        await expect(ctx.fns.chat.register({ kind: "button", entries: [{ name: "Bad", moduleDir: "gh", rel: "gh/$chatbutton_Bad.ts", mod: mod({ render: () => null }) }] })).rejects.toThrow("name must");
-    });
-
-
-    test("model chip opens the provider picker; context ring estimates the next payload before the first answer", async () => {
-        const { ctx } = await ctxWithAgent();
-        const chip = await ctx.fns.chat.modelChip({ agentId: "a1" });
-        expect(chip).toContain('hx-popup="agent.modelPicker"');
-        expect(chip).toContain("Opus 4.5");
-        const ring = await ctx.fns.chat.contextRing({ agentId: "a1" });
-        expect(ring).toContain('data-context-meter');
-        expect(ring).toContain('Next request estimate');
-    });
-
+describe("shared chat icon renderer", () => {
     test("icon: running ring around the logo, live ring follows the header status", async () => {
         const ctx: any = await mkTestCtx();
         const running = ctx.fns.chat.icon({ model: "anthropic:claude-opus-4-5", active: true });
@@ -110,12 +68,4 @@ describe("chat icon", () => {
         expect(ctx.fns.chat.icon({ icon: null, model: "anthropic:claude-opus-4-5" })).not.toContain("<img");
     });
 
-    test("saveAvatar reports a bad SVG inside the editor instead of failing", async () => {
-        const { ctx } = await ctxWithAgent();
-        await ctx.fns.session.save({ agent: ctx.state.agent.a1 });
-        const res = await ctx.fns.chat.saveIcon({ agentId: "a1", svg: "<div/>" });
-        expect(await res.text()).toContain("exactly one &lt;svg&gt;");
-        const ok = await ctx.fns.chat.saveIcon({ agentId: "a1", emoji: "HC" });
-        expect(ok.headers.get("HX-Refresh")).toBe("true");
-    });
 });

@@ -3,8 +3,6 @@ export default {
     icon: "flask",
     live: true,
     prepare() { return { args: {}, title: "Tests" }; },
-    render(_ctx: Context, opts: { agentId: string; item: types.canvas.Item }) {
-        return `<iframe data-canvas-frame="${opts.item.id}" src="/code/tests" title="Tests" class="block h-full w-full border-0 bg-base-100" loading="eager"></iframe>`;
-    },
+    render() { return '<p>Open Tests in the native Canvas viewer.</p>'; },
     describe() { return "live test-run report per kind (fast / integration / live / all, .runtime/test-report-<kind>.xml) with a Run button"; },
 } satisfies types.canvas.Kind;

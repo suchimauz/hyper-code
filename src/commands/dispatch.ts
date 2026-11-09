@@ -39,7 +39,7 @@ export default async function (
     let messageIdx:number|undefined;
     if(command.task){
     const message=await ctx.fns.session.appendMessage({id:opts.agentId,message:{role:'user',content:command.task,message_type:'planning_task'}}); messageIdx=message.idx;
-    const event={type:'user',text:command.task,messageIdx,ts:now,command:{name:'plan',text,argsText:command.task,requestId:opts.requestId,operationId},html:''}; event.html=await ctx.fns.agent.renderEventHtml({event,agentId:opts.agentId});
+    const event={type:'user',text:command.task,messageIdx,ts:now,command:{name:'plan',text,argsText:command.task,requestId:opts.requestId,operationId}};
     await ctx.fns.session.appendEvent({id:opts.agentId,event,ts:now});
     await ctx.fns.procs.db.run({sql:'UPDATE agents SET stopped_at=NULL,last_error=NULL,next_run_at=?,updated_at=? WHERE id=?',params:[now,now,opts.agentId]});
     }

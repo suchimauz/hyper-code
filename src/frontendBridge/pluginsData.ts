@@ -1,7 +1,7 @@
 /**
  * List mounted plugins and browse the plugin catalogue for the UI Lab Plugins page
  *
- * Use for the React "Plugins" screen. GET returns every mounted plugin (name, label, description, Phosphor icon, version, source layer, namespaces, function and route counts, skill and settings availability) plus a cookie-bound CSRF token. GET ?plugin=<name> returns one mounted plugin's detail card: SKILL.md overview, live functions with signatures, declared settings (secret values never included) and secret presence. GET ?market=1&q=<text> searches every registered plugin provider (at most 20 items each) and marks already mounted ones. Market items carry their pinned provider selection and whether the provider supports reviewed activation. POST accepts one JSON action — reload, optionally for an exact mounted plugin, or review with a provider selection, which opens Hyper's preview-only plugins.startReview agent for install and returns its id — after owner, same-origin, CSRF, content-type and size checks. Activation still requires the review agent's separate human confirmation.
+ * Use for the React "Plugins" screen. GET returns every mounted plugin (name, label, description, Phosphor icon, version, source layer, namespaces, function and route counts, skill and settings availability) plus a cookie-bound CSRF token. GET ?plugin=<name> returns one mounted plugin's detail card: SKILL.md overview, live functions with signatures, declared settings (secret values never included) and secret presence. GET ?sources=1 reads offline local inventory and provider configuration links without provider requests. GET ?market=1&q=<text>&provider=<id> searches selected providers with a fair twenty-result total cap and marks already mounted ones. Market items carry their pinned provider selection and whether the provider supports reviewed activation. POST accepts one JSON action — reload, optionally for an exact mounted plugin, or review with a provider selection, which opens Hyper's preview-only plugins.startReview agent for install, update or rollback and returns its id — after owner, same-origin, CSRF, content-type and size checks. Activation still requires the review agent's separate human confirmation.
  * @param opts.req Authenticated GET, or owner CSRF-protected JSON POST with action reload and optional name, or action review with a provider selection.
  */
 export default async function (
@@ -38,16 +38,25 @@ export default async function (
                     secrets:(config?.secrets??[]).map(s=>({name:s.name,title:s.title??s.name,description:s.description??'',required:!!s.required,configured:s.configured})),
                 }});
             }
+            if(url.searchParams.get('sources')==='1'){
+                const inventory=await ctx.fns.plugins.installed({});
+                let providers:types.plugins.ProviderInfo[]=[];
+                const errors=[...inventory.errors];
+                try{providers=await ctx.fns.plugins.providers({});}catch{errors.push('Provider discovery unavailable; local inventory remains available.');}
+                return reply({sources:inventory.plugins.map(p=>({...p,mounted:mounted.some(m=>m.name===p.name)})),errors,providers:providers.map(p=>({id:p.id,label:p.label,description:p.description,configurationHref:p.configurationHref??null}))});
+            }
             if(url.searchParams.get('market')==='1'){
                 const q=(url.searchParams.get('q')??'').slice(0,200);
-                const providers=await ctx.fns.plugins.providers({});
+                const providers=(await ctx.fns.plugins.providers({})).filter(p=>!url.searchParams.get('provider')||p.id===url.searchParams.get('provider'));
                 const names=new Set(mounted.map(p=>p.name));
                 const sections=await Promise.all(providers.map(async p=>{
                     try{const r=await ctx.fns.plugins.dispatch({provider:p.id,operation:'search',args:{q,limit:20}}) as {items:types.plugins.ProviderItem[];errors:string[]};
                         return {provider:p.id,label:p.label,errors:r.errors.slice(0,5),items:r.items.slice(0,20).map(i=>({name:i.selection.name,label:i.label??i.selection.name,description:i.description??'',icon:i.icon??null,version:i.version??null,mounted:names.has(i.selection.name),selection:i.selection,reviewable:!!p.handlers?.materialize}))};}
                     catch{return {provider:p.id,label:p.label,errors:['Provider unavailable'],items:[]};}
                 }));
-                return reply({sections});
+                const counts=sections.map(()=>0); let remaining=20;
+                while(remaining>0){let added=false;for(let i=0;i<sections.length&&remaining>0;i++){if(counts[i]!<sections[i]!.items.length){counts[i]=counts[i]!+1;remaining--;added=true;}}if(!added)break;}
+                return reply({sections:sections.map((s,i)=>({...s,items:s.items.slice(0,counts[i])}))});
             }
             const plugins=await Promise.all(mounted.map(async p=>{
                 let meta:any={};try{meta=await ctx.fns.plugins.readMetadata({path:p.path+'/package.json'});}catch{}
@@ -64,10 +73,12 @@ export default async function (
     if(!await ctx.fns.auth.verifyCsrf({req,token:req.headers.get('x-csrf-token')||''}))return reply({error:'Invalid request token'},403);
     if(req.headers.get('content-type')?.split(';')[0]?.trim()!=='application/json')return reply({error:'JSON body required'},415);
     const raw=await req.text();if(raw.length>4096)return reply({error:'Request too large'},413);
-    let data:{action?:unknown;name?:unknown;selection?:unknown};try{data=JSON.parse(raw);}catch{return reply({error:'Invalid JSON'},400);}
+    let data:{action?:unknown;name?:unknown;selection?:unknown;operation?:unknown};try{data=JSON.parse(raw);}catch{return reply({error:'Invalid JSON'},400);}
     if(data&&typeof data==='object'&&data.action==='review'){
-        if(Object.keys(data).some(k=>!['action','selection'].includes(k))||!data.selection||typeof data.selection!=='object'||Array.isArray(data.selection))return reply({error:'Invalid plugin selection'},400);
-        try{const result=await ctx.fns.plugins.startReview({selection:data.selection as types.plugins.ProviderSelection,operation:'install'});return reply({ok:true,agentId:result.id});}
+        if(Object.keys(data).some(k=>!['action','selection','operation'].includes(k))||!data.selection||typeof data.selection!=='object'||Array.isArray(data.selection))return reply({error:'Invalid plugin selection'},400);
+        const operation=data.operation??'install';
+        if(operation!=='install'&&operation!=='update'&&operation!=='rollback')return reply({error:'Invalid review operation'},400);
+        try{const result=await ctx.fns.plugins.startReview({selection:data.selection as types.plugins.ProviderSelection,operation});return reply({ok:true,agentId:result.id});}
         catch(error){return reply({error:error instanceof Error?error.message:'Could not open plugin review'},400);}
     }
     if(!data||typeof data!=='object'||Object.keys(data).some(k=>!['action','name'].includes(k))||data.action!=='reload'||(data.name!==undefined&&typeof data.name!=='string'))return reply({error:'Invalid plugin action'},400);

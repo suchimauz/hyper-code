@@ -1,86 +1,20 @@
 import { describe, test, expect } from 'bun:test';
-import { mkTestCtx } from '../_testCtx.entry';
-
-describe('GET/POST /settings/declared', () => {
-    test('GET renders form with all declared settings', async () => {
-        const ctx = await mkTestCtx();
-        const res = await ctx.fns.procs.http.dispatch({ url: '/settings/declared' });
-        expect(res.status).toBe(200);
-        const body = await res.text();
-        expect(body).toContain('declared settings');
-        expect(body).toContain('lmstudioBaseUrl');
-        expect(body).toContain('defaultModel');
-        expect(body).toContain('debounceMs');
-        expect(body).toContain('hx-post="/settings/declared"');
-    });
-
-    test('source badges in GET output match resolution chain', async () => {
-        const ctx = await mkTestCtx();
-        ctx.env.LMSTUDIO_URL = 'http://env-host:1234';
-        await ctx.fns.settings.set({
-            module: 'llm', scopeType: 'global', key: 'defaultModel', value: 'kimi:k2',
-        });
-
-        const res = await ctx.fns.procs.http.dispatch({ url: '/settings/declared' });
-        const body = await res.text();
-        // env-sourced
-        expect(body).toMatch(/env: LMSTUDIO_URL/);
-        // db-sourced
-        expect(body).toMatch(/>db</);
-    });
-
-    test('POST writes form values via settings.set', async () => {
-        const ctx = await mkTestCtx();
-        const fd = new FormData();
-        fd.set('llm.defaultModel', 'openai:gpt-4o-mini');
-        fd.set('agent.debounceMs', '1500');
-
-        const res = await ctx.fns.procs.http.dispatch({ method: 'POST', url: '/settings/declared', body: fd });
-        expect(res.status).toBe(200);
-        const body = await res.text();
-        expect(body).toContain('settings-form');
-
-        expect(await ctx.fns.settings.get({ module: 'llm', scopeType: 'global', key: 'defaultModel' }))
-            .toBe('openai:gpt-4o-mini');
-        expect(await ctx.fns.settings.get({ module: 'agent', scopeType: 'global', key: 'debounceMs' }))
-            .toBe(1500);
-    });
-
-    test('POST with reset=<key> removes the row', async () => {
-        const ctx = await mkTestCtx();
-        await ctx.fns.settings.set({
-            module: 'llm', scopeType: 'global', key: 'defaultModel', value: 'kimi:k2',
-        });
-        expect(await ctx.fns.settings.get({ module: 'llm', scopeType: 'global', key: 'defaultModel' }))
-            .toBe('kimi:k2');
-
-        const fd = new FormData();
-        fd.set('reset', 'llm.defaultModel');
-        await ctx.fns.procs.http.dispatch({ method: 'POST', url: '/settings/declared', body: fd });
-
-        // Now falls back to declared default.
-        expect(await ctx.fns.settings.get({ module: 'llm', scopeType: 'global', key: 'defaultModel' }))
-            .toBe('claude-code:claude-opus-5');
-    });
-
-    test('POST validates enum and silently ignores bad values', async () => {
-        const ctx = await mkTestCtx();
-        const fd = new FormData();
-        fd.set('llm.defaultModel', 'made-up-model-not-in-options');
-        await ctx.fns.procs.http.dispatch({ method: 'POST', url: '/settings/declared', body: fd });
-
-        // Bad enum was rejected — value stays at default.
-        expect(await ctx.fns.settings.get({ module: 'llm', scopeType: 'global', key: 'defaultModel' }))
-            .toBe('claude-code:claude-opus-5');
-    });
-
-    test('POST validates number bounds and ignores NaN', async () => {
-        const ctx = await mkTestCtx();
-        const fd = new FormData();
-        fd.set('agent.debounceMs', 'not-a-number');
-        await ctx.fns.procs.http.dispatch({ method: 'POST', url: '/settings/declared', body: fd });
-
-        expect(await ctx.fns.settings.get({ module: 'agent', scopeType: 'global', key: 'debounceMs' }))
-            .toBe(1000);
-    });
+import api from './browserApi';
+import get from './$route_declared_GET';
+function fixture(role = 'owner') {
+ const calls: unknown[] = []; const descriptor = { type: 'number', min: 1, max: 10, default: 2 }; const registry = new Map<string, any>([['demo.count', descriptor], ['demo.secret', {type:'secret',default:'DEFAULT_SECRET'}]]);
+ const ctx: any = { state: { settings: { registry } }, fns: { settings: { declared: async () => [{module:'demo',key:'secret',descriptor:{type:'secret',default:'DEFAULT_SECRET'},currentValue:'PLAIN_SECRET',source:'db'},{module:'demo',key:'count',descriptor,currentValue:3,source:'db'}], files: async () => ({values:{}}), set: async (o: unknown) => calls.push(o), remove: async (o: unknown) => calls.push(o), saveEnv: async (o: unknown) => calls.push(o) }, auth: {currentUser:async()=>({required:true,user:role?{id:'owner',role}:null}),verifyCsrf:async ({token}:any)=>token==='valid'}, http:{publicOrigin:async()=> 'https://hyper.test'} } };
+ const session: any = {user:{id:'owner',role}};
+ const request = (data?: unknown, headers: Record<string,string> = {}) => new Request('https://hyper.test/settings/declared', {method:data===undefined?'GET':'POST',headers:{'content-type':'application/json','x-csrf-token':'valid',...headers},...(data===undefined?{}:{body:JSON.stringify(data)})});
+ const run=(data?:unknown,headers?:Record<string,string>,section:'declared'|'overview'='declared')=>api(ctx,session,{req:request(data,headers),section});
+ return {ctx,session,request,run,calls};
+}
+describe('native settings API',()=>{
+ test('HTML bookmark redirects to React page',async()=>{const s=fixture();const r=await get(s.ctx,s.session,{req:s.request(),params:{}});expect(r.status).toBe(302);expect(r.headers.get('location')).toContain('extension:settings/declared');});
+ test('owner-only snapshots never include secret current or default values',async()=>{const s=fixture();const r=await s.run();const text=await r.text();expect(text).not.toContain('PLAIN_SECRET');expect(text).not.toContain('DEFAULT_SECRET');expect(text).toContain('configured');expect(r.headers.get('cache-control')).toBe('no-store');expect((await fixture('member').run()).status).toBe(403);expect((await fixture('').run()).status).toBe(401);});
+ test('CSRF and origin protect writes',async()=>{const s=fixture();for(const h of [{'x-csrf-token':'bad'},{origin:'https://evil.test'},{'sec-fetch-site':'cross-site'}])expect((await s.run({action:'reset',name:'demo.count'},h)).status).toBe(403);expect(s.calls).toEqual([]);});
+ test('number bounds, types, unknown keys, and actions rejected',async()=>{const s=fixture();for(const value of [0,11,'5',null])expect((await s.run({action:'save',name:'demo.count',value})).status).toBe(400);expect((await s.run({action:'reset',name:'undeclared.key'})).status).toBe(400);expect((await s.run({action:'wrong',name:'demo.count'})).status).toBe(400);expect(s.calls).toEqual([]);});
+ test('save and reset use declared targets only; empty secrets unchanged',async()=>{const s=fixture();expect((await s.run({action:'save',name:'demo.count',value:5})).status).toBe(200);expect((await s.run({action:'reset',name:'demo.count'})).status).toBe(200);await s.run({action:'save',name:'demo.secret',value:''});expect(s.calls).toHaveLength(2);expect(s.calls[0]).toEqual({module:'demo',key:'count',scopeType:'global',value:5,isSecret:false});});
+ test('file-fixed values cannot be saved or reset',async()=>{const s=fixture();s.ctx.fns.settings.files=async()=>({values:{'demo.count':{value:7,path:'/instance.json'}}});for(const action of ['save','reset'])expect((await s.run({action,name:'demo.count',value:5})).status).toBe(409);expect(s.calls).toEqual([]);});
+ test('provider keys allowlisted and never echoed; exception details redacted',async()=>{const s=fixture();expect((await s.run({action:'env',key:'PATH',value:'x'},undefined,'overview')).status).toBe(400);const r=await s.run({action:'env',key:'OPENAI_API_KEY',value:'SENSITIVE'},undefined,'overview');expect(await r.text()).not.toContain('SENSITIVE');expect(s.calls).toHaveLength(1);s.ctx.fns.settings.saveEnv=async()=>{throw Error('SENSITIVE');};expect(await (await s.run({action:'env',key:'OPENAI_API_KEY',value:'SENSITIVE'},undefined,'overview')).text()).not.toContain('SENSITIVE');});
 });

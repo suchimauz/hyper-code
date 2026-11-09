@@ -25,10 +25,10 @@ test("private results reject Files HTTP routes, symlink aliases and directory li
                 expect(await response.text()).not.toContain("PRIVATE_PAYLOAD_SENTINEL");
             }
         }
-        const root = await ctx.fns.files.view({ path: dir, isDir: true });
-        expect(root.html).not.toContain('>alias<');
-        const hyper = await ctx.fns.files.view({ path: join(dir, ".hyper"), isDir: true });
-        expect(hyper.html).not.toContain('>results<');
+        const root = await (await ctx.fns.files.browserData({ path: dir })).json();
+        expect(root.entries.map((entry: {name: string}) => entry.name)).not.toContain('alias');
+        const hyper = await (await ctx.fns.files.browserData({ path: join(dir, ".hyper") })).json();
+        expect(hyper.entries.map((entry: {name: string}) => entry.name)).not.toContain('results');
         const normal = await ctx.fns.files.rawResponse({ path: join(dir, "public.txt") });
         expect(normal.status).toBe(200);
         expect(await normal.text()).toBe("public");

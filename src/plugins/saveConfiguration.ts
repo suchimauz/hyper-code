@@ -1,7 +1,7 @@
 /**
  * Validates and saves only a mounted plugin configuration whitelist
  *
- * Use only after a user submits its configuration form. Rejects unknown keys and secret edits, validates the full form before any writes, and resets only whitelisted overrides. Omitted booleans are unchecked only within this plugin form.
+ * Use only after a user submits its configuration form. Rejects unknown keys and supports write-only secret settings, validates the full form before any writes, and resets only whitelisted overrides. Omitted booleans are unchecked only within this plugin form.
  * @param opts.name Exact mounted plugin name.
  * @param opts.values Full submitted form keyed by qualified setting name. Omitted declared booleans become false.
  * @param opts.reset One qualified whitelisted setting to reset; cannot be combined with values.
@@ -23,20 +23,21 @@ export default async function (
      if (opts.values !== undefined) throw new Error('Reset cannot be combined with values');
      const item = config.settings.find(i => i.name === opts.reset);
      if (!item) throw new Error('Reset target is not a configured setting');
-     if (item.secret) throw new Error('Secret settings are read-only here; use secure secret management.');
+
      await ctx.fns.settings.remove({module:item.module,scopeType:'global',key:item.key});
      return ctx.fns.plugins.configuration({name:opts.name});
     }
     if (!opts.values || typeof opts.values !== 'object' || Array.isArray(opts.values)) throw new Error('values form is required');
     const values = opts.values;
     for (const key of Object.keys(values)) if (!config.settings.some(i => i.name === key)) throw new Error('Unknown configuration setting: ' + key);
-    const writes: Array<{module:string;key:string;value:string|number|boolean}> = [];
+    const writes: Array<{module:string;key:string;value:string|number|boolean;isSecret:boolean}> = [];
     for (const item of config.settings) {
      const present = Object.prototype.hasOwnProperty.call(values,item.name);
      const raw = values[item.name]; const d = item.descriptor;
      if (present && !['string','number','boolean'].includes(typeof raw)) throw new Error('Invalid field value: ' + item.name);
      if (item.secret) {
-      if (present && raw !== '') throw new Error('Secret edits are not supported here. Use secure secret input/storage and the plugin documented secret:// reference setting.');
+      if (present && typeof raw !== 'string') throw new Error('Secret must be text');
+      if (present && raw !== '') writes.push({module:item.module,key:item.key,value:raw,isSecret:true});
       continue;
      }
      if (!present && d.type !== 'boolean') continue;
@@ -55,8 +56,8 @@ export default async function (
       value = raw;
       if (d.type === 'enum' && (!d.options || !d.options.includes(value))) throw new Error('Invalid enum option: ' + item.name);
      } else throw new Error('Unsupported setting type: ' + d.type);
-     if (!Object.is(value,item.currentValue)) writes.push({module:item.module,key:item.key,value});
+     if (!Object.is(value,item.currentValue)) writes.push({module:item.module,key:item.key,value,isSecret:false});
     }
-    for (const write of writes) await ctx.fns.settings.set({...write,scopeType:'global',isSecret:false});
+    for (const write of writes) await ctx.fns.settings.set({...write,scopeType:'global'});
     return ctx.fns.plugins.configuration({name:opts.name});
 }

@@ -1,2 +1,15 @@
-/** GET /substack — publication catalogue and authenticated mirror status. */
-export default async function(ctx:Context,_session:Session|null,_opts:{req:Request;params:Record<string,string>}){const esc=(v:any)=>ctx.fns.procs.ui.escape({text:String(v??"")}),pubs=await ctx.fns.substack.list({}),rows=pubs.map((p:any)=>`<a href="/substack/${encodeURIComponent(p.key)}" class="grid items-center gap-3 border-t border-base-200 px-4 py-3 first:border-t-0 sm:grid-cols-[1fr_8rem_10rem]"><div><div class="font-medium">${esc(p.name)}</div><div class="text-2xs text-faint">${esc(p.host)}</div></div><div class="text-xs">${p.posts} posts</div><div class="truncate font-mono text-3xs text-faint">${esc(p.cursor?.lastPublishedAt??'never synced')}</div></a>`).join("");return{title:"Substack",main:`<div class="mx-auto w-full max-w-5xl p-5 sm:p-8"><header><div class="mb-2 text-xs font-medium uppercase tracking-[.18em] text-primary">Standalone producer</div><h1 class="text-3xl font-semibold">Substack</h1><p class="mt-2 text-sm text-subtle">Subscriptions, archives, authenticated full bodies and incremental cursors. Not connected to News.</p></header><section class="mt-6 overflow-hidden rounded-xl border border-base-300 bg-base-100">${rows}</section></div>`};}
+/** Browse mirrored Substack publications with authenticated JSON or the React reader.
+ * @param opts.req Request; Accept application/json selects read-only JSON.
+ * @param opts.params Decoded path parameters.
+ */
+export default async function (ctx: Context, session: Session | null, opts: { req: Request; params: Record<string, string> }) {
+    const headers = { 'cache-control': 'no-store', vary: 'Accept' };
+    if (!(session as Session & { user?: { id: string } })?.user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers });
+    const url = new URL(opts.req.url);
+    if (!opts.req.headers.get('accept')?.includes('application/json')) {
+        const query = new URLSearchParams({ view: 'extension:readers/substack' });
+
+        return new Response(null, { status: 303, headers: { ...headers, location: '/?' + query } });
+    }
+    return Response.json({ publications: await ctx.fns.substack.list({}) }, { headers });
+}

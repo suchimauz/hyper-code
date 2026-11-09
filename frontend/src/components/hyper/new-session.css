@@ -22,3 +22,11 @@ button.new-session-chip:hover { background: var(--hover); }
 .workspace-draft-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 28px; padding: 4px 6px; border-radius: 6px; font: inherit; font-size: var(--font-body); text-align: left; }
 .workspace-draft-row.is-selected { background: var(--selected); }
 @media (max-width: 480px) { .new-session-chips { gap: 8px; } .new-session-model { gap: 8px; } }
+
+.new-session-advanced { margin-block: 8px; font-size: 13px; }
+.new-session-advanced summary { cursor: pointer; padding: 8px 0; }
+.new-session-advanced-fields { display: grid; gap: 12px; border: 0; padding: 8px 0; margin: 0; max-height: 40vh; overflow: auto; }
+.new-session-advanced-fields > label { display: grid; gap: 6px; }
+.new-session-advanced-fields input:not([type="checkbox"]), .new-session-advanced-fields textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; }
+.new-session-advanced-fields pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.new-session-advanced-fields p { margin: 0; }

@@ -1,4 +1,4 @@
-/** Adds function-RAG metadata and refreshed HTML to the matching user event. */
+/** Annotate a user event with structured function-RAG metadata, preserving any historical HTML without regenerating presentation markup. */
 export default async function (
     ctx: Context,
     _session: Session | null,
@@ -35,7 +35,7 @@ export default async function (
         retrieved: Number(opts.retrieved ?? 0),
         injected: String(opts.injected).slice(0, 6000),
     };
-    event.html = await ctx.fns.agent.renderEventHtml({ event, agentId: opts.agent.id });
+
     const result = await ctx.fns.session.replaceEventAt({ id: opts.agent.id, idx: event.idx, event });
     if (result.updated) {
         await ctx.fns.session.syncAgentState({ agent: opts.agent });

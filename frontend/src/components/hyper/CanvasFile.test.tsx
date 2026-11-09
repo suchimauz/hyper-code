@@ -29,3 +29,37 @@ it('navigates directories through the agent-bound endpoint', async () => {
   await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
   expect(request).toHaveBeenLastCalledWith('/canvas/a', { method: 'POST', csrfToken: 'state-token', body: { navigate: { itemId: 7, file: { path: '/tmp/file/child', host: 'local' } } } });
 });
+it.each(['image', 'audio', 'video', 'pdf', 'html', 'download'] as const)('renders native %s preview without the SSR viewer', async previewKind => {
+  request.mockResolvedValue({ path: '/tmp/file', preview: true, previewKind });
+  const view = render(<CanvasFile csrfToken="state-token" agentId="a" item={item} theme="light" refresh={() => {}} />);
+  expect(await screen.findByRole('link', { name: 'Скачать файл' })).toHaveAttribute('href', '/canvas/a/item/7/document?download=1');
+  const frame = view.container.querySelector('iframe');
+  if (previewKind === 'pdf' || previewKind === 'html') { expect(frame).toHaveAttribute('sandbox', ''); expect(frame).toHaveAttribute('src', '/canvas/a/item/7/document'); }
+  else expect(frame).toBeNull();
+  if (previewKind === 'image') expect(screen.getByRole('img')).toHaveAttribute('src', '/canvas/a/item/7/document');
+  if (previewKind === 'audio' || previewKind === 'video') expect(view.container.querySelector(previewKind)).toHaveAttribute('controls');
+});
+it('renders Markdown locally without allowing raw executable HTML', async () => {
+  request.mockResolvedValue({ path: '/tmp/file', content: '# Heading\n<script>alert(1)</script>', previewKind: 'markdown' });
+  const view = render(<CanvasFile csrfToken="state-token" agentId="a" item={item} theme="light" refresh={() => {}} />);
+  expect(await screen.findByRole('heading', { name: 'Heading' })).toBeVisible();
+  expect(view.container.querySelector('script,iframe')).toBeNull();
+});
+it.each(['local', 'work box'])('resolves Markdown sibling assets on %s', async host => {
+  request.mockResolvedValue({ path: '/tmp/docs/readme.md', content: '![picture](./images/a.png)\n[next](../next.md)', previewKind: 'markdown' });
+  render(<CanvasFile csrfToken="token" agentId="a" item={{...item,args:{path:'/tmp/docs/readme.md',host}}} theme="light" refresh={() => {}} />);
+  const prefix = host === 'local' ? '/files/absolute' : '/files/remote/work%20box';
+  expect(await screen.findByRole('img')).toHaveAttribute('src', `${window.location.origin}${prefix}/tmp/docs/images/a.png`);
+  expect(screen.getByRole('link', {name:'next'})).toHaveAttribute('href', `${window.location.origin}${prefix}/tmp/next.md`);
+});
+it('gives HTML a path-based base and restrictive CSP without enabling scripts', async () => {
+  request.mockResolvedValue({path:'/tmp/docs/index.html',content:'<link rel="stylesheet" href="./style.css"><img src="./a.png"><script>alert(1)</script>',previewKind:'html'});
+  const view = render(<CanvasFile csrfToken="token" agentId="a" item={item} theme="light" refresh={() => {}} />);
+  await screen.findByRole('link',{name:'Скачать файл'});
+  const frame=view.container.querySelector('iframe')!;
+  expect(frame).toHaveAttribute('sandbox','');
+  expect(frame.getAttribute('srcdoc')).toContain(`${window.location.origin}/files/absolute/tmp/docs/index.html`);
+  expect(frame.getAttribute('srcdoc')).toContain("default-src 'none'");
+  expect(frame.getAttribute('srcdoc')).toContain('Content-Security-Policy');
+  expect(frame).not.toHaveAttribute('src');
+});

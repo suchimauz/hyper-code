@@ -8,7 +8,7 @@ const mergeRuns = (older: EventPage['runs'], newer: EventPage['runs']) => [...ne
 
 export function useHyper() {
   const [agents, setAgents] = useState<HyperAgent[]>([]);
-  const [selected, setSelected] = useState(() => new URL(location.href).searchParams.get('agent') || '');
+  const [selected, setSelected] = useState(() => new URL(location.href).searchParams.get('newSession') === '1' ? '' : new URL(location.href).searchParams.get('agent') || '');
   const [events, setEvents] = useState<ChatEvent[]>([]);
   const [page, setPage] = useState<EventPage | null>(null);
   const [error, setError] = useState('');
@@ -21,7 +21,7 @@ export function useHyper() {
   const generation = useRef(0);
   const select = useCallback((id: string) => {
     current.current = id; setSelected(id); const url = new URL(location.href);
-    if (id) { url.searchParams.set('agent', id); url.searchParams.delete('new'); }
+    if (id) { url.searchParams.delete('newSession'); url.searchParams.set('agent', id); url.searchParams.delete('new'); }
     else { url.searchParams.delete('agent'); url.searchParams.set('new', '1'); }
     history.replaceState(null, '', url);
   }, []);

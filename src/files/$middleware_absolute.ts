@@ -15,6 +15,8 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     const url = new URL(opts.req.url);
     const prefix = "/files/absolute";
     if (url.pathname !== prefix && !url.pathname.startsWith(prefix + "/")) return;
+    const who = await ctx.fns.auth.currentUser({ req: opts.req });
+    if (who.required && !who.user && !who.legacy) return new Response('Authentication required', { status: 401 });
 
     let decoded: string;
     try {

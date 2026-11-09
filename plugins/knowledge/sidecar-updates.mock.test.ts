@@ -75,12 +75,3 @@ test('last-turn distinct entities, ambiguity skips, empty batch, duplicate check
  await expect(broken.run([broken.mention({attributeUpdates:[{attribute:'headline',value:'New',operation:'correct',evidence:'Acme headline New'}]})])).rejects.toThrow();
  expect(broken.state.scratchpad.knowledgeSidecar.lastTurn).toEqual(saved); expect(broken.state.provenance).toEqual([]);
 });
-test('last-turn UI is honest about empty/legacy/error states and escapes counter input',async()=>{
- const source=await Bun.file(new URL('./src/knowledge/agentMetaSection.ts',import.meta.url)).text();
- const render=new Function(new Bun.Transpiler({loader:'ts'}).transformSync(source).replace('export default','return'))();
- const ctx={fns:{procs:{ui:{escape:({text}:any)=>Bun.escapeHTML(text)}},ui:{toggle:()=>''}}};
- const show=(knowledgeSidecar:any)=>render(ctx,null,{agent:{id:'parent',scratchpad:{knowledgeTrackingEnabled:true,knowledgeSidecar}}});
- expect(show({})).not.toContain('Last successful turn');
- const html=show({status:'error',error:'<bad>',lastTurn:{sourceMessageIdx:3,matched:'<img>',created:0,facts:{}}});
- expect(html).toContain('Last successful turn · message 3'); expect(html).toContain('0 matched'); expect(html).toContain('&lt;bad&gt;'); expect(html).not.toContain('<img>'); expect(html).toContain('not all observations below');
-});

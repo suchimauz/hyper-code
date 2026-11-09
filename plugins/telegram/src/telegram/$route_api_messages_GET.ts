@@ -1,5 +1,10 @@
 /** Returns recent messages from one personal Telegram dialog without marking them read. */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
+
+    const who = await ctx.fns.auth.currentUser({ req: opts.req });
+    const { user } = who;
+    if (who.required && !user && !who.legacy) return Response.json({ error: "Authentication required" }, { status: 401 });
+    if (user && user.role !== "owner") return Response.json({ error: "Owner access required" }, { status: 403 });
     const url = new URL(opts.req.url);
     const chat = String(url.searchParams.get("chat") ?? "").trim();
     if (!chat) return Response.json({ error: "chat is required" }, { status: 400 });

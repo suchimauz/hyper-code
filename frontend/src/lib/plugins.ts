@@ -16,8 +16,14 @@ export async function getPlugins(signal?: AbortSignal) {
   return data;
 }
 
-export async function searchPluginMarket(q: string, signal?: AbortSignal) {
-  const data = await requestJson<{ sections: MarketSection[] }>(`${PATH}?market=1&q=${encodeURIComponent(q)}`, { signal });
+export type SourcePlugin = { name: string; label?: string; description?: string; version?: string; selection?: PluginSelection; previousSelection?: PluginSelection; managed: boolean; modified?: boolean; status: string; mounted: boolean };
+export type SourceProvider = { id: string; label: string; description: string; configurationHref: string | null };
+export function getPluginSources(signal?: AbortSignal) {
+  return requestJson<{ sources: SourcePlugin[]; providers: SourceProvider[]; errors: string[] }>(`${PATH}?sources=1`, { signal });
+}
+
+export async function searchPluginMarket(q: string, signal?: AbortSignal, provider = '') {
+  const data = await requestJson<{ sections: MarketSection[] }>(`${PATH}?market=1&q=${encodeURIComponent(q)}&provider=${encodeURIComponent(provider)}`, { signal });
   if (!Array.isArray(data.sections)) throw new Error('Не удалось загрузить каталог');
   return data.sections;
 }
@@ -44,8 +50,8 @@ export async function getPluginDetail(name: string, signal?: AbortSignal) {
 export const stripFrontMatter = (text: string) => text.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
 
 /** Opens Hyper's preview-only install review agent; activation needs separate confirmation there. */
-export function reviewPluginInstall(csrfToken: string, selection: PluginSelection) {
-  return requestJson<{ ok: boolean; agentId: string }>(PATH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ action: 'review', selection }) });
+export function reviewPluginInstall(csrfToken: string, selection: PluginSelection, operation: 'install' | 'update' | 'rollback' = 'install') {
+  return requestJson<{ ok: boolean; agentId: string }>(PATH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ action: 'review', selection, operation }) });
 }
 
 /** Groups by the real Hyper plugin layer, in dsh section order. */

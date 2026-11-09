@@ -1,5 +1,6 @@
 /** Lists registered News share adapters and their destinations for the guarded native share picker. */
-export default async function (ctx: Context, _session: Session | null, _opts: { req: Request; params: Record<string, string> }) {
+export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
+    const denied = await ctx.fns.news.authorizeUi({req:opts.req}); if (denied) return denied;
     const targets = await ctx.fns.news.shareTargets({});
     const result = [];
     for (const target of targets) {
