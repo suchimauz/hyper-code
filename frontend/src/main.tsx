@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { App } from './App';
 import { LiveApp } from './LiveApp';
 import './styles/live.css';
@@ -23,4 +24,4 @@ if (viewport) {
   viewport.addEventListener('resize', sync); viewport.addEventListener('scroll', sync); sync();
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode>{new URL(location.href).searchParams.has('demo') ? <App /> : <LiveApp />}</StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{/* Shared tooltip group: after the first delayed tooltip, adjacent ones open instantly until the pointer leaves all of them. */}<Tooltip.Provider>{new URL(location.href).searchParams.has('demo') ? <App /> : <LiveApp />}</Tooltip.Provider></StrictMode>);
