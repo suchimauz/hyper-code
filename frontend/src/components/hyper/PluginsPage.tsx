@@ -1,26 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Info, Plus, Puzzle, RotateCw, Search, X } from 'lucide-react';
-import { getPluginSources, type SourcePlugin, type SourceProvider, getPlugins, groupPlugins, phosphorClass, reloadPlugins, reviewPluginInstall, searchPluginMarket, type InstalledPlugin, type MarketItem, type MarketSection } from '../../lib/plugins';
+import { Info, Plus, RotateCw, Search, X } from 'lucide-react';
+import { getPluginSources, type SourcePlugin, type SourceProvider, getPlugins, groupPlugins, reloadPlugins, reviewPluginInstall, searchPluginMarket, type InstalledPlugin, type MarketItem, type MarketSection } from '../../lib/plugins';
+import { PluginIcon } from './PluginIcon';
 import { PluginDetail } from './PluginDetail';
 import { PluginUiReview } from './PluginUiReview';
 import './plugins-page.css';
 
 type Tab = 'installed' | 'market' | 'sources';
-
-/** Phosphor stylesheet is served by Hyper itself; loaded once, on demand. */
-function usePhosphor() {
-  useEffect(() => {
-    if (document.querySelector('link[data-phosphor]')) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet'; link.href = '/ui/vendor/phosphor.css'; link.dataset.phosphor = '';
-    document.head.append(link);
-  }, []);
-}
-
-function PluginIcon({ icon }: { icon: string | null }) {
-  const cls = phosphorClass(icon);
-  return <span className="plugins-tile" aria-hidden="true">{cls ? <i className={`ph ${cls}`} /> : <Puzzle size={20} strokeWidth={1.25} />}</span>;
-}
 
 function InstalledCard({ plugin, pending, onOpen, onReload }: { plugin: InstalledPlugin; pending: boolean; onOpen: () => void; onReload?: () => void }) {
   return <li className="plugins-card">
@@ -114,7 +100,6 @@ function Market({ csrf, onOpenAgent, onOpenPlugin }: { csrf: string; onOpenAgent
 
 /** Plugins page, as in dsh, over Hyper's mounted plugins and provider catalogue. */
 export function PluginsPage({ onOpenAgent }: { onOpenAgent?: (id: string) => void } = {}) {
-  usePhosphor();
   const [tab, setTab] = useState<Tab>(() => new URL(location.href).searchParams.get('catalogTab') === 'sources' ? 'sources' : new URL(location.href).searchParams.get('catalogTab') === 'market' ? 'market' : 'installed');
   const [plugins, setPlugins] = useState<InstalledPlugin[] | null>(null);
   const [csrf, setCsrf] = useState('');

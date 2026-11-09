@@ -1,7 +1,7 @@
 import { ThemeMenu } from './ThemeMenu';
 import type { ThemeMode } from '../../hooks/useTheme';
 import { useEffect, useId, useState } from 'react';
-import { Archive, ArchiveRestore, ChevronDown, Timer, Puzzle, Folder, FolderOpen, FolderPlus, LogOut, PanelLeft, Plus, Search, Settings, Users, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ChevronDown, Timer, Puzzle, PanelsTopLeft, Folder, FolderOpen, FolderPlus, LogOut, PanelLeft, Plus, Search, Settings, Users, X } from 'lucide-react';
 import { HoverPanel } from '../ui/HoverPanel';
 import { type ProjectAction, type ChatAction, type NavigationProject, type NavigationUser } from '../../lib/navigation';
 import { WorkspaceChatRow } from './WorkspaceChatRow';
@@ -81,7 +81,7 @@ export function WorkspaceSidebar({ onOpenPeople, peopleActive, extensionNavigati
     <div className="workspace-actions">
       <button className="workspace-action" aria-label="New Session" title="New Session" onClick={() => onNewSession?.()} disabled={!onNewSession}><span className="new-session-icon"><Plus size={12} strokeWidth={1.5} /></span>{!compact && <span>New Session</span>}</button>
       {extensionNavigation.map(item => <button key={item.key} className={`workspace-action ${item.active ? 'is-selected' : ''}`} aria-current={item.active ? 'page' : undefined} aria-label={item.title} title={item.title} onClick={item.onSelect}><Puzzle size={16} strokeWidth={1} />{!compact && <span>{item.title}</span>}</button>)}
-      {onOpenPages && <button className={`workspace-action ${pagesActive ? 'is-selected' : ''}`} aria-current={pagesActive ? 'page' : undefined} aria-label="Pages" title="Pages" onClick={onOpenPages}><Puzzle size={16} strokeWidth={1} />{!compact && <span>Pages</span>}</button>}
+      {onOpenPages && <button className={`workspace-action ${pagesActive ? 'is-selected' : ''}`} aria-current={pagesActive ? 'page' : undefined} aria-label="Pages" title="Pages" onClick={onOpenPages}><PanelsTopLeft size={16} strokeWidth={1} />{!compact && <span>Pages</span>}</button>}
       {onOpenPlugins && <button className={`workspace-action ${pluginsActive ? 'is-selected' : ''}`} aria-current={pluginsActive ? 'page' : undefined} aria-label="Plugins" title="Plugins" onClick={onOpenPlugins}><Puzzle size={16} strokeWidth={1} />{!compact && <span>Plugins</span>}</button>}
       {onOpenAutomation && <button className={`workspace-action ${automationActive ? 'is-selected' : ''}`} aria-current={automationActive ? 'page' : undefined} aria-label="Cron Tasks" title="Cron Tasks" onClick={onOpenAutomation}><Timer size={16} strokeWidth={1} />{!compact && <span>Cron Tasks</span>}</button>}
       {compact && <button className="workspace-action" aria-label="Workspaces" title="Workspaces" onClick={onToggle}><Folder size={16} strokeWidth={1} /></button>}
