@@ -8,7 +8,7 @@ The former navigation/dock/chat shell in `ui.layout` is removed, not renamed. Th
 
 People is a native React page (`?view=people`); `/auth/users` negotiates JSON and redirects HTML visits. Sidebar draft is a native React composer (`?sidebarDraft=<binding>`), retaining the existing atomic first-message claim and owner/origin/CSRF checks. No agent is created merely by opening the composer.
 
-React Canvas owns tabs/state, native text-file editing and directory browsing, and host-reviewed plugin `canvasKinds`. Files too large or unsuitable for text editing and plugin kinds without a registered React view still use `canvas.itemDocument` and their existing kind renderers. HTML/URL sandbox nesting is preserved. Do not claim every plugin renderer is native React, and do not remove the item-document or secure-input transports.
+React Canvas owns tabs/state, native text-file editing and directory browsing, and granted plugin `canvasKinds` (declared in the plugin's `procs.ui`, loaded at runtime). Files too large or unsuitable for text editing and plugin kinds without a granted React view still use `canvas.itemDocument` and their existing kind renderers. HTML/URL sandbox nesting is preserved. Do not claim every plugin renderer is native React, and do not remove the item-document or secure-input transports.
 
 `SecureInputHost` reads metadata from owner-only `/input/compat?agentId=…`. On explicit opening, supported secure kinds use the original card transports inside an isolated document; Redmine approval opens a separate top-level page, preserving its confirmation authority. No approval is inferred from generic form submission. Native React choice/confirm remain separate.
 

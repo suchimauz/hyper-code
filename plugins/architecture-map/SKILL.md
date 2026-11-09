@@ -14,3 +14,7 @@ The function is read-only. It does not reimplement source parsing; run `code.ind
 Run `architectureMap.indexGit({})` after repository HEADs change. It caches non-merge per-file Git history in Postgres, follows renames, and removes each file's creation commit from churn. Unchanged repository HEADs are served from cache.
 
 Use `architectureMap.turbulence({ root? })` to rank current production files by cached churn and deterministic source complexity. Open `architectureMap.turbulence` on Canvas for the interactive scatter plot and Danger Zone list.
+
+## Browser UI
+
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["architecture", "turbulence"], "canvasKinds": ["architectureMap.map", "architectureMap.turbulence"], "applications": {"/architectureMap": "architecture", "/architectureMap/turbulence": "turbulence"}}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "architecture-map" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

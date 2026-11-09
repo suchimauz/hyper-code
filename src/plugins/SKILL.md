@@ -173,7 +173,7 @@ A plugin widget nobody placed lands on the built-in **Plugins** tab automaticall
 
 ### Chat UI
 
-React owns the chat toolbar, Meta panel and Composer. The former chat header part declarations and layout registry have been removed; plugins must not add SSR chat badges, buttons or cards. Use the host-reviewed React SDK registration contract in `docs/ui-architecture.md` for trusted UI contributions, with explicit grants and backend authorization.
+React owns the chat toolbar, Meta panel and Composer. The former chat header part declarations and layout registry have been removed; plugins must not add SSR chat badges, buttons or cards. Contribute UI through the plugin's own `ui/index.tsx` and `procs.ui` grants (see “Plugin UI” below and `docs/ui-architecture.md`), with backend authorization on every route.
 
 ### Settings
 

@@ -154,3 +154,7 @@ Plugin-created tabs are automatically closed after ten minutes without CDP activ
 Prefer the high-level Google search, AI and research workflows for those tasks rather than scraping Google manually. AI-generated answers can be wrong; compare factual claims with source pages. Consent pages, login challenges and CAPTCHA are reported as errors rather than silently returning empty results.
 
 All CDP capabilities remain public. Use `browser.evaluate`, `cdp.send` or `cdp.session` when the focused browser operations do not expose a required Chrome capability. This plugin connects to an existing debuggable Chrome; it does not launch the browser.
+
+## Browser UI
+
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["live"], "applications": {"/browser/live": "live"}}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "browser" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

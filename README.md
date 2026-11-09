@@ -111,7 +111,7 @@ Home / global menu
 
 **Layout → Regions → Widgets** is the direction of the UI redesign: the layout defines areas of the screen, plugins supply independent parts, and settings control their composition. Not every UI part is a home widget; Canvas tabs, chat parts, and search sources have separate contracts. The redesign is ongoing—this is a conceptual map, not a screenshot or a promise of a finished drag-and-drop editor.
 
-Runtime plugins can provide more than tools. The `$widget_`, `$search_`, `$app_` and `$dock_` conventions below belong to compatibility SSR navigation; they do not automatically register React pages or grant browser execution. New primary-shell contributions use the host-reviewed `@hyper/ui` extension registry. Canvas and Markdown renderers have their own contracts and remain separate from React extension slots:
+Runtime plugins can provide more than tools. The `$widget_`, `$search_`, `$app_` and `$dock_` conventions below belong to compatibility SSR navigation; they do not automatically register React pages or grant browser execution. New primary-shell contributions are React UI extensions: a plugin puts its UI in `ui/index.tsx` and declares grants in `package.json` `procs.ui`; Hyper builds and loads it at runtime (see [UI architecture](docs/ui-architecture.md)). Canvas and Markdown renderers have their own contracts and remain separate from React extension slots:
 
 | Convention | Purpose |
 | --- | --- |

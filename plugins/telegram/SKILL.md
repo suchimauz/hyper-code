@@ -53,3 +53,7 @@ await ctx.fns.telegram.search({ query: "Circleback", max: 10 });
 await ctx.fns.telegram.findChat({ query: "ИИшница", limit: 10 });
 await ctx.fns.telegram.messages({ chat: "-1001951583351", max: 30 });
 ```
+
+## Browser UI
+
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["overview"], "applications": {"/telegram": "overview"}}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "telegram" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

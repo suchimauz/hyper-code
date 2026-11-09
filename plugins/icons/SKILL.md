@@ -26,3 +26,7 @@ Bundled offline from lucide-static 1.57.0: 2,154 SVG files and upstream search t
 From the repository root run `python3 plugins/icons/scripts/update-assets.py` to reproduce the pinned assets. The script checks the archive SHA-512 against assets/source.json and npm metadata, and replaces generated icons/tags/license only. To intentionally upgrade, change the version in assets/source.json and remove its old integrity first; review the resulting asset and license diff.
 
 Tests: `bun test --no-isolate plugins/icons/src/icons/icons.test.ts` (offline, no database required).
+
+## Browser UI
+
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "canvasKinds": ["icons.browser"]}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "icons" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

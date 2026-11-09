@@ -13,3 +13,7 @@ await ctx.fns.whisper.transcribe({ path: "/tmp/a.wav", model: "large-v3-turbo", 
 
 Any ffmpeg-readable format is accepted; it is converted to 16 kHz mono WAV first.
 Test page: `/whisper` — live mic transcription (partial text while speaking, final after a pause); clap to start a new block. `ensureServer` keeps a model resident for fast requests.
+
+## Browser UI
+
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["overview"], "applications": {"/whisper": "overview"}}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "whisper" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

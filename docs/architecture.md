@@ -349,7 +349,7 @@ If writes ever become the bottleneck, we'd partition the agent space across mult
 
 ### Why React with a compatibility boundary
 
-The primary shell uses React/Vite and a public SDK so reviewed extensions share components, theme tokens, lifecycle and host-owned slots. Existing HTMX/SSR consumers are maintained separately until their actual callers migrate. Keep one React runtime and explicit backend security checks; neither the SDK nor host grants sandbox trusted same-origin extension code.
+The primary shell uses React/Vite and a public SDK so built-in and runtime-loaded plugin extensions share components, theme tokens, lifecycle and host-owned slots. Existing HTMX/SSR consumers are maintained separately until their actual callers migrate. Keep one React runtime and explicit backend security checks; neither the SDK nor host grants sandbox trusted same-origin extension code.
 
 ### Why no durable `agent.thinking.delta` channel
 
