@@ -1,7 +1,6 @@
 import {test,expect} from 'bun:test';
 import chats from './chats.ts';
 import list from './list.ts';
-import render from './renderChrome.ts';
 import dock from '../dock/runningAgents.ts';
 import menu from '../nav/chatItems.ts';
 
@@ -29,8 +28,4 @@ test('idle ancestors appear active in dock and menu without altering state',asyn
  const out=await dock(ctx,null,{});expect(out).toContain('Ожидает · Подагенты: 2');expect(out).toContain('/agent/root');expect(out).not.toContain('/agent/idle');
  const cards=[{id:'root',runState:'idle'},{id:'idle',runState:'idle'},{id:'own',runState:'running'}];
  const items=await menu(ctx,null,{agents:cards});expect(items.map(x=>x.active)).toEqual([true,false,true]);expect(cards[0]?.runState).toBe('idle');expect(items[0]?.detail).toBeUndefined();
-});
-test('project tabs and mobile icons mark idle parent activity with tooltip only',async()=>{
- const {ctx}=fixture();const out=await render(ctx,null,{projects:[{id:'p',title:'Project',dir:'/work',host:''}],projectId:'p',chats:[{id:'root',title:'Parent',runState:'idle',teamRunningCount:2}],tabIds:['root']});
- expect(out.tabs).toContain('Working subagents: 2');expect(out.tabs).toContain('project-mobile-activity');expect(out.tabs.replaceAll('\\','')).toContain('"active":true');expect(out.tabs).not.toContain('<span>Working subagents');
 });

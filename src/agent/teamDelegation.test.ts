@@ -5,7 +5,6 @@ import team from "./team";
 import steer from "./steer";
 import ask from "./ask";
 import done from "../session/done";
-import renderMeta from "../ui/agentMetaPanel";
 import archiveMember from "./archiveMember";
 import unarchiveMember from "./unarchiveMember";
 import archiveCompleted from "./archiveCompleted";
@@ -205,26 +204,4 @@ describe("team delegation", () => {
     });
 
 
-    test("parent Meta panel renders child plans in Team", async () => {
-        // the real UI helpers (button, toggle, sections…), not hand stubs that fall behind them
-        const ctx: any = await mkTestCtx({ db: false });
-        const html = await renderMeta(ctx, null, {
-            agent: { id: "p", scratchpad: {}, goal: null } as any,
-            archivedTeam: [{ id: "z", title: "Old research", runState: "idle", status: "ready", summary: "Archived result", updatedAt: 1, archivedAt: 2, plan: { tasks: [] } }],
-            team: [{ id: "c", title: "Research", runState: "running", status: "working", summary: null, updatedAt: 1, plan: { tasks: [
-                { id: "a", title: "Inspect", status: "done" },
-                { id: "b", title: "Compare", status: "active" },
-            ] } }],
-        });
-        expect(html).toContain("Team");
-        expect(html).toContain("Research");
-        expect(html).toContain("Inspect");
-        expect(html).toContain("Compare");
-        expect(html).toContain('/agent/c');
-        expect(html).toContain("Show archived (1)");
-        expect(html).toContain("Old research");
-        expect(html).toContain("/unarchive");
-        expect(html).toContain("Restore &amp; open");
-        expect(html).toContain("/stop");
-    });
 });

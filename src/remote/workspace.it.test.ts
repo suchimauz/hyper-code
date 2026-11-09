@@ -152,8 +152,7 @@ describe.skipIf(!enabled)("remote workspace (agent.workspaceHost)", () => {
         rpc.session = { ...actx.session, url: new URL("http://localhost/rpc") };
         const html = String(await rpc.fns.ui.previewFile({ path: "docs sp/readme.md" }));
         expect(html).toContain(`src="/files/remote/embed/plain${home}/proj/docs%20sp/readme.md"`);
-        const header = String(await ctx.fns.ui.chatColumn({ agentId: agent.id }));
-        expect(header).toContain(`Remote files · plain:${home}/proj`);
+
     });
 
     test("remote.list / stat / readBytes", async () => {

@@ -1,58 +1,120 @@
-// FUNCTIONAL test in a real (headless) Chrome: the agent opens a canvas while the person's tab is in the
-// background. A hidden tab has no event stream (procs/events/client.js drops it), so the canvas.changed
-// event never reaches it; canvas.js must catch up when the tab is shown again. Before the fix the canvas
-// stayed closed. Runs in the suite's headless Chrome (test/chrome/headless.ts); skipped without Chrome.
-import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkTestCtx } from "../_testCtx.entry";
-import { testChrome } from "../../test/chrome/headless";
+// Real Chrome regression for React surfaces, with an isolated allowlisted fixture server.
+// No mkTestCtx, DB, real auth, messages, approval endpoints, or developer browser.
+import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { startHeadlessChrome, type HeadlessChrome } from '../../test/chrome/headless';
+import { resolve } from 'node:path';
 
-const CDP = (await testChrome()) ?? "";
-const ctx: any = await mkTestCtx();
+let chrome: HeadlessChrome | null;
 let server: ReturnType<typeof Bun.serve>;
-
+let assets = new Map<string, Blob>();
+const unexpected: string[] = [];
+const saves: { body: any; csrf: string | null }[] = [];
+let content = 'original fixture text';
+let activeItemId = 1;
 beforeAll(async () => {
-    await ctx.fns.procs.http.loadRoutes({});
-    server = Bun.serve({ port: 0, hostname: "127.0.0.1", idleTimeout: 60, fetch: (req, srv) => ctx.fns.procs.http.handle({ req, server: srv }) });
-});
-afterAll(() => server?.stop(true));
-
-async function openTab(url: string) {
-    const tab: any = await (await fetch(`${CDP}/json/new?${encodeURIComponent(url)}`, { method: "PUT" })).json();
-    const ws = new WebSocket(tab.webSocketDebuggerUrl);
-    await new Promise((ok, fail) => { ws.onopen = ok; ws.onerror = fail; });
-    let id = 0;
-    const pending = new Map<number, (v: any) => void>();
-    ws.onmessage = (e) => { const m = JSON.parse(String(e.data)); pending.get(m.id)?.(m); };
-    const evaluate = (expression: string) => new Promise<any>((ok) => {
-        pending.set(++id, (m) => ok(m.result?.result?.value));
-        ws.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } }));
-    });
-    const close = async () => { ws.close(); await fetch(`${CDP}/json/close/${tab.id}`).catch(() => null); };
-    return { evaluate, close };
-}
-
-const canvasState = `(() => { const r = document.querySelector('[data-canvas-agent]'); return { open: !!r?.hasAttribute('data-canvas-open'), tabs: r?.querySelectorAll('[data-canvas-tab]').length ?? -1 }; })()`;
-// Chrome's own hidden state cannot be forced on a headless tab, so the page is told it is hidden the way
-// the browser does it: visibilityState plus a visibilitychange event (events/client.js then drops its stream).
-const setVisibility = (state: "hidden" | "visible") => `Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => '${state}' }); document.dispatchEvent(new Event('visibilitychange')); true`;
-
-test.skipIf(!CDP)("a canvas the agent opened while the tab was hidden opens when the tab is shown again", async () => {
-    const agent = await ctx.fns.agent.start({ model: "mock:test" });
-    const tab = await openTab(`http://127.0.0.1:${server.port}/agent/${agent.id}`);
-    try {
-        for (let i = 0; i < 100 && !(await tab.evaluate("!!(window.__hyperCanvasInstalled && window.__hyperEventsInstalled && document.querySelector('[data-canvas-agent]'))")); i++) await Bun.sleep(50);
-        expect(await tab.evaluate(canvasState)).toEqual({ open: false, tabs: 0 });
-
-        await tab.evaluate(setVisibility("hidden"));
-        await ctx.fns.canvas.show({ agentId: agent.id, kind: "html", title: "Drawing", args: { html: "<p>drawing</p>" } });
-        await Bun.sleep(300);
-        expect((await tab.evaluate(canvasState)).open).toBe(false);   // hidden: no stream, nothing arrived
-
-        await tab.evaluate(setVisibility("visible"));
-        let state: any = null;
-        for (let i = 0; i < 60; i++) { state = await tab.evaluate(canvasState); if (state.open && state.tabs === 1) break; await Bun.sleep(50); }
-        expect(state).toEqual({ open: true, tabs: 1 });
-    } finally {
-        await tab.close();
+  const build = await Bun.build({ entrypoints: [resolve(import.meta.dir, '../../test/chrome/react-surfaces.fixture.tsx')], target: 'browser', minify: false, tsconfig: resolve(import.meta.dir, '../../frontend/tsconfig.json'), loader: { '.woff2': 'file' } });
+  if (!build.success) throw new Error(build.logs.join('\n'));
+  assets = new Map(build.outputs.map(output => ['/' + output.path.split('/').pop(), output]));
+  const js = [...assets.keys()].find(path => path.endsWith('.js'))!;
+  const css = [...assets.keys()].filter(path => path.endsWith('.css')).map(path => `<link rel="stylesheet" href="${path}">`).join('');
+  server = Bun.serve({ hostname: '127.0.0.1', port: 0, async fetch(req) {
+    const url = new URL(req.url), path = url.pathname;
+    const json = (value: unknown) => Response.json(value);
+    if (req.method === 'GET' && path === '/') return new Response(`<!doctype html><html><head><meta name="csrf-token" content="fixture-csrf">${css}</head><body><div id="root"></div><script type="module" src="${js}"></script></body></html>`, { headers: { 'Content-Type': 'text/html', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; img-src 'self' data:; font-src 'self'" } });
+    if (req.method === 'GET' && assets.has(path)) return new Response(assets.get(path));
+    if (path === '/favicon.ico') return new Response(null, { status: 204 });
+    if (req.method === 'GET' && path === '/nav/items') return json({ items: [
+      { id: 'fixture', label: 'Fixture application', href: '/fixture-document', group: 'Tests' },
+      { id: 'shell', label: 'Forbidden shell', href: '/' }, { id: 'bank', label: 'Forbidden bank', href: '/tbank' },
+      { id: 'external', label: 'Forbidden external', href: 'https://example.com' },
+    ] });
+    if (req.method === 'GET' && path === '/fixture-document') return new Response('<!doctype html><html><body><h1>Isolated application document</h1></body></html>', { headers: { 'Content-Type': 'text/html' } });
+    if (req.method === 'GET' && path === '/auth/users') return json({ meId: 'fixture-owner', csrfToken: 'fixture-csrf', google: null, users: [{ id: 'fixture-owner', name: 'Fixture Owner', email: 'owner@example.invalid', role: 'owner', disabledAt: null, hasPassword: false, providers: [] }] });
+    if (req.method === 'GET' && path === '/canvas/fixture/state') return json({ items: [1, 2].map(id => ({ id, title: `Fixture ${id}`, icon: 'file-text', active: id === activeItemId, kind: 'file', args: { path: `/fixture/${id}.txt` } })) });
+    if (req.method === 'POST' && path === '/canvas/fixture') {
+      const body = await req.json();
+      if ([1, 2].includes(body.activeItemId) && Object.keys(body).length === 1) { activeItemId = body.activeItemId; return json({ activeItemId }); }
     }
+    if (req.method === 'POST' && /^\/canvas\/fixture\/item\/[12]$/.test(path)) {
+      const body = await req.json();
+      if (body.fileAction === 'read') return json({ path, content: path.endsWith('/1') ? content : 'second file' });
+      if (body.fileAction === 'save' && path.endsWith('/1')) {
+        saves.push({ body, csrf: req.headers.get('x-csrf-token') }); content = body.content;
+        return json({ path, content });
+      }
+    }
+    unexpected.push(`${req.method} ${path}`);
+    return new Response('Fixture route not allowlisted', { status: 404 });
+  } });
+  chrome = await startHeadlessChrome();
+  if (!chrome) throw new Error('Chrome required: set CHROME_BIN to an installed Chromium binary (never silently skip this regression)');
 }, 30_000);
+afterAll(async () => { server?.stop(true); await chrome?.stop(); });
+
+async function open(surface: string) {
+  const target = await (await fetch(`${chrome!.url}/json/new?${encodeURIComponent(`http://127.0.0.1:${server.port}/?surface=${surface}`)}`, { method: 'PUT' })).json() as any;
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((ok, fail) => { ws.onopen = ok; ws.onerror = fail; });
+  let id = 0;
+  const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  ws.onmessage = event => {
+    const message = JSON.parse(String(event.data)); const task = pending.get(message.id); if (!task) return;
+    clearTimeout(task.timer); pending.delete(message.id);
+    if (message.error || message.result?.exceptionDetails) task.reject(new Error(JSON.stringify(message)));
+    else task.resolve(message.result);
+  };
+  const command = (method: string, params: object = {}) => new Promise<any>((resolve, reject) => {
+    const ticket = ++id; const timer = setTimeout(() => { pending.delete(ticket); reject(new Error(`CDP timeout: ${method}`)); }, 5000);
+    pending.set(ticket, { resolve, reject, timer }); ws.send(JSON.stringify({ id: ticket, method, params }));
+  });
+  const evaluate = async (expression: string) => (await command('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result?.value;
+  const wait = async (expression: string) => { for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await Bun.sleep(50); } throw new Error(`DOM condition timed out: ${expression}; ${await evaluate('document.body.innerText')}`); };
+  return { evaluate, wait, command, close: async () => { for (const task of pending.values()) { clearTimeout(task.timer); task.reject(new Error('Tab closed')); } pending.clear(); ws.close(); await fetch(`${chrome!.url}/json/close/${target.id}`); } };
+}
+const click = (text: string) => `[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)}).click()`;
+
+test('React Applications filters unsafe/native destinations and opens a themed fixture document', async () => {
+  const tab = await open('applications');
+  try {
+    await tab.wait(`document.body.textContent.includes('Fixture application')`);
+    expect(await tab.evaluate(`document.body.textContent.includes('Forbidden')`)).toBe(false);
+    await tab.evaluate(click('Fixture applicationTests'));
+    await tab.wait(`document.querySelector('iframe')?.contentDocument?.body.textContent.includes('Isolated application document')`);
+    expect(await tab.evaluate(`document.querySelector('iframe').contentDocument.documentElement.dataset.theme`)).toBe('dark');
+    await tab.evaluate(click('Все приложения'));
+    await tab.wait(`!!document.querySelector('input[type=search]')`);
+    expect(await tab.evaluate(`document.querySelectorAll('[role=alert]').length`)).toBe(0);
+    expect(unexpected).toEqual([]);
+  } finally { await tab.close(); }
+}, 20_000);
+
+test('React Canvas retains unsaved draft across tabs and sends exact optimistic save with CSRF', async () => {
+  const tab = await open('canvas');
+  try {
+    await tab.wait(`document.querySelector('textarea')?.value === 'original fixture text'`);
+    await tab.evaluate(`window.fixtureEditor=document.querySelector('textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(window.fixtureEditor,'edited fixture text'); window.fixtureEditor.dispatchEvent(new Event('input',{bubbles:true}));`);
+    await tab.wait(`document.body.textContent.includes('Сохранить *')`);
+    await tab.evaluate(click('Fixture 2'));
+    await tab.wait(`document.querySelector('[data-tab-key="item-2"] [role=tab]').getAttribute('aria-selected')==='true'`);
+    await tab.wait(`document.querySelectorAll('textarea').length === 2`);
+    await tab.evaluate(click('Fixture 1'));
+    await tab.wait(`document.querySelector('[data-tab-key="item-1"] [role=tab]').getAttribute('aria-selected')==='true'`);
+    expect(await tab.evaluate(`document.querySelector('textarea')===window.fixtureEditor && window.fixtureEditor.value==='edited fixture text'`)).toBe(true);
+    await tab.evaluate(`document.querySelector('.canvas-content:not([hidden]) button').click()`);
+    await tab.wait(`document.querySelector('.canvas-content:not([hidden]) button').disabled && !document.body.textContent.includes('Сохранить *')`);
+    expect(saves).toEqual([{ body: { fileAction: 'save', content: 'edited fixture text', expectedContent: 'original fixture text' }, csrf: 'fixture-csrf' }]);
+    expect(await tab.evaluate(`document.querySelectorAll('[role=alert]').length`)).toBe(0);
+    if (process.env.REACT_BROWSER_SCREENSHOT) { const image = await tab.command('Page.captureScreenshot', { format: 'png' }); await Bun.write(process.env.REACT_BROWSER_SCREENSHOT, Buffer.from(image.data, 'base64')); }
+    expect(unexpected).toEqual([]);
+  } finally { await tab.close(); }
+}, 20_000);
+
+test('React People renders isolated owner account without issuing mutations', async () => {
+  const tab = await open('people');
+  try {
+    await tab.wait(`document.querySelector('table')?.textContent.includes('Fixture Owner')`);
+    expect(await tab.evaluate(`document.querySelector('table').textContent.includes('You')`)).toBe(true);
+    expect(await tab.evaluate(`document.querySelectorAll('[role=alert]').length`)).toBe(0);
+    expect(unexpected).toEqual([]);
+  } finally { await tab.close(); }
+}, 20_000);

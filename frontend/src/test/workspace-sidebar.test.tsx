@@ -45,14 +45,17 @@ it('compact rail retains New Session and expand controls without Search without 
   fireEvent.click(screen.getByRole('button', { name: 'New Session' })); expect(props.onSelect).not.toHaveBeenCalled();
 });
 it('opens profile by hover, uses actual identity and native POST logout; hides People for members', async () => {
-  const view = render(<WorkspaceSidebar {...props} />);
+  const onOpenPeople = vi.fn();
+  const view = render(<WorkspaceSidebar {...props} onOpenPeople={onOpenPeople} />);
   await userEvent.hover(screen.getByRole('button', { name: 'Профиль: Test User' }));
-  expect(await screen.findByRole('link', { name: 'People' })).toHaveAttribute('href', '/auth/users');
-  const logout = screen.getByRole('button', { name: 'Sign out' }).closest('form');
+  await userEvent.click(await screen.findByRole('button', { name: 'People' }));
+  expect(onOpenPeople).toHaveBeenCalledOnce();
+  await userEvent.hover(screen.getByRole('button', { name: 'Профиль: Test User' }));
+  const logout = (await screen.findByRole('button', { name: 'Sign out' })).closest('form');
   expect(logout).toHaveAttribute('method', 'post'); expect(logout).toHaveAttribute('action', '/auth/logout');
   view.unmount(); render(<WorkspaceSidebar {...props} user={{ name: 'Member Name', role: 'member' }} />);
   await userEvent.click(screen.getByRole('button', { name: 'Профиль: Member Name' }));
-  expect(screen.queryByRole('link', { name: 'People' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'People' })).toBeNull();
 });
 
 it('defaults to the selected workspace and restores explicit open and closed choices after remount', () => {

@@ -34,7 +34,7 @@ describe('LiveApp Canvas integration', () => {
 
   it('keeps the same item frame across close, reopen, and revision changes', async () => {
     const ui = render(<LiveApp />);
-    const frame = await screen.findByTitle('Canvas Hyper') as HTMLIFrameElement;
+    const frame = await screen.findByTitle('Canvas: Document') as HTMLIFrameElement;
     const doc = document.implementation.createHTMLDocument('shell');
     doc.body.innerHTML = '<main data-mobile-canvas><textarea>draft</textarea></main>';
     const resync = vi.fn();
@@ -45,28 +45,28 @@ describe('LiveApp Canvas integration', () => {
     expect(state.setOpen).toHaveBeenCalledWith(false);
     state = { ...state, open: false }; ui.rerender(<LiveApp />);
     expect(frame.closest('.live-workspace')).toHaveClass('no-canvas');
-    expect(screen.getByTitle('Canvas Hyper')).toBe(frame);
+    expect(screen.getByTitle('Canvas: Document')).toBe(frame);
     fireEvent.click(screen.getByRole('button', { name: 'Открыть Canvas' }));
     expect(state.setOpen).toHaveBeenCalledWith(true);
     state = { ...state, open: true, rev: '2' }; ui.rerender(<LiveApp />);
     expect(frame.closest('.live-workspace')).toHaveClass('has-canvas');
-    expect(screen.getByTitle('Canvas Hyper')).toBe(frame);
+    expect(screen.getByTitle('Canvas: Document')).toBe(frame);
     expect(frame.contentDocument).toBe(doc);
     expect(doc.querySelector('textarea')?.value).toBe('draft');
     expect(resync).not.toHaveBeenCalled();
   });
 
   it('loads an agent-bound document when switching agents', async () => {
-    const ui = render(<LiveApp />); const first = await screen.findByTitle('Canvas Hyper');
+    const ui = render(<LiveApp />); const first = await screen.findByTitle('Canvas: Document');
     chat = { ...chat, selected: 'b /?' }; ui.rerender(<LiveApp />);
-    await waitFor(() => expect(screen.getByTitle('Canvas Hyper')).toHaveAttribute('src', '/canvas/b%20%2F%3F/item/7/document?theme=light'));
-    expect(screen.getByTitle('Canvas Hyper')).not.toBe(first);
+    await waitFor(() => expect(screen.getByTitle('Canvas: Document')).toHaveAttribute('src', '/canvas/b%20%2F%3F/item/7/document?theme=light'));
+    expect(screen.getByTitle('Canvas: Document')).not.toBe(first);
     expect(useCanvas).toHaveBeenLastCalledWith('b /?');
   });
 
   it('propagates the selected app theme to the loaded Canvas shell', async () => {
     render(<LiveApp />);
-    const frame = await screen.findByTitle('Canvas Hyper') as HTMLIFrameElement;
+    const frame = await screen.findByTitle('Canvas: Document') as HTMLIFrameElement;
     const doc = document.implementation.createHTMLDocument('shell'); doc.body.innerHTML = '<main data-mobile-canvas></main>';
     Object.defineProperty(frame, 'contentDocument', { configurable: true, value: doc });
     fireEvent.load(frame);
@@ -75,6 +75,6 @@ describe('LiveApp Canvas integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Тема: Светлая. Переключить на: Тёмная' }));
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(frame).toHaveAttribute('src', '/canvas/a/item/7/document?theme=dark');
-    expect(screen.getByTitle('Canvas Hyper')).toBe(frame);
+    expect(screen.getByTitle('Canvas: Document')).toBe(frame);
   });
 });

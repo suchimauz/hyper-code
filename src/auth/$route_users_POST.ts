@@ -1,15 +1,24 @@
 /**
  * Handles the People page forms (owners only): add a person, disable/enable, change role, and
- * edit your own name, email and password. Redirects back with a short result message.
+ * edit your own name, email and password. JSON clients receive a result; forms redirect.
+ * @param opts.req Authenticated JSON or form request with cookie-bound CSRF token.
+ * @param opts.params Route parameters (unused).
  */
 export default async function (ctx: Context, session: Session | null, opts: { req: Request; params: Record<string, string> }) {
     const me = (session as any)?.user as types.auth.User | undefined;
     if (!me || me.role !== "owner") return new Response("Only owners can manage people", { status: 403 });
-    const form = await opts.req.formData();
-    const get = (k: string) => String(form.get(k) ?? "").trim();
+    const json = opts.req.headers.get('accept')?.includes('application/json');
+    let values: unknown;
+    try { values = opts.req.headers.get('content-type')?.includes('application/json') ? await opts.req.json() : Object.fromEntries(await opts.req.formData()); }
+    catch { return Response.json({error:'Invalid request body'}, {status:400}); }
+    if (!values || typeof values !== 'object' || Array.isArray(values)) return Response.json({error:'Invalid request body'}, {status:400});
+    const fields = values as Record<string, unknown>;
+    const get = (k: string) => typeof fields[k] === 'string' ? (fields[k] as string).trim() : '';
+    if (!await ctx.fns.auth.verifyCsrf({req:opts.req,token:opts.req.headers.get('x-csrf-token') || get('_csrf')})) return Response.json({error:'CSRF verification failed'}, {status:403});
     const back = (key: "ok" | "error", message: string) =>
-        new Response(null, { status: 303, headers: { location: `/auth/users?${key}=${encodeURIComponent(message)}`, "cache-control": "no-store" } });
+        json ? Response.json({[key]:message}, {status:key==='error'?400:200,headers:{'cache-control':'no-store'}}) : new Response(null, { status: 303, headers: { location: `/?view=people&${key}=${encodeURIComponent(message)}`, "cache-control": "no-store" } });
     try {
+        if (get('id') === me.id && ['disable','role'].includes(get('action'))) return back('error', 'Use another owner to change your access');
         switch (get("action")) {
             case "add": {
                 const google = await ctx.fns.auth.googleConfig({});

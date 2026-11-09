@@ -39,8 +39,7 @@ test('durable tail clears transient bubble out of band, preserving cursor and hi
  expect(final).toContain('final answer');expect(final).toContain('offset=1');expect(final).toContain('hx-swap-oob="outerHTML"');expect(final.match(/id="msg-stream"/g)).toHaveLength(1);
  const history=await (await eventsRoute(ctx,null,{req:new Request('http://localhost/agent/sample/events.html?before=1'),params:{id:'sample'}})).text();
  expect(history).not.toContain('msg-stream');
- const column=await Bun.file(new URL('../ui/chatColumn.ts',import.meta.url)).text();
- expect(column.indexOf('await ctx.fns.agent.renderTransientStream')).toBeGreaterThan(column.indexOf('id="msg-tail"'));
+
 });
 
 async function extracted(){

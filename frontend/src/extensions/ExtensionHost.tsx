@@ -3,7 +3,7 @@ import { Button } from '../components/ui/Button';
 import type { ExtensionContext, RegisteredAction, RegisteredView } from './types';
 import './extensions.css';
 
-class ExtensionBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+export class ExtensionBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   render() { return this.state.failed ? <p role="alert">Расширение недоступно. Откройте его заново.</p> : this.props.children; }

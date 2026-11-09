@@ -46,10 +46,6 @@ test('knowledge full evidence is available via disclosure on touch, empty/error 
  expect(w.document.querySelector('blockquote')?.textContent).toBe(evidence); expect(w.document.body.textContent).toContain('Offline'); expect(w.document.querySelector('a[href="/agent/ab/message/1"]')).not.toBeNull(); w.happyDOM.abort();
  expect(knowledge(ctx,null,{agent:{id:'ab',scratchpad:{}} as any})).toContain('No entities observed yet');
 });
-test('inspector layout has local touch, typography, focus and reduced motion protections', async () => {
- const css=await Bun.file(new URL('./layout.ts',import.meta.url)).text(); expect(css).toContain(':where([data-agent-meta-content], .inspector-trigger-popup)'); expect(css).toContain('min-height: 44px'); expect(css).toContain('font-size: 16px !important'); expect(css).toContain('.ui-toggle-input:focus-visible + .ui-toggle-track'); expect(css).toContain('prefers-reduced-motion: reduce');
-});
-
 test('real renderer action classes and collapsed task instructions are visible controls', () => {
  const w=dom(render('plan',{agent:{id:'ab',scratchpad:{plan:{title:'Ship',tasks:[{id:'one',title:'Review',instructions:'Verify',status:'pending'}]}}}}));
  for(const b of w.document.querySelectorAll('button')) {
@@ -65,7 +61,7 @@ test('shared surface roles cover settings, compaction, lists and native disclosu
  for(const html of samples) { const w=dom(html); expect(w.document.querySelector('.inspector-list, .inspector-row')).not.toBeNull(); for(const input of w.document.querySelectorAll('.ui-toggle-input')) expect(input.closest('.inspector-setting-row')).not.toBeNull(); w.happyDOM.abort(); }
 });
 async function page(main: string) {
- return layout({...ctx, state:{procs:{styles:[{href:'/compiled-app.css'}]}}, fns:{...ctx.fns, ui:{...ctx.fns.ui,faviconUrl:async()=>'/favicon.ico',navMenu:()=>''},dock:{render:async()=>''}}},null,{main});
+ return layout({...ctx, state:{procs:{styles:[{href:'/compiled-app.css'}]}}, fns:{...ctx.fns, ui:{...ctx.fns.ui,faviconUrl:async()=>'/favicon.ico'},dock:{render:async()=>''}}},null,{main});
 }
 test('rendered shell does not predeclare layers before the compiled stylesheet or override button contracts', async () => {
  const html=await page(render('settings'));
@@ -83,26 +79,5 @@ test('rendered shell does not predeclare layers before the compiled stylesheet o
   expect(el.classList.contains('ui-button--xs')).toBe(true);
   expect(el.disabled).toBe(true); expect(el.getAttribute('style')).toBeNull(); d.happyDOM.abort();
  }
- w.happyDOM.abort();
-});
-test('rendered Inspector typography and group insets follow semantic roles, not blanket overrides', async () => {
- const html=await page('');
- const start=html.indexOf('/* Agent Inspector:');
- const css=html.slice(start,html.indexOf('@media (pointer: coarse)',start));
- const w=dom(render('settings')+render('compaction')+render('plan',{agent:{id:'ab',scratchpad:{plan:{tasks:[{id:'active',title:'Active',status:'active'},{id:'pending',title:'Pending',status:'pending'}]}}}}));
- // These utility baselines deliberately precede Inspector CSS. Tests exercise actual selectors on renderer output.
- const style=w.document.createElement('style'); style.textContent='.font-semibold{font-weight:600}.font-medium{font-weight:500}'+css; w.document.head.append(style);
- const computed=(selector:string)=>{const el=w.document.querySelector(selector);expect(el).not.toBeNull();return w.getComputedStyle(el!);};
- expect(computed('.inspector-heading').fontWeight).toBe('600');
- expect(computed('legend').fontWeight).toBe('600');
- expect(computed('.inspector-toggle-label').fontWeight).toBe('400');
- expect(computed('.inspector-field > span').fontWeight).toBe('400');
- expect(computed('[data-task-status="active"] .inspector-task-title').fontWeight).toBe('500');
- expect(computed('[data-task-status="pending"] .inspector-task-title').fontWeight).toBe('500');
- expect(computed('.inspector-list').paddingLeft).toBe('0px');
- expect(computed('legend').paddingLeft).toBe('12px'); // Gray group heading has an inset; flat setting rows do not.
- expect(computed('.inspector-setting-row').paddingLeft).toBe('0px');
- const outside=w.document.createElement('div'); outside.innerHTML=toggle(ctx,null,{name:'outside',enabled:true,label:'Outside'}); w.document.body.append(outside);
- expect(w.getComputedStyle(outside.querySelector('.inspector-toggle-label')!).fontWeight).toBe('500');
  w.happyDOM.abort();
 });

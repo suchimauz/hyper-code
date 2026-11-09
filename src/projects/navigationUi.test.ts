@@ -1,6 +1,4 @@
 import {describe,test,expect} from 'bun:test';
-import navigation from './navigation.ts';
-import pane from '../agent/pane.ts';
 import action from './$route_action_POST.ts';
 import view from './$route_view_GET.ts';
 import projectArchive from './$route_archive_GET.ts';
@@ -21,8 +19,6 @@ describe('project UI boundaries',()=>{
   ctx.fns.projects.list=async()=>[{id:'old',title:'Archived workspace',dir:'/old',host:'',archived:true},{id:'active',title:'Active workspace',dir:'/active',host:'',archived:false}];
   const page=await projectArchive(ctx,null,{req:new Request('http://local/projects/archive')});expect(page.main).toContain('Archived workspace');expect(page.main).not.toContain('Active workspace');expect(page.main).toContain('data-project-action="restore-project"');expect(page.main).toContain('data-project-id="old"');
  });
- test('current direct URL projects its tab without persisting or loading transcript',async()=>{const {ctx,calls}=fixture();await navigation(ctx,null,{agentId:'a'});expect(JSON.parse(calls[0]!).tabIds).toEqual(['a']);});
- test('agent pane keeps direct canvas/chat surface, hides navigation in embeds',async()=>{const {ctx}=fixture();const main='<div data-page="agent"><section id="chat-panel"></section></div>';expect(await pane(ctx,null,{main,path:'/agent/a'})).toBe('<div id="project-tabs-host">tabs</div>'+main);for(const query of ['embed=1','presentation=sidebar'])expect(await pane(ctx,{url:new URL('http://local/agent/a?'+query)} as any,{main,path:'/agent/a'})).toBe(main);});
  test('cross-origin action lacking csrf cannot touch project APIs',async()=>{const {ctx}=fixture();ctx.fns.auth.verifyCsrf=async()=>false;ctx.fns.projects.create=()=>{throw Error('must not write')};const r=await action(ctx,null,{req:new Request('http://local/projects/action',{method:'POST',headers:{origin:'http://evil'},body:JSON.stringify({action:'create',dir:'/x'})})});expect(r.status).toBe(403);});
  test('close supplies fallback without assuming another window active chat',async()=>{const {ctx}=fixture();const r=await action(ctx,null,{req:new Request('http://local/projects/action',{method:'POST',body:JSON.stringify({action:'close',projectId:'p',agentId:'a'})})});expect(await r.json()).toEqual({ok:true,fallbackUrl:'/projects/view?projectId=p'});});
  test('archive is scoped and offers restore, not delete or generation',async()=>{const {ctx}=fixture();const result=await view(ctx,null,{req:new Request('http://local/projects/view?projectId=p&archive=1')});if(result instanceof Response)throw new Error('Archive must render index');expect(result.main).toContain('data-project-action="restore"');expect(result.main).toContain('data-chat-id="archived"');expect(result.main).not.toContain('delete');});

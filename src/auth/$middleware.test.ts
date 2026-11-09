@@ -4,7 +4,7 @@ import middleware from "../$middleware";
 const nik = { id: "nik", email: null, name: "Nik", role: "owner", hasPassword: true, canSignIn: true, configuredAt: 1, createdAt: 1, disabledAt: null };
 
 function context(who: { user: any; required: boolean }): any {
-    return { fns: { auth: { currentUser: async () => who }, h2: { redirect: () => null } }, state: {} };
+    return { fns: { auth: { currentUser: async () => who }, h2: { redirect: () => null }, http: { publicOrigin: async ({req}: {req: Request}) => new URL(req.url).origin }, frontendRuntime: { page: async () => undefined }, sidebar: { draft: async () => null } }, state: {} };
 }
 
 test("sign-in gate redirects HTML and rejects JSON", async () => {

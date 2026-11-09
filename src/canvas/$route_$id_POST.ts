@@ -6,8 +6,8 @@
 /** Changes an agent's canvas state from the browser (canvas.update). */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }): Promise<Response> {
     const agentId = String(opts.params.id ?? "");
-    const known = ((await ctx.fns.procs.db.select({ sql: "SELECT 1 FROM agents WHERE id = ?", params: [agentId] })) as any[]).length > 0;
-    if (!known) return new Response("unknown agent", { status: 404 });
+    const denied = await ctx.fns.canvas.authorizeHttp({ req: opts.req, agentId });
+    if (denied) return denied;
     const type = opts.req.headers.get("content-type") ?? "";
     let body: any = {};
     if (type.includes("application/json")) body = await opts.req.json().catch(() => ({}));
@@ -19,6 +19,9 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         if (form?.has("closeItemId")) body.closeItemId = String(form.get("closeItemId"));
         if (form?.has("reopenItemId")) body.reopenItemId = String(form.get("reopenItemId"));
     }
+    // File navigation changes the server-side target subsequently read or saved by React.
+    // Keep the existing page-local state transport, but require the native file operation's CSRF authority.
+    if ((body.navigate?.file || body.show?.kind === 'file') && !await ctx.fns.auth.verifyCsrf({ req: opts.req, token: opts.req.headers.get('x-csrf-token') ?? '' })) return new Response('Invalid CSRF token', { status: 403 });
     const closeItemId = body.closeItemId == null || body.closeItemId === "" ? undefined : Number(body.closeItemId);
     const activeItemId = body.activeItemId == null || body.activeItemId === "" ? undefined : Number(body.activeItemId);
     if ((closeItemId !== undefined && !Number.isInteger(closeItemId)) || (activeItemId !== undefined && !Number.isInteger(activeItemId))) return new Response("invalid item id", { status: 400 });

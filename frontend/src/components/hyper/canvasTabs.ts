@@ -1,5 +1,5 @@
 /** dsh-style Canvas tab model: local Start pages beside the agent's real Hyper canvas items. */
-export type CanvasItemTab = { id: number; title: string; icon: string; active: boolean };
+export type CanvasItemTab = { id: number; title: string; icon: string; active: boolean; kind?: string; args?: Record<string, unknown>; state?: Record<string, unknown> };
 /** Local tabs: Start pages and Terminal pages share one counter so every key stays unique. */
 export type CanvasTabsStore = { starts: number[]; terms: number[]; next: number; selected: string | null };
 
@@ -31,7 +31,7 @@ export function parseCanvasTabs(value: unknown): CanvasItemTab[] {
   if (!Array.isArray(items)) throw new Error('Invalid Canvas state');
   return items.map(item => {
     if (!item || !Number.isSafeInteger(item.id) || item.id < 1 || typeof item.title !== 'string' || typeof item.active !== 'boolean') throw new Error('Invalid Canvas tab');
-    return { id: item.id, title: item.title, icon: typeof item.icon === 'string' ? item.icon : 'square', active: item.active };
+    return { id: item.id, title: item.title, icon: typeof item.icon === 'string' ? item.icon : 'square', active: item.active, ...(typeof item.kind === 'string' ? { kind: item.kind } : {}), ...(item.args && typeof item.args === 'object' && !Array.isArray(item.args) ? { args: item.args } : {}), ...(item.state && typeof item.state === 'object' && !Array.isArray(item.state) ? { state: item.state } : {}) };
   });
 }
 

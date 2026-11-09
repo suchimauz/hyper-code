@@ -4,9 +4,9 @@
 /** Answers an agent's current canvas view and panel revision for a page catching up. */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }): Promise<Response> {
     const agentId = String(opts.params.id ?? "");
-    const known = ((await ctx.fns.procs.db.select({ sql: "SELECT 1 FROM agents WHERE id = ?", params: [agentId] })) as any[]).length > 0;
-    if (!known) return new Response("unknown agent", { status: 404 });
+    const denied = await ctx.fns.canvas.authorizeHttp({ req: opts.req, agentId });
+    if (denied) return denied;
     const [view, rev, items] = await Promise.all([ctx.fns.canvas.get({ agentId }), ctx.fns.canvas.revision({ agentId }), ctx.fns.canvas.list({ agentId })]);
-    const tabs = items.map(item => ({ id: item.id, title: item.title, kind: item.kind, active: item.active, icon: ctx.state.canvas?.kinds?.[item.kind]?.icon ?? 'square' }));
+    const tabs = items.map(item => ({ id: item.id, title: item.title, kind: item.kind, args: item.args, state: item.state, active: item.active, icon: ctx.state.canvas?.kinds?.[item.kind]?.icon ?? 'square' }));
     return Response.json({ ...view, rev: rev.panel, items: tabs }, { headers: { "cache-control": "no-store" } });
 }

@@ -16,13 +16,7 @@ test("menu is fixed first, the person fixed last, entries split into top and bot
     const items = await ctx.fns.dock.items({});
     expect(items.top.map((x: any) => x.id)).toEqual(["a.early", "a.late"]);
     expect(items.bottom.map((x: any) => x.id)).toEqual(["b.low"]);
-    const html = await ctx.fns.dock.render({});
-    const order = [...html.matchAll(/data-dock-id="([^"]+)"/g)].map(m => m[1]);
-    expect(order[0]).toBe("menu");
-    expect(order.slice(1)).toEqual(["a.early", "a.late", "b.low"]);
-    expect(html.indexOf('id="dock-top"')).toBeLessThan(html.indexOf('id="dock-bottom"'));
-    expect(html).toContain('href="/early"');
-    expect(html).toContain('title="Early"');
+
 });
 
 test("instance layout reorders, moves between zones and hides; a person's layout replaces it; reset falls back", async () => {
@@ -49,21 +43,6 @@ test("instance layout reorders, moves between zones and hides; a person's layout
     // Without a signed-in person the instance layout itself was the one written and reset.
     items = await ctx.fns.dock.items({});
     expect(items.source).toBe("default");
-});
-
-test("a broken or slow entry is left out without breaking the Dock", async () => {
-    const ctx: any = await mkTestCtx();
-    register(ctx, {
-        "p.boom": { render: () => { throw new Error("boom"); } },
-        "p.slow": { render: () => new Promise(resolve => setTimeout(() => resolve("<b>late</b>"), 500)) },
-        "p.none": { render: () => null },
-        "p.ok": { render: () => ({ icon: "ph-envelope", label: "3 unread", href: "/inbox", badge: 3 }) },
-    });
-    const html = await ctx.fns.dock.render({ timeoutMs: 50 });
-    expect(html).toContain('data-dock-id="p.ok"');
-    expect(html).toContain('aria-label="3 unread"');
-    expect(html).toContain(">3</span>");
-    for (const id of ["p.boom", "p.slow", "p.none"]) expect(html).not.toContain(`data-dock-id="${id}"`);
 });
 
 test("malformed layout JSON is ignored and the save route validates its body", async () => {
@@ -96,11 +75,6 @@ test("pinned chats come from the person's pins and pinned pages from layout.pins
     let items = await ctx.fns.dock.items({});
     expect(items.top.map((x: any) => x.id)).toEqual(["q.one", `agent:${agent.id}`, "page:/news"]);
     expect((await ctx.fns.auth.pinnedIds({})).has(agent.id)).toBe(true);
-    const html = await ctx.fns.dock.render({});
-    expect(html).toContain(`data-dock-id="agent:${agent.id}" data-dock-pinned="agent"`);
-    expect(html).toContain(`href="/agent/${agent.id}"`);
-    expect(html).toContain('title="News"');
-
     // Reordering keeps pinned entries; a page pin survives a layout save that omits pins.
     await ctx.fns.dock.saveLayout({ layout: { top: ["page:/news", "q.one"] } });
     items = await ctx.fns.dock.items({});

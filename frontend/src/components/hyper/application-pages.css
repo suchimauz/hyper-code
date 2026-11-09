@@ -1,0 +1,10 @@
+.application-pages { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 1rem; gap: 1rem; color: var(--text); }
+.application-pages header { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.application-pages h2 { margin: 0; margin-right: auto; font-size: 1.125rem; }
+.application-pages iframe { flex: 1; width: 100%; min-height: 20rem; border: 1px solid var(--line); border-radius: .75rem; background: var(--bg); }
+.application-filter { display: grid; gap: .5rem; }
+.application-filter input { width: 100%; padding: .75rem; border-radius: .5rem; border: 1px solid var(--line); background: var(--bg); color: inherit; }
+.application-pages ul { display: grid; grid-template-columns: repeat(auto-fill,minmax(12rem,1fr)); list-style: none; padding: 0; margin: 0; gap: .75rem; overflow: auto; }
+.application-pages li button { width: 100%; text-align: start; display: grid; gap: .5rem; padding: 1rem; border: 1px solid var(--line); border-radius: .75rem; background: var(--surface); color: inherit; cursor: pointer; min-height: 44px; }
+.application-pages li button:focus-visible, .application-filter input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+.application-pages li span { font-size: .875rem; color: var(--text-secondary); }

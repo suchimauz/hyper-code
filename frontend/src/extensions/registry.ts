@@ -6,6 +6,7 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
   const navigation: ExtensionRegistry['navigation'][number][] = [];
   const panels: ExtensionRegistry['panels'][number][] = [];
   const actions: ExtensionRegistry['actions'][number][] = [];
+  const canvasKinds: ExtensionRegistry['canvasKinds'][number][] = [];
   const ids = new Set<string>();
   const valid = (id: string) => /^[a-z][a-z0-9-]{0,63}$/.test(id);
   for (const extension of extensions) {
@@ -23,6 +24,14 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
         else (kind === 'pages' ? pages : panels).push(Object.freeze({ ...entry, key }) as ExtensionRegistry['pages'][number]);
       }
     }
+    const seenKinds = new Set<string>();
+    for (const entry of extension.canvasKinds ?? []) {
+      if (!/^[a-zA-Z][\w-]*\.[a-zA-Z][\w.-]*$/.test(entry.kind) || seenKinds.has(entry.kind)) throw new Error(`Invalid Canvas kind: ${entry.kind}`);
+      seenKinds.add(entry.kind);
+      if (!grant?.canvasKinds?.includes(entry.kind)) continue;
+      if (canvasKinds.some(kind => kind.kind === entry.kind)) throw new Error(`Duplicate Canvas kind: ${entry.kind}`);
+      canvasKinds.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.kind}` }));
+    }
     const seenNav = new Set<string>();
     for (const item of extension.navigation ?? []) {
       if (!extension.pages?.some(page => page.id === item.page) || seenNav.has(item.page) || !item.title.trim()) throw new Error(`Invalid navigation: ${extension.id}/${item.page}`);
@@ -31,5 +40,5 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
       if (pages.some(page => page.key === key)) navigation.push(Object.freeze({ key, title: item.title }));
     }
   }
-  return Object.freeze({ pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
+  return Object.freeze({ canvasKinds: Object.freeze(canvasKinds), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
 }

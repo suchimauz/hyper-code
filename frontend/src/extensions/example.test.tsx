@@ -11,7 +11,7 @@ import { ExtensionSurface } from './ExtensionHost';
 
 describe('public-SDK dev/test fixture', () => {
   it('does not register demonstration surfaces in production', () => {
-    expect(installedExtensions).toEqual({ pages: [], navigation: [], panels: [], actions: [] });
+    expect(installedExtensions).toEqual({ pages: [], navigation: [], panels: [], actions: [], canvasKinds: [] });
     expect(exampleExtensions.pages).toHaveLength(1);
     expect(exampleExtensions.navigation).toHaveLength(1);
     expect(exampleExtensions.panels).toHaveLength(1);

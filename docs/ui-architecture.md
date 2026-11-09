@@ -4,7 +4,11 @@
 
 The primary UI is the React/Vite frontend in `frontend/` (`LiveApp.tsx`), served at `/`. `/old-ui` is no longer an alternate application: its supported GET/HEAD root and agent links redirect to `/` with validated query state; other methods are rejected and unknown paths return 404. See `src/legacyUi/handle.ts`.
 
-This does **not** mean all server-rendered UI has been removed. Shared SSR renderers, route assets, Canvas content renderers and inline approval surfaces still have compatibility consumers. React Canvas now reads tab metadata from `/canvas/:id/state` and displays `/canvas/:id/item/:itemId/document`; it no longer reads the `/mobile` shell DOM or embeds `ui.layout`. The item document still uses existing kind renderers and compatibility assets, with nested HTML/URL sandboxing intact. Do not delete these shared renderers or claim every kind is native React.
+The former navigation/dock/chat shell in `ui.layout` is removed, not renamed. The function remains a small **document renderer** because `procs.http.toResponse` resolves it dynamically for strings and `{main}` responses. It supplies page-local styles, HTMX, CSRF, live updates and popup RPC, not a second application shell. Required built-in/plugin documents remain accessible from React's Applications page (`?view=applications`), using only explicitly registered `nav.items` destinations. They are trusted same-origin server documents, not remote extensions or Canvas HTML sandbox content.
+
+People is a native React page (`?view=people`); `/auth/users` negotiates JSON and redirects HTML visits. Sidebar draft is a native React composer (`?sidebarDraft=<binding>`), retaining the existing atomic first-message claim and owner/origin/CSRF checks. No agent is created merely by opening the composer.
+
+React Canvas owns tabs/state, native text-file editing and directory browsing, and host-reviewed plugin `canvasKinds`. Files too large or unsuitable for text editing and plugin kinds without a registered React view still use `canvas.itemDocument` and their existing kind renderers. HTML/URL sandbox nesting is preserved. Do not claim every plugin renderer is native React, and do not remove the item-document or secure-input transports.
 
 `SecureInputHost` reads metadata from owner-only `/input/compat?agentId=…`. On explicit opening, supported secure kinds use the original card transports inside an isolated document; Redmine approval opens a separate top-level page, preserving its confirmation authority. No approval is inferred from generic form submission. Native React choice/confirm remain separate.
 
@@ -15,8 +19,9 @@ Postgres is authoritative. React owns presentation state; HTTP endpoints own acc
 | Consumer | Live path / responsibility |
 | --- | --- |
 | HTTP SSR responses | `procs.http.toResponse` dynamically resolves `ui.layout` (with framework fallback) for HTTP strings and `{ main }` responses. Static `ctx.fns` call graphs alone do not prove the layout is unused. |
-| People and SSR pages | `/auth/users`, `sidebar.draft`, and built-in/plugin SSR pages still use shared rendering and assets. React navigation does not make these endpoints obsolete. |
-| Canvas item documents | `canvas.itemDocument` invokes `kind.render` and assembles compatibility assets for `/canvas/:id/item/:itemId/document`; React owns tabs, not every kind's content. |
+| React People and draft | `/auth/users` and `sidebar.draft` retain their authorized JSON/write contracts; HTML visits redirect to React. They no longer render the old page/composer shell. |
+| Application documents | `/nav/items` with JSON Accept lists declared destinations without chats. React `ApplicationPages` hosts necessary built-in/plugin HTML pages; each destination still enforces its own authorization. Disabled banks are not installed or enabled. |
+| Canvas item documents | Native file and granted React `canvasKinds` views take precedence. `canvas.itemDocument` still invokes `kind.render` for remaining kinds/previews, preserving their assets and nested HTML/URL sandboxes. |
 | Secure input compatibility | `input.compatView` supplies owner-only metadata; isolated cards retain their secure transports. Redmine approval uses a separate top-level page; generic submit is never approval authority. |
 
 The dead `legacyUi.rewriteResponse` and `legacyUi.navigationUrl` helpers were removed. This is not removal of the shared SSR pipeline. SSH settings opens the native `llm-connections` tab through a host callback, not a `/llms` link. Treat legacy navigation-asset cleanup separately from these live consumers.
@@ -28,7 +33,7 @@ The dead `legacyUi.rewriteResponse` and `legacyUi.navigationUrl` helpers were re
 `extensions/installed.ts` has no SDK demonstration installed in production. `ui-plugins/sdk-example.tsx` remains a dev/test fixture, registered explicitly in the separate registry in `extensions/example.test.tsx`; its presence is not production navigation or action registration.
 
 - Import UI primitives, API/live helpers and public types from `@hyper/ui`; use React from the host. Vite deduplicates React and React DOM. Do not bundle another React runtime, deep-import `@hyper/ui/*`, or import private host components. The Vite boundary restricts modules under `ui-plugins/` to React and the public entry.
-- Export a `UiExtension` with a valid unique `id` and `apiVersion: 1`. It can declare `pages`, `navigation`, `panels`, and `actions`.
+- Export a `UiExtension` with a valid unique `id` and `apiVersion: 1`. It can declare `pages`, `navigation`, `panels`, `actions`, and `canvasKinds`. Canvas kinds require explicit host grants by kind, receive the authorized item's `args`/`state` and extension context, and must not replace backend authorization. Unregistered kinds retain the document renderer.
 - Host code imports reviewed extensions in `extensions/installed.ts` and supplies explicit per-extension grants for page, panel and action IDs. Navigation must reference a declared, granted page. Backend plugin installation does not automatically install browser code.
 - The registry validates IDs, duplicate entries, titles and navigation references. The host owns placement and supplies `ExtensionContext`: `agentId`, `theme`, and `readOnly`. Views receive `{ context }`; actions receive the context directly. Mark mutating actions with `mutates` so read-only host controls can disable them.
 - `ExtensionHost` provides error containment and pending/error presentation. These are UI safeguards, **not** a security sandbox. Extensions execute as trusted code in the host origin. No remote module URLs, user-supplied HTML-to-module loading, or untrusted extensions.
@@ -49,6 +54,6 @@ Use the SDK's `Button`, `IconButton`, `Sheet`, `Stack`, `Panel`, `TextField` and
 
 ## Compatibility only: SSR, HTMX and popup RPC
 
-Existing SSR consumers may still use `ui.layout`, `#main`, `ui.live`, `$script_*.js`, and the shared `app-popup` dialog. These are not the primary extension contract. In these consumers keep navigation attributes off containers whose descendants own refreshes; self-refreshing fragments target themselves.
+Necessary server documents still use the minimal `ui.layout`, `#main`, `ui.live`, page-specific `$script_*.js`, and the shared `app-popup` dialog. The old application shell, global nav menu, mobile inspector/message/usage shell scripts, navigation preload and press-feedback shell assets are removed. Retained page transports are not the primary extension contract. In these consumers keep navigation attributes off containers whose descendants own refreshes; self-refreshing fragments target themselves.
 
 Existing `hx-popup="module.function"` triggers with optional `hx-popup-params` use the popup-RPC HTMX extension and `POST /rpc`. Popup functions return `ui.popupContent({ title, kind, html })`; an empty successful response closes the dialog. Preserve that contract where used, including confirmation/authentication flows, rather than mixing manual fetch/swaps into it. New React extensions use SDK components and authorized APIs, not popup RPC by default.

@@ -8,4 +8,4 @@ export { requestJson, ApiError } from './api';
 export type { ApiRequestOptions } from './api';
 export { subscribeLive, useLiveSubscription } from './live';
 export type { LiveEvent, LiveStatus, LiveSubscriptionOptions } from './live';
-export type { UiExtension, ExtensionContext, ExtensionViewProps } from '../extensions/types';
+export type { UiExtension, ExtensionContext, ExtensionViewProps, ExtensionCanvasProps, ExtensionCanvasKind } from '../extensions/types';

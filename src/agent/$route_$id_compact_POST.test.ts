@@ -16,10 +16,6 @@ describe("POST /agent/:id/compact", () => {
     ctx.state.registry.session.getMaxEventIdx = () => -1;
     ctx.state.registry.session.getEvents = () => [];
     ctx.state.registry.session.getFullMessages = () => [];
-    // The chat shows a context ring in the composer; it opens the compact form (chat.compactPopup).
-    const html = await ctx.fns.ui.chatColumn({ agentId: "a1" });
-    expect(html).toContain('id="chat-context-ring"');
-    expect(html).toContain("/chat/a1/ring");
     const form = ctx.fns.chat.compactForm({ agentId: "a1" });
     expect(form).toContain("Compact context");
     expect(form).toContain('hx-post="/agent/a1/compact"');

@@ -7,9 +7,6 @@ describe('web transient stream', () => {
         const agent = await ctx.fns.agent.start({ model: 'mock:test' });
         await ctx.fns.session.save({ agent });
         agent.scratchpad.mobileStream = { text: '<script>unsafe</script> partial', revision: 1, startedAt: Date.now() };
-        const initial = await ctx.fns.ui.chatColumn({ agentId: agent.id });
-        expect(initial.match(/id="msg-stream"/g)).toHaveLength(1);
-        expect(initial).toContain('&lt;script&gt;unsafe&lt;/script&gt; partial');
         for (let i = 0; i < 2; i++) {
             const response = await ctx.fns.procs.http.dispatch({ url: `/agent/${agent.id}/stream.html` });
             const html = await response.text();

@@ -19,6 +19,7 @@ export type WorkspaceSidebarProps = {
   onNewSession?: (projectId?: string) => void;
   /** Opens the in-app Settings screen from the account menu. */
   onOpenSettings?: () => void;
+  onOpenPeople?: () => void; peopleActive?: boolean;
   /** Opens the Automation tasks page (Hyper cron tasks). */
   onOpenAutomation?: () => void; automationActive?: boolean;
   /** Opens the Plugins page (mounted Hyper plugins and catalogue). */
@@ -55,7 +56,7 @@ function WorkspaceSection({ project, selected, query, onSelect, archivedView, pe
   </section>;
 }
 
-export function WorkspaceSidebar({ extensionNavigation = [], onOpenAutomation, automationActive, onOpenPlugins, pluginsActive, onOpenSettings, pendingProjects, onProjectAction, onNewSession, draftProjectId, pendingChats, actionError, onAction, projects, user, selected, compact = false, mobile = false, loading, error, profileError, theme, themeMode, onTheme, onToggle, onSelect, searchInputRef, onRetry, quotas, onOpenQuotas }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ onOpenPeople, peopleActive, extensionNavigation = [], onOpenAutomation, automationActive, onOpenPlugins, pluginsActive, onOpenSettings, pendingProjects, onProjectAction, onNewSession, draftProjectId, pendingChats, actionError, onAction, projects, user, selected, compact = false, mobile = false, loading, error, profileError, theme, themeMode, onTheme, onToggle, onSelect, searchInputRef, onRetry, quotas, onOpenQuotas }: WorkspaceSidebarProps) {
   const [query, setQuery] = useState('');
   const [view, setView] = useState(readWorkspaceView);
   const [adding, setAdding] = useState(false);
@@ -95,7 +96,7 @@ export function WorkspaceSidebar({ extensionNavigation = [], onOpenAutomation, a
       {user ? <HoverPanel label="Меню профиля" className="workspace-account-menu" open={accountOpen} onOpenChange={setAccountOpen} trigger={<button className="workspace-profile" aria-label={`Профиль: ${user.name}`} title={compact ? user.name : undefined}>
         <span className="workspace-avatar">{user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : initials}</span>
         {!compact && <><span className="workspace-identity"><strong>{user.name}</strong><span>{user.role === 'owner' ? 'Owner' : 'Member'}</span></span><ChevronDown size={14} strokeWidth={1} /></>}
-      </button>}><div className="workspace-account-menu-name">{user.name}</div>{user.role === 'owner' && <a href="/auth/users"><Users size={14} strokeWidth={1} />People</a>}{onOpenSettings && <button type="button" className="workspace-account-menu-item" onClick={() => { setAccountOpen(false); onOpenSettings(); }}><Settings size={14} strokeWidth={1} />Settings</button>}<form method="post" action="/auth/logout"><button type="submit"><LogOut size={14} strokeWidth={1} />Sign out</button></form></HoverPanel> : !compact && <span className="workspace-profile-missing" title={profileError}>{profileError ? 'Профиль недоступен' : 'Hyper'}</span>}
+      </button>}><div className="workspace-account-menu-name">{user.name}</div>{user.role === 'owner' && onOpenPeople && <button type="button" className="workspace-account-menu-item" aria-current={peopleActive ? 'page' : undefined} onClick={() => { setAccountOpen(false); onOpenPeople(); }}><Users size={14} strokeWidth={1} />People</button>}{onOpenSettings && <button type="button" className="workspace-account-menu-item" onClick={() => { setAccountOpen(false); onOpenSettings(); }}><Settings size={14} strokeWidth={1} />Settings</button>}<form method="post" action="/auth/logout"><button type="submit"><LogOut size={14} strokeWidth={1} />Sign out</button></form></HoverPanel> : !compact && <span className="workspace-profile-missing" title={profileError}>{profileError ? 'Профиль недоступен' : 'Hyper'}</span>}
       <ThemeMenu mode={themeMode ?? theme} onChange={onTheme} />
     </div>
   </nav>;

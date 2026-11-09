@@ -16,7 +16,6 @@ export default async function (ctx: Context, session: Session | null, opts: { re
     if (session && who?.user) (session as any).user = who.user;
     if (session && who?.setCookie) (session as any).setCookie = who.setCookie;
     if (who?.required) {
-    if (url.pathname.startsWith('/sidebar/draft/')) return ctx.fns.sidebar.draft({ req: opts.req });
         {
             const user = who.user;
             if (!user && !who.legacy) {
@@ -41,6 +40,8 @@ export default async function (ctx: Context, session: Session | null, opts: { re
         }
     }
 
+    // Draft owns its loopback, binding and CSRF checks in both open and signed-in modes.
+    if (url.pathname.startsWith('/sidebar/draft/')) return ctx.fns.sidebar.draft({ req: opts.req });
     const frontendPage = await ctx.fns.frontendRuntime.page({ req: opts.req });
     if (frontendPage) return frontendPage;
 

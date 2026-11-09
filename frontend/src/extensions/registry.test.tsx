@@ -7,7 +7,13 @@ const view = () => <p>Plugin content</p>;
 const plugin: UiExtension = { id: 'example', apiVersion: 1, pages: [{ id: 'main', title: 'Main', component: view }], navigation: [{ page: 'main', title: 'Open main' }], panels: [{ id: 'panel', title: 'Panel', component: view }], actions: [{ id: 'act', title: 'Act', run: () => {} }] };
 const context = { agentId: 'test', theme: 'dark' as const, readOnly: false };
 describe('host extension registry', () => {
-  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],panels:[],actions:[]}));
+  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],panels:[],actions:[],canvasKinds:[]}));
+  it('Canvas kinds require an explicit independent grant and cannot override builtins', () => {
+    const extension = { ...plugin, canvasKinds: [{ kind: 'example.map', component: view }] };
+    expect(createExtensionRegistry([extension], {}).canvasKinds).toHaveLength(0);
+    expect(createExtensionRegistry([extension], {example:{canvasKinds:['example.map']}}).canvasKinds[0].kind).toBe('example.map');
+    expect(() => createExtensionRegistry([{...extension,canvasKinds:[{kind:'file',component:view}]}], {})).toThrow();
+  });
   it('grants each surface independently, with namespaced keys and immutable snapshots', () => {
     const registry = createExtensionRegistry([plugin], { example: { pages: ['main'], panels: ['panel'] } });
     expect(registry.pages[0].key).toBe('example/main'); expect(registry.navigation[0].key).toBe('example/main');

@@ -3,6 +3,8 @@ import { AppWindow, Compass, FileText, FolderOpen, Globe, Maximize, Minimize, Pa
 import { IconButton } from '../ui/IconButton';
 import { itemKey, parseCanvasTabs, readTabs, resolveSelected, startKey, termKey, writeTabs, type CanvasItemTab, type CanvasTabsStore } from './canvasTabs';
 import { CanvasTerminal } from './CanvasTerminal';
+import { CanvasFile } from './CanvasFile';
+import { CanvasKind } from './CanvasKind';
 import './canvas-panel.css';
 
 type Props = { agentId: string; revision: string | null; theme: 'light' | 'dark'; onClose: () => void; expanded: boolean; onExpand: () => void };
@@ -49,7 +51,6 @@ export function CanvasStartPage({ onFiles, onTerminal, busy, error }: { onFiles:
  * Content lives in an agent/item-bound compatibility document, not the legacy application shell.
  * Inner HTML/URL frames keep their original CSP and sandbox. */
 export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExpand }: Props) {
-  const frame = useRef<HTMLIFrameElement>(null);
   const bound = useRef(agentId);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(false);
@@ -109,11 +110,11 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
   }, [ready, opening, pending, items.length, store.starts.length, store.terms.length, setStore]);
   const selected = resolveSelected(store, items);
   const selectedItem = items.find(item => itemKey(item.id) === selected) ?? null;
-  // Keep the last content document mounted behind local tabs (unsaved file edits survive).
-  const lastDocument = useRef<{ agentId: string; id: number } | null>(null);
-  if (selectedItem) lastDocument.current = { agentId, id: selectedItem.id };
-  const documentItem = lastDocument.current?.agentId === agentId
-    ? items.find(item => item.id === lastDocument.current?.id) ?? null : null;
+  // Keep visited content mounted across all tab switches, preserving unsaved edits.
+  const visited = useRef<{ agentId: string; ids: Set<number> }>({ agentId, ids: new Set() });
+  if (visited.current.agentId !== agentId) visited.current = { agentId, ids: new Set() };
+  if (selectedItem) visited.current.ids.add(selectedItem.id);
+  const documentItems = items.filter(item => visited.current.ids.has(item.id));
   const select = (key: string) => {
     setStore(value => ({ ...value, selected: key }));
     const item = items.find(entry => itemKey(entry.id) === key);
@@ -190,10 +191,10 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
       {store.terms.map(n => <CanvasTerminal key={`${agentId}:${n}`} agentId={agentId} theme={theme} active={selected === termKey(n)} />)}
       {!onLocal && !ready && !error && <div className="canvas-loading" role="status">Загружаем Canvas…</div>}
       {error && <div className="canvas-load-error" role="alert">Не удалось загрузить Canvas. <button onClick={retry}>Повторить</button></div>}
-      {documentItem && <iframe ref={frame} key={agentId + ':' + documentItem.id} title="Canvas Hyper"
-        src={`/canvas/${encodeURIComponent(agentId)}/item/${documentItem.id}/document?theme=${theme}`}
-        onLoad={() => setError(false)} onError={() => setError(true)} aria-hidden={onLocal || undefined}
-        className={`canvas-frame ready${onLocal ? ' behind' : ''}`} />}
+      {documentItems.map(item => <div key={`${agentId}:${item.id}`} className="canvas-content" hidden={selectedItem?.id !== item.id}>
+        {item.kind === 'file' ? <CanvasFile agentId={agentId} item={item} theme={theme} refresh={() => void sync()} /> :
+          <CanvasKind agentId={agentId} item={item} theme={theme} />}
+      </div>)}
     </div>
   </section>;
 }

@@ -25,9 +25,11 @@ test('draft bind/context/reopen creates nothing; concurrent first submit binds o
  const identity={browserEpoch:'epoch-123456789012',tabId:10,targetId:'target'};
  const binding=await(await api('bind',identity,pair.token)).json();expect(binding.agentId).toBeNull();
  await api('context',identity,pair.token);await api('bind',identity,pair.token);expect(starts).toBe(0);
- const request=(method='GET',origin='http://localhost:3010',extra:Record<string,string>={})=>new Request(binding.frameUrl,{method,headers:{...(method==='POST'?{origin,'hx-request':'true'}:{}),...extra},...(method==='POST'?{body:new URLSearchParams({text:'Explain this page'})}:{})});
+ const csrf=await ctx.fns.auth.csrfToken({req:new Request(binding.frameUrl)});
+ const request=(method='GET',origin='http://localhost:3010',extra:Record<string,string>={})=>new Request(binding.frameUrl,{method,headers:{...(method==='POST'?{origin,'hx-request':'true'}:{}),...extra},...(method==='POST'?{body:new URLSearchParams({text:'Explain this page',_csrf:csrf})}:{})});
  // Render the real shell and shared composer; no agent placeholder exists.
- const page=await ctx.fns.sidebar.draft({req:request()});expect(page.status).toBe(200);const html=await page.text();expect(html).toContain('id="chat-panel"');expect(html).toContain('id="form"');expect(html).toContain('Before navigation');expect(html).toContain('mock:first');expect(html).not.toContain('Browser:');expect(starts).toBe(0);
+ const page=await ctx.fns.sidebar.draft({req:request()});expect(page.status).toBe(303);expect(page.headers.get('location')).toContain('sidebarDraft=');const data=await(await ctx.fns.sidebar.draft({req:request('GET','http://localhost:3010',{accept:'application/json'})})).json();expect(data.title).toBe('Before navigation');expect(data.model).toBe('mock:first');expect(data.csrfToken).toBe(csrf);expect(starts).toBe(0);
+ expect((await ctx.fns.sidebar.draft({req:new Request(binding.frameUrl,{method:'POST',headers:{origin:'http://localhost:3010'},body:new URLSearchParams({text:'No CSRF'})})})).status).toBe(403);expect(starts).toBe(0);
  expect((await ctx.fns.sidebar.draft({req:request('POST','https://evil.test')})).status).toBe(403);
  expect((await ctx.fns.sidebar.draft({req:request('POST','http://localhost:3010',{authorization:'Bearer '+pair.token})})).status).toBe(403);
  const realCurrentUser=reg.auth.currentUser;reg.auth.currentUser=async()=>({user:null,required:true});

@@ -11,20 +11,20 @@ it('reads JSON tabs and uses an item document, never a mobile shell',async()=>{
  const fetcher=api();render(<CanvasPanel {...props}/>);
  expect(await screen.findByRole('tab',{name:'File <unsafe>'})).toBeInTheDocument();
  expect(fetcher.mock.calls[0]?.[0]).toBe('/canvas/a/state');
- expect(screen.getByTitle('Canvas Hyper')).toHaveAttribute('src','/canvas/a/item/12/document?theme=light');
+ expect(screen.getByTitle(`Canvas: ${tab.title}`)).toHaveAttribute('src','/canvas/a/item/12/document?theme=light');
  expect(document.querySelector('iframe[src*="mobile"]')).toBeNull();
 });
 it('preserves a live document across revisions and refreshes JSON metadata',async()=>{
- api();const ui=render(<CanvasPanel {...props}/>);const frame=await screen.findByTitle('Canvas Hyper');
+ api();const ui=render(<CanvasPanel {...props}/>);const frame=await screen.findByTitle(`Canvas: ${tab.title}`);
  ui.rerender(<CanvasPanel {...props} revision="2"/>);
- await waitFor(()=>expect(fetch).toHaveBeenCalledTimes(2));expect(screen.getByTitle('Canvas Hyper')).toBe(frame);
+ await waitFor(()=>expect(fetch).toHaveBeenCalledTimes(2));expect(screen.getByTitle(`Canvas: ${tab.title}`)).toBe(frame);
 });
 it('rejects stale responses after switching agents',async()=>{
  let resolve!: (value:Response)=>void;
  vi.stubGlobal('fetch',vi.fn().mockImplementationOnce(()=>new Promise(r=>{resolve=r;})).mockResolvedValue(Response.json({items:[{...tab,id:20,title:'B'}]})));
  const ui=render(<CanvasPanel {...props}/>);ui.rerender(<CanvasPanel {...props} agentId="b"/>);
  await screen.findByRole('tab',{name:'B'});await act(async()=>resolve(Response.json({items:[tab]})));
- expect(screen.queryByRole('tab',{name:tab.title})).toBeNull();expect(screen.getByTitle('Canvas Hyper')).toHaveAttribute('src','/canvas/b/item/20/document?theme=light');
+ expect(screen.queryByRole('tab',{name:tab.title})).toBeNull();expect(screen.getByTitle('Canvas: B')).toHaveAttribute('src','/canvas/b/item/20/document?theme=light');
 });
 it('shows retry on a failed JSON request',async()=>{
  vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response('',{status:401})).mockResolvedValue(Response.json({items:[]})));

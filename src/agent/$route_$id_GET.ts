@@ -1,63 +1,14 @@
-// GET /agent/:id — an agent is an ordinary application page. The global layout
-// owns only the agents rail; this route owns the chat and its agent-specific
-// side panel, so navigating to /llms or /files replaces the agent completely.
-/** Handles the id get HTTP route.  * @param opts.req Incoming HTTP request.
- * @param opts.params Route path parameters.
-*/
-export default async function (ctx: Context, _session: Session | null, opts: {
-        /** Incoming HTTP request. */
-req: Request;
-        /** Values bound to the operation. */
-params: Record<string, string> }) {
-    const id = opts.params.id!;
-    let agent = (ctx.state as any).agent?.[id];
-    if (!agent) {
-        agent = (await ctx.fns.session?.load?.({ id })) ?? null;
-        if (agent) {
-            (ctx.state as any).agent ??= {};
-            (ctx.state as any).agent[id] = agent;
-        }
-    }
-    if (!agent) return new Response("Not Found", { status: 404 });
-
-    // Speculative navigation must not promote a chat in the recent-agents rail.
-    const prefetch = opts.req.headers.get("X-Hyper-Prefetch") === "1";
-    if (!prefetch) {
-        await ctx.fns.procs.db.run({
-            sql: `INSERT INTO kv(key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-            params: [`hot:${id}`, String(Date.now())],
-        });
-    }
-    const chat = await ctx.fns.ui.chatColumn({ agentId: id, prefetch });
-    const [team, archivedTeam, triggers, metaState, extraSettings] = await Promise.all([
-        ctx.fns.agent.team({ agent }),
-        ctx.fns.agent.team({ agent, includeArchived: true }),
-        ctx.fns.agent.triggers({ id, status: "all" }),
-        ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = ?", params: ["ui:rightPanelCollapsed"] }).catch(() => [] as any[]),
-        ctx.fns.ui.agentSettingsBlocks({ agentId: id }),
-    ]);
-    const [canvas, canvasPanel] = await Promise.all([ctx.fns.canvas.get({ agentId: id }), ctx.fns.canvas.panelHtml({ agentId: id })]);
-    const metaCollapsed = String((metaState as any[])[0]?.value ?? "0") === "1";
-    const recovery = agent.scratchpad?.parked ? await Promise.all([
-        ctx.fns.llm.listModels({}),
-        ctx.fns.llm.listAccounts({}),
-        ctx.fns.llm.modelPolicy({ action: "list" }),
-    ]) : null;
-    const globalCompactionPercent = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
-    const persistentGoalEnabled = await ctx.fns.goal.enabled({});
-    const meta = ctx.fns.ui.agentMetaPanel({ persistentGoalEnabled, globalCompactionPercent, agent, team, archivedTeam, triggers, extraSettings, collapsed: metaCollapsed,
-        models: recovery?.[0], accounts: recovery?.[1], disabledModels: recovery?.[2].disabledModels });
-    // id="chat-panel" is the chat client's mount point: /agent/chat.js loads
-    // once for the whole app and (re)binds itself to this element after every
-    // swap — Enter-to-send, stick-to-bottom, older-message paging and the tool
-    // cards all hang off it. Without the id the page renders and does nothing.
-    // The canvas panel is always rendered; data-canvas-open shows it and narrows the chat to --chat-w
-    // (src/canvas/$script_canvas.js flips it without re-rendering the chat).
-    const main = `<div ${ctx.fns.procs.ui.attr({ page: "agent", id })} data-canvas-agent="${ctx.fns.procs.ui.escape({ text: id })}"${canvas.open ? " data-canvas-open" : ""} style="--chat-w:${canvas.chatWidth}px" class="flex min-h-0 min-w-0 flex-1 bg-base-200">
-  ${canvasPanel}
-  <section id="chat-panel" data-agent-id="${ctx.fns.procs.ui.escape({ text: id })}" class="flex min-w-0 flex-1 flex-col">${chat}${await ctx.fns.ui.resourceMonitor({agentId:id})}</section>
-  ${meta}
-</div>`;
-
-    return { currentId: id, title: agent.title || id, main };
+/**
+ * Redirect legacy agent page links to the React application without rendering a second shell.
+ * Existing authentication and ownership checks run in the HTTP access layer.
+ * @param opts.req Incoming HTTP request.
+ * @param opts.params Route parameters containing the agent identifier.
+ */
+export default function (_ctx: Context, _session: Session | null, opts: {
+    /** Incoming HTTP request. */ req: Request;
+    /** Route parameters containing the agent identifier. */ params: Record<string, string>;
+}): Response {
+    const id = opts.params.id;
+    if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) return new Response("Not Found", { status: 404 });
+    return new Response(null, { status: 303, headers: { location: `/?agent=${encodeURIComponent(id)}` } });
 }

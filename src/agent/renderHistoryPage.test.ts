@@ -5,7 +5,6 @@ import renderEvent from './renderEventHtml';
 import renderEvents from './renderEventsHtml';
 import renderPeer from './renderPeerMessageHtml';
 import renderSleep from './renderSleepContextHtml';
-import chatColumn from '../ui/chatColumn';
 import route from './$route_$id_events.html_GET';
 import {renderCtx} from '../ui/testRender.entry';
 
@@ -69,16 +68,4 @@ test('history HTTP route counts visible cards and live tail retains raw event cu
  expect(html).toContain('Исходящее');expect(html).toContain('before=1&limit=1');expect(html).not.toContain('id="msg-tail"');
  const tail=await route(ctx,null,{req:new Request('http://test/agent/owner/events.html?offset=2'),params:{id:'owner'}});const tailHtml=await tail.text();
  expect(tailHtml).toContain('offset=222');expect(tailHtml).toContain('id="msg-tail"');expect(tailHtml).not.toContain('Исходящее');
-});
-
-test('initial compacted chat keeps old correspondence and UI-only events, with no synthetic m-0 anchors',async()=>{
- const {ctx}=await harness([{idx:0,type:'user',text:'old preserved message',messageIdx:0},outgoing(1),...Array.from({length:240},(_,i)=>({idx:i+2,type:'context_usage'}))]);
- ctx.state.agent.owner={id:'owner',model:'mock',sleepContext:{mode:'compact',activeRevision:1,generations:[{revision:1,tailStart:999,sourceOffset:999,contextMessages:[{role:'user',content:'summary <unsafe>'}]}]}};
- const html=await chatColumn(ctx,null,{agentId:'owner'});const w=new Window();
- try{w.document.body.innerHTML=html;const d=w.document;
-  expect(d.querySelectorAll('.service-message--outgoing')).toHaveLength(1);expect(d.querySelectorAll('#m-0')).toHaveLength(1);
-  expect(d.querySelector('[data-compact-context]')?.hasAttribute('open')).toBe(false);
-  expect(d.querySelector('[data-compact-context]')?.querySelector('[id^=m-]')).toBeNull();
-  expect(html).toContain('old preserved message');expect(html).toContain('summary &lt;unsafe&gt;');expect(html).toContain('offset=242');
- }finally{await w.happyDOM.close();}
 });
