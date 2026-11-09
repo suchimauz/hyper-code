@@ -1,7 +1,7 @@
 /**
  * Clear an idle isolated goal under an exact owner barrier and snapshot CAS
  *
- * Trusted internal orchestration only, not authorization. Rejects running owners and outstanding delegated accounting authority; holds a nonwaiting owner barrier and transaction while clearing. Never clears Stop or schedules work.
+ * Trusted internal orchestration only, not authorization. Rejects running owners and outstanding delegated accounting authority; waits for the owner barrier like Codex's goal state permit and holds it and transaction while clearing. Never clears Stop or schedules work.
  * @param opts.agentId Independently authorized exact owner.
  * @param opts.expectedGoalId Observed existing goal UUID.
  * @param opts.expectedRevision Observed goal revision. @minimum 1
@@ -23,8 +23,8 @@ export default async function (
 ): Promise<{goal:null;resume:{scheduled:false;reason:string}}> {
     if(!await ctx.fns.goal.enabled({}))throw new Error('Goal feature disabled');
     if(opts.expectedRunToken!==null)throw new Error('Goal conflict: clear requires idle owner');
-    const lease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:opts.agentId,runToken:null});
-    if(!lease)throw new Error('Goal busy: dispatch/accounting boundary reserved');
+    const lease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:opts.agentId,runToken:null,wait:true});
+    if(!lease)throw new Error('Goal accounting boundary unavailable');
     try {
     return await ctx.fns.procs.db.transaction({fn:async()=>{
     const owner=(await ctx.fns.procs.db.select({sql:'SELECT run_token,run_state,archived_at FROM agents WHERE id=? FOR UPDATE',params:[opts.agentId]}))[0];

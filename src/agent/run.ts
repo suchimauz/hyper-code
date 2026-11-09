@@ -89,6 +89,15 @@ export default async function (
     let lifecycleStarted = false;
     let goalRun: types.goal.RunState | undefined;
     let goalOwnerLease: Readonly<{agentId:string;runToken:string|null}> | null = null;
+    // Like Codex's goal_state_permit: the owner boundary is held only around accounting
+    // and status writes, never across a provider request or tool execution, so an
+    // external pause/edit waits briefly instead of failing as "busy".
+    const goalBoundary = async <T>(fn: () => Promise<T>): Promise<T> => {
+        const lease = await ctx.fns.goal.ownerBarrier({ action: 'acquire', agentId: agent.id, runToken: goalRun!.binding.runToken, wait: true });
+        if (!lease) throw new Error('Goal accounting boundary unavailable');
+        try { return await fn(); }
+        finally { await ctx.fns.goal.ownerBarrier({ action: 'release', agentId: agent.id, runToken: lease.runToken, lease }); }
+    };
     // Shared reference: finally may grant permission only after the last checkpoint commits.
     const goalReturn: { goalContinuation?: { goalId: string; revision: number; allowContinuation: true } } = {};
     let goalResult: types.goal.RunResult | undefined;
@@ -192,7 +201,7 @@ export default async function (
             legacyAutomation = false;
             await ctx.fns.goal.runStopRegistry({ action: 'register', agentId: agent.id, runToken, state: goalRun });
             // Fresh accumulator begins AFTER activation; preceding response is never billed twice.
-            goalResult = await ctx.fns.goal.runCheckpointFlush({ state: goalRun });
+            goalResult = await goalBoundary(() => ctx.fns.goal.runCheckpointFlush({ state: goalRun! }));
             if (goalResult.kind !== 'committed') throw new Error('Native Goal initial accounting failed');
         } else if (goalRun) {
             goalRun.revision = snapshot.revision;
@@ -326,14 +335,7 @@ export default async function (
             return Object.assign(goalReturn, { text: '', usage: null, consumedUserIdx, inputWaiting: true });
         }
         if (nativeHandoffFailed) throw new Error('Native Goal accounting handoff failed; explicit retry required');
-        if (goalOwnerLease) {
-            await ctx.fns.goal.ownerBarrier({action:'release',agentId:agent.id,runToken:goalOwnerLease.runToken,lease:goalOwnerLease});
-            goalOwnerLease=null;
-        }
-        if (goalRun || nativeBinding()) {
-            goalOwnerLease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:agent.id,runToken:goalRun?.binding.runToken ?? runToken!});
-            if (!goalOwnerLease || goalRun?.sealed || goalRun?.blocked) throw new DOMException('Goal accounting boundary busy or closed; retry explicitly', 'AbortError');
-        }
+        if (goalRun?.sealed || goalRun?.blocked) throw new DOMException('Goal accounting boundary closed; retry explicitly', 'AbortError');
         await assertRunActive();
         if (++turns > MAX_TURNS) {
             await ctx.fns.session.appendErrorEvent({ id: agent.id, error: `run hit the ${MAX_TURNS}-turn cap — closing; send a message to continue` });
@@ -514,7 +516,7 @@ export default async function (
         // Account the just-finished request BEFORE authorizing its tool batch.
         // Unknown usage gets a bounded local summary, never another model/tool loop.
         if (goalRun) {
-            goalResult = await ctx.fns.goal.runCheckpointFlush({ state: goalRun });
+            goalResult = await goalBoundary(() => ctx.fns.goal.runCheckpointFlush({ state: goalRun! }));
             await assertRunActive();
             refreshNativeRevision();
             if (goalResult.kind !== 'committed' || goalResult.status !== 'active') {
@@ -795,7 +797,7 @@ export default async function (
             await assertRunActive();
             if (!r.isError && r.terminal?.type === 'html') terminal = r.terminal;
             if (goalRun && r.handlerExecuted) {
-                goalResult = await ctx.fns.goal.runCheckpointFlush({ state: goalRun });
+                goalResult = await goalBoundary(() => ctx.fns.goal.runCheckpointFlush({ state: goalRun! }));
                 refreshNativeRevision();
                 if (goalResult.kind === 'committed' && goalResult.budgetTransition && !terminal) {
                     await ctx.fns.goal.budgetSteer({ agentId: goalRun.binding.rootAgentId, goalIdentity: goalRun.binding.goalId, runToken: goalRun.binding.runToken });
@@ -866,7 +868,7 @@ export default async function (
         throw error;
     } finally {
         // A rejected cycle must not checkpoint concurrently with an external mutation.
-        if (goalRun && !goalOwnerLease) goalOwnerLease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:agent.id,runToken:goalRun.binding.runToken});
+        if (goalRun && !goalOwnerLease) goalOwnerLease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:agent.id,runToken:goalRun.binding.runToken,wait:true});
         if (goalRun && goalOwnerLease) {
             // Accounting must not mask the original exception or skip lifecycle cleanup.
             try {

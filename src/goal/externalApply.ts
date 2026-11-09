@@ -1,7 +1,7 @@
 /**
  * Apply an external goal edit at a reserved accounting boundary
  *
- * Trusted internal caller only, not a model tool or authorization boundary. Uses a nonwaiting local barrier shared with complete dispatch/tool cycles. Running edits require the exact local root binding and drain its old-objective accounting before CAS; successful edits seal that binding. Remote owners, pending requests and delegation authorities fail closed. Does not clear Stop, enqueue messages, or automatically activate paused goals. Active edits remain state-only.
+ * Trusted internal caller only, not a model tool or authorization boundary. Like Codex's set_thread_goal it waits for the owner's goal-state boundary (held by agent.run only around accounting writes, never across provider requests or tools) instead of failing as busy. Running edits require the exact unsealed local root binding: committed accounting is flushed first when no provider request is in flight, otherwise the edit applies at the current revision and the in-flight request is not billed to the edited goal. Revision bumps made only by this run's own accounting are accepted, since any earlier external edit would have sealed the binding. Successful edits seal that binding. Remote owners and delegation authorities fail closed. Does not clear Stop, enqueue messages, or automatically activate paused goals. Active edits remain state-only.
  * @param opts.agentId Exact goal owner selected by the trusted caller.
  * @param opts.expectedGoalId Previously observed goal identity; null asserts absence.
  * @param opts.expectedRevision Previously observed revision; never refreshed on conflict.
@@ -31,19 +31,22 @@ export default async function (
     },
 ): Promise<{goal: types.goal.State | null; resume: {scheduled: false; reason: string}}> {
     if (!await ctx.fns.goal.enabled({})) throw new Error('Goal feature disabled');
-    const lease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:opts.agentId,runToken:opts.expectedRunToken});
-    if (!lease) throw new Error('Goal busy: dispatch/accounting boundary reserved; retry explicitly');
+    const lease=await ctx.fns.goal.ownerBarrier({action:'acquire',agentId:opts.agentId,runToken:opts.expectedRunToken,wait:true});
+    if (!lease) throw new Error('Goal accounting boundary unavailable');
     let state: types.goal.RunState | undefined;
     let revision=opts.expectedRevision;
     try {
      if (opts.expectedRunToken !== null) {
       state=await ctx.fns.goal.runStopRegistry({action:'get',agentId:opts.agentId,runToken:opts.expectedRunToken});
-      if (!state || state.sealed || state.blocked || state.binding.authority || state.binding.rootAgentId!==opts.agentId || state.binding.goalId!==opts.expectedGoalId || state.revision!==opts.expectedRevision || state.pendingRequests.size) throw new Error('Goal conflict: no drained local source boundary');
+      if (!state || state.sealed || state.blocked || state.binding.authority || state.binding.rootAgentId!==opts.agentId || state.binding.goalId!==opts.expectedGoalId || opts.expectedRevision===null || state.revision<opts.expectedRevision) throw new Error('Goal conflict: no live local source boundary');
       const before=await ctx.fns.goal.read({agentId:opts.agentId});
-      if (!before.enabled || !before.goal || before.goal.goalId!==opts.expectedGoalId || before.goal.revision!==opts.expectedRevision || before.goal.objective!==state.binding.objective) throw new Error('Goal conflict: observed boundary changed');
-      const checkpoint=await ctx.fns.goal.runCheckpointFlush({state,maxAttempts:1});
-      if (checkpoint.kind!=='committed') throw new Error('Goal conflict: source accounting did not commit');
-      revision=checkpoint.revision;
+      if (!before.enabled || !before.goal || before.goal.goalId!==opts.expectedGoalId || before.goal.revision<opts.expectedRevision || before.goal.objective!==state.binding.objective) throw new Error('Goal conflict: observed boundary changed');
+      if (state.pendingRequests.size) revision=before.goal.revision;
+      else {
+       const checkpoint=await ctx.fns.goal.runCheckpointFlush({state,maxAttempts:1});
+       if (checkpoint.kind!=='committed') throw new Error('Goal conflict: source accounting did not commit');
+       revision=checkpoint.revision;
+      }
      }
     const result=await ctx.fns.procs.db.transaction({fn: async () => {
      const owner=(await ctx.fns.procs.db.select({sql:'SELECT run_token,run_state,archived_at FROM agents WHERE id=? FOR UPDATE',params:[opts.agentId]}))[0];
