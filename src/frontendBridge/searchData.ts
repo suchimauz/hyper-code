@@ -20,7 +20,14 @@ export default async function (
     const tab=tabs.find(t=>t.id===opts.tab)??tabs[0];
     const sessions=await ctx.fns.session.list({includeArchived:true});
     const titles=new Map(sessions.map(s=>[s.id,s.title]));
-    const clean=(items: types.nav.Item[] = [])=>items.map(i=>({id:i.id,label:(i.id?.startsWith('agent:')?titles.get(i.id.slice(6)):undefined)||i.label,href:/^\/(?:a\/[A-Za-z0-9_-]+|agent\/[A-Za-z0-9_-]+|projects\/(?:view|archive)|files|search|settings(?:\/declared)?|llms|auth\/users|plugins|shared-agents|controlPlane|sshInstance|functions|knowledge|architectureMap|gcal\/|news(?:\/reader)?|tasks|discovery|gaps|rss|hackernews|substack|inbox|whisper|autotext|cron|update|telemetry)(?:\?[^#]*)?$/.test(i.href) && !/[\\\r\n]/.test(i.href) ? i.href : null,hint:i.hint,detail:i.detail,model:i.model,active:i.active,unread:i.unread,unreadCount:i.unreadCount,owner:i.owner,group:i.group}));
+    const safeHref = (href: string) => {
+        if (/[\\\u0000-\u0020\u007f]/.test(href)) return null;
+        if (href === '/?newSession=1') return href;
+        if (/^\/agent\/[A-Za-z0-9_-]+#m-\d+$/.test(href)) return href;
+        if (/^\/inbox\/[A-Za-z0-9_-]+$/.test(href)) return href;
+        return /^\/(?:a\/[A-Za-z0-9_-]+|agent\/[A-Za-z0-9_-]+|projects\/(?:view|archive)|files|search|settings(?:\/declared)?|llms|auth\/users|plugins|shared-agents|controlPlane|sshInstance|functions|knowledge|architectureMap|gcal\/?|news(?:\/reader)?|tasks|discovery|gaps|rss|hackernews|substack|inbox|whisper|autotext|cron|update|telemetry)(?:\?[^#]*)?$/.test(href) ? href : null;
+    };
+    const clean=(items: types.nav.Item[] = [])=>items.map(i=>({id:i.id,label:(i.id?.startsWith('agent:')?titles.get(i.id.slice(6)):undefined)||i.label,href:safeHref(i.href),hint:i.hint,detail:i.detail,model:i.model,active:i.active,unread:i.unread,unreadCount:i.unreadCount,owner:i.owner,group:i.group}));
     const base={activeTab:tab?.id??null,tabs:tabs.map(t=>({id:t.id,title:t.title}))};
     if(opts.q?.trim()) { const result=await ctx.fns.nav.searchAll({q:opts.q.trim(),tab:tab?.id,inlineMs:0});return {...base,mode:'search',widgets:[],groups:result.groups.map(g=>({id:g.id,title:g.title,items:clean(g.items),...(g.error?{error:'Unavailable'}:{})}))}; }
     const registry=(ctx.state as typeof ctx.state & {nav?:{widgets?:Record<string,types.nav.Widget>}}).nav?.widgets??{};
@@ -32,7 +39,8 @@ export default async function (
     try{const out=await Promise.race([Promise.resolve().then(()=>def.render(ctx,session,{size:p.size??'M',config})),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('timeout')),2500)})]);
     if(typeof out==='string')return {...base,status:'unsupported'};
     const data:types.nav.WidgetOutput=Array.isArray(out)?{items:out}:out??{};
-    return {...base,status:data.html||data.sections?.some(s=>s.html)?'unsupported':'ok',items:clean(data.items),sections:(data.sections??[]).map(s=>({title:s.title,collapsed:s.collapsed,count:s.count,items:clean(s.items)}))};
+    if ('html' in data || data.sections?.some(s => 'html' in s)) return {...base,status:'unsupported'};
+    return {...base,status:'ok',items:clean(data.items),sections:(data.sections??[]).map(s=>({title:s.title,collapsed:s.collapsed,count:s.count,items:clean(s.items)}))};
     }catch{return {...base,status:'unavailable'};}finally{if(timer)clearTimeout(timer);}
     }));return {...base,mode:'home',groups:[],widgets};
 }

@@ -33,6 +33,7 @@ export default async function (
      } else if(opts.req.method!=='GET') return Response.json({message:'Method not allowed'},{status:405});
      const rows=await ctx.fns.procs.db.select({sql:'SELECT status_line,status_line_every,status_line_mode,auto_compact_window_percent,run_state FROM agents WHERE id=?',params:[opts.id]});
      const target=ctx.state.agent[opts.id]??await ctx.fns.session.load({id:opts.id});
-     return Response.json({settings:rows[0],plan:target?.scratchpad?.plan??null,csrfToken:await ctx.fns.auth.csrfToken({req:opts.req})},{headers:{'Cache-Control':'no-store'}});
+     const triggers=await ctx.fns.procs.db.select({sql:'SELECT id,kind,status,prompt,next_at AS "nextAt" FROM agent_triggers WHERE agent_id=? ORDER BY created_at DESC LIMIT 100',params:[opts.id]});
+     return Response.json({settings:rows[0],triggers,plan:target?.scratchpad?.plan??null,csrfToken:await ctx.fns.auth.csrfToken({req:opts.req})},{headers:{'Cache-Control':'no-store'}});
     } catch(error) {const e=error as Error & {status?:number}; return Response.json({message:e.status?e.message:(opts.req.method==='POST'?e.message:'Meta unavailable')},{status:e.status??400,headers:{'Cache-Control':'no-store'}});}
 }

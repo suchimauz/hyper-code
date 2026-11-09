@@ -56,30 +56,46 @@ describe('ui control helpers', () => {
     expect(emitted[0]).toEqual({ type: 'ui.navigate', path: '/files/absolute/src/x.ts' });
   });
 
-  test('secure-input SSE lifecycle is owned by popup.js, not legacy control.js', async () => {
+  test('native secure-input metadata is owner-filtered JSON, never a popup fragment', async () => {
     const { ctx } = await mkCtx();
-    const script = await ctx.fns.ui.controlScript({});
-    expect(script).not.toContain('secure-input-refresh');
-    expect(script).not.toContain('secureInputReturnFocus');
-    expect(script).not.toContain("createElement('input')");
-    expect(ctx.fns.secureInput.submit).toBeFunction();
-    expect(ctx.fns.secureInput.current).toBeFunction();
+    ctx.state.registry.auth.currentUser = async (_c: any, _s: any, { req }: any) => ({ required: true, user: { id: req.headers.get('x-test-user') ?? 'owner' } });
+    ctx.state.registry.auth.csrfToken = async () => 'fixture-csrf';
+    ctx.state.secureInput = { prompts: new Map([['p1', {
+      id: 'p1', name: 'test-1', title: 'Test', message: 'Enter', kind: 'text', maxlength: 20,
+      ownerId: 'owner', expiresAt: Date.now() + 60_000, resolve: () => {}, reject: () => {},
+    }]]) };
+    expect((await ctx.fns.secureInput.current({})).status).toBe(403);
+    const res = await ctx.fns.procs.http.dispatch({ url: '/secureInput/current' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    const data = await res.json();
+    expect(data.csrfToken).toBe('fixture-csrf');
+    expect(data.prompt).toEqual({ id: 'p1', name: 'test-1', title: 'Test', message: 'Enter', kind: 'text', maxlength: 20, expiresAt: ctx.state.secureInput.prompts.get('p1').expiresAt });
+    const hidden = await ctx.fns.secureInput.current({ req: new Request('http://localhost/secureInput/current', { headers: { 'x-test-user': 'other' } }) });
+    expect(await hidden.json()).toEqual({ prompt: null });
   });
 
-
-  test('secure-input styling lives in the server-rendered HTMX fragment', async () => {
+  test('native secure-input answers require protected HTTP and cancellation settles the prompt', async () => {
     const { ctx } = await mkCtx();
-    const html = ctx.fns.secureInput.render({ prompt: { id: 'p1', name: 'test-1', title: 'Test', message: 'Enter', kind: 'text', maxlength: 20 } });
-    expect(html).toContain('input input-bordered');
-    expect(html).toContain('ui-button ui-button--sm ui-button--primary');
-    expect(html).toContain('data-secure-cancel');
-    // Two hx-popup attributes, and both are load-bearing: the form submits the
-    // secret through `secureInput.submit`, and Cancel posts the same method
-    // with `cancel: 1` rather than closing the popup in the browser — the
-    // waiting agent has to be told, or it waits forever. This asserted one
-    // until Cancel grew its own call and then simply went stale.
-    expect(html.match(/hx-popup=/g)?.length).toBe(2);
-    expect(html).toContain('hx-popup-params=');
+    const answers: string[] = [], errors: string[] = [];
+    ctx.state.registry.auth.currentUser = async () => ({ required: true, user: { id: 'owner' } });
+    ctx.state.registry.auth.verifyCsrf = async (_c: any, _s: any, { token }: any) => token === 'fixture-csrf';
+    const entry = () => ({ id: 'p1', ownerId: 'owner', kind: 'text', maxlength: 20, expiresAt: Date.now() + 60_000, resolve: (value: string) => answers.push(value), reject: (error: Error) => errors.push(error.message) });
+    ctx.state.secureInput = { prompts: new Map([['p1', entry()]]) };
+    const submit = (body: object, token = 'fixture-csrf') => ctx.fns.procs.http.dispatch({ method: 'POST', url: '/secureInput/submit', headers: { 'content-type': 'application/json', 'x-csrf-token': token }, body: JSON.stringify(body) });
+    expect((await ctx.fns.secureInput.submit({})).status).toBe(403);
+    expect((await submit({ id: 'p1', value: 'fixture-value' }, 'bad')).status).toBe(403);
+    expect((await submit({ id: 'stale', value: 'fixture-value' })).status).toBe(404);
+    expect(answers).toEqual([]);
+    const accepted = await submit({ id: 'p1', value: 'fixture-value' });
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toEqual({ ok: true });
+    expect(answers).toEqual(['fixture-value']);
+    expect(ctx.state.secureInput.prompts.size).toBe(0);
+    ctx.state.secureInput.prompts.set('p1', entry());
+    expect((await submit({ id: 'p1', cancel: true })).status).toBe(200);
+    expect(errors).toEqual(['transient input prompt cancelled']);
+    expect(ctx.state.secureInput.prompts.size).toBe(0);
   });
 
 });

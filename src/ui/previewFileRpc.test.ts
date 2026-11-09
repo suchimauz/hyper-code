@@ -1,44 +1,49 @@
 import { describe, expect, test } from "bun:test";
-import { mkTestCtx } from "../_testCtx.entry";
-import { join } from "node:path";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import previewFile from "../../.hyper/ui/previewFile";
 
-describe("ui.previewFile popup RPC", () => {
-    test("returns an iframe fragment instead of JSON metadata", async () => {
-        const ctx = await mkTestCtx();
-        const dir = await mkdtemp(join(tmpdir(), "hyper-preview-rpc-"));
-        try {
-            const path = join(dir, "readme.md");
-            await writeFile(path, "# Preview");
-            // /rpc is cookie-authenticated and CSRF-protected, deliberately
-            // independent of Origin — so a dispatch must carry a real signed
-            // session cookie and the token derived from it, or the 401 under
-            // test is the guard working rather than the handler answering.
-            const cookieName = ctx.fns.procs.auth.cookieName({});
-            const token = await ctx.fns.procs.auth.sign({ sub: "preview-test", name: "Preview", role: "owner", days: 1 });
-            const cookie = `${cookieName}=${token}`;
-            const csrf = await ctx.fns.auth.csrfToken({ req: new Request("http://localhost/rpc", { headers: { cookie } }) });
-            const response = await ctx.fns.procs.http.dispatch({
-                url: "/rpc",
-                method: "POST",
-                headers: {
-                    "content-type": "application/json",
-                    "hx-request": "true",
-                    cookie,
-                    "x-csrf-token": csrf,
-                },
-                body: JSON.stringify({ method: "ui.previewFile", params: { path } }),
-            });
-            const html = await response.text();
-            expect(response.status).toBe(200);
-            expect(response.headers.get("content-type")).toContain("text/html");
-            expect(html).toContain("data-popup-content");
-            expect(html).toContain("<iframe");
-            expect(html).toContain("/files/embed/");
-            expect(html).not.toContain(`{"path":`);
-        } finally {
-            await rm(dir, { recursive: true, force: true });
+// No filesystem, SSH, database or UI writes: all runtime dependencies are mocked.
+function fixture(host: string | null = null, privateResult = false) {
+    const calls: { name: string; args: any }[] = [];
+    const ctx = { fns: {
+        files: {
+            embedUrl: async (args: any) => { calls.push({ name: "resolve", args }); return { path: "/workspace/docs/readme.md", host, url: "/files/embed/workspace/docs/readme.md" }; },
+            isPrivateResult: async (args: any) => { calls.push({ name: "private", args }); return privateResult; },
+        },
+        canvas: { show: async (args: any) => { calls.push({ name: "canvas", args }); return { id: 42 }; } },
+    } } as unknown as Context;
+    return { calls, ctx };
+}
+
+describe("ui.previewFile native Canvas", () => {
+    test("pins local paths and preserves source mode and title", async () => {
+        const { ctx, calls } = fixture();
+        const result = await previewFile(ctx, null, { path: "docs/readme.md", mode: "source", title: "Read me", maxChars: 10 });
+        expect(result).toMatchObject({ itemId: 42, host: null, mode: "source", path: "/workspace/docs/readme.md" });
+        expect(calls).toEqual([
+            { name: "resolve", args: { path: "docs/readme.md", host: undefined, mode: "source" } },
+            { name: "private", args: { path: "/workspace/docs/readme.md", host: undefined } },
+            { name: "canvas", args: { kind: "file", args: { path: "/workspace/docs/readme.md", host: "local", mode: "source" }, title: "Read me" } },
+        ]);
+    });
+    test("pins inherited remote workspace and explicit remote host", async () => {
+        for (const host of [undefined, "ssh-host"]) {
+            const f = fixture("ssh-host");
+            await previewFile(f.ctx, null, { path: "docs/readme.md", host, mode: "preview" });
+            expect(f.calls[0].args.host).toBe(host);
+            expect(f.calls[2].args).toEqual({ kind: "file", args: { path: "/workspace/docs/readme.md", host: "ssh-host", mode: "preview" }, title: "ssh-host:/workspace/docs/readme.md" });
         }
+    });
+    test("rejects private results before showing any Canvas tab", async () => {
+        const f = fixture(null, true);
+        await expect(previewFile(f.ctx, null, { path: "alias-to-private-result" })).rejects.toThrow("file not found");
+        expect(f.calls.map(c => c.name)).toEqual(["resolve", "private"]);
+    });
+    test("generic RPC fails explicitly before resolving or exposing any file", async () => {
+        const f = fixture();
+        const result = await previewFile(f.ctx, { url: new URL("http://localhost/rpc") } as Session, { path: "/another-user/file" });
+        expect(result).toBeInstanceOf(Response);
+        expect((result as Response).status).toBe(403);
+        expect(await (result as Response).text()).toContain("Canvas");
+        expect(f.calls).toEqual([]);
     });
 });

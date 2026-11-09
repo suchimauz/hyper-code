@@ -1,8 +1,7 @@
 import { test, expect } from "bun:test";
 import listModels from "./listModels";
-import modelPickerHtml from "../agent/modelPickerHtml";
 
-test("named-only local Codex remains in rendered picker with a Hyper current route", async () => {
+test("named-only local Codex and Hyper routes remain in the native picker catalog", async () => {
     const originalFetch = globalThis.fetch;
     const requested: string[] = [];
     globalThis.fetch = (async (url: string | URL | Request) => {
@@ -36,11 +35,5 @@ test("named-only local Codex remains in rendered picker with a Hyper current rou
         expect(requested).toEqual(["pro500"]);
         expect(groups.codex).toEqual(["codex/pro500:gpt-6-astra"]);
         expect(groups["hyper/mini6"]).toEqual(remoteModels.map(id => `hyper/mini6:${id}`));
-        (ctx.fns.llm as any).listModels = async () => groups;
-        const html = await modelPickerHtml(ctx, null, { current: "hyper/mini6:codex/pro:gpt-6-astra", mode: "form" });
-        expect(html).toContain("Show Codex accounts");
-        expect(html).toContain("codex/pro500:gpt-6-astra");
-        expect(html).toContain("hyper/mini6:codex/pro:gpt-6-astra");
-        expect(html).toContain("hyper/mini6:codex/pro500:gpt-6-astra");
     } finally { globalThis.fetch = originalFetch; }
 });

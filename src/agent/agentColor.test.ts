@@ -20,12 +20,7 @@ test('random agent colors survive saves and reloads and both directions use the 
     // Deliberately distinct persisted hues prove this is not an ID hash or recipient color.
     await ctx.fns.procs.db.run({ sql: 'UPDATE agents SET color_hue = CASE WHEN id = ? THEN 17.5 ELSE 241.25 END WHERE id IN (?, ?)', params: [a.id, a.id, b.id] });
     expect((await author()).hue).toBe(17.5);
-    const incoming = await ctx.fns.agent.renderPeerMessageHtml({ agentId: b.id, event: { agentMessage: { from: a.id, body: 'hello' } } });
-    const outgoing = await ctx.fns.agent.renderPeerMessageHtml({ agentId: a.id, event: { outgoingAgentMessage: { deliveryKey: 'color-test', to: b.id, body: 'hello', status: 'delivered', messageIdx: 0 } } });
-    expect(incoming).toContain('--service-hue:17.5');
-    expect(outgoing).toContain('--service-hue:17.5');
-    const reply = await ctx.fns.agent.renderPeerMessageHtml({ agentId: a.id, event: { agentMessage: { from: b.id, body: 'reply' } } });
-    expect(reply).toContain('--service-hue:241.25');
+    expect((await ctx.fns.auth.author({ userId: 'agent:' + b.id })).hue).toBe(241.25);
     expect((await ctx.fns.auth.author({ userId: 'agent:missing-color-test' })).hue).toBe(210);
 });
 

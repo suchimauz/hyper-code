@@ -1,32 +1,26 @@
 import { expect, test } from 'bun:test';
 import route from './$route__POST';
 
-const ctx: any = { fns: {
-    auth: { verifyCsrf: ({ token }: any) => token === 'valid', currentUser: async () => ({ user: { id: 'test', name: 'Test' }, required: true }) },
-    demo: { hello: ({ name }: any) => `<b>Hello ${name}</b>` },
-    procs: {
-        log: { info: () => {}, warn: () => {} },
-        http: { toResponse: ({ value }: any) => new Response(value, { headers: { 'content-type': 'text/html' } }) },
-    },
-} };
-const call = (body: any, headers: any = {}) => route(ctx, null, { req: new Request('http://localhost/rpc', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', 'x-csrf-token': 'valid', ...headers } }) });
-
-test('authenticated csrf-protected rpc dispatches ctx.fns with an opts object', async () => {
-    const res = await call({ method: 'demo.hello', params: { name: 'Ada' } });
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe('<b>Hello Ada</b>');
-});
-test('rpc requires authentication and a valid cookie-bound csrf token', async () => {
-    const currentUser = ctx.fns.auth.currentUser;
-    ctx.fns.auth.currentUser = async () => ({ user: null, required: true });
-    try { expect((await call({ method: 'demo.hello', params: {} })).status).toBe(401); }
-    finally { ctx.fns.auth.currentUser = currentUser; }
-    expect((await call({ method: 'demo.hello', params: {} }, { 'x-csrf-token': 'forged' })).status).toBe(403);
-    expect((await call({ method: 'demo.hello', params: {} }, { 'x-csrf-token': '' })).status).toBe(403);
+test('retired RPC returns 410 without accessing functions or reading payloads', async () => {
+    const ctx = new Proxy({}, { get() { throw new Error('No dispatch permitted'); } }) as Context;
+    for (const body of [JSON.stringify({ method: 'secureInput.submit', params: { value: 'never-consumed' } }), JSON.stringify({ method: 'demo.hello', params: {} }), 'invalid json']) {
+        const req = new Request('http://localhost/rpc', { method: 'POST', body });
+        const response = route(ctx, null, { req });
+        expect(response.status).toBe(410);
+        expect(req.bodyUsed).toBe(false);
+        expect(await response.text()).toContain('retired');
+    }
 });
 
-test('rpc is independent of origin and rejects prototype paths', async () => {
-    expect((await call({ method: 'demo.hello', params: { name: 'UI' } }, { origin: 'https://any-public-origin.example', 'sec-fetch-site': 'cross-site' })).status).toBe(200);
-    expect((await call({ method: 'demo.__proto__.x', params: {} })).status).toBe(400);
-    expect((await call({ method: 'missing.fn', params: {} })).status).toBe(404);
+test('generic popup helpers and browser dispatch scripts are absent', async () => {
+    for (const path of ['../ui/popup.ts', '../ui/popupContent.ts', '../ui/$script_popup.js', '../ui/$script_rpc.js', '../ui/inplacePopup.ts', '../agent/toolDetails.ts']) {
+        expect(await Bun.file(new URL(path, import.meta.url)).exists(), path).toBe(false);
+    }
+    for (const path of ['../ui/layout.ts', '../canvas/itemDocument.ts']) {
+        const source = await Bun.file(new URL(path, import.meta.url)).text();
+        expect(source).not.toContain('/ui/rpc.js');
+        expect(source).not.toContain('/ui/popup.js');
+        expect(source).toContain('/procs/ui/htmx.js');
+        expect(source).toContain('csrf-token');
+    }
 });

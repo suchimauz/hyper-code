@@ -1,11 +1,12 @@
 // Geometry follows the dsh settings modal (DeepSeek Harness, MIT); see THIRD_PARTY_NOTICES.md.
 import { Dialog } from '@base-ui/react/dialog';
-import { Plug, Server, X } from 'lucide-react';
+import { Bell, Plug, Server, X } from 'lucide-react';
 import { LlmConnectionsPanel } from './LlmConnectionsPanel';
 import { SshInstancesPanel } from './SshInstancesPanel';
+import { PushSettingsPanel } from './PushSettingsPanel';
 import './settings.css';
 
-export const SETTINGS_TABS = [{ id: 'llm-connections', label: 'LLM Connections', icon: Plug }, { id: 'ssh-instances', label: 'SSH Instances', icon: Server }] as const;
+export const SETTINGS_TABS = [{ id: 'llm-connections', label: 'LLM Connections', icon: Plug }, { id: 'ssh-instances', label: 'SSH Instances', icon: Server }, { id: 'push-notifications', label: 'Notifications', icon: Bell }] as const;
 export type SettingsTab = typeof SETTINGS_TABS[number]['id'];
 
 /**
@@ -29,7 +30,7 @@ export function SettingsDialog({ open, tab, onTab, onOpenChange }: { open: boole
         </nav>
         <div className="settings-content">
           <div className="settings-header" aria-hidden="true" />
-          <div className="settings-options">{tab === 'llm-connections' && <LlmConnectionsPanel />}{tab === 'ssh-instances' && <SshInstancesPanel onOpenConnections={() => onTab('llm-connections')} />}</div>
+          <div className="settings-options">{tab === 'push-notifications' && <PushSettingsPanel />}{tab === 'llm-connections' && <LlmConnectionsPanel />}{tab === 'ssh-instances' && <SshInstancesPanel onOpenConnections={() => onTab('llm-connections')} />}</div>
         </div>
       </Dialog.Popup>
     </Dialog.Portal>

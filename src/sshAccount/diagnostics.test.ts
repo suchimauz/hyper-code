@@ -2,7 +2,6 @@ import {test,expect,spyOn} from 'bun:test';
 import startLogin from './startLogin';
 import status from './status';
 import cancel from './cancel';
-import progress from './progressPopup';
 
 for(const provider of ['codex','claude-code'] as const) for(const failure of ['login','credentials','status','success','cancel'] as const) test(`${provider} safe diagnostics ${failure}`,async()=>{
  let out!:ReadableStreamDefaultController<Uint8Array>,err!:ReadableStreamDefaultController<Uint8Array>,resolve!:(n:number)=>void,command='';
@@ -32,8 +31,6 @@ for(const provider of ['codex','claude-code'] as const) for(const failure of ['l
   expect(JSON.stringify(flow)).not.toContain('SECRET_TOKEN');expect(JSON.stringify(d)).not.toContain('auth.json');expect(JSON.stringify(d)).not.toContain('https:');
   expect(d.reason).toBe(failure==='success'?null:failure==='credentials'?'missing-credentials':'http');
   expect(d.stages.at(-1)!.endedAt).toBeNumber();
-  const html=await progress(ctx,null,id);expect(html).toContain('Safe login diagnostics');expect(html).toContain('Process exit:');expect(html).not.toContain('SECRET_TOKEN');
-  expect(await progress(ctx,null,id)).toContain(new Date(d.endedAt!).toISOString());
   expect(command).toContain(provider==='codex'?'login --device-auth':'auth login --claudeai');
  }finally{resolve(1);spawn.mockRestore();}
 });

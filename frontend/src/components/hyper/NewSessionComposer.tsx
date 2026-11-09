@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { createPortal } from 'react-dom';
+import { WorkspaceSuggestions } from './WorkspaceSuggestions';
 import { PendingAttachments } from './PendingAttachments';
 import { attachmentLimitError } from '../../lib/attachments';
 import { useChatFileDrop } from '../../hooks/useChatFileDrop';
@@ -82,7 +83,7 @@ export function NewSessionComposer({ draft, onChange, projects, onCreated, onPen
       {advancedOpen && <fieldset disabled={locked} className="new-session-advanced-fields">
         <label>Title<input maxLength={120} value={shown.title || ''} onChange={event => change({title: event.target.value})} placeholder="Optional title" /></label>
         <label>Project workspace<input readOnly value={selected ? `${selected.host ? selected.host + ':' : ''}${selected.dir}` : 'No project selected'} /></label>
-        <label>Custom local workspace<input value={shown.workspaceDir || ''} onChange={event => change({workspaceDir: event.target.value, createWorkspaceDir: ''})} placeholder="Leave empty to use the project workspace" /></label>
+        <WorkspaceSuggestions value={shown.workspaceDir || ''} onChange={workspaceDir => change({workspaceDir, createWorkspaceDir: ''})} />
         <p>A custom local directory creates an independent session, without the selected project's host or directory.</p>
         {shown.workspaceDir && <label><input type="checkbox" checked={shown.createWorkspaceDir === '1'} onChange={event => change({createWorkspaceDir: event.target.checked ? '1' : ''})} />Create this directory if it does not exist</label>}
         <fieldset><legend>Prompt presets</legend>

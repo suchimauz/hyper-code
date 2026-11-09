@@ -1,73 +1,26 @@
-// GET /agent/dirs?workspaceDir=proj — HTMX fuzzy directory suggestions.
-// Relative queries search only direct children of the user's home; absolute
-// queries search only direct children of their resolved root. With no query, the five most recently used workspaces
-// are returned instead.
-import { homedir } from "node:os";
-import { dirname, isAbsolute, resolve, sep } from "node:path";
-import { readdir, stat } from "node:fs/promises";
+import { homedir } from 'node:os';
+import { dirname, isAbsolute, resolve } from 'node:path';
+import { readdir, stat } from 'node:fs/promises';
 
-/** Return clickable workspace-directory suggestions for the new-agent form.
- * @param opts.req Incoming request containing `workspaceDir` (or `q`).
+/** Read bounded, shallow local workspace suggestions for a signed-in user. Recent paths belong only to that user; no files or remote hosts are inspected.
+ * @param opts.req GET request with optional q or workspaceDir query (maximum 4096 characters).
  */
-export default async function (ctx: Context, _session: Session | null, opts: {
-    /** Incoming HTTP request. */
-    req: Request;
-}) {
-    const esc = (s: any) => ctx.fns.procs.ui.escape({ text: String(s ?? "") });
-    const url = new URL(opts.req.url);
-    const raw = String(url.searchParams.get("workspaceDir") ?? url.searchParams.get("q") ?? "").trim();
-
-    let paths: string[];
-    if (!raw) {
-        const rows = await ctx.fns.procs.db.select({
-            sql: `SELECT workspace_dir AS path, MAX(updated_at) AS last_used
-                  FROM agents
-                  WHERE workspace_dir IS NOT NULL AND workspace_dir <> ''
-                  GROUP BY workspace_dir
-                  ORDER BY last_used DESC
-                  LIMIT 5`,
-        }).catch(() => [] as any[]);
-        paths = (rows as any[]).map(row => String(row.path));
-    } else {
-        const home = ctx.env.HOME || homedir();
-        const expanded = raw.startsWith("~") ? home + raw.slice(1) : raw;
-        let root = isAbsolute(expanded) ? expanded : home;
-        if (isAbsolute(expanded)) {
-            while (root !== dirname(root) && !(await stat(root).catch(() => null))?.isDirectory()) root = dirname(root);
-        }
-
-        const needle = (isAbsolute(expanded) ? expanded.slice(root.length) : expanded)
-            .split(sep).filter(Boolean).join("");
-        const output = await shallowDirectories(root);
-
-        const normalizedNeedle = expanded.toLowerCase().replaceAll(sep, "");
-        const score = (path: string) => {
-            const candidate = path.toLowerCase().replaceAll(sep, "");
-            let at = 0, gaps = 0, first = -1;
-            for (const ch of normalizedNeedle) {
-                const found = candidate.indexOf(ch, at);
-                if (found < 0) return Number.MAX_SAFE_INTEGER;
-                if (first < 0) first = found;
-                gaps += found - at;
-                at = found + 1;
-            }
-            return gaps * 10 + first + path.length / 1000;
-        };
-        paths = [...new Set(output)]
-            .sort((a, b) => score(a) - score(b) || a.localeCompare(b))
-            .slice(0, 10);
-    }
-
-    if (!paths.length) return new Response(`<div class="px-3 py-2 text-xs text-subtle">no folders found</div>`, { headers: { "content-type": "text/html; charset=utf-8" } });
-    const html = paths.map(path => {
-        const encoded = encodeURIComponent(path);
-        return `<button type="button" role="option" class="flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs hover:bg-base-200" hx-get="/agent/dirs/status?q=${encoded}" hx-target="#workspace-dir-status" hx-swap="innerHTML" onclick="document.getElementById('workspace-dir-input').value=this.dataset.path;this.parentElement.replaceChildren()" data-path="${esc(path)}"><i class="ph ph-folder shrink-0 text-subtle"></i><span class="truncate">${esc(path)}</span></button>`;
-    }).join("");
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
-}
-
-
-async function shallowDirectories(root: string): Promise<string[]> {
-    const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
-    return entries.filter(entry => entry.isDirectory()).slice(0, 250).map(entry => resolve(root, entry.name));
+export default async function(ctx: Context, _session: Session|null, opts: {/** Incoming HTTP request. */req: Request}): Promise<Response> {
+ const reply=(body:object,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store',Vary:'Cookie'}});
+ const who=await ctx.fns.auth.currentUser({req:opts.req});
+ if(!who.required||who.legacy||!who.user||who.user.disabledAt!==null)return reply({message:'Authenticated user session required'},401);
+ const url=new URL(opts.req.url); const raw=(url.searchParams.get('q')??url.searchParams.get('workspaceDir')??'').trim();
+ if(raw.length>4096||raw.includes('\0')||raw.startsWith('~')&&raw!=='~'&&!raw.startsWith('~/'))return reply({message:'Invalid local path'},400);
+ try {
+ if(!raw){const rows=await ctx.fns.procs.db.select({sql:"SELECT workspace_dir AS path FROM agents WHERE created_by=? AND archived_at IS NULL AND workspace_dir IS NOT NULL AND workspace_dir<>'' AND COALESCE(workspace_host,'')='' GROUP BY workspace_dir ORDER BY MAX(updated_at) DESC LIMIT 5",params:[who.user.id]});return reply({paths:rows.map(row=>String(row.path)),path:null,status:'empty'});}
+ const home=ctx.env.HOME||homedir();const expanded=raw.startsWith('~')?home+raw.slice(1):raw;
+ const target=resolve(raw);const info=await stat(target).catch(()=>null);
+ let root=isAbsolute(expanded)?resolve(expanded):home;
+ while(root!==dirname(root)&&!(await stat(root).catch(()=>null))?.isDirectory())root=dirname(root);
+ const entries=await readdir(root,{withFileTypes:true});
+ const needle=(isAbsolute(expanded)?expanded.slice(root.length):expanded).toLowerCase().replaceAll('/','');
+ const score=(name:string)=>{let at=0,gaps=0;for(const ch of needle){const next=name.toLowerCase().indexOf(ch,at);if(next<0)return Infinity;gaps+=next-at;at=next+1;}return gaps;};
+ const paths=entries.filter(e=>e.isDirectory()&&(needle.startsWith('.')||!e.name.startsWith('.'))).map(e=>({path:resolve(root,e.name),score:score(e.name)})).filter(e=>Number.isFinite(e.score)).sort((a,b)=>a.score-b.score||a.path.localeCompare(b.path)).slice(0,20).map(e=>e.path);
+ return reply({paths,path:target,status:info?.isDirectory()?'directory':info?'file':'missing'});
+ }catch(error){return reply({message:'Unable to inspect local workspace'},(error as {code?:string}).code==='EACCES'?403:400);}
 }

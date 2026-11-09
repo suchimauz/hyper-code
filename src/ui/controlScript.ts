@@ -148,7 +148,7 @@ export default async function (_ctx: Context, _session: Session | null, _opts?: 
         "    if (html && !(status === 404 && ctx.target?.id !== 'main')) return;",
         "    ctx.swap = 'none';",
         "    // Popup RPC renders its own error; live regions just wait for the next signal.",
-        "    if (ctx.target?.id === 'app-popup-body' || ctx.sourceElement?.closest?.('[data-live-topic]')) return;",
+        "    if (ctx.sourceElement?.closest?.('[data-live-topic]')) return;",
         "    let message = (ctx.text || '').slice(0, 400);",
         "    try { const j = JSON.parse(ctx.text); message = j.message || j.error || message; } catch {}",
         "    if (html) message = 'Not found';",

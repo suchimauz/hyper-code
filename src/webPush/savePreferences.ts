@@ -1,7 +1,7 @@
 /**
  * Save authenticated owner choices for main-agent push notifications
  *
- * Handles the Inspector form POST. Verifies active cookie-bound identity, same origin and CSRF, validates form fields, and atomically writes only for an eligible agent owned by the authenticated user. No recipient identity is accepted from the browser.
+ * Handles the native React settings form POST and returns JSON. Verifies active cookie-bound identity, same origin and CSRF, validates form fields, and atomically writes only for an eligible agent owned by the authenticated user. No recipient identity is accepted from the browser.
  * @param opts.req Incoming form POST with authentication cookie and CSRF token.
  */
 export default async function (
@@ -32,6 +32,5 @@ export default async function (
     if (!await ctx.fns.auth.verifyCsrf({req,token:form.get('csrf') ?? ''})) return fail('Invalid CSRF token',403);
     const saved = await ctx.fns.procs.db.select({sql:"INSERT INTO web_push_preferences (agent_id,owner_id,input_enabled,error_enabled,updated_at) SELECT a.id,a.created_by,?,?,? FROM agents a JOIN users u ON u.id=a.created_by WHERE a.id=? AND a.created_by=? AND a.parent_id IS NULL AND COALESCE(a.visibility,'nav')='nav' AND a.archived_at IS NULL AND u.disabled_at IS NULL ON CONFLICT (agent_id,owner_id) DO UPDATE SET input_enabled=EXCLUDED.input_enabled,error_enabled=EXCLUDED.error_enabled,updated_at=EXCLUDED.updated_at RETURNING agent_id",params:[form.has('input'),form.has('error'),Date.now(),agentId,owner]});
     if (!saved.length) return fail('Agent unavailable',403);
-    const html=await ctx.fns.webPush.settingsHtml({agentId});
-    return new Response(html.replace('</form>', '<p role="status" class="text-xs">Notification preferences saved.</p></form>'),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
+    return Response.json({ok:true,agentId,input:form.has('input'),error:form.has('error')},{headers:{'cache-control':'no-store'}});
 }

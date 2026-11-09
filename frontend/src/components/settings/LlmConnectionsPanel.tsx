@@ -1,4 +1,6 @@
+import { CodexAccountReset } from './CodexAccountReset';
 import { LlmPolicySettings } from './LlmPolicySettings';
+import { RemoteLoginDiagnostics } from './RemoteLoginDiagnostics';
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { ExternalLink, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -70,17 +72,18 @@ function PendingLogin({ login, run, busy }: { login: LlmLogin; run: Run; busy: b
   return <div className={`llm-login ${failed ? 'is-failed' : ''}`} data-llm-login={`${login.provider}/${login.account}`}>
     <div className="llm-login-head"><span className={`ssh-badge ${failed ? 'is-failed' : 'is-pending'}`}><span aria-hidden="true" />{failed ? 'Login failed' : 'Waiting for sign-in'}</span><b>{login.account}</b><span className="llm-login-where">{PROVIDER_NAME[login.provider] ?? login.provider} · {login.instance ? `SSH ${login.instance}` : 'Local'}</span></div>
     {login.error && <p className="settings-note llm-error" role="alert">{login.error}</p>}
+    {login.instance && <RemoteLoginDiagnostics diagnostics={login.diagnostics} />}
     {!failed && <>
       {login.verificationUri ? <a className="button button--primary llm-auth-link" href={login.verificationUri} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} strokeWidth={1.5} />Open authorization page</a>
         : <p className="settings-note" role="status">Waiting for the CLI to provide an authorization link…</p>}
       {login.userCode && <div className="llm-device-code"><span>Device code</span><code>{login.userCode}</code></div>}
-      {login.callbackSubmitted && <p className="settings-note" role="status">Callback submitted. Status refreshes automatically.</p>}
+      {login.callbackSubmitted && <p className="settings-note" role="status">Callback submitted. Status refreshes automatically. If login does not finish, cancel and start again; do not resend the callback.</p>}
       {login.needsCode && <form className="ssh-form" onSubmit={submit} autoComplete="off">
         <label className="settings-field" htmlFor={id}><span className="settings-field-label">{login.instance ? 'Callback URL' : 'Authorization code'}</span><input id={id} type="password" value={code} onChange={event => setCode(event.target.value)} required placeholder={login.instance ? 'http://localhost:…/callback?code=…' : 'Paste the code from the browser'} spellCheck={false} /><span className="settings-field-hint">{login.instance ? 'After sign-in the browser may show a localhost error. Copy the full address from that tab. It is sent privately to the SSH server.' : 'Sent directly to the running CLI and never stored.'}</span></label>
         <div className="ssh-form-actions"><Button type="submit" variant="primary" disabled={busy || !code.trim()}>Submit</Button></div>
       </form>}
     </>}
-    {login.instance && login.id && !failed && <div className="ssh-form-actions"><Button variant="ghost" disabled={busy} onClick={() => { void run({ action: 'cancel', id: login.id! }); }}>Cancel login</Button></div>}
+    {login.id && (login.instance || login.provider === 'kimi-coding') && !failed && <div className="ssh-form-actions"><Button variant="ghost" disabled={busy} onClick={() => { void run({ action: 'cancel', id: login.id! }); }}>Cancel login</Button></div>}
   </div>;
 }
 
@@ -97,7 +100,7 @@ function RemoveAccount({ item, run, busy, onDone }: { item: LlmAccount; run: Run
   </form>;
 }
 
-function AccountRow({ item, instances, run, busy }: { item: LlmAccount; instances: string[]; run: Run; busy: boolean }) {
+function AccountRow({ item, instances, run, busy, csrf }: { item: LlmAccount; instances: string[]; run: Run; busy: boolean; csrf: string }) {
   const [open, setOpen] = useState<'reconnect' | 'remove' | null>(null);
   const slot = accountSlot(item);
   const login = (item.provider === 'anthropic-oauth' ? 'claude-code' : item.provider) as LoginProvider;
@@ -119,6 +122,7 @@ function AccountRow({ item, instances, run, busy }: { item: LlmAccount; instance
       {item.needsReconnect ? <span className="llm-quota is-critical">authentication required</span> : <Quota item={item} />}
       {!item.available && !item.needsReconnect && <span className="llm-quota is-unknown">unavailable</span>}
     </div>
+    {item.provider === 'codex' && <CodexAccountReset key={item.account} account={item.account} csrfToken={csrf} disabled={busy} />}
     {open === 'reconnect' && <LoginForm provider={login} instances={instances} run={run} busy={busy} onDone={() => setOpen(null)} account={{ name: slot.instance ? slot.name : item.account, instance: slot.instance && /^ssh\./.test(item.account) ? slot.instance : null }} />}
     {open === 'remove' && <RemoveAccount item={item} run={run} busy={busy} onDone={() => setOpen(null)} />}
   </li>;
@@ -180,11 +184,11 @@ export function LlmConnectionsPanel() {
             </header>
             {adding === group.login && group.login && <LoginForm provider={group.login} instances={instances} run={run} busy={busy} onDone={() => setAdding(null)} />}
             {flows.map(login => <PendingLogin key={`${login.id ?? ''}${login.provider}/${login.account}`} login={login} run={run} busy={busy} />)}
-            {rows.length > 0 ? <ul className="llm-rows">{rows.map(item => <AccountRow key={`${item.provider}/${item.account}`} item={item} instances={instances} run={run} busy={busy} />)}</ul>
+            {rows.length > 0 ? <ul className="llm-rows">{rows.map(item => <AccountRow key={`${item.provider}/${item.account}`} item={item} instances={instances} run={run} busy={busy} csrf={csrf} />)}</ul>
               : !flows.length && <p className="settings-footnote">{group.hint ?? 'No accounts yet.'}</p>}
           </section>;
         })}
-        {other.length > 0 && <section className="llm-group" aria-labelledby="llm-group-other"><header className="llm-group-head"><NavigationChatIcon /><h3 id="llm-group-other">Other</h3></header><ul className="llm-rows">{other.map(item => <AccountRow key={`${item.provider}/${item.account}`} item={item} instances={instances} run={run} busy={busy} />)}</ul></section>}
+        {other.length > 0 && <section className="llm-group" aria-labelledby="llm-group-other"><header className="llm-group-head"><NavigationChatIcon /><h3 id="llm-group-other">Other</h3></header><ul className="llm-rows">{other.map(item => <AccountRow key={`${item.provider}/${item.account}`} item={item} instances={instances} run={run} busy={busy} csrf={csrf} />)}</ul></section>}
       </div>}
     {accounts !== null && !loadError && <LlmPolicySettings />}
   </div>;

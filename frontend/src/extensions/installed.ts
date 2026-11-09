@@ -16,6 +16,7 @@ import { telegramExtension } from '../ui-plugins/telegram';
 import { agentSourceExtension } from '../ui-plugins/agent-source';
 import { developerCanvasesExtension } from '../ui-plugins/developer-canvases';
 import { browserLiveExtension } from '../ui-plugins/browser-live';
+import { initialPromptExtension } from '../ui-plugins/initial-prompt';
 
 /** Host-reviewed build-time allowlist. Backend installation grants no browser code execution. */
 // Demonstrations remain test fixtures, never production navigation or actions.
@@ -23,7 +24,7 @@ export const installedExtensions = createExtensionRegistry([
   tasksExtension, documentationExtension, agentMetaExtension, settingsExtension,
   sharedAgentsExtension, instancesExtension, readersExtension, newsExtension,
   visualizationsExtension, whisperExtension, knowledgeExtension, operationsExtension,
-  utilityExtension, telegramExtension, agentSourceExtension, developerCanvasesExtension, browserLiveExtension,
+  utilityExtension, telegramExtension, agentSourceExtension, developerCanvasesExtension, browserLiveExtension, initialPromptExtension,
 ], {
   tasks: { pages: ['overview'] },
   documentation: { pages: ['search', 'functions'] },
@@ -42,4 +43,5 @@ export const installedExtensions = createExtensionRegistry([
   'agent-source': { pages: ['overview'] },
   'developer-canvases': { canvasKinds: ['code.tests', 'icons.browser'] },
   'browser-live': { pages: ['live'] },
+  'initial-prompt': { pages: ['overview'] },
 });

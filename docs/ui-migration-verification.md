@@ -12,11 +12,25 @@ Delivered surfaces:
 - Native Canvas text editing and directory navigation; optimistic explicit Save, conflict handling, preserved mounted tab contents, host-granted React plugin kinds. Other plugin renderers and rich/binary previews retain item documents.
 - Secure input compatibility, Redmine's separate approval authority, HTML/URL sandboxes, SSE resync and SDK example dev/test-only status are retained.
 
-`/projects/view` and `/projects/archive` remain standalone project documents, not the old shell. Page-local HTMX, popup RPC, Canvas item assets and approval transports remain intentionally. Sber/TBank are not migrated or enabled.
+Current source redirects `/projects/view` and `/projects/archive` into the native workspace filter. Generic popup/RPC helpers and scripts are removed; `POST /rpc` is a 410 tombstone without payload parsing or runtime dispatch. Page-local HTMX, Canvas item documents/assets, protected input cards and independent Redmine approval transports remain intentionally. Sber/TBank are not migrated or enabled.
 
-## Evidence collected
+## Third-wave source and verification
 
-Commands run from the repository root. Scratch outputs are local, git-ignored evidence, not shipped artifacts.
+The worktree now removes ordinary `renderEventHtml` branches and `ui.chatEventCard`, with only the protected input-card adapter retained. Native lifecycle/busy-tool receipts, Push settings, People presence, initial-prompt inspection, project-icon editing and transient `SecureInputDialog` replace their old app UI paths. Mentions uses structured `mentions.rowsData`. Shared document rendering, Canvas fallback documents and protected input/Redmine authority are preserved; not all SSR is removed.
+
+Explicit terminal `respondHtml` answers now carry `htmlSource: assistant-answer` and render through a bounded parse5-to-React semantic allowlist. No raw HTML injection, handlers, styles, URL attributes, forms, SVG or media are admitted; links become text and the plain-text version remains available. Historical unmarked HTML is not automatically trusted because the same stored field also contains rendered Markdown; those events retain their text fallback. The three frontend HTML security/provenance tests and seven API projection tests passed. This deliberately does not promise pixel-identical historical HTML rendering.
+
+A broader worker verification attempt reported `runGoal` harness failures involving a missing `classifyError` mock and an `appendHelpers` timeout. The parent reran both with a 240-second test allowance: `appendHelpers` passed after 100.47 seconds, while `runGoal` had 10 passes and 35 failures. An isolated copy of both `run.ts` and its test from HEAD `464b1d3c` reproduced the same 10/35 result (scratch `baseline-goal.log`), establishing that those failures precede this wave; no goal behavior was changed to hide them. The separately rerun 46-test selection below is green; the whole backend suite has not been certified.
+
+The third-wave production build and **584 frontend tests across 115 files** pass after the popup removal and final author/dialog changes. Human author display has 16 focused fixture tests; the transient dialog has 14 React lifecycle tests plus a source guard, including explicit submission, cancellation, expiry and authorization-loss cleanup. Menu/default-layout and parking/wake fixture repairs pass 12 tests (72 assertions). RPC/document retirement separately passed 22 mocked tests (151 assertions). These are bounded checks, not a claim that the entire backend suite is green.
+
+Read-only browser checks of People and Notifications show no alerts, Vite error overlay or legacy popup host. `/secureInput/current` returned 200 with no active prompt; no real secret was entered. Earlier own-agent full-prompt reader inspection showed the native reader without logging its contents. Screenshot capture timed out, so no screenshot-based visual verification is claimed. No real notification subscription, reset, icon save, secret submission, send or approval was performed.
+
+The final call-graph audit still reports eight unrelated unresolved calls in private healthrepo/circleback/tunnel integrations. Global code quality is therefore **not** green. The parent rerun of 46 focused backend tests across 13 files passes (256 assertions), covering RPC, transient secrets, icons, structured widgets, prompt reads, tool abort, lifecycle, retired shell and PAYG classification. An additional cold 16-test selection passes (72 assertions, 103.16 seconds) after test-only repairs to lifecycle mocks, native secure-input control assertions and Anthropic settings redirects. Frontend logs are stored locally under `.hyper/tmp/ehz/final-build.log` and `final-frontend.log`; the 46-test log is `final-backend.log`. An additional protected-input/Canvas selection passes 30 tests (151 assertions), including compatibility metadata, choice/cancel behavior, durable input waiting and transient secret submission (`final-protected.log`). Its wait fixture was updated with an in-memory transaction wrapper; this does not claim to test database locking or rollback.
+
+## Earlier shell-migration checkpoint evidence
+
+The following records the earlier checkpoint and is retained as historical evidence, not a claim that these exact checks cover the final third-wave worktree. Commands run from the repository root. Scratch outputs are local, git-ignored evidence, not shipped artifacts.
 
 | Check | Result / evidence |
 | --- | --- |

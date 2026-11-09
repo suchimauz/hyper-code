@@ -10,6 +10,8 @@ function fixture() {
         choice: { prepare: async ({}, { spec }: any) => spec },
         secret: {}, confirm: {}, grid: {},
     } } }, fns: { procs: { db: {
+        // This fixture exercises gate semantics; transaction rollback/locking is covered by DB integration tests.
+        transaction: async ({ fn }: { fn: () => Promise<unknown> }) => fn(),
         run: async ({ params }: any) => { rows.push({ id: params[0], agent_id: params[1], kind: params[2], state: 'open', spec: JSON.parse(params[5]), created_at: params[6] }); },
         select: async ({ sql, params }: any) => {
             if (sql.includes('SELECT EXISTS')) return [{ waiting: rows.some(r => r.agent_id === params[0] && r.spec._agentWait === true && (['open', 'processing'].includes(r.state) || (params[1] != null && r.created_at >= params[1]))) }];

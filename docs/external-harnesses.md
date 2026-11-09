@@ -125,7 +125,7 @@ The tokens are not interchangeable. External routes:
 - require a token with the route's exact JWT `kind`;
 - cap request bodies at 256 KB.
 
-The browser-oriented `/rpc` route is not an external harness API. It requires an authenticated browser session in addition to same-origin checks. Use `/external/*` through the CLI instead.
+The former browser `/rpc` endpoint is retired and returns 410 without dispatch. Use `/external/*` through the CLI instead.
 
 ## Command reference
 

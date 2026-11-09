@@ -3,7 +3,6 @@ import tabs from "./tabs";
 import pages from "./$widget_pages";
 import projects from "./$widget_projects";
 import chatItems from "./chatItems";
-import rows from "./rows";
 
 test("default overview separates management, preserving saved layouts and hidden tabs", async () => {
     let source = "default"; let layout: any = {};
@@ -36,19 +35,15 @@ test("page sections use permission-filtered items and retain explicit nav.pages 
     expect((await pages.render(ctx, null, { size: "wide", config: { section: "daily" } })).items?.map(i => i.href)).toEqual(["/search"]);
 });
 
-test("project avatars use the shared safe renderer and chat rows show exact host project names, not IDs", async () => {
+test("project and chat data retain exact host project names and pin ownership", async () => {
     const projectList = [{ id: "p", title: "Personal project", dir: "/work/repo", host: "remote", icon: "<svg/>" }, { id: "q", title: "/work/repo", dir: "/work/repo", host: "" }];
     const ctx: any = { fns: { projects: { list: async () => projectList }, agent: { teamActivity: async () => ({}) }, chat: { icon: ({ icon }: any) => icon ? "SAFE_ICON" : "MODEL" }, procs: { ui: { escape: ({ text }: any) => Bun.escapeHTML(text) } } } };
     const projectRows = (await projects.render(ctx)).items!;
     expect(projectRows[1].label).toBe("repo");
     expect(projectRows[1].detail).toBeUndefined();
-    expect(await rows(ctx, null, { items: projectRows })).toContain("data-nav-project-icon");
+    expect(projectRows[0].label).toBe("Personal project");
     const items = await chatItems(ctx, null, { agents: [{ id: "abc", title: "Chat", model: "model", workspaceDir: "/work/repo", workspaceHost: "remote" }] });
     expect(items[0].detail).toBe("Personal project");
     expect(items[0].pin).toBe("agent:abc");
-    const html = await rows(ctx, null, { items, pinned: new Set() });
-    expect(html).toContain("data-nav-detail");
-    expect(html).toContain("Personal project");
-    expect(html).not.toContain("data-nav-technical-id");
-    expect(html).toContain('/nav/agent/abc/pin');
+    expect(items[0].label).toBe("Chat");
 });

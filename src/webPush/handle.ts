@@ -25,13 +25,15 @@ export default async function (
     const users=await ctx.fns.procs.db.select({sql:'SELECT id FROM users WHERE id = ? AND disabled_at IS NULL',params:[identity]});
     if(!users.length)return response({error:'Authentication required'},401);
     if(opts.action==='config'){
+        const preferences = await ctx.fns.procs.db.select({sql:"SELECT a.id, a.title, COALESCE(p.input_enabled,true) AS input, COALESCE(p.error_enabled,true) AS error FROM agents a LEFT JOIN web_push_preferences p ON p.agent_id=a.id AND p.owner_id=a.created_by WHERE a.created_by=? AND a.parent_id IS NULL AND COALESCE(a.visibility,'nav')='nav' AND a.archived_at IS NULL ORDER BY a.id",params:[identity]});
+        const csrf = await ctx.fns.auth.csrfToken({req});
         const origin=await ctx.fns.http.publicOrigin({req});
-        if(!origin.startsWith('https://'))return response({enabled:false,publicKey:null,userId:identity,binding:binding.key,endpointHashes:[]});
+        if(!origin.startsWith('https://'))return response({enabled:false,publicKey:null,userId:identity,binding:binding.key,endpointHashes:[],preferences,csrf});
         const keys=await ctx.fns.webPush.vapid({subject:origin});
         const subs=await ctx.fns.procs.db.select({sql:'SELECT endpoint FROM web_push_subscriptions WHERE owner_id=? AND session_key=? AND expires_at>?',params:[identity,binding.key,Date.now()]});
         const {createHash}=await import('node:crypto');
         const endpointHashes=subs.map(s=>createHash('sha256').update(String(s.endpoint)).digest('hex'));
-        return response({enabled:true,publicKey:keys.publicKey,userId:identity,binding:binding.key,endpointHashes});
+        return response({enabled:true,publicKey:keys.publicKey,userId:identity,binding:binding.key,endpointHashes,preferences,csrf});
     }
     const origin=await ctx.fns.http.publicOrigin({req});
     if(!origin.startsWith('https://')||req.headers.get('origin')!==origin||!await ctx.fns.auth.verifyCsrf({req,token:req.headers.get('x-csrf-token')??''}))return response({error:'Invalid request origin'},403);

@@ -53,7 +53,7 @@ function routeHarness(){
  if(sql.startsWith('INSERT INTO web_push_subscriptions'))return conflict?[]:[{id:'s1'}];
  if(sql.startsWith('SELECT endpoint'))return [{endpoint:sub.endpoint}];return [];
  });
- const ctx:any={fns:{http:{publicOrigin:async()=> 'https://example.com'},auth:{verifyCsrf:async()=>true},procs:{auth:{cookieName:()=> 'session'},db:{select,run,transaction:async({fn}:any)=>fn()}},webPush:{sessionBinding:async()=>({ownerId:'u1',key:'binding',sessionId:null,expiresAt:Date.now()+10000}),vapid:async()=>({publicKey:'public',privateKey:'PRIVATE'}),validateSubscription:(o:any)=>validate({} as any,null,o)}}};
+ const ctx:any={fns:{http:{publicOrigin:async()=> 'https://example.com'},auth:{verifyCsrf:async()=>true,csrfToken:async()=> 'csrf'},procs:{auth:{cookieName:()=> 'session'},db:{select,run,transaction:async({fn}:any)=>fn()}},webPush:{sessionBinding:async()=>({ownerId:'u1',key:'binding',sessionId:null,expiresAt:Date.now()+10000}),vapid:async()=>({publicKey:'public',privateKey:'PRIVATE'}),validateSubscription:(o:any)=>validate({} as any,null,o)}}};
  const req=(body:any,origin='https://example.com')=>new Request('https://example.com/webPush/subscribe',{method:'POST',headers:{cookie:'session=token',origin,'content-type':'application/json','x-csrf-token':'csrf'},body:JSON.stringify(body)});
  return {ctx,run,select,sub,req,foreign:()=>{existing=[{owner_id:'other',session_key:'other'}]},conflict:()=>{conflict=true}};
 }

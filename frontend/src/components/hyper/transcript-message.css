@@ -4,6 +4,10 @@
 .chat-content > .message + .message { margin-top: 12px; }
 .chat-content > .work-group + .message { margin-top: 16px; }
 .user-message-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 0; max-width: min(calc(var(--chat-content-width, 748px) * .702), 82%); }
+.user-message-author { display: flex; align-items: center; justify-content: flex-end; gap: 8px; max-width: 100%; color: var(--text-secondary); font-size: 12px; line-height: 18px; }
+.user-message-avatar { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 50%; object-fit: cover; }
+.user-message-initials { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: 600; overflow: hidden; }
+.user-message-author-name { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .user-message-bubble { max-width: 100%; padding: 10px 16px; border-radius: 20px; background: var(--user-bubble, #f4f2f3); font-size: 14px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .user-message-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .user-message-actions { display: flex; align-items: center; gap: 8px; height: 28px; }
@@ -15,3 +19,9 @@
   .message--user:has(~ .message--user):hover .user-message-actions, .message--user:focus-within .user-message-actions { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .user-message-actions { transition: none !important; } }
+
+.lifecycle-event { color: var(--text-muted); font-size: .875rem; padding: .5rem 0; }
+.lifecycle-event summary { cursor: pointer; overflow-wrap: anywhere; }
+.lifecycle-event summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.lifecycle-event-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; margin: .5rem 0; font: inherit; }
+.lifecycle-event small { display: block; margin-top: .5rem; }

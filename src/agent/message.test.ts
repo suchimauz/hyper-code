@@ -29,9 +29,7 @@ test("agent.message: stored under the sender's name, envelope names whom to answ
     const events = await ctx.fns.session.getEvents({ id: b.id });
     const ev: any = events.at(-1);
     expect(ev.actor).toBe("agent:" + a.id);
-    const html = await ctx.fns.agent.renderEventHtml({ event: ev, agentId: b.id });
-    expect(html).toContain('data-agent-message="' + a.id + '"');
-    expect(html).toContain("Researcher");
+    expect(ev.agentMessage).toMatchObject({ from: a.id, title: 'Researcher' });
     const author = await ctx.fns.auth.author({ userId: "agent:" + a.id });
     expect(author).toMatchObject({ kind: "agent", agentId: a.id });
 });

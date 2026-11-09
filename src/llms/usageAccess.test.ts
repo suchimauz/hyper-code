@@ -16,7 +16,7 @@ for (const role of ['user', 'owner']) {
    sshInstance: { list: async () => [{ name: 'host' }] },
    llm: { usageOverview: async () => [snapshot], accountAuthHealth: async () => [], accountCredentialExists: () => false, listModels: async () => ({ 'ssh/host': ['ssh/host:codex/work:test'] }) },
    node: { list: async () => [] },
-   ui: { live: ({html}: any) => html, usageDial: (data: any) => JSON.stringify(data) },
+   ui: { live: ({html}: any) => html },
   } };
   ctx.fns.sshAccount = {
    quotaAccounts: () => quotaAccounts(ctx, session, {}),
@@ -24,7 +24,7 @@ for (const role of ['user', 'owner']) {
    registry: (opts: any) => registry(ctx, session, opts),
   };
   ctx.fns.llm.listAccounts = () => listAccounts(ctx, session, { provider: 'codex' });
-  ctx.fns.llms = { usageData: (opts: any) => usageData(ctx, session, opts) };
+  ctx.fns.llms = { quotaData: () => usageData(ctx, session, {}) };
   const response = await route(ctx, session, {});
   expect(response.status).toBe(200);
   const body = await response.text();

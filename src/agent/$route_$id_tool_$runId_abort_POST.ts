@@ -21,6 +21,12 @@ export default async function (
 ): Promise<Response> {
     const id = opts.params.id!;
     const runId = opts.params.runId!;
+    const who = await ctx.fns.auth.currentUser({ req: opts.req });
+    if (!who.user || who.legacy || who.user.disabledAt != null) return Response.json({ error: 'unauthorized' }, { status: 401 });
+    if (!await ctx.fns.auth.verifyCsrf({ req: opts.req, token: opts.req.headers.get('x-csrf-token') ?? '' })) return Response.json({ error: 'invalid_csrf' }, { status: 403 });
+    const owner = (await ctx.fns.procs.db.select({ sql: 'SELECT created_by, archived_at FROM agents WHERE id=?', params: [id] }))[0];
+    if (!owner || owner.archived_at != null) return Response.json({ error: 'not_found' }, { status: 404 });
+    if (owner.created_by !== who.user.id) return Response.json({ error: 'forbidden' }, { status: 403 });
     const run = ctx.fns.tools.runs({ agentId: id }).find(item => item.id === runId);
     if (!run) return Response.json({ error: "no such running tool call" }, { status: 404 });
 
@@ -28,7 +34,7 @@ export default async function (
     const seconds = Math.round((Date.now() - run.startedAt) / 1000);
     await ctx.fns.session.appendEvent({
         id,
-        event: { type: "tool_aborted", name: run.name, subject: run.subject, elapsedSec: seconds },
+        event: { type: "tool_aborted", runId, name: run.name, subject: run.subject, elapsedSec: seconds },
     });
     const agent = (ctx.state as any).agent?.[id];
     if (agent) await ctx.fns.session.syncAgentState({ agent });

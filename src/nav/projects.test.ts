@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import projects from "./$widget_projects";
 import chats from "./$widget_chats";
 import tabs from "./tabs";
-import rows from "./rows";
 
 // Pure context doubles: no database, saved settings, filesystem, or live agents are mutated.
 test("projects menu uses active native project rows and always exposes archive", async () => {
@@ -21,11 +20,8 @@ test("projects menu uses active native project rows and always exposes archive",
     expect(output.items?.map(i => i.id)).toEqual(["project:virtual:/a?b", "project:empty"]);
     expect(output.items?.[0]).toMatchObject({ href: "/projects/view?projectId=virtual%3A%2Fa%3Fb", icon: "ph-folder-open", unread: true, hint: "2 в работе", detail: "server" });
     expect(output.sections?.[0]?.items?.[0]).toMatchObject({ href: "/projects/archive", label: "Архив проектов" });
-    const html = await rows(ctx, null, { items: output.items ?? [] });
-    expect(html).toContain('class="nav-row');
-    expect(html).toContain("&lt;Project&gt;");
-    expect(html).toContain('data-nav-unread-count');
-    expect(html).not.toContain("/files?path=");
+    expect(output.items?.[0]?.label).toBe("<Project>");
+    expect(output.items?.[0]?.href).not.toContain("/files?path=");
 });
 
 test("empty project list keeps the archive reachable", async () => {
@@ -48,7 +44,7 @@ test("default home orders projects before chats and pages; saved layout remains 
     expect(JSON.stringify(layout)).toBe(before);
 });
 
-test("new agent opens ordinary creation popup without preselecting a project", async () => {
+test("new agent opens native creation without preselecting a project", async () => {
     let popupArgs: any;
     const ctx: any = { fns: {
         nav: { agents: async () => [], chatItems: async () => [] },
@@ -56,8 +52,7 @@ test("new agent opens ordinary creation popup without preselecting a project", a
         ui: { popup: (opts: object) => { popupArgs = opts; return "popup trigger"; } },
     } };
     const output = await chats.render(ctx, null, { size: "tall", config: {} });
-    expect(output.html).toBe("popup trigger");
-    expect(popupArgs).toMatchObject({ method: "ui.newAgentPopup", params: {} });
-    expect(popupArgs.attrs).toContain("data-nav-default");
-    expect(popupArgs.attrs).toContain("nav-row");
+    expect(output.html).toBeUndefined();
+    expect(popupArgs).toBeUndefined();
+    expect(output.items).toEqual([{ id: "new-chat", label: "Новый чат", href: "/?newSession=1", icon: "ph-plus-circle" }]);
 });

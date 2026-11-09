@@ -9,8 +9,16 @@ export type LlmAccount = {
   windows: { primary?: QuotaWindow; secondary?: QuotaWindow; tertiary?: QuotaWindow } | null;
   planType: string | null; parkedAgents: number;
 };
+/** Bounded phase metadata only; never raw provider output or credentials. */
+export type LoginDiagnostics = {
+  startedAt: number; endedAt: number | null; exitCode: number | null;
+  reason: 'network' | 'tls' | 'permission' | 'http' | 'missing-credentials' | 'cli-exit' | 'timeout' | 'interrupted' | null;
+  httpCode: number | null;
+  stages: { phase: 'ssh-preflight' | 'cli-login' | 'credential-check' | 'login-status'; startedAt: number; endedAt: number | null; exitCode: number | null }[];
+};
 /** Safe in-progress login hint: never contains tokens. */
 export type LlmLogin = {
+  diagnostics?: LoginDiagnostics;
   id: string | null; provider: string; account: string; instance: string | null; status: string;
   verificationUri: string | null; userCode: string | null; needsCode: boolean; callbackSubmitted: boolean; error: string | null;
 };

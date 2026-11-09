@@ -23,14 +23,14 @@ Declare transport topics on mounted content with `data-live-topic`; `types` filt
 
 The lower-level `window.hyperLive` and HTMX live-region examples below document the shared transport and compatibility consumers, not the primary extension import API. `/old-ui` redirects, but shared SSR/Canvas content and inline approvals still use compatibility code.
 
-The SDK example is retained only as a dev/test fixture, with a separate registry in `frontend/src/extensions/example.test.tsx`; production `extensions/installed.ts` does not mount it or its subscription. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers are removed, not the dynamic HTTP layout or live SSR transports. See the [residual consumer map](ui-architecture.md#residual-compatibility-consumers) before removing assets or subscriptions.
+The SDK example is retained only as a dev/test fixture, with a separate registry in `frontend/src/extensions/example.test.tsx`; production `extensions/installed.ts` does not mount it or its subscription. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers are removed, not the dynamic HTTP layout or live SSR transports. See the [residual consumer map](ui-architecture.md#remaining-html-consumers) before removing assets or subscriptions.
 
 ## Pieces
 
 ```
 server                                         browser tab
 ──────                                         ───────────
-write (canvas.show, dock.pin, a message…)
+write (canvas.show, a message, a presence change…)
   └─ procs.events.emit({ topic?, event })
         │
 GET /procs/events?topics=…  ── SSE ──────────► procs/events/client.js   (window.hyperLive)
@@ -39,9 +39,9 @@ GET /procs/events?topics=…  ── SSE ──────────► procs
                                                  │  gap      → resync() on every state subscriber
                                                  │             + re-fetch every live region
                                                  ▼
-GET <state route>  ◄────── resync ─────────── subscribers: canvas, dock, mentions, agent meta,
-(/canvas/:id/state, /dock,                       flow count, secure input, live regions…
- /mentions/badge, …)
+GET <state route>  ◄────── resync ─────────── subscribers: native Canvas, People,
+(/canvas/:id/state, /auth/online,                 live regions…
+ …)
 ```
 
 - `src/procs/events/emit.ts`, `subscribe.ts`: the in-process bus. A topic narrows who hears an event; no
@@ -103,8 +103,8 @@ Browser code never listens to the stream directly. It registers:
 ```js
 // Something that mirrors server state: a badge, a panel, the canvas.
 window.hyperLive.subscribe({
-    name: 'dock',                    // for error messages
-    types: ['dock.changed'],         // event types; omit for all
+    name: 'example-state',           // for error messages
+    types: ['example.changed'],         // event types; omit for all
     onEvent: event => refresh(),     // quick reaction to one event
     resync: reason => refresh(),     // REQUIRED: re-read your state from the server
 });
@@ -123,25 +123,23 @@ cannot be written that forgets to catch up.
 Choosing between them:
 
 - **State** → `subscribe`. If there is no GET that returns the current state, add one; it is usually a few
-  lines (see `src/canvas/$id/state/$route__GET.ts`). Often the existing render route is enough (`/dock`,
-  `/mentions/badge`, `/ui/gap-count`).
+  lines (see `src/canvas/$id/state/$route__GET.ts`). Use a currently supported state endpoint, not retired shell fragment routes.
 - **Command** → `command`. A command sent while the tab was away is lost. Whoever sends it owns a timeout
   (`ui.eval`, `screen.eval`). If losing it would leave the page wrong, it is state, not a command: keep the
-  state on the server and `subscribe` (the secure-input prompt does this — `secureInput.current` is the
-  state, the event only says "look again").
+  state on the server and `subscribe`. Transient secure input currently uses abortable polling of
+  `/secureInput/current` instead; do not describe its removed popup script as a live subscriber.
 
 Current subscribers:
 
 | subscriber | file | events | resync reads |
 |---|---|---|---|
 | live regions | `procs/events/client.js` (built in) | any event with a `topic` | each region's own `hx-get` |
-| canvas | `canvas/$script_canvas.js` | `canvas.changed` | `GET /canvas/:id/state`, then `/canvas/:id/panel` if the revision differs |
-| dock | `dock/$script_dock.js` | `dock.changed` | `GET /dock` |
-| mentions badge | `mentions/$script_live.js` | `mentions.changed` | `GET /mentions/badge` |
-| agent meta panel | `ui/$script_meta.js` | `ui.metaSection` | every section via `ui.agentMetaSectionHtml` |
-| attention-gap count | `ui/$script_gap-count.js` | `flow.count` | `GET /ui/gap-count` |
-| secure input | `ui/$script_popup.js` | `secure-input.prompt(.closed)` | `secureInput.current` |
+| native Canvas | `frontend/src/components/hyper/CanvasPanel.tsx` and host live state | Canvas invalidation | authorized `/canvas/:id/state`; no retired panel fragment |
+| People presence | `frontend/src/components/PeoplePage.tsx` | `presence` | `GET /auth/online` |
+| transient secure input (polling, not SSE subscription) | `frontend/src/components/SecureInputDialog.tsx` | abortable 1.5-second refresh | `GET /secureInput/current` |
 | commands | `ui/controlScript.ts` | `ui.navigate`, `ui.notify`, `ui.eval`, `ui.action`, `eval`, `agent.event_appended` | — (command) |
+
+The former dock/meta scripts, `/canvas/:id/panel`, `/mentions/badge` and popup/RPC scripts are removed; they are not subscription examples to copy. `POST /rpc` is a 410 tombstone. Native transient secure input is separate from retained protected input cards and Redmine approval documents. Shared document, Canvas item-document and input live transports still exist; this is not removal of all SSR.
 
 For server-rendered fragments prefer a live region (`ui.live`, see ui-live-rendering.md): it gets
 re-fetching on events and on gaps for free.

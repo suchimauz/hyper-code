@@ -200,7 +200,6 @@ export default async function (
                     timeoutMs: running.timeoutMs,
                     ts: Date.now(),
                 };
-                busy.html = await ctx.fns.agent.renderEventHtml({ event: busy, agentId: id });
                 await ctx.fns.session.appendEvent({ id, event: busy, ts: busy.ts });
             }
         }

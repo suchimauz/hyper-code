@@ -147,11 +147,12 @@ describe.skipIf(!enabled)("remote workspace (agent.workspaceHost)", () => {
         expect((await d(`/files/remote/plain${home}/proj/missing.txt`)).status).toBe(404);
     });
 
-    test("ui.previewFile and the chat header open the remote view", async () => {
+    test("ui.previewFile refuses generic remote-file RPC", async () => {
         const rpc = Object.create(actx);
         rpc.session = { ...actx.session, url: new URL("http://localhost/rpc") };
-        const html = String(await rpc.fns.ui.previewFile({ path: "docs sp/readme.md" }));
-        expect(html).toContain(`src="/files/remote/embed/plain${home}/proj/docs%20sp/readme.md"`);
+        const response = await rpc.fns.ui.previewFile({ path: "docs sp/readme.md" });
+        expect(response).toBeInstanceOf(Response);
+        expect((response as Response).status).toBe(403);
 
     });
 
@@ -172,8 +173,9 @@ describe.skipIf(!enabled)("remote workspace (agent.workspaceHost)", () => {
         expect(file.headers.get("location")).toBe(`/files/remote/embed/plain${home}/proj/saved.txt?tab=code`);
         const rpc = Object.create(actx);
         rpc.session = { ...actx.session, url: new URL("http://localhost/rpc") };
-        const html = String(await rpc.fns.ui.previewFile({ host: "rg", path: "~" }));
-        expect(html).toContain(`src="/files/remote/embed/rg/home/tester"`);
+        const response = await rpc.fns.ui.previewFile({ host: "rg", path: "~" });
+        expect(response).toBeInstanceOf(Response);
+        expect((response as Response).status).toBe(403);
     });
 
     test("review: remote HTML preview assets come back raw, not as UI pages", async () => {

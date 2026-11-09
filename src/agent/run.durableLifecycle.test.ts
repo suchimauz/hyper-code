@@ -8,14 +8,15 @@ function harness(turns: any[]) {
     const noop = async () => {};
     const append = async ({ message }: any) => { const row = { ...message, idx: messages.length }; messages.push(row); return row; };
     const ctx: any = { fns: {
+        input: { isWaiting: async () => false }, // No ordinary-question gate in these lifecycle scenarios.
         planning: { read: async ({agentId}: any) => ({version:1,agentId,mode:'execute',revision:0,scope:'session',advisory:true,runningPolicy:'reject',pending:null,proposal:null}) },
         goal: { delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) },
         session: { forAgent: () => ({}), appendUserMessage: async () => { events.push({type:'user'}); }, appendMessage: append,
             syncAgentState: noop, updateMessageContent: noop, appendAssistantEvent: async ({payload}: any) => { const idx = events.length; events.push({type:'assistant',...payload}); return {idx}; },
             appendToolCallEvent: async () => { events.push({type:'tool_call'}); }, recordContextUsage: noop, appendErrorEvent: noop },
-        agent: { recordRunLifecycle: async (o: any) => records.push(o), statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({status:'not_needed'}), stashResult: async ({output}:any) => ({content:output}), sanitizeHtmlBody: ({html}:any) => html },
-        procs: { db: { select: async () => [{i:0,stopped_at:null}] }, events: {emit:noop}, log:{warn:noop} },
-        llm:{stream:async () => { const t = turns.shift(); if(t instanceof Error) throw t; if(t === 'stop') { agent.abortController.abort(); throw new DOMException('Stopped','AbortError'); } return t; }},
+        agent: { retryWait: noop, retrySchedule: async () => false, recordRunLifecycle: async (o: any) => records.push(o), statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({status:'not_needed'}), stashResult: async ({output}:any) => ({content:output}), sanitizeHtmlBody: ({html}:any) => html },
+        procs: { db: { run: noop, select: async () => [{i:0,stopped_at:null}] }, events: {emit:noop}, log:{warn:noop} },
+        llm:{resolveEndpoint: async () => ({provider:'fixture'}), classifyError: () => ({kind:'fatal',retryable:false}), stream:async () => { const t = turns.shift(); if(t instanceof Error) throw t; if(t === 'stop') { agent.abortController.abort(); throw new DOMException('Stopped','AbortError'); } return t; }},
         markdown:{render:async ({source}:any) => source}, tools:{call:async ({name}:any) => ({output:'ok',...(name === 'respondHtml' ? {terminal:{type:'html',html:'<p>final</p>',text:'final'}}:{})})}
     }};
     return {agent,ctx,events,records, execute:()=>run(ctx,null,{agent,userText:'question'})};

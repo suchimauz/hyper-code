@@ -13,22 +13,21 @@ async function makeCtx() {
 }
 
 describe("managed Anthropic OAuth connections UI", () => {
-    test("disconnected page exposes connect action but no secrets", async () => {
+    test("legacy connections page redirects to native settings without secrets", async () => {
         const ctx = await makeCtx();
         const res = await ctx.fns.procs.http.dispatch({ url: "/llms" });
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(303);
+        expect(res.headers.get('location')).toBe('/?settings=llm-connections');
+        expect(res.headers.get('cache-control')).toBe('no-store');
         const html = await res.text();
-        expect(html).toContain("Codex");
-        expect(html).toContain("Claude");
-        expect(html).toContain("Add Claude account");
-        expect(html).toContain('hx-popup="llms.loginPopupFor"');
-        expect(html).toContain('&quot;provider&quot;:&quot;claude-code&quot;');
+        expect(html).toBe('');
+        expect(await ctx.fns.llm.anthropicOAuthStatus({})).toMatchObject({ connected: false, loginStatus: 'idle' });
         expect(html).not.toContain("access_enc");
         expect(html).not.toContain("refresh_enc");
         expect(html).not.toContain("code_verifier");
     });
 
-    test("connect route creates pending login and renders manual fallback without verifier", async () => {
+    test("connect route creates pending login and redirects to native settings without verifier", async () => {
         const ctx = await makeCtx();
         // Avoid binding a real callback port while retaining the real PKCE flow.
         ctx.state.registry.llm.startAnthropicOAuth = (c: any, s: any) => startAnthropicOAuth(c, s, { listen: false });
@@ -38,8 +37,12 @@ describe("managed Anthropic OAuth connections UI", () => {
         const pending = [...ctx.state.llm.anthropicOAuth.pending.values()][0] as any;
         const page = await ctx.fns.procs.http.dispatch({ url: "/llms" });
         const html = await page.text();
-        expect(html).toContain("Codex");
-        expect(html).toContain("Claude");
+        expect(page.status).toBe(303);
+        expect(page.headers.get('location')).toBe('/?settings=llm-connections');
+        const status = await ctx.fns.llm.anthropicOAuthStatus({});
+        expect(status).toMatchObject({ connected: false, loginStatus: 'pending', pendingAccount: 'default' });
+        expect(JSON.stringify(status)).not.toContain(pending.verifier);
+        expect(html).toBe('');
         expect(html).not.toContain(pending.verifier);
         expect(html).not.toContain("sk-ant-oat");
     });
@@ -65,14 +68,16 @@ describe("managed Anthropic OAuth connections UI", () => {
         expect(html).not.toContain("refresh-super-secret");
     });
 
-    test("sanitized completion error is visible without echoing submitted input", async () => {
+    test("sanitized completion error is available to native status without echoing input", async () => {
         const ctx = await makeCtx();
         await ctx.fns.llm.startAnthropicOAuth({ listen: false });
         const fd = new FormData();
         fd.set("authorization", "sensitive-invalid-code#wrong-state");
         await ctx.fns.procs.http.dispatch({ method: "POST", url: "/llms/anthropic-oauth/complete", body: fd });
         const html = await (await ctx.fns.procs.http.dispatch({ url: "/llms" })).text();
-        expect((ctx.state as any).llm.anthropicOAuth.lastError).toContain("Anthropic OAuth state mismatch");
+        const status = await ctx.fns.llm.anthropicOAuthStatus({});
+        expect(status.error).toContain("Anthropic OAuth state mismatch");
+        expect(JSON.stringify(status)).not.toContain('sensitive-invalid-code');
         expect(html).not.toContain("sensitive-invalid-code");
     });
 

@@ -1,23 +1,10 @@
-import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import route from "./$route_dirs_GET";
-
-const roots: string[] = [];
-afterAll(async () => { await Promise.all(roots.map(path => rm(path, { recursive: true, force: true }))); });
-
-describe("GET /agent/dirs", () => {
-    test("suggests folders using Node filesystem APIs when fd is unavailable", async () => {
-        const root = await mkdtemp(join(tmpdir(), "hyper-dirs-"));
-        roots.push(root);
-        await Promise.all([mkdir(join(root, "alpha-project")), mkdir(join(root, "beta-project"))]);
-        const ctx: any = { env: { HOME: root }, fns: { procs: { ui: { escape: ({ text }: any) => String(text) } } } };
-
-        const response = await route(ctx, null, { req: new Request(`http://localhost/agent/dirs?workspaceDir=${encodeURIComponent(root + "/")}`) });
-        expect(response.status).toBe(200);
-        const html = await response.text();
-        expect(html).toContain(join(root, "alpha-project"));
-        expect(html).toContain(join(root, "beta-project"));
-    });
-});
+import { afterAll, expect, test } from 'bun:test';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import route from './$route_dirs_GET';
+const roots:string[]=[];afterAll(async()=>{await Promise.all(roots.map(p=>rm(p,{recursive:true,force:true})));});
+const auth={required:true,legacy:false,user:{id:'owner',disabledAt:null}};
+test('bounded shallow JSON suggestions and path status without shell or creation',async()=>{const root=await mkdtemp(join(tmpdir(),'hyper-dirs-'));roots.push(root);await mkdir(join(root,'alpha-project'));await mkdir(join(root,'beta'));await writeFile(join(root,'file'),'x');const ctx:any={env:{HOME:root},fns:{auth:{currentUser:async()=>auth}}};const get=async(q:string)=>route(ctx,null,{req:new Request('http://local/agent/dirs?q='+encodeURIComponent(q))});expect(await (await get('alp')).json()).toMatchObject({paths:[join(root,'alpha-project')],status:'missing'});expect(await (await get(join(root,'file'))).json()).toMatchObject({status:'file'});expect(await (await get(root+'/')).json()).toMatchObject({status:'directory'});expect((await get('~other')).status).toBe(400);});
+test('recents are owner-scoped and local only',async()=>{const ctx:any={fns:{auth:{currentUser:async()=>auth},procs:{db:{select:async({sql,params}:any)=>{expect(params).toEqual(['owner']);expect(sql).toContain('created_by=?');expect(sql).toContain('workspace_host');return [{path:'/work'}];}}}}};expect(await (await route(ctx,null,{req:new Request('http://local/agent/dirs')})).json()).toMatchObject({paths:['/work']});});
+test('unauthenticated requests cannot inspect paths',async()=>{const ctx:any={fns:{auth:{currentUser:async()=>({required:false})}}};expect((await route(ctx,null,{req:new Request('http://local/agent/dirs?q=/')})).status).toBe(401);});

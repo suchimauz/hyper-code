@@ -52,7 +52,7 @@ test("two users: every human message goes to the model as <Name>: text, stored t
     expect(renamed.messages.filter((m: any) => m.role === "user")[1].content).toStartWith("<Anna Karenina>: ");
 });
 
-test("chat shows the author badge on user messages once there are two users", async () => {
+test("structured user events retain exact author attribution without legacy HTML", async () => {
     const ctx = await mkTestCtx();
     const nik = await ctx.fns.auth.createUser({ name: "Nikolai Ryzhikov", email: "niquola@health-samurai.io", password: "password-123" });
     const anna = await ctx.fns.auth.createUser({ name: "Anna K", email: "anna@health-samurai.io", password: "password-456" });
@@ -63,10 +63,12 @@ test("chat shows the author badge on user messages once there are two users", as
     const [ev] = await ctx.fns.procs.db.select({ sql: "SELECT actor, payload FROM events WHERE agent_id = ? AND type = 'user' ORDER BY idx DESC LIMIT 1", params: [agent.id] });
     expect(ev.actor).toBe(anna.id);
     const payload = typeof ev.payload === "string" ? JSON.parse(ev.payload) : ev.payload;
-    expect(payload.html).toContain('data-author="anna"');
-    expect(payload.html).toContain("Anna K");
-    expect(payload.html).toContain(">AK<");
-    expect(payload.html).toContain("rounded-br-md");
+    expect(payload.html).toBeUndefined();
+    expect(payload.text).toBe("hi from Anna");
+    expect(await ctx.fns.auth.author({ userId: ev.actor })).toMatchObject({ id: anna.id, name: "Anna K", initials: "AK", picture: null });
+    const stored = await ctx.fns.session.getMessages({ id: agent.id });
+    expect(stored.at(-1).author).toBe(anna.id);
+    expect(JSON.stringify(payload)).not.toContain(anna.email);
 });
 
 test("buildLlmRequest sends the prefix and the one-line explanation to the model", async () => {
@@ -105,52 +107,11 @@ test("photo from the ID token's picture claim is stored and shown as the avatar"
     const agent = await r.fns.agent.start({ model: "mock:echo" });
     await r.fns.session.save({ agent });
     await r.fns.session.appendUserMessage({ id: agent.id, text: "hi" });
-    const [ev] = await ctx.fns.procs.db.select({ sql: "SELECT payload FROM events WHERE agent_id = ? AND type = 'user' ORDER BY idx DESC LIMIT 1", params: [agent.id] });
+    const [ev] = await ctx.fns.procs.db.select({ sql: "SELECT actor, payload FROM events WHERE agent_id = ? AND type = 'user' ORDER BY idx DESC LIMIT 1", params: [agent.id] });
     const payload = typeof ev.payload === "string" ? JSON.parse(ev.payload) : ev.payload;
-    expect(payload.html).toContain('<img src="https://lh3.googleusercontent.com/a/v=s96-c"');
-    expect(payload.html).toContain("Valeria F");
-});
-
-test("who is online: everyone in Hyper (left bar) and who is in this chat (inspector), live on join/leave", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_OIDC_ISSUER: "https://cp.example" } });
-    const val = await ctx.fns.auth.linkIdentity({ provider: "oidc", sub: "val", email: "valeria@health-samurai.io", name: "Valeria F", picture: "https://lh3.googleusercontent.com/a/v=s96-c" });
-    const nik = await ctx.fns.auth.createUser({ name: "Nikolai Ryzhikov", email: "niquola@health-samurai.io", password: "password-123" });
-    expect(await ctx.fns.auth.online({})).toBe("");
-    const topics: string[] = [];
-    ctx.fns.procs.events.subscribe({ handler: (e: any) => { if (e.topic) topics.push(e.topic); }, topics: ["presence"] });
-    const anon = ctx.fns.procs.events.join({}); // anonymous tab (no session user): ignored
-    const rv = await asUser(ctx, val), rn = await asUser(ctx, nik);
-    const valChatA = rv.fns.procs.events.join({ topics: ["agent:a", "presence"] });
-    const valHome = rv.fns.procs.events.join({ topics: ["agents"] }); // second tab, no chat
-    const nikChatB = rn.fns.procs.events.join({ topics: ["agent:b"] });
-
-    // Everyone in Hyper, seen by an anonymous/other viewer: both.
-    let all = await ctx.fns.auth.online({ layout: "column" });
-    expect(all).toContain('data-online="' + val!.id + '"');
-    expect(all).toContain('<img src="https://lh3.googleusercontent.com/a/v=s96-c"');
-    expect(all).toContain("(2 tabs)");
-    expect(all).toContain(">NR<");
-    expect(all).toContain("flex-col");
-    // Nikolai does not see himself.
-    const nikSees = await rn.fns.auth.online({});
-    expect(nikSees).toContain('data-online="' + val!.id + '"');
-    expect(nikSees).not.toContain('data-online="' + nik.id + '"');
-    // Per chat: only who looks at it.
-    const inA = await ctx.fns.auth.online({ agentId: "a" });
-    expect(inA).toContain('data-online="' + val!.id + '"');
-    expect(inA).not.toContain('data-online="' + nik.id + '"');
-    expect(inA).toContain("in this chat");
-    expect(await ctx.fns.auth.online({ agentId: "b" })).toContain('data-online="' + nik.id + '"');
-
-    valChatA();
-    expect(await ctx.fns.auth.online({ agentId: "a" })).toBe("");
-    expect(await ctx.fns.auth.online({})).toContain('data-online="' + val!.id + '"'); // still has the home tab
-    valHome(); nikChatB(); anon();
-    expect(await ctx.fns.auth.online({})).toBe("");
-    expect(topics.filter((t) => t === "presence").length).toBeGreaterThanOrEqual(6);
-    expect((await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/online" })).status).toBe(401); // signed-in people only
-    expect(ctx.fns.auth.onlineRegion({ agentId: "a" })).toContain('hx-get="/auth/online?agent=a"');
-    expect(ctx.fns.auth.onlineRegion({ layout: "column" })).toContain('data-live-topic="presence"');
-    expect(ctx.fns.auth.onlineRegion({ layout: "column" })).toContain('hx-swap="innerHTML"');
-    expect(ctx.fns.auth.onlineRegion({ layout: "column" })).toContain('min-h-7');
+    expect(ev.actor).toBe(u!.id);
+    expect(payload.html).toBeUndefined();
+    expect(payload.text).toBe("hi");
+    expect(await ctx.fns.auth.author({ userId: ev.actor })).toMatchObject({ id: u!.id, name: "Valeria F", initials: "VF", picture: "https://lh3.googleusercontent.com/a/v=s96-c" });
+    expect(JSON.stringify(payload)).not.toContain("valeria@health-samurai.io");
 });

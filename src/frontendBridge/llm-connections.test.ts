@@ -36,3 +36,12 @@ describe('ui-lab llm connections',()=>{
  test('native errors map to 422',async()=>{const s=setup();s.ctx.fns.llm.startAccountLogin=async()=>{throw new Error('already running')};const r=await run(s,post({action:'login',provider:'codex',account:'w'}));expect(r.status).toBe(422);expect((await r.json()).error).toBe('already running');});
  test('middleware dispatches after authentication',async()=>{let n=0;const ctx:any={fns:{frontendBridge:{llmConnections:async()=>{n++;return Response.json({ok:true})}}}};expect((await middleware(ctx,null,{req:get()})).status).toBe(401);expect((await middleware(ctx,owner as any,{req:get()})).status).toBe(200);expect(n).toBe(1);});
 });
+
+test('remote diagnostics JSON projects bounded fields and omits transport and raw logs',async()=>{
+ const s=setup();const flow=s.ctx.state.sshAccount.flows.get('r1');
+ flow.diagnostics={startedAt:1000,endedAt:null,exitCode:null,reason:'tls',httpCode:null,raw:'SECRET',stages:Array.from({length:6},()=>({phase:'cli-login',startedAt:1000,endedAt:null,exitCode:null,raw:'SECRET'}))};
+ flow.callbackSubmission='uncertain';
+ const response=await run(s,get());const text=await response.text();const row=JSON.parse(text).logins.find((f:any)=>f.id==='r1');
+ expect(row.diagnostics.stages).toHaveLength(4);expect(row.diagnostics.reason).toBe('tls');expect(row.needsCode).toBe(false);expect(row.callbackSubmitted).toBe(true);
+ expect(text).not.toContain('SECRET');expect(text).not.toContain('callbackConnection');expect(text).not.toContain('process');
+});

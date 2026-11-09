@@ -1,7 +1,6 @@
 import { test, expect } from 'bun:test';
 import usage from './zaiCodingUsage';
 import refresh from './refreshUsage';
-import dial from '../ui/usageDial';
 
 const now = 1792645579000;
 const payload = {success:true,code:200,data:{level:'lite',limits:[
@@ -32,16 +31,7 @@ test('Z.ai refresh uses the normal snapshot store, caches success and hides fail
  expect((await refresh(ctx,null,opts))[0]?.status).toBe('cached');
  fail=true;expect((await refresh(ctx,null,{...opts,maxAgeMs:0}))[0]?.status).toBe('failed');expect(deleted).toBe(true);
 });
-test('Z.ai dual rings put weekly outside and 5h inside with explicit tooltip and no invented fills',()=>{
- const ctx:any={fns:{procs:{ui:{escape:({text}:any)=>String(text)}},ui:{modelLogo:()=>'<svg data-logo></svg>'}}};
- const entry:any={provider:'zai-coding',account:'default',label:'Z.ai Coding Plan',usedPercent:20,resetsAt:now+3600000,planType:'lite',parkedAgents:0,tone:'neutral',windows:{primary:{usedPercent:20,resetsAt:now+3600000},secondary:{usedPercent:7,resetsAt:now+86400000}}};
- let html=dial(ctx,null,{entries:[entry],now});
- expect(html).toContain('data-quota-window="weekly" class="text-success"><circle cx="14" cy="14" r="12"');
- expect(html).toContain('data-quota-window="5h" class="text-success"><circle cx="14" cy="14" r="9"');
- expect(html).toContain('quota-tip-name">Weekly</span><span>7% used</span>');expect(html).toContain('quota-tip-name">5h</span><span>20% used</span>');const ru=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});expect(html).toContain(`resets ${ru.format(new Date(now+3600000))}`);
- html=dial(ctx,null,{entries:[{...entry,windows:{},usedPercent:null,quotaStatus:'unavailable'}],now});expect(html).not.toContain('stroke-dasharray');expect(html).toContain('quota unavailable — usage unknown');
- html=dial(ctx,null,{entries:[{...entry,windows:{primary:{usedPercent:100,resetsAt:now-1}}}],now});expect(html).not.toContain('stroke-dasharray');
-});
+// Named Z.ai periods and expired measurements are covered through quotaData in ui/usageDial.test.ts.
 
 test('Z.ai usage leaves through the chosen SSH instance while the plan key stays local',async()=>{
  const fetched:any[]=[];

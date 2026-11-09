@@ -1,6 +1,5 @@
 import {test,expect,spyOn} from 'bun:test';
 import submit from './submitCode';
-import popupSubmit from './submitFromPopup';
 import status from './status';
 const callback='http://localhost:45678/callback?code=synthetic-secret&state=synthetic-state';
 function fixture(){
@@ -33,9 +32,6 @@ test('concurrent submissions lock before SSH and ambiguous delivery never permit
 test('safe pre-transport failure permits retry, rechecks cancellation after connection await',async()=>{
  const {ctx,flow}=fixture();ctx.fns.sshInstance.connection=async()=>{throw new Error(callback);};try{await submit(ctx,null,{id:'f',code:callback});throw new Error('expected failure');}catch(e){expect(String(e)).not.toContain('synthetic-secret');expect(String(e)).toContain('not sent');}expect(flow.callbackSubmission).toBeUndefined();
  ctx.fns.sshInstance.connection=async()=>{flow.status='cancelled';return {bin:'ssh',args:[],host:'pinned'};};await expect(submit(ctx,null,{id:'f',code:callback})).rejects.toThrow('not sent');expect(flow.callbackSubmission).toBeUndefined();
-});
-test('popup forwarding returns only safe progress and never echoes callback',async()=>{
- const {ctx}=fixture();let forwarded=false;ctx.fns.sshAccount.submitCode=async(o:any)=>{forwarded=o.code===callback;};ctx.fns.sshAccount.progressPopup=async(o:any)=>{expect(o).toEqual({id:'f'});return '<p>pending</p>';};expect(await popupSubmit(ctx,null,{id:'f',code:callback})).toBe('<p>pending</p>');expect(forwarded).toBe(true);
 });
 test('older flows require restart and changed pinned SSH destinations cannot receive callbacks',async()=>{
  const {ctx,flow}=fixture();delete flow.callbackConnection;await expect(submit(ctx,null,{id:'f',code:callback})).rejects.toThrow('Start a new login');flow.callbackConnection={bin:'ssh',args:['--'],host:'original'};await expect(submit(ctx,null,{id:'f',code:callback})).rejects.toThrow('not sent');expect(flow.callbackSubmission).toBeUndefined();

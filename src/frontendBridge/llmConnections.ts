@@ -19,12 +19,12 @@ export default async function (
     const req=opts.req;
     if(!['GET','POST'].includes(req.method))return new Response(null,{status:405,headers:{...headers,Allow:'GET, POST'}});
     if(user.role!=='owner')return reply({error:'Only owners can manage LLM connections'},403);
-    type Flow={id:string|null;provider:string;account:string;instance:string|null;status:string;verificationUri:string|null;userCode:string|null;needsCode:boolean;callbackSubmitted:boolean;error:string|null};
+    type Flow={id:string|null;provider:string;account:string;instance:string|null;status:string;verificationUri:string|null;userCode:string|null;needsCode:boolean;callbackSubmitted:boolean;error:string|null;diagnostics?:types.sshAccount.LoginFlow['diagnostics']};
     const flows=():Flow[]=>{
         const local=ctx.fns.llm.accountLoginStatus({}).map(f=>({id:f.id??null,provider:f.provider,account:f.account,instance:null,status:f.status,verificationUri:f.verificationUri,userCode:f.userCode,needsCode:f.needsCode,callbackSubmitted:false,error:f.error}));
         const remote=[...((ctx.state as {sshAccount?:{flows?:Map<string,types.sshAccount.LoginFlow>}}).sshAccount?.flows?.values()??[])]
             .filter(f=>!!f.instance&&f.status!=='connected'&&f.status!=='cancelled'&&f.expiresAt>Date.now()-600000)
-            .map(f=>({id:f.id,provider:f.provider,account:f.account,instance:f.instance,status:f.status,verificationUri:f.verificationUri,userCode:f.userCode,needsCode:f.provider==='claude-code'&&f.status==='pending'&&!!f.verificationUri&&!f.callbackSubmission,callbackSubmitted:!!f.callbackSubmission,error:f.error}));
+            .map(f=>({id:f.id,provider:f.provider,account:f.account,instance:f.instance,status:f.status,verificationUri:f.verificationUri,userCode:f.userCode,needsCode:f.provider==='claude-code'&&f.status==='pending'&&!!f.verificationUri&&!f.callbackSubmission,callbackSubmitted:!!f.callbackSubmission,error:f.error,...(f.diagnostics?{diagnostics:{startedAt:f.diagnostics.startedAt,endedAt:f.diagnostics.endedAt,exitCode:f.diagnostics.exitCode,reason:f.diagnostics.reason,httpCode:f.diagnostics.httpCode,stages:f.diagnostics.stages.slice(0,4).map(s=>({phase:s.phase,startedAt:s.startedAt,endedAt:s.endedAt,exitCode:s.exitCode}))}}:{})}));
         return [...local,...remote];
     };
     if(req.method==='GET'){

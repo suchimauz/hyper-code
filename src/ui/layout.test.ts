@@ -17,8 +17,8 @@ describe('HTML page documents without the retired application shell', () => {
     test('preserves trusted markup, styles and page-local secure transports', async () => {
         const { ctx, session } = fixture();
         const html = await layout(ctx, session, { main: '<article>Plugin page</article>', title: '<News>', currentId: 'a"b', headExtra: '<meta name="plugin" content="yes">' });
-        for (const text of ['<article>Plugin page</article>', '&lt;News&gt;', 'cookie-bound-token', '/theme.css', '/procs/ui/htmx.js', '/procs/events/client.js', '/ui/control.js', '/ui/rpc.js', '/ui/popup.js', 'data-agent-id="a&quot;b"', 'name="plugin"']) expect(html).toContain(text);
-        for (const text of ['id="dock"', 'nav-overlay', 'mobileInspector.js', 'mobileUsage.js', 'mobileMessage.js', '/agent/chat.js', 'hyperLegacyUrl', 'data-presentation="sidebar"']) expect(html).not.toContain(text);
+        for (const text of ['<article>Plugin page</article>', '&lt;News&gt;', 'cookie-bound-token', '/theme.css', '/procs/ui/htmx.js', '/procs/events/client.js', '/ui/control.js', 'data-agent-id="a&quot;b"', 'name="plugin"']) expect(html).toContain(text);
+        for (const text of ['/ui/rpc.js', '/ui/popup.js', 'id="app-popup"', 'id="dock"', 'nav-overlay', 'mobileInspector.js', 'mobileUsage.js', 'mobileMessage.js', '/agent/chat.js', 'hyperLegacyUrl', 'data-presentation="sidebar"']) expect(html).not.toContain(text);
     });
     test('minimal main has no inherited navigation or page-wide swap targets', async () => {
         const { ctx, session } = fixture();

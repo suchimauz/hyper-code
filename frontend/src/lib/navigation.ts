@@ -2,7 +2,7 @@ import { requestJson } from './hyper';
 
 export type NavigationIcon = { src: string; custom: boolean };
 export type NavigationChat = { colorHue?: number | null; pinned?: boolean; pinnedAt?: number | null; icon?: NavigationIcon | null; id: string; title: string; model: string; modelLabel?: string; effort?: { requested: string; applied: string; label: string | null; downgraded: boolean } | null; createdAt?: number | null; runState: string; teamRunningCount?: number; hasUnread: boolean; archived?: boolean; lastReplyAt: number | null };
-export type NavigationProject = { createdAt?: number | null; id: string; title: string; dir: string; host: string | null; virtual?: boolean; archived?: boolean; runningCount?: number; unreadCount?: number; chats: NavigationChat[] };
+export type NavigationProject = { icon?: string | null; createdAt?: number | null; id: string; title: string; dir: string; host: string | null; virtual?: boolean; archived?: boolean; runningCount?: number; unreadCount?: number; chats: NavigationChat[] };
 export type NavigationData = { projects: NavigationProject[] };
 export type NavigationUser = { id?: number | string; name: string; email?: string; picture?: string | null; role: 'owner' | 'member' };
 /** Server-computed native owner capability; never infer it from missing user/profile data. */

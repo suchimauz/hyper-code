@@ -41,11 +41,7 @@ test("a person's @id in a message becomes an unread mention for them; opening th
     await ctx.fns.session.appendMessage({ id: agent.id, message: { role: "user", content: "## People\n@anna", message_type: "world_state", excluded_from_cursor: true } });
     expect(await ctx.fns.mentions.unreadCount({ userId: "anna" })).toBe(2);
 
-    // The rail badge and the global menu show Anna's unread mentions, with links to the message.
-    const badge = await ra.fns.mentions.badge({});
-    expect(badge).toContain('data-me="anna"');
-    expect(badge).toContain("2 unread mentions");
-    expect(badge).toContain(`/agent/${agent.id}#m-${idx}`);
+    // The global menu retains unread mentions and links after retiring the rail badge.
     const menu = await (await get(anna, "/nav/items")).text();
     expect(menu).toContain("Mentions · 2");
     expect(menu).toContain(`/agent/${agent.id}#m-${reply.idx}`);
@@ -55,9 +51,7 @@ test("a person's @id in a message becomes an unread mention for them; opening th
     expect(await ctx.fns.mentions.unreadCount({ userId: "anna" })).toBe(0);
     expect(await ra.fns.mentions.unreadByAgent({})).toEqual({});
     expect(await ctx.fns.mentions.unreadCount({ userId: "niquola" })).toBe(1);
-    expect(await ra.fns.mentions.badge({})).not.toContain("unread");
-    // The live refresh route answers the same badge for the signed-in person.
-    expect(await (await get(nik, "/mentions/badge")).text()).toContain("1 unread mention");
+    expect(await rn.fns.mentions.unreadByAgent({})).toEqual({ [agent.id]: 1 });
 });
 
 test("mentions render as chips with the person's name, never inside code", async () => {

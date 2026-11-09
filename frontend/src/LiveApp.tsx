@@ -25,6 +25,7 @@ import { CanvasPanel } from './components/hyper/CanvasPanel';
 import { QuestionHistoryContext } from './components/hyper/QuestionHistory';
 import type { ChoiceInput } from './lib/questions';
 import { SettingsDialog, type SettingsTab } from './components/settings/SettingsDialog';
+import { SecureInputDialog } from './components/SecureInputDialog';
 import { AutomationTasks } from './components/hyper/AutomationTasks';
 import { PluginsPage } from './components/hyper/PluginsPage';
 import { PeoplePage } from './components/PeoplePage';
@@ -137,8 +138,8 @@ export function LiveApp() {
   const readOnly = archived || !hyper.page || (hyper.page.archived == null && !selectedChat);
   const current = hyper.agents.find(item => item.id === hyper.selected) ?? selectedChat;
   const requestedSettings = new URLSearchParams(location.search).get('settings');
-  const [settingsOpen, setSettingsOpen] = useState(requestedSettings === 'ssh-instances' || requestedSettings === 'llm-connections');
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>(requestedSettings === 'llm-connections' ? 'llm-connections' : 'ssh-instances');
+  const [settingsOpen, setSettingsOpen] = useState(requestedSettings === 'ssh-instances' || requestedSettings === 'llm-connections' || requestedSettings === 'push-notifications');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>(requestedSettings === 'push-notifications' ? 'push-notifications' : requestedSettings === 'llm-connections' ? 'llm-connections' : 'ssh-instances');
   const changeSettingsOpen = (open: boolean) => {
     setSettingsOpen(open);
     if (!open) { const url = new URL(location.href); url.searchParams.delete('settings'); history.replaceState(null, '', url); }
@@ -191,6 +192,6 @@ export function LiveApp() {
   return <><div className={embedded ? 'embedded-chat-marker' : ''} hidden /><div hidden data-live-topic="agents" /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}` : 'agents'} /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}:stream` : 'agents'} />
     <AppShell sidebarVisible={!embedded} sidebar={embedded ? null : sidebar()} sidebarCompact={sidebarCompact} workspaceNav>
       <div style={paneDrag == null ? undefined : { '--pane-drag': `${paneDrag}px` } as React.CSSProperties} className={`workspace-layout live-workspace view-${mobileView} ${paneDrag == null ? '' : 'pane-dragging'} ${canvasOpen ? 'has-canvas' : 'no-canvas'} ${canvasExpanded ? 'canvas-expanded' : ''}`}><SplitPane primary={sidebarBindingId ? <SidebarDraftPage bindingId={sidebarBindingId} onCreated={id => { const url = new URL(location.href); url.searchParams.delete('sidebarDraft'); url.searchParams.set('agent', id); url.searchParams.set('presentation', 'sidebar'); history.replaceState(null, '', url); created(id); }} /> : pageView === 'people' ? <PeoplePage /> : pageView === 'applications' ? <ApplicationPages theme={theme} /> : extensionPage ? <ExtensionSurface view={extensionPage} context={{ agentId: null, theme, readOnly: navigation.canManage !== true }} onClose={() => setPageView(null)} /> : automation ? <AutomationTasks /> : pageView === 'plugins' ? <PluginsPage onOpenAgent={selectChat} /> : chat} secondary={pageView ? null : activeExtensionPanel ? <ExtensionSurface view={activeExtensionPanel} context={extensionContext} onClose={() => setExtensionPanel(null)} /> : sideAgent ? <SubagentPanel id={sideAgent.id} title={sideAgent.title} onClose={closeSecondary} /> : canvas} label="Ширина Canvas" secondaryWidth={canvasWidth} onWidthChange={resizeCanvas} maxWidth={1600} /></div>
-    </AppShell><SettingsDialog open={settingsOpen} tab={settingsTab} onTab={setSettingsTab} onOpenChange={changeSettingsOpen} />{!embedded && <><EdgeSwipe side="right" label="Свайп влево — открыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'chat' || canvasUnavailable} onSwipe={showCanvas} /><EdgeSwipe side="left" label="Свайп вправо — закрыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'canvas'} onSwipe={closeSecondary} /></>}<Sheet hideHeader swipeToOpen={!embedded && mobileView === 'chat'} title="Рабочее пространство" open={sheetOpen} onOpenChange={setSheetOpen} initialFocus={mobileSearchRef}>{sidebar(true)}</Sheet>
+    </AppShell>{!embedded && <SecureInputDialog />}<SettingsDialog open={settingsOpen} tab={settingsTab} onTab={setSettingsTab} onOpenChange={changeSettingsOpen} />{!embedded && <><EdgeSwipe side="right" label="Свайп влево — открыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'chat' || canvasUnavailable} onSwipe={showCanvas} /><EdgeSwipe side="left" label="Свайп вправо — закрыть Canvas" onDrag={setPaneDrag} disabled={mobileView !== 'canvas'} onSwipe={closeSecondary} /></>}<Sheet hideHeader swipeToOpen={!embedded && mobileView === 'chat'} title="Рабочее пространство" open={sheetOpen} onOpenChange={setSheetOpen} initialFocus={mobileSearchRef}>{sidebar(true)}</Sheet>
   </>;
 }

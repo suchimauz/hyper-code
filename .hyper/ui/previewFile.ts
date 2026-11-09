@@ -1,12 +1,12 @@
 /**
- * Opens the full Files UI in a wide application popup without leaving the current agent.
+ * Opens a file or directory in the current agent's native Canvas Files tab.
  *
- * Use when the user asks to inspect or navigate files in a popup. The iframe uses the
- * canonical path-based Files URL, so relative Markdown links and media assets work, and
- * Files tabs such as Preview, Code, and Edit remain available.
+ * Use when the user asks to inspect files without leaving the chat. Paths are pinned
+ * to the resolved workspace host; private result-store files are rejected. Generic
+ * HTTP RPC calls are refused because they do not establish an owned agent context.
  * @param opts.path Workspace-relative or absolute file or directory path to open.
  * @param opts.mode Initial file tab. Auto uses the Files UI default. @default auto
- * @param opts.title Optional popup title; defaults to the file path.
+ * @param opts.title Optional Canvas tab title; defaults to the resolved file path.
  * @param opts.maxChars Deprecated compatibility option; Files UI loads the complete file. @default 200000 @minimum 1 @maximum 1000000
  * @param opts.host SSH host alias the path lives on; omitted means the agent workspace (remote when it has a host).
  */
@@ -18,33 +18,26 @@ export default async function (
         path: string;
         /** Initial file tab. Auto uses the Files UI default. @default auto */
         mode?: "auto" | "preview" | "source";
-        /** Optional popup title; defaults to the file path. */
+        /** Optional Canvas tab title; defaults to the resolved file path. */
         title?: string;
         /** Deprecated compatibility option; Files UI loads the complete file. @default 200000 @minimum 1 @maximum 1000000 */
         maxChars?: number;
         /** SSH host alias the path lives on; omitted means the agent workspace (remote when it has a host). */
         host?: string;
     },
-): Promise<string | { path: string; mode: "auto" | "preview" | "source"; url: string }> {
+): Promise<Response | { path: string; host: string | null; mode: "auto" | "preview" | "source"; url: string; itemId: number }> {
+    // Generic RPC cannot establish the owned agent context required by Canvas.
+    if (session?.url?.pathname === "/rpc") {
+        return new Response("Open files from an owned agent's Canvas instead.", { status: 403 });
+    }
     const mode = opts.mode ?? "auto";
     const { path, host, url } = await ctx.fns.files.embedUrl({ path: opts.path, host: opts.host, mode });
+    if (await ctx.fns.files.isPrivateResult({ path, host: host ?? undefined })) {
+        throw new Error("file not found");
+    }
     const title = opts.title ?? (host ? `${host}:${path}` : path);
-    const html = ctx.fns.ui.popupContent({
-        title,
-        kind: "file-preview",
-        class: "h-full w-full",
-        html: `<iframe src="${escapeAttribute(url)}" title="${escapeAttribute(title)}" class="block h-full w-full border-0 bg-base-200" loading="eager"></iframe>`,
+    const item = await ctx.fns.canvas.show({
+        kind: "file", args: { path, host: host ?? "local", mode }, title,
     });
-
-    // Popup RPC owns the swap into #app-popup-body. Returning the fragment is
-    // essential: returning our metadata object makes procs.http.toResponse emit
-    // JSON, which htmx then paints over the iframe created by ui.eval.
-    if (session?.url?.pathname === "/rpc") return html;
-
-    await ctx.fns.ui.eval({ code: `window.hyperPopup?.content(${JSON.stringify(html)}, ${JSON.stringify(title)}, 'file-preview')` });
-    return { path, mode, url };
-}
-
-function escapeAttribute(value: string): string {
-    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    return { path, host, mode, url, itemId: item.id };
 }

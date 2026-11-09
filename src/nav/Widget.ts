@@ -16,7 +16,7 @@ export type Widget = {
     config?: Record<string, { type: "string" | "number" | "boolean"; default?: string | number | boolean; description?: string }>;
     /** Seconds the drawn tile may be reused for the same person, size and config. @default 0 */
     ttl?: number;
-    /** Draws the tile: rows as Item[] (drawn by the framework), trusted HTML, or both; null shows "empty". */
+    /** Returns native structured rows; the host escapes text. HTML is unsupported; null shows empty. */
     render: (ctx: Context, session: Session | null, opts: { size: types.nav.Size; config: Record<string, unknown> }) =>
-        types.nav.WidgetOutput | types.nav.Item[] | string | null | Promise<types.nav.WidgetOutput | types.nav.Item[] | string | null>;
+        types.nav.WidgetOutput | types.nav.Item[] | null | Promise<types.nav.WidgetOutput | types.nav.Item[] | null>;
 };

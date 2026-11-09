@@ -14,12 +14,11 @@ export default {
         ]);
         const chatItems = await ctx.fns.nav.chatItems({ agents });
         const pinnedAgents = pinnedIds.size ? (await ctx.fns.nav.agents({ limit: 500 }).catch(() => [] as any[])).filter((a: any) => pinnedIds.has(String(a.id))) : [];
-        const newAgent = ctx.fns.ui.popup({ method: "ui.newAgentPopup", params: {}, html: '<i class="ph ph-plus-circle" aria-hidden="true"></i> Новый чат', tone: "primary", attrs: 'data-nav-default class="nav-row mb-3" aria-label="Новый чат"' });
-        const mentionsHtml = mentions.length ? await ctx.fns.mentions.rowsHtml({ items: mentions, navRow: true }) : "";
+        const mentionItems = mentions.length ? await ctx.fns.mentions.rowsData({ items: mentions }) : [];
         return {
-            html: opts.config.hideNewChat === true ? "" : newAgent,
+            items: opts.config.hideNewChat === true ? [] : [{ id: "new-chat", label: "Новый чат", href: "/?newSession=1", icon: "ph-plus-circle" }],
             sections: [
-                ...(mentions.length ? [{ title: `Упоминания · ${mentions.length}`, html: mentionsHtml, tone: "primary" as const }] : []),
+                ...(mentions.length ? [{ title: `Упоминания · ${mentions.length}`, items: mentionItems, tone: "primary" as const }] : []),
                 ...(pinnedAgents.length ? [{ title: "Закреплённые", items: await ctx.fns.nav.chatItems({ agents: pinnedAgents }), tone: "warning" as const }] : []),
                 { title: "Недавние чаты", items: chatItems },
             ],

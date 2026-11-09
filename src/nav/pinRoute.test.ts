@@ -22,14 +22,8 @@ describe("web nav pin route", () => {
         let rows = await ctx.fns.procs.db.select({ sql: "SELECT value FROM kv WHERE key = 'mobile-pin-agent:pn'" });
         expect(rows).toHaveLength(1);
 
-        const menu = await ctx.fns.procs.http.dispatch({ url: "/nav/items" });
-        const html = await menu.text();
-        expect(html).toContain("Unpin agent");
-        expect(html).toContain("ph-push-pin-slash");
-        expect(html).toContain("group-hover:opacity-60");
-        expect(html).not.toContain("ph-push-pin-slash text-error");
-        expect(html.indexOf('>Pinned</h4>')).toBeLessThan(html.indexOf('>Recent</h4>'));
-        expect(html.match(/Pinned test/g)?.length).toBeGreaterThanOrEqual(2); // recent + pinned shortcut
+        // Native consumers read pin ownership, not the removed /nav/items renderer.
+        expect(await ctx.fns.auth.pinnedIds({})).toContain("pn");
 
         const unpin = await ctx.fns.procs.http.dispatch({
             method: "POST", url: "/nav/agent/pn/pin", body: new URLSearchParams({ pinned: "0" }),

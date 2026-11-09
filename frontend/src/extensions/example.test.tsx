@@ -19,7 +19,7 @@ describe('public-SDK dev/test fixture', () => {
       'settings/overview', 'settings/declared', 'shared-agents/overview', 'instances/overview',
       'readers/hackernews', 'readers/substack', 'readers/inbox', 'news/overview', 'news/rss',
       'visualizations/calendar', 'visualizations/architecture', 'visualizations/turbulence', 'whisper/overview', 'knowledge/overview',
-      'operations/telemetry', 'operations/gaps', 'utilities/autotext', 'utilities/update', 'telegram/overview', 'agent-source/overview', 'browser-live/live',
+      'operations/telemetry', 'operations/gaps', 'utilities/autotext', 'utilities/update', 'telegram/overview', 'agent-source/overview', 'browser-live/live', 'initial-prompt/overview',
     ]);
     expect(installedExtensions.panels.map(panel => panel.key)).toEqual(['agent-meta/overview']);
     expect(installedExtensions.actions).toEqual([]);

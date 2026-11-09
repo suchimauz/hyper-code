@@ -82,20 +82,49 @@ describe("usage-limit parking", () => {
         expect(result.resetsAt).toBe(now + 60_000);
     });
 
-    test("parking preserves a user's own wake and unpark restores it", async () => {
+    test("parking and unpark preserve a user's independent unified wake trigger", async () => {
         const ctx: any = await mkTestCtx();
         const a = await ctx.fns.agent.start({ model: "mock:test" });
         const mine = Date.now() + 30 * 60_000;
         await ctx.fns.agent.wakeAt({ id: a.id, at: mine, reason: "my own reminder" });
 
+        const triggers = await ctx.fns.agent.triggers({ id: a.id });
+        expect(triggers).toHaveLength(1);
+        expect(triggers[0]).toMatchObject({ kind: "at", mode: "once", status: "active", prompt: "my own reminder" });
+        expect(Number(triggers[0].nextAt)).toBe(mine);
+
         await ctx.fns.agent.parkOnUsageLimit({ info: limitInfo() });
-        expect((await ctx.fns.session.load({ id: a.id })).scratchpad.parked.previousWake).toMatchObject({ at: mine, reason: "my own reminder" });
+        // wakeAt now creates an independent trigger, not the legacy parking alarm.
+        expect((await ctx.fns.session.load({ id: a.id })).scratchpad.parked.previousWake).toBeNull();
+        expect(await ctx.fns.agent.triggers({ id: a.id })).toEqual(triggers);
 
         const un = await ctx.fns.agent.unpark({ id: a.id, reason: "model-switch" });
         expect(un.wasParked).toBe(true);
         const row = (await ctx.fns.procs.db.select({ sql: "SELECT wake_at, wake_reason FROM agents WHERE id = ?", params: [a.id] }))[0];
+        expect(row.wake_at).toBeNull();
+        expect(row.wake_reason).toBeNull();
+        expect(await ctx.fns.agent.triggers({ id: a.id })).toEqual(triggers);
+        expect((await ctx.fns.session.load({ id: a.id })).scratchpad.parked).toBeUndefined();
+    });
+
+    test("unpark restores an existing legacy wake alarm", async () => {
+        const ctx: any = await mkTestCtx();
+        const a = await ctx.fns.agent.start({ model: "mock:test" });
+        const mine = Date.now() + 30 * 60_000;
+        // Old persisted alarms still use agents.wake_at; wakeAt no longer writes it.
+        await ctx.fns.procs.db.run({
+            sql: "UPDATE agents SET wake_at = ?, wake_reason = ? WHERE id = ?",
+            params: [mine, "legacy reminder", a.id],
+        });
+        await ctx.fns.agent.parkOnUsageLimit({ info: limitInfo() });
+        expect((await ctx.fns.session.load({ id: a.id })).scratchpad.parked.previousWake)
+            .toEqual({ at: mine, reason: "legacy reminder" });
+        expect((await ctx.fns.agent.unpark({ id: a.id })).wasParked).toBe(true);
+        const row = (await ctx.fns.procs.db.select({
+            sql: "SELECT wake_at, wake_reason FROM agents WHERE id = ?", params: [a.id],
+        }))[0];
         expect(Number(row.wake_at)).toBe(mine);
-        expect(row.wake_reason).toBe("my own reminder");
+        expect(row.wake_reason).toBe("legacy reminder");
         expect((await ctx.fns.session.load({ id: a.id })).scratchpad.parked).toBeUndefined();
     });
 

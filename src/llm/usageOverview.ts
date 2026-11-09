@@ -1,11 +1,9 @@
-// What the quota indicator needs, in one query: every subscription credential
-// we have a snapshot for, plus how many agents are currently parked on it.
-/** Lists subscription quota snapshots with the parked-agent count per credential. */
 /**
  * Collect the recorded quota of every subscription credential.
  *
- * Returns the worst unexpired primary, secondary or tertiary window per credential. Reads only the
- * small stored snapshot set; it never scans agents and never calls a provider.
+ * Returns the worst unexpired primary, secondary or tertiary window per credential.
+ * Reads stored snapshots and aggregates durable parked-agent counts by credential;
+ * it never loads agent transcripts or calls a provider.
  *
  * Use connectedOnly for live quota indicators: historical Codex snapshots must
  * not imply a connection after the CLI removes its auth file. Stored history is retained.
@@ -49,6 +47,16 @@ export default async function (
         params: [],
     })) as any[];
 
+    const parkedRows = await ctx.fns.procs.db.select({
+        sql: `SELECT scratchpad::jsonb->'parked'->>'provider' AS provider,
+                     COALESCE(scratchpad::jsonb->'parked'->>'account', 'default') AS account,
+                     COUNT(*) AS count
+              FROM agents
+              WHERE archived_at IS NULL AND scratchpad::jsonb->'parked'->>'reason' = 'usage_limit'
+              GROUP BY 1, 2`,
+        params: [],
+    }) as Array<{provider: string; account: string; count: number | string}>;
+    const parkedCounts = new Map(parkedRows.map(row => [JSON.stringify([row.provider, row.account]), Number(row.count)]));
     const out = [];
     for (const row of rows) {
         let snapshot: types.llm.UsageSnapshot | null = null;
@@ -78,7 +86,7 @@ export default async function (
             resetsAt: worst?.resetsAt ?? null,
             planType: snapshot.planType ?? null,
             resetCredits: snapshot.resetCredits ?? null,
-            parkedAgents: 0,
+            parkedAgents: parkedCounts.get(JSON.stringify([snapshot.provider, account])) ?? 0,
             tone: usedPercent == null ? "neutral" : usedPercent >= alertAt ? "error" : usedPercent >= criticalAt ? "critical" : usedPercent >= warnAt ? "warning" : "neutral",
             updatedAt: Number(snapshot.updatedAt ?? 0),
             windows: { primary, secondary, tertiary },

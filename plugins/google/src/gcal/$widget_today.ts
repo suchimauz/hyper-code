@@ -27,11 +27,11 @@ export default {
                 return {
                     id: `gcal:${e.calendarId}/${e.id}`,
                     label: e.summary || "(no title)",
-                    href: e.htmlLink && /^https:\/\//.test(e.htmlLink) ? e.htmlLink : "/gcal/",
+                    href: "/gcal/", // Open the authorized native calendar; never forward provider URLs.
                     icon: e.meetLink ? "ph-video-camera" : "ph-calendar-dot",
                     hint: days > 1 ? `${day.format(at)} ${when}` : when,
                 };
             });
-        return items.length ? { items } : { html: `<a href="/gcal/" class="nav-row flex items-center gap-2 rounded px-2 py-1 text-xs text-faint hover:bg-base-200/60">Nothing more today</a>` };
+        return { items: items.length ? items : [{ id: "gcal:empty", label: "Nothing more today", href: "/gcal/", icon: "ph-calendar-blank" }] };
     },
 } satisfies types.nav.Widget;

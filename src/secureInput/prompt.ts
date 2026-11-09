@@ -1,5 +1,5 @@
 // Ask the human for transient sensitive input in the browser UI. The value travels
-// directly from a popup form to an in-memory Promise: never through the LLM,
+// directly from a protected native dialog to an in-memory Promise: never through the LLM,
 // transcript, tool arguments/results, scratchpad, DB, logs, or filesystem.
 /**
  * Prompts the user for transient sensitive input without exposing the value to the transcript.
@@ -42,6 +42,12 @@ export default async function (
     const kind = opts.kind ?? "password";
     if (!["otp", "password", "text"].includes(kind)) throw new Error("secureInput.prompt: invalid kind");
     const timeoutMs = Math.max(10_000, Math.min(opts.timeoutMs ?? 300_000, 900_000));
+    const caller = _session?.agent ?? (_session?.agentId ? await ctx.fns.session.load({ id: _session.agentId }) : null);
+    const agentId = caller?.id ? String(caller.id) : null;
+    const owner = agentId ? (await ctx.fns.procs.db.select({ sql: 'SELECT created_by FROM agents WHERE id = ? AND archived_at IS NULL', params: [agentId] }))[0] : null;
+    const ownerId = agentId ? (owner?.created_by ?? null) : ((_session as any)?.user?.id ?? null);
+    if (!agentId && !ownerId) throw new Error('secure input requires an owning agent or authenticated user');
+    if (agentId && !owner) throw new Error('secure input agent unavailable');
     const secureState = ((ctx.state as any).secureInput ??= {});
     if (secureState.disabled) throw new Error("transient input prompts are disabled");
     const id = Bun.randomUUIDv7().replace(/[^a-zA-Z0-9]/g, "");
@@ -62,17 +68,10 @@ export default async function (
     const answer = new Promise<string>((res, rej) => { resolve = res; reject = rej; });
     const maxlength = Math.max(1, Math.min(opts.maxlength ?? (kind === "otp" ? 16 : 256), 4096));
     const message = String(opts.message ?? "");
-    prompts.set(id, { id, name, title, message, kind, maxlength, resolve, reject, createdAt: Date.now() });
+    prompts.set(id, { id, name, title, message, kind, maxlength, resolve, reject, ownerId, agentId, expiresAt: Date.now() + timeoutMs, createdAt: Date.now() });
 
-    ctx.fns.procs.events.emit({ event: {
-        type: "secure-input.prompt",
-        id,
-        name,
-        title,
-        message,
-        kind,
-        maxlength,
-    } });
+    // Broadcast only an invalidation, never owner-specific form metadata.
+    ctx.fns.procs.events.emit({ event: { type: 'secure-input.changed' } });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -88,7 +87,7 @@ export default async function (
         prompts.delete(id);
         // Cleared by secureInput.current once a browser observed the closure;
         // the deadline only covers a page with no UI connected at all.
-        secureState.closing = { id, until: Date.now() + 10_000 };
-        ctx.fns.procs.events.emit({ event: { type: "secure-input.prompt.closed", id } });
+        secureState.closing = { id, ownerId, until: Date.now() + 10_000 };
+        ctx.fns.procs.events.emit({ event: { type: 'secure-input.changed' } });
     }
 }

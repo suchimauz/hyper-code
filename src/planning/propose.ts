@@ -27,7 +27,6 @@ export default async function (
     const spec={proposalId:id,plan,revision:state.revision+1};
     await ctx.fns.procs.db.run({sql:"INSERT INTO inputs(id,agent_id,kind,state,title,message,spec,created_at,updated_at) VALUES (?,?,'planning-review','open','Review implementation plan','Advisory planning mode is not a sandbox.',?::jsonb,?,?)",params:[inputId,agent.id,JSON.stringify(spec),now,now]});
     const event={type:'input',inputId,kind:'planning-review',title:'Review implementation plan',ts:now,html:''};
-    event.html=await ctx.fns.agent.renderEventHtml({event,agentId:agent.id});
     await ctx.fns.session.appendEvent({id:agent.id,event,ts:now});
     }});
     await ctx.fns.planning.publish({agentId:agent.id,proposal:true});

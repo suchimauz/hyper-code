@@ -848,7 +848,7 @@ export default async function (
                 statusLine: activeStatus.split('\n').find((line: string) => line.startsWith('User status line: '))?.slice('User status line: '.length) || null,
             };
             const answerEvent = await ctx.fns.session.appendAssistantEvent({ id: agent.id, payload: {
-                text, html, usage, messageIdx: final.idx, instructionIndicators,
+                text, html, htmlSource: 'assistant-answer', usage, messageIdx: final.idx, instructionIndicators,
             } });
             finalAnswerIdx = answerEvent.idx;
             await assertRunActive();

@@ -1,20 +1,17 @@
 import {expect,test} from 'bun:test';
-import usageDial from '../ui/usageDial';
+import quotaData from './quotaData';
 
-test('OpenCode monthly budget is monetary text, never a ring',()=>{
- const ctx:any={fns:{procs:{ui:{escape:({text}:any)=>String(text)}},ui:{modelLogo:()=>'<i>logo</i>'}}};
- const entry={provider:'opencode',account:'default',label:'OpenCode Console',usedPercent:null,resetsAt:null,planType:'Pay as you go',parkedAgents:0,tone:'neutral' as const,memberBudgetText:'Monthly member budget $1.25 / $10.00'};
- const html=usageDial(ctx,null,{entries:[entry]});
- expect(html).toContain('Monthly member budget $1.25 / $10.00');
- expect(html).not.toContain('<circle');
- expect(html).not.toContain('quota-ring');
- expect(html).not.toContain('%');
+async function account(planType:string,memberBudgetText:string) {
+ const entry={provider:'opencode',account:'default',label:'OpenCode',usedPercent:null,resetsAt:null,planType,parkedAgents:0,tone:'neutral',memberBudgetText};
+ const ctx:any={fns:{llms:{usageData:async()=>({entries:[entry],gateway:null})},llm:{listAccounts:async()=>[entry]},settings:{getNumber:async({fallback}:any)=>fallback},procs:{db:{select:async()=>[],run:async()=>({changes:1})}}}};
+ return (await quotaData(ctx,null,{})).accounts[0];
+}
+test('OpenCode PAYG money never becomes a subscription percentage',async()=>{
+ const row=await account('Pay as you go','Monthly member budget $1.25 / $10.00');
+ expect(Object.values(row.windows ?? {})).toEqual([]);expect(JSON.stringify(row)).not.toContain('$');
 });
-
-test('Go unknown quota uses the normal unavailable ring, never cached PAYG dollars',()=>{
- const ctx:any={fns:{procs:{ui:{escape:({text}:any)=>String(text)}},ui:{modelLogo:()=>'<i>logo</i>'}}};
- const html=usageDial(ctx,null,{entries:[{provider:'opencode',account:'default',label:'OpenCode Go',usedPercent:null,resetsAt:null,planType:'Go subscription',parkedAgents:0,tone:'neutral',memberBudgetText:'Monthly member budget $5 / unlimited'}]});
- expect(html).toContain('quota-ring');
- expect(html).toContain('href="/llms"');
- for(const forbidden of ['unlimited','$5','Monthly member budget']) expect(html).not.toContain(forbidden);
+test('Go unknown quota never exposes cached PAYG dollars as measured quota',async()=>{
+ const row=await account('Go subscription','Monthly member budget $5 / unlimited');
+ expect(row.kind).toBe('quota');expect(row.windows).toEqual({});expect(row.quotaStatus).toBe('unavailable');
+ for(const forbidden of ['unlimited','$5','Monthly member budget']) expect(JSON.stringify(row)).not.toContain(forbidden);
 });

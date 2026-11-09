@@ -67,7 +67,7 @@ export default async function (
      const host = entry.node ?? ssh?.[1];
      const account = ssh?.[2] ?? entry.account;
      const connection = entry.node ? "hyper" : ssh ? "ssh" : "local";
-     const kind = providers.has(entry.provider) || entry.provider === "opencode" && /go/i.test(entry.planType ?? "") ? "quota" : "status";
+     const kind = providers.has(entry.provider) || entry.provider === "opencode" && /^(?:opencode\s+)?go(?:\s+subscription)?$/i.test((entry.planType ?? "").trim()) ? "quota" : "status";
      const windows: NonNullable<types.llms.QuotaAccount["windows"]> = {};
      let expired = false;
      for (const w of Object.values(entry.windows ?? {})) {

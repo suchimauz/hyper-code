@@ -1,29 +1,32 @@
-import { describe, expect, test } from "bun:test";
-import prompt from "./prompt";
+import { expect, test } from 'bun:test';
+import prompt from './prompt';
 
-describe("secureInput.prompt", () => {
-    test("emits only metadata and resolves through the private in-memory capability", async () => {
-        const events: any[] = [];
-        const ctx: any = { state: {}, fns: { procs: { events: { emit: ({ event }: any) => events.push(event) } } } };
-        const waiting = prompt(ctx, null, { title: "Code", kind: "otp", timeoutMs: 10_000 });
-        const opened = events[0];
-        expect(opened).toMatchObject({ type: "secure-input.prompt", title: "Code", kind: "otp" });
-        expect(JSON.stringify(opened)).not.toContain("123456");
-        ctx.state.secureInput.prompts.get(opened.id).resolve("123456");
-        expect(await waiting).toBe("123456");
-        expect(ctx.state.secureInput.prompts.has(opened.id)).toBe(false);
-    });
+test('active and closing lifecycle preserves one prompt; timeout cleans in-memory capability', async () => {
+ const events: object[]=[];
+ const ctx:any={state:{},fns:{procs:{events:{emit:({event}:any)=>events.push(event)}}}};
+ const session:any={user:{id:'owner'}};
+ const waiting=prompt(ctx,session,{title:'First',timeoutMs:10000});
+ const id=ctx.state.secureInput.prompts.keys().next().value;
+ await expect(prompt(ctx,session,{title:'Second'})).rejects.toThrow('already active');
+ expect(ctx.state.secureInput.prompts.size).toBe(1);
+ ctx.state.secureInput.prompts.get(id).resolve('MOCK');expect(await waiting).toBe('MOCK');
+ expect(ctx.state.secureInput.prompts.size).toBe(0);
+ await expect(prompt(ctx,session,{title:'Third'})).rejects.toThrow('still closing');
+ expect(events).toEqual([{type:'secure-input.changed'},{type:'secure-input.changed'}]);
+});
 
-    test("a new prompt is rejected while the active prompt is preserved", async () => {
-        const events: any[] = [];
-        const ctx: any = { state: {}, fns: { procs: { events: { emit: ({ event }: any) => events.push(event) } } } };
-        const first = prompt(ctx, null, { title: "First", kind: "text", timeoutMs: 10_000 });
-        const firstId = events.find((e: any) => e.type === "secure-input.prompt").id;
-        await expect(prompt(ctx, null, { title: "Second", kind: "text", timeoutMs: 10_000 })).rejects.toThrow("already active");
-        expect(ctx.state.secureInput.prompts.has(firstId)).toBe(true);
-        expect(ctx.state.secureInput.prompts.size).toBe(1);
-        ctx.state.secureInput.prompts.get(firstId).resolve("ok");
-        expect(await first).toBe("ok");
-    });
+test('ownerless non-agent callers fail closed',async()=>{
+ await expect(prompt({state:{},fns:{}} as any,null,{title:'No owner'})).rejects.toThrow('requires an owning agent');
+});
 
+test('timeout rejects and removes pending capability',async()=>{
+ const ctx:any={state:{},fns:{procs:{events:{emit:()=>{}}}}};
+ const session:any={user:{id:'owner'}};
+ const original=globalThis.setTimeout;
+ // Only accelerate this mocked prompt timer, restoring before awaiting.
+ globalThis.setTimeout=((fn:any)=>original(fn,1)) as any;
+ const waiting=prompt(ctx,session,{title:'Timeout',timeoutMs:10000});
+ globalThis.setTimeout=original;
+ await expect(waiting).rejects.toThrow('timed out');
+ expect(ctx.state.secureInput.prompts.size).toBe(0);expect(ctx.state.secureInput.closing.id).toBeString();
 });

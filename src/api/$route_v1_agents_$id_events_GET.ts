@@ -117,7 +117,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     }
 
     const mobileEvents = events
-        .filter((event: any) => (event.type === 'input' && event.kind === 'choice' && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result", "llm_retry"].includes(String(event.type)))
+        .filter((event: any) => (event.type === 'input' && event.kind === 'choice' && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result", "llm_retry", "tool_busy", "tool_aborted", "goal_transition", "parked", "unparked", "model_changed", "team_update", "wake_up", "canvas_ping", "plan_activation", "goal_activation", "goal_check", "attempt", "attachment_event", "user_message"].includes(String(event.type)))
         .map((event: any) => ({
             ...(event.type === 'input' ? { inputId: event.inputId, kind: 'choice' } : {}),
             ...(event.type === 'llm_retry' ? {
@@ -138,6 +138,39 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
             messageIdx: typeof event.messageIdx === 'number' ? event.messageIdx : null,
             ts: Number(event.ts),
             type: String(event.type),
+            // Display-only lifecycle metadata. Never spread event payloads, credentials or form state.
+            lifecycle: (() => {
+                const fields: Record<string, string[]> = {
+                    parked: ['provider', 'account', 'message', 'resetsAt', 'wakeAt'],
+                    unparked: ['reason', 'resumed'], model_changed: ['from', 'to'],
+                    team_update: ['event', 'memberId', 'taskId', 'taskTitle', 'summary'],
+                    wake_up: ['watchId', 'triggerId', 'triggerKind', 'watchStatus', 'prompt', 'reason', 'summary', 'resultPreview', 'cronExpression', 'timezone', 'scheduleId'],
+                    canvas_ping: ['title'], plan_activation: ['title', 'taskId', 'instructions'],
+                    goal_activation: ['iterations'], goal_check: ['status', 'iteration', 'maxIterations', 'reason', 'nextStep'],
+                    attempt: ['error'], attachment_event: ['source', 'eventType'],
+                };
+                const scheduled = ['user', 'user_message'].includes(String(event.type)) && event.automationKind === 'scheduled';
+                const keys = scheduled ? ['automationKind', 'triggerKind', 'cronExpression', 'timezone', 'prompt', 'reason', 'summary', 'content', 'scheduleId', 'triggerId'] : fields[String(event.type)];
+                if (!keys) return null;
+                const display: Record<string, string | number | boolean> = {};
+                for (const key of keys) {
+                    const value = event[key];
+                    if (typeof value === 'string') display[key] = value;
+                    else if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) display[key] = value;
+                }
+                if (event.type === 'wake_up' && typeof event.resultRef?.id === 'string') display.resultId = event.resultRef.id;
+                // Canvas/watch data is intentionally a bounded inert text preview, not a new executable surface.
+                const data = event.type === 'canvas_ping' ? event.data : event.type === 'wake_up' ? event.result : undefined;
+                if (data != null) display.dataPreview = JSON.stringify(data).slice(0, 16000);
+                if (event.type === 'attachment_event') {
+                    for (const key of ['chatTitle', 'chatId', 'senderName', 'senderId', 'text', 'summary']) {
+                        const value = event.payload?.[key];
+                        if (typeof value === 'string' || typeof value === 'number') display[key] = String(value);
+                    }
+                }
+                return display;
+            })(),
+            excludedFromLlm: event.excludedFromLlm === true,
             ...(event.type === 'planning_mode' && typeof event.operationId === 'string' ? {operationId:event.operationId,requestId:event.requestId ?? null} : {}),
             command: event.command && typeof event.command === 'object' ? event.command : typeof event.command === 'string' ? {name:event.command} : null,
             ...(['command_invocation','command_result'].includes(String(event.type)) ? {
@@ -149,6 +182,8 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
             text: event.type === 'thinking' || event.type === 'input' ? null : typeof event.text === "string" ? event.text : (typeof event.error === "string" ? event.error : null),
             mentions: mentioned.get(Number(event.idx)) ?? [],
             html: event.type === 'thinking' || event.type === 'input' ? null : typeof event.html === "string" ? event.html : null,
+            // Only the explicit terminal answer path opts in; historical rendered markdown is not proof.
+            htmlSource: event.type === 'assistant' && event.htmlSource === 'assistant-answer' && typeof event.html === 'string' ? 'assistant-answer' : null,
             actor: typeof event.actor === 'string' ? event.actor : null,
             navigationEligible: event.type === 'user' && humanMessages.has(event.messageIdx)
                 && !String(event.actor || '').startsWith('agent:') && !event.agentMessage && !event.outgoingAgentMessage
@@ -167,6 +202,12 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
                 messageIdx: typeof event.outgoingAgentMessage.messageIdx === 'number' ? event.outgoingAgentMessage.messageIdx : null,
             } : null,
             name: typeof event.name === "string" ? event.name : null,
+            ...(['tool_busy', 'tool_aborted'].includes(String(event.type)) ? {
+                runId: typeof event.runId === 'string' ? event.runId : null,
+                subject: typeof event.subject === 'string' ? event.subject : null,
+                elapsedSec: typeof event.elapsedSec === 'number' && Number.isFinite(event.elapsedSec) ? Math.max(0, event.elapsedSec) : null,
+                timeoutMs: typeof event.timeoutMs === 'number' && Number.isFinite(event.timeoutMs) && event.timeoutMs > 0 ? event.timeoutMs : null,
+            } : {}),
             toolSummary: event.type === 'tool_call' || event.type === 'tool_result'
                 ? toolSummary(String(event.name || 'tool'), event.args) : null,
             preview: event.type === "tool_call"

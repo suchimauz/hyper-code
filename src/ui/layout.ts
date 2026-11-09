@@ -1,20 +1,20 @@
 /**
  * Render standalone HTML documents for trusted built-in and plugin pages.
  * Used dynamically by procs.http.toResponse. React owns the application shell;
- * this document retains page-local HTMX, live updates, popup and CSRF transports.
+ * this document retains page-local HTMX, live updates, and CSRF transports.
  * @param opts Document content and metadata.
- * @param opts.currentId Optional agent context for page-local RPC.
+ * @param opts.currentId Optional agent context for page-local documents.
  * @param opts.title Optional title prefix.
  * @param opts.main Trusted server-rendered page markup.
  * @param opts.headExtra Trusted additional document-head markup.
- * @param opts.lean Omit page-local popup assets. @default false
+ * @param opts.lean Reserved compatibility option; documents always omit retired popup assets. @default false
  */
 export default async function (ctx: Context, session: Session | null, opts: {
-    /** Agent context for page-local RPC. */ currentId?: string;
+    /** Agent context for page-local documents. */ currentId?: string;
     /** Optional title prefix. */ title?: string;
     /** Trusted server-rendered page markup. */ main: string;
     /** Trusted additional document-head markup. */ headExtra?: string;
-    /** Omit page-local popup assets. @default false */ lean?: boolean;
+    /** Reserved compatibility option; documents always omit retired popup assets. @default false */ lean?: boolean;
 }): Promise<string> {
     const esc = (text: string) => ctx.fns.procs.ui.escape({ text });
     const currentId = opts.currentId ?? session?.req?.headers.get("x-hyper-agent");
@@ -36,23 +36,14 @@ ${((ctx.state as any).procs?.styles ?? []).map((style: { href: string }) => `<li
 html,body { min-height:100%; margin:0; }
 #page-view,#main { min-width:0; }
 :where(button,a,input,select,textarea,summary):focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
-#app-popup { width:min(48rem,calc(100vw - 2rem)); max-height:85dvh; margin:auto; border:1px solid var(--color-ui-border); border-radius:1rem; padding:0; color:var(--color-base-content); background:var(--color-base-100); }
-#app-popup::backdrop { background:rgb(0 0 0 / .4); }
-#app-popup-body { overflow:auto; padding:1rem; max-height:70dvh; }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation:none!important; transition:none!important; } }
 </style>
 ${opts.headExtra ?? ""}
 <script src="/procs/ui/htmx.js" defer></script>
 <script src="/procs/events/client.js" defer></script>
 <script src="/ui/control.js" defer></script>
-<script src="/ui/rpc.js?v=6" defer></script>
-${opts.lean ? "" : '<script src="/ui/popup.js" defer></script>'}
 </head><body class="bg-base-100 text-base-content text-sm"${currentId ? ` data-agent-id="${esc(currentId)}"` : ""}>
 <section id="page-view"><main id="main" hx-history-elt>${opts.main}</main></section>
-${opts.lean ? "" : `<dialog id="app-popup" aria-labelledby="app-popup-title">
-<header class="flex items-center gap-3 border-b border-ui-border p-4"><h2 id="app-popup-title" class="flex-1 font-semibold"></h2><button type="button" id="app-popup-close" data-action="close-popup" aria-label="Close">Close</button></header>
-<div id="app-popup-body" class="app-popup-body"></div>
-<footer data-tool-popup-footer><button type="button" data-tool-popup-close>Close</button></footer>
-</dialog>`}
+
 </body></html>`;
 }

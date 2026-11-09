@@ -16,7 +16,7 @@ describe("GET /api/v1/agents/:id/events", () => {
         expect(JSON.stringify(body)).not.toContain('never expose');
         expect(JSON.stringify(body)).not.toContain('private');
     });
-    test("filters service events, returns mobile fields, and initially requests the newest page", async () => {
+    test("returns lifecycle and mobile fields and initially requests the newest page", async () => {
         let eventOpts: any;
         const ctx: any = { state: { agent: { ab: { scratchpad: { mobileStream: { text: "live", revision: 3, startedAt: 9 } } } } }, fns: {
             auth: { author: async () => null },
@@ -29,7 +29,7 @@ describe("GET /api/v1/agents/:id/events", () => {
         } };
         const response = await route(ctx, null, { req: new Request("http://localhost/api/v1/agents/ab/events?limit=10"), params: { id: "ab" } });
         expect(eventOpts).toMatchObject({ id: "ab", beforeIdx: 3, limit: 10 });
-        expect(await response.json()).toMatchObject({ version: 1, agentId: "ab", mascot: "deepy", nextAfter: 3, isRunning: true, partial: { text: "live", revision: 3, startedAt: 9 }, events: [{ idx: 2, type: "assistant", text: "hello @anna", mentions: ["anna"] }] });
+        expect(await response.json()).toMatchObject({ version: 1, agentId: "ab", mascot: "deepy", nextAfter: 3, isRunning: true, partial: { text: "live", revision: 3, startedAt: 9 }, events: [{ idx: 1, type: "wake_up", lifecycle: { reason: "x" } }, { idx: 2, type: "assistant", text: "hello @anna", mentions: ["anna"] }] });
     });
 
     test("includes resolved authors for multiuser messages", async () => {
@@ -107,4 +107,32 @@ describe("GET /api/v1/agents/:id/events", () => {
         expect(await (await route(ctx, null, opts)).json()).toMatchObject({ events: [], nextAfter: 3 });
     });
 
+});
+
+test('lifecycle projection allowlists display fields without leaking arbitrary payload or input state', async () => {
+    const events = [
+        {idx:0,ts:1,type:'parked',provider:'p',account:'a',message:'limit',resetsAt:123,token:'secret'},
+        {idx:1,ts:1,type:'team_update',event:'plan.completed',memberId:'b',summary:'done',private:'secret'},
+        {idx:2,ts:1,type:'attachment_event',source:'telegram',payload:{text:'message',senderName:'Person',token:'secret'}},
+        {idx:3,ts:1,type:'wake_up',watchId:'w',watchStatus:'ready',resultRef:{id:'stored',private:'secret'},result:{ok:true}},
+        {idx:4,ts:1,type:'input',inputId:'private',kind:'secret',prompt:'secret',html:'secret'},
+        {idx:5,ts:1,type:'assistant',html:'<p>saved respondHtml</p>'},
+        {idx:6,ts:1,type:'assistant',html:'<p>explicit</p>',htmlSource:'assistant-answer'},
+        {idx:7,ts:1,type:'user',html:'<p>untrusted</p>',htmlSource:'assistant-answer'},
+        {idx:8,ts:1,type:'tool_result',html:'<p>untrusted</p>',htmlSource:'assistant-answer'},
+    ];
+    const ctx:any={state:{},fns:{auth:{author:async()=>null},mentions:{parse:async()=>[]},procs:{db:{select:async({sql}:any)=>sql.includes('SELECT 1')?[{exists:1}]:[{run_state:'idle',next_run_at:null}]}},session:{getEvents:async()=>events,getMaxEventIdx:async()=>5}}};
+    const response=await route(ctx,null,{req:new Request('http://local/api/v1/agents/a/events'),params:{id:'a'}});
+    const body:any=await response.json();
+    expect(body.events[0].lifecycle).toEqual({provider:'p',account:'a',message:'limit',resetsAt:123});
+    expect(body.events[1].lifecycle).toEqual({event:'plan.completed',memberId:'b',summary:'done'});
+    expect(body.events[2].lifecycle).toEqual({source:'telegram',text:'message',senderName:'Person'});
+    expect(body.events[3].lifecycle).toEqual({watchId:'w',watchStatus:'ready',resultId:'stored',dataPreview:'{"ok":true}'});
+    expect(body.events.some((event:any) => event.type === 'input')).toBe(false);
+    expect(body.events[4].html).toBe('<p>saved respondHtml</p>');
+    expect(events[5].html).toBe('<p>saved respondHtml</p>');
+    expect(body.events[4].htmlSource).toBeNull();
+    expect(body.events[5].htmlSource).toBe('assistant-answer');
+    expect(body.events[6].htmlSource).toBeNull();
+    expect(body.events[7].htmlSource).toBeNull();
 });

@@ -68,3 +68,33 @@ it('explains that only owners can manage connections', async () => {
   render(<LlmConnectionsPanel />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Только владелец');
 });
+
+it('shows safe remote diagnostics and prevents callback replay while retaining cancel', async () => {
+  const calls = mockApi({ logins: [{ id: 'r1', provider: 'claude-code', account: 'w', instance: 'box', status: 'pending', verificationUri: 'https://claude.ai/oauth/authorize', userCode: null, needsCode: false, callbackSubmitted: true, error: null, diagnostics: { startedAt: 1000, endedAt: null, exitCode: null, reason: 'tls', httpCode: null, stages: [{ phase: 'cli-login', startedAt: 1000, endedAt: null, exitCode: null }] } }] });
+  render(<LlmConnectionsPanel />);
+  fireEvent.click(await screen.findByText('Safe login diagnostics'));
+  expect(screen.getByText(/TLS \/ certificate error/)).toBeVisible();
+  expect(screen.getByText(/do not resend the callback/)).toBeVisible();
+  expect(screen.queryByLabelText(/Callback URL/)).toBeNull();
+  expect(calls.some(c => c.method === 'POST')).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel login' }));
+  await waitFor(() => expect(calls.find(c => c.method === 'POST')?.body).toEqual({ action: 'cancel', id: 'r1' }));
+});
+
+it('submits remote callback privately with CSRF and clears the input', async () => {
+  const calls = mockApi({ logins: [{ id: 'r1', provider: 'claude-code', account: 'w', instance: 'box', status: 'pending', verificationUri: 'https://claude.ai/oauth/authorize', needsCode: true, callbackSubmitted: false, error: null }] });
+  render(<LlmConnectionsPanel />);
+  const field = await screen.findByLabelText(/Callback URL/);
+  fireEvent.change(field, { target: { value: 'http://localhost:123/callback?code=synthetic&state=test' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+  await waitFor(() => expect(field).toHaveValue(''));
+  expect(calls.find(c => c.method === 'POST')?.body).toEqual({ action: 'code', id: 'r1', code: 'http://localhost:123/callback?code=synthetic&state=test' });
+  expect(calls.find(c => c.method === 'POST')?.headers['X-CSRF-Token']).toBe('csrf');
+});
+
+it('allows cancelling local Kimi device authorization', async () => {
+  const calls = mockApi({ logins: [{ id: 'k1', provider: 'kimi-coding', account: 'w', instance: null, status: 'pending', verificationUri: 'https://auth.kimi.com', needsCode: false, callbackSubmitted: false, error: null }] });
+  render(<LlmConnectionsPanel />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel login' }));
+  await waitFor(() => expect(calls.find(c => c.method === 'POST')?.body).toEqual({ action: 'cancel', id: 'k1' }));
+});

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
-import dial from "../ui/usageDial";
 import recordUsage from "./recordUsage";
+import usageData from "../llms/usageData";
 
 // These normalization regressions need no registry, browser or Postgres server.
 function quotaCtx(): any {
@@ -22,12 +22,6 @@ function quotaCtx(): any {
 }
 
 const NOW = 1_786_900_000_000;
-const escCtx: any = {
-    fns: {
-        procs: { ui: { escape: ({ text }: any) => String(text ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!)) } },
-        ui: { modelLogo: ({ model }: any) => `<span data-logo="${model}"></span>` },
-    },
-};
 
 describe("llm.recordUsage", () => {
     test("reads Anthropic unified headers into both windows", async () => {
@@ -248,20 +242,26 @@ describe("llm.usageOverview", () => {
         expect(await tone(75)).toBe("error");
     });
 
-    test("includes an active xAI agent in the sidebar before a snapshot exists", async () => {
-        const ctx: any = await mkTestCtx();
-        await ctx.fns.agent.start({ model: "xai:grok-4.6" });
-        const entry = (await ctx.fns.llm.usageOverview({ now: NOW })).find((e: any) => e.provider === "xai");
+    test("connected xAI inventory remains visible before a quota snapshot exists", async () => {
+        // Inventory, not active sessions, owns connection identity. No auth or provider I/O.
+        const ctx: any = {state:{llmUsageRefresh:{startedAt:Date.now()}},fns:{
+            llm:{usageOverview:async()=>[],listAccounts:async()=>[{provider:"xai",account:"default",label:"Grok",model:"xai:grok-4.6",available:true,parkedAgents:0,planType:null}],listModels:async()=>({xai:["xai:grok-4.6"]})},
+            node:{list:async()=>[]},
+        }};
+        const entry = (await usageData(ctx,null,{includeConnected:true})).entries.find(e=>e.provider==="xai");
         expect(entry).toBeDefined();
-        expect(entry.model).toBe("xai:grok-4.6");
-        expect(entry.usedPercent).toBeNull();
+        expect(entry!.model).toBe("xai:grok-4.6");
+        expect(entry!.models).toEqual(["xai:grok-4.6"]);
+        expect(entry!.usedPercent).toBeNull();
+        expect(entry!.available).toBe(true);
     });
 
 
     test("counts the agents parked on each credential", async () => {
         const ctx: any = await mkTestCtx();
+        const first = await ctx.fns.agent.start({ model: "mock:test" });
         await ctx.fns.agent.start({ model: "mock:test" });
-        await ctx.fns.agent.start({ model: "mock:test" });
+        const other = await ctx.fns.agent.start({ model: "mock/work:test" });
         await ctx.fns.agent.parkOnUsageLimit({
             info: { kind: "usage_limit", provider: "mock", account: "default", message: "spent", retryable: false, resetsAt: NOW + 86_400_000 } as any,
             now: NOW,
@@ -269,54 +269,11 @@ describe("llm.usageOverview", () => {
         const entry = (await ctx.fns.llm.usageOverview({ now: NOW })).find((e: any) => e.provider === "mock");
         expect(entry.parkedAgents).toBe(2);
         expect(entry.usedPercent).toBe(100);
+        expect((await ctx.fns.session.load({id:other.id})).scratchpad.parked).toBeUndefined();
+        await ctx.fns.procs.db.run({sql:"UPDATE agents SET archived_at = ? WHERE id = ?",params:[NOW,first.id]});
+        const afterArchive = (await ctx.fns.llm.usageOverview({now:NOW})).find((e:any)=>e.provider==="mock");
+        expect(afterArchive.parkedAgents).toBe(1);
     });
 });
 
-describe("ui.usageDial", () => {
-    const entry = (over: any = {}) => ({ provider: "codex", account: "default", label: "codex", model: "codex:gpt-5.6-sol", usedPercent: 78, resetsAt: NOW + 7_200_000, planType: "prolite", parkedAgents: 0, tone: "warning", ...over });
-
-    test("nothing recorded renders nothing", () => {
-        expect(dial(escCtx, null, { entries: [], now: NOW })).toBe("");
-    });
-
-    test("generic quota remains explicitly unclassified", () => {
-        const html = dial(escCtx, null, { entries: [entry({ usedPercent: 50 })], now: NOW });
-        // Generic quota has no measured period and cannot become a 5h bar.
-        expect(html).toContain("50% used · период неизвестен");
-        expect(html).not.toMatch(/>\s*50\s*</);
-    });
-
-    test("each ring carries its provider mark", () => {
-        const html = dial(escCtx, null, { entries: [entry({ model: "kimi-coding:k3" })], now: NOW });
-        expect(html).toContain('data-logo="kimi-coding:k3"');
-    });
-
-    test("crossing the thresholds changes the colour", () => {
-        expect(dial(escCtx, null, { entries: [entry({ usedPercent: 20, tone: "neutral" })], now: NOW })).toContain("text-faint");
-        expect(dial(escCtx, null, { entries: [entry({ usedPercent: 40, tone: "warning" })], now: NOW })).toContain("text-warning");
-        expect(dial(escCtx, null, { entries: [entry({ usedPercent: 92, tone: "error" })], now: NOW })).toContain("text-error");
-    });
-
-    test("a parked credential shows an error and says how many wait", () => {
-        const html = dial(escCtx, null, { entries: [entry({ usedPercent: 100, tone: "error", parkedAgents: 14 })], now: NOW });
-        expect(html).toContain("Высокое использование квоты");
-        expect(html).toContain("14 agent(s) parked");
-    });
-
-    test("the tooltip interprets the number instead of just stating it", () => {
-        const calm = dial(escCtx, null, { entries: [entry({ usedPercent: 20, tone: "neutral" })], now: NOW });
-        expect(calm).toContain("20% used");
-        expect(calm).toContain("период неизвестен");
-        expect(calm).toContain("5h no data");
-
-        const hot = dial(escCtx, null, { entries: [entry({ usedPercent: 78, tone: "error" })], now: NOW });
-        expect(hot).toContain("78% used");
-        expect(hot).toContain("Высокое использование квоты");
-    });
-
-    test("no data draws an empty ring instead of a fake zero", () => {
-        const html = dial(escCtx, null, { entries: [entry({ usedPercent: null, tone: "neutral" })], now: NOW });
-        expect(html).not.toContain("stroke-dasharray");
-        expect(html).toContain("Нет данных");
-    });
-});
+// Quota presentation/domain regressions live in ui/usageDial.test.ts against quotaData.
