@@ -1,11 +1,10 @@
-import { useEffect, useId, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUp, Check, ChevronDown, ChevronUp, Pencil, Trash2, X } from 'lucide-react';
 import type { QueueItem } from '../../lib/queue';
 import type { useMessageQueue } from '../../hooks/useMessageQueue';
 import './queue-dock.css';
 import { QueueGlyph } from './QueueGlyph';
-import { Tooltip } from '../ui/Tooltip';
-function Action({ title, ...props }: ComponentProps<'button'>) { return <Tooltip label={title} side="bottom" delay={500}><button {...props} /></Tooltip>; }
+import { IconButton } from '../ui/IconButton';
 
 type Props = { queue: ReturnType<typeof useMessageQueue>; running: boolean; disabled?: boolean };
 /** Durable next-turn messages, with text-only editing and explicit steer controls. */
@@ -37,14 +36,14 @@ export function QueueDock({ queue, running, disabled }: Props) {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'Escape') { event.preventDefault(); close(); }
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void save(); }
-        }} /><div className="queue-actions"><Action type="button" aria-label="Сохранить сообщение" title="Сохранить · Enter" disabled={busy || !text.trim()} onClick={() => void save()}><Check /></Action><Action type="button" aria-label="Отменить редактирование" title="Отменить · Escape" disabled={busy} onClick={close}><X /></Action></div></> : <>
+        }} /><div className="queue-actions"><IconButton size="compact" label="Сохранить сообщение" tooltip="Сохранить · Enter" disabled={busy || !text.trim()} onClick={() => void save()}><Check size={16} /></IconButton><IconButton size="compact" label="Отменить редактирование" tooltip="Отменить · Escape" disabled={busy} onClick={close}><X size={16} /></IconButton></div></> : <>
           {!!item.files.length && <span className="queue-files">{item.files.map((file, index) => <span className="queue-file" key={index} title={`${file.name} (${file.size} B)`}><span className="queue-file-name">{file.name}</span><span className="queue-file-size">{file.size < 1024 ? `${file.size} B` : file.size < 1048576 ? `${Math.round(file.size / 1024)} KB` : `${(file.size / 1048576).toFixed(1)} MB`}</span></span>)}</span>}
           <span className="queue-preview" title={item.text}>{item.text.replace(/\s+/g, ' ') || (item.files.length ? 'Вложения' : '')}</span>
           {(pending || queue.processing === item.id) && <span className="queue-status" role="status">{pending ? 'Отправка…' : 'Обработка…'}</span>}
           <div className="queue-actions">
-            <Action type="button" aria-label="Редактировать сообщение" title={item.files.length ? 'Редактирование вложений недоступно' : 'Редактировать'} disabled={busy || !!item.files.length} onClick={event => { editButton.current = event.currentTarget; setEditing(item); setText(item.text); }}><Pencil /></Action>
-            <Action type="button" aria-label="Удалить из очереди" title="Удалить" disabled={busy} onClick={() => void queue.perform([item], 'remove')}><Trash2 /></Action>
-            <Action type="button" aria-label="Направить агенту сейчас" title="Направить агенту сейчас" disabled={busy || !running} onClick={() => void queue.perform([item], 'steer')}><ArrowUp /></Action>
+            <IconButton size="compact" label="Редактировать сообщение" tooltip={item.files.length ? 'Редактирование вложений недоступно' : 'Редактировать'} disabled={busy || !!item.files.length} onClick={event => { editButton.current = event.currentTarget; setEditing(item); setText(item.text); }}><Pencil size={16} /></IconButton>
+            <IconButton size="compact" label="Удалить из очереди" tooltip="Удалить" disabled={busy} onClick={() => void queue.perform([item], 'remove')}><Trash2 size={16} /></IconButton>
+            <IconButton size="compact" label="Направить агенту сейчас" tooltip="Направить агенту сейчас" disabled={busy || !running} onClick={() => void queue.perform([item], 'steer')}><ArrowUp size={16} /></IconButton>
           </div>
         </>}
       </li>;

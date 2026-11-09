@@ -7,12 +7,8 @@
 .queue-row + .queue-row { box-shadow: inset 0 1px var(--line); }
 .queue-lead { flex: none; color: var(--text-caption); }
 .queue-preview { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 20px; }
-.queue-actions { display: flex; align-items: center; flex: none; gap: 10px; }
-.queue-actions button { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); cursor: pointer; }
-.queue-actions svg { width: 14px; height: 14px; stroke-width: 1; }
-.queue-actions button:hover:not(:disabled), .queue-header:hover:not(:disabled) { background: var(--surface-raised); }
-.queue-actions button:active:not(:disabled) { background: var(--line); }
-.queue-actions button:disabled { opacity: .35; cursor: default; }
+.queue-actions { display: flex; align-items: center; flex: none; gap: var(--space-1); }
+.queue-header:hover:not(:disabled) { background: var(--surface-raised); }
 .queue-header:disabled { cursor: default; }
 .queue-dock button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .queue-editor { flex: 1; min-width: 0; resize: vertical; max-height: 120px; min-height: 28px; padding: 3px 7px; border: 1px solid var(--accent); border-radius: 6px; background: var(--input-bg); color: var(--text); font: inherit; font-size: 13px; line-height: 20px; outline: none; }
