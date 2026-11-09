@@ -5,6 +5,7 @@ import type { useMessageQueue } from '../../hooks/useMessageQueue';
 import './queue-dock.css';
 import { QueueGlyph } from './QueueGlyph';
 import { IconButton } from '../ui/IconButton';
+import { useAutoGrow } from '../../hooks/useAutoGrow';
 
 type Props = { queue: ReturnType<typeof useMessageQueue>; running: boolean; disabled?: boolean };
 /** Durable next-turn messages, with text-only editing and explicit steer controls. */
@@ -21,6 +22,8 @@ export function QueueDock({ queue, running, disabled }: Props) {
     if (!rows.length) setExpanded(false);
     if (editing && (disabled || !queue.items.some(item => item.id === editing.id))) setEditing(null);
   }, [rows.length, queue.items, disabled, editing]);
+  const editorInput = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(editorInput, editing ? text : '');
   const close = () => { setEditing(null); editButton.current?.focus(); };
   const save = async () => { if (editing && text.trim() && await queue.perform([editing], 'edit', text.trim())) close(); };
   if (!rows.length && !queue.error) return null;
@@ -32,7 +35,7 @@ export function QueueDock({ queue, running, disabled }: Props) {
       const busy = disabled || pending || !!queue.processing;
       return <li className="queue-row" key={item.id}>
         {rows.length === 1 && <QueueGlyph />}
-        {active ? <><textarea autoFocus rows={1} className="queue-editor" aria-label="Текст сообщения в очереди" value={text} disabled={busy} onChange={event => setText(event.target.value)} onKeyDown={event => {
+        {active ? <><textarea ref={editorInput} autoFocus rows={1} className="queue-editor" aria-label="Текст сообщения в очереди" value={text} disabled={busy} onChange={event => setText(event.target.value)} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'Escape') { event.preventDefault(); close(); }
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void save(); }

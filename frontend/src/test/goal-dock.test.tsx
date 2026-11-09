@@ -51,3 +51,12 @@ it('keeps Shift+Enter and IME Enter as input, and resizes on multiline edits', a
   fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
   expect(props.onClose).toHaveBeenCalled();
 });
+it.each(['Цель', 'Бюджет токенов'])('cancels editing with Escape from %s like the Cancel button', async label => {
+  vi.mocked(getGoal).mockResolvedValue(snapshot);
+  const onClose = vi.fn();
+  render(<GoalDock {...props} onClose={onClose} editor={{ text: 'Черновик' }} />);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить цель' })).toBeEnabled());
+  fireEvent.keyDown(screen.getByLabelText(label), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Сохранить цель' })).toBeNull());
+  expect(onClose).toHaveBeenCalledOnce(); expect(changeGoal).not.toHaveBeenCalled();
+});

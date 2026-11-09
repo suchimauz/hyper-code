@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CornerDownLeft, ChevronDown, ChevronRight, Pause, Pencil, Play, Target } from 'lucide-react';
 import { changeGoal, getGoal, goalStatus, type GoalAction, type GoalSnapshot } from '../../lib/goal';
 import { Button } from '../ui/Button';
+import { useAutoGrow } from '../../hooks/useAutoGrow';
 import { IconButton } from '../ui/IconButton';
 import './queue-dock.css';
 import './goal-dock.css';
@@ -16,14 +17,7 @@ export function GoalDock({ agentId, running, disabled, editor, onClose, onAccept
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const objectiveInput = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const input = objectiveInput.current;
-    if (!input) return;
-    input.style.height = 'auto';
-    const style = getComputedStyle(input);
-    const borders = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-    input.style.height = `${Math.min(input.scrollHeight + (borders || 0), 160)}px`;
-  }, [objective, editing]);
+  useAutoGrow(objectiveInput, editing ? objective : '');
   const refresh = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
     const controller = new AbortController(); let reading = false;
@@ -64,7 +58,9 @@ export function GoalDock({ agentId, running, disabled, editor, onClose, onAccept
     </div>
     {expanded && goal && !editing && <div className="goal-details"><p>{goal.objective}</p><span>Токены: {goal.tokensUsed.toLocaleString('ru-RU')}{goal.tokenBudget === null ? ' · без лимита' : ` / ${goal.tokenBudget.toLocaleString('ru-RU')}`} · Время: {Math.floor(goal.timeUsedSeconds / 60)} мин</span></div>}
     {editing && <form className="goal-details goal-form" onSubmit={event => { event.preventDefault(); if (snapshot?.enabled && objective.trim()) void perform(goal ? 'edit' : 'create'); }} onKeyDown={event => {
-      if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.shiftKey || event.target instanceof HTMLButtonElement) return;
+      if (event.nativeEvent.isComposing) return;
+      if (event.key === 'Escape') { event.preventDefault(); if (!busy) close(); return; }
+      if (event.key !== 'Enter' || event.shiftKey || event.target instanceof HTMLButtonElement) return;
       event.preventDefault(); event.currentTarget.requestSubmit();
     }}>
       <label>Цель<textarea ref={objectiveInput} rows={1} autoFocus className="queue-editor" value={objective} onChange={event => setObjective(event.target.value)} disabled={busy || disabled} /></label>
