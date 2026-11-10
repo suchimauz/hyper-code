@@ -4,6 +4,7 @@
  * Use when retaining verbatim messages after context compaction. The returned tailStart is a message offset; all earlier messages must remain represented by the summary. Both estimated-token and serialized-character budgets are hard limits, regardless of how few text messages remain. Assistant tool calls and their results form indivisible spans, including parallel results. If the newest span alone exceeds a limit, return an empty tail rather than overflowing or dropping part of an exchange. This function never edits the transcript.
  * @param opts.messages Canonical ordered transcript whose newest complete exchanges should be retained.
  * @param opts.maxTokens Maximum estimated tokens in the retained suffix; zero permits only an empty tail. @default 30000 @minimum 0
+ * @param opts.model Provider-qualified model route whose tokenizer counts the tail; omitted keeps the chars/4 heuristic.
  * @param opts.maxChars Maximum serialized content and tool-call characters, including encoded payloads, retained verbatim. @default 120000 @minimum 0
  */
 export default async function (
@@ -16,6 +17,8 @@ export default async function (
         maxTokens?: number;
         /** Maximum serialized content and tool-call characters, including encoded payloads, retained verbatim. @default 120000 @minimum 0 */
         maxChars?: number;
+        /** Provider-qualified model route whose tokenizer counts the tail; omitted keeps the chars/4 heuristic. */
+        model?: string;
     },
 ): Promise<{ tailStart: number; tokens: number; chars: number }> {
     const maxTokens = opts.maxTokens ?? 30000, maxChars = opts.maxChars ?? 120000;
@@ -49,7 +52,7 @@ export default async function (
         const start = boundaries[i]!, group = messages.slice(start, tailStart);
         const groupChars = group.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length) + JSON.stringify(m.tool_calls ?? []).length, 0);
         if (chars + groupChars > maxChars) break;
-        const groupTokens = await ctx.fns.compaction.estimateTokens({ messages: group });
+        const groupTokens = await ctx.fns.compaction.estimateTokens({ messages: group, model: opts.model });
         if (tokens + groupTokens > maxTokens) break;
         tailStart = start; chars += groupChars; tokens += groupTokens;
     }

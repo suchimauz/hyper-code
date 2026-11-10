@@ -35,7 +35,7 @@ export default async function (
     const effective = projection.messages;
     // One shared measurement: the latest provider-reported prompt plus an
     // estimate of only the messages persisted after that request.
-    const measured = await ctx.fns.agent.contextTokens({ agentId: agent.id, model: agent.model, fallbackTokens: await ctx.fns.compaction.estimateTokens({ messages: effective }) });
+    const measured = await ctx.fns.agent.contextTokens({ agentId: agent.id, model: agent.model, fallbackTokens: await ctx.fns.compaction.estimateTokens({ messages: effective, model: agent.model }) });
     const estimatedTokens = measured.tokens;
     const source = measured.source;
     const configured = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactTokens", fallback: 700000 });

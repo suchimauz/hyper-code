@@ -13,7 +13,7 @@ function fixture({ reported=140000, active=false, available=true }={}) {
  const generation=active?{mode:'compact',sourceOffset:2,tailStart:2,activatedAt:1,model:agent.model,contextMessages:[{role:'assistant',content:'summary'}]}:null;
  const events:any[]=[usage(reported,0,2)];
  const ctx:any={fns:{
-  compaction:{project:(opts:any)=>project(ctx,null,opts),estimateTokens:(opts:any)=>estimateTokens(null as any,null,opts),resolve:()=>{if(!available)throw Error('unavailable');return {};},portable:({messages}:any)=>messages,contextWindow:()=>200000},
+  compaction:{tokenizer:async()=>null,calibration:async()=>({factor:1,samples:0,source:'heuristic'}),project:(opts:any)=>project(ctx,null,opts),estimateTokens:(opts:any)=>estimateTokens(ctx,null,opts),resolve:()=>{if(!available)throw Error('unavailable');return {};},portable:({messages}:any)=>messages,contextWindow:()=>200000},
   procs:{db:{select:({sql}:any)=>{if(sql.includes('FROM agents'))return [{run_state:'running',run_token:'owner',model:agent.model,sleep_context:generation}];expect(sql).toContain("type = 'context_usage'");expect(sql).toContain('LIMIT 1');return events.filter(e=>e.type==='context_usage').slice(-1);}}},
   session:{getMessages:()=>[{role:'user',content:'task',idx:0},{role:'assistant',content:'response',idx:1}],getFullMessages:(o:any)=>ctx.fns.session.getMessages(o),appendEventWithHtml:()=>{}},
   agent:{normalizeSleepContext:({sleepContext}:any)=>sleepContext,getSleepGeneration:()=>generation,compactContext:()=>{calls++;return {status:'compacted'};},contextTokens:(o:any)=>contextTokens(ctx,null,o)},

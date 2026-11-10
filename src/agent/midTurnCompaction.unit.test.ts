@@ -25,7 +25,7 @@ function fixture() {
   }}},
   session:{deliverInbound:async()=>({drained:0}),getMessages:async({id}:any)=>structuredClone(rows[id]??[]), updateScratchpad:async()=>{},appendEventWithHtml:async()=>{},archive:async()=>{},appendMessage:async({id,message}:any)=>{(rows[id]??=[]).push(message);},syncAgentState:async()=>{agent.sleepContext=row.sleep_context;}},
   agent:{normalizeSleepContext:({sleepContext}:any)=>sleepContext,getSleepGeneration:()=>null,start:async()=>({id:'child',model:'test'}),fullSystemPrompt:async()=>'',contextTokens:async({fallbackTokens}:any)=>({tokens:fallbackTokens,source:'estimate',reportedTokens:null,deltaTokens:null,reportedAt:null})},
-  compaction:{retainGenerations:async({generations}:any)=>generations,project:(opts:any)=>project(ctx,null,opts),estimateTokens:(opts:any)=>estimateTokens(ctx,null,opts),selectTail:(opts:any)=>selectTail(ctx,null,opts),resolve:async()=>({provider:'test',compact:async(_c:any,_s:any,opts:any)=>summarize(opts)})}
+  compaction:{tokenizer:async()=>null,calibration:async()=>({factor:1,samples:0,source:'heuristic'}),retainGenerations:async({generations}:any)=>generations,project:(opts:any)=>project(ctx,null,opts),estimateTokens:(opts:any)=>estimateTokens(ctx,null,opts),selectTail:(opts:any)=>selectTail(ctx,null,opts),resolve:async()=>({provider:'test',compact:async(_c:any,_s:any,opts:any)=>summarize(opts)})}
  }};
  return {ctx,agent,root,row,ac,setSummary:(fn:any)=>{summarize=fn;},call:()=>compact(ctx,null,{agent,runToken:'owner',signal:ac.signal})};
 }

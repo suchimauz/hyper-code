@@ -37,7 +37,7 @@ export default async function (
     const fingerprintSql = "SELECT md5(COALESCE(jsonb_agg(to_jsonb(m) ORDER BY idx)::text, '[]')) AS fingerprint FROM messages m WHERE agent_id = ?";
     const fingerprint = ((await ctx.fns.procs.db.select({ sql: fingerprintSql, params: [parent.id] })) as any[])[0].fingerprint;
     // Capture must describe the messages read above, not a concurrent append/edit.
-    if (JSON.stringify(await ctx.fns.session.getMessages({ id: parent.id })) !== JSON.stringify(rootMessages)) return { status: "stale", tokensBefore: await ctx.fns.compaction.estimateTokens({ messages: rootMessages }) };
+    if (JSON.stringify(await ctx.fns.session.getMessages({ id: parent.id })) !== JSON.stringify(rootMessages)) return { status: "stale", tokensBefore: await ctx.fns.compaction.estimateTokens({ messages: rootMessages, model: parent.model }) };
     const sleep = ctx.fns.agent.normalizeSleepContext({ sleepContext: row.sleep_context });
     if (sleep?.draftRevision != null) throw new Error("compaction already running");
 
@@ -46,11 +46,11 @@ export default async function (
     const effective = projection.messages;
     // Validity compares estimate with estimate; the reported "before" uses the
     // shared provider-backed measurement when a fresh one exists.
-    const tokensBefore = await ctx.fns.compaction.estimateTokens({ messages: effective });
+    const tokensBefore = await ctx.fns.compaction.estimateTokens({ messages: effective, model: parent.model });
     const measuredBefore = await ctx.fns.agent.contextTokens({ agentId: parent.id, model: parent.model, fallbackTokens: tokensBefore });
     // Budget complete exchanges, not a minimum text-message count: one image
     // or parallel tool batch must not make the retained suffix unbounded.
-    const { tailStart } = await ctx.fns.compaction.selectTail({ messages: rootMessages });
+    const { tailStart } = await ctx.fns.compaction.selectTail({ messages: rootMessages, model: parent.model });
     if (tailStart <= Math.max(0, projection.tailStart ?? 0)) return { status: "not_needed", tokensBefore };
     const revision = Math.max(0, ...(sleep?.generations ?? []).map((g: any) => Number(g.revision ?? 0))) + 1;
     const createdAt = Date.now();
@@ -92,7 +92,7 @@ export default async function (
       });
       const summary = result.summary;
       const summaryMessage: any = result.message;
-      const tokensAfter = await ctx.fns.compaction.estimateTokens({ messages: [summaryMessage, ...rootMessages.slice(tailStart)] });
+      const tokensAfter = await ctx.fns.compaction.estimateTokens({ messages: [summaryMessage, ...rootMessages.slice(tailStart)], model: parent.model });
       generation.compactor = compactor.provider;
       if (parent.jevCompactionEnabled === true) {
         generation.preservationReview = await ctx.fns.agent.reviewCompaction({
@@ -141,7 +141,7 @@ export default async function (
         return { status: "stale", tokensBefore };
       }
       parent.sleepContext = next;
-      await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_completed", payload: { revision, tokensBefore: measuredBefore.tokens, tokensBeforeSource: measuredBefore.source, tokensAfter, tokensAfterEstimated: true, keptMessages: rootMessages.length - tailStart, summary } });
+      await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_completed", payload: { revision, tokensBefore: measuredBefore.tokens, tokensBeforeSource: measuredBefore.source, tokensAfter: Math.round(tokensAfter * (await ctx.fns.compaction.calibration({ model: parent.model })).factor), tokensAfterEstimated: true, keptMessages: rootMessages.length - tailStart, summary } });
       // The draft child has done its only job. Archive it here and in the catch
       // below: otherwise every compaction — successful or failed — leaves a hidden
       // agent row behind that later looks like unfinished delegated work.

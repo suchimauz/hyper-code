@@ -400,7 +400,7 @@ export default async function (
         const onRunAbort = () => sampling.abort(ac.signal.reason ?? "run_aborted");
         ac.signal.addEventListener("abort", onRunAbort, { once: true });
         let streamed: any;
-        let requestCoverage: { model: string; coveredIdx: number } | undefined;
+        let requestCoverage: { model: string; coveredIdx: number; estimatedPromptTokens?: number; estimateSource?: 'tokenizer' | 'heuristic' } | undefined;
         const goalRequestId = crypto.randomUUID();
         let goalProvider = 'unsupported';
         const goalFormat = 'common-stream' as const;
@@ -451,7 +451,23 @@ export default async function (
             // Messages persisted after this point are not measured by this request's usage.
             const coveredRows = await ctx.fns.procs.db.select({ sql: 'SELECT MAX(idx) AS idx FROM messages WHERE agent_id = ?', params: [agent.id] }) as Array<{ idx: number | string | null }>;
             requestCoverage = { model: agent.model, coveredIdx: coveredRows[0]?.idx == null ? -1 : Number(coveredRows[0].idx) };
+            // Local estimate of the same request for provider calibration; runs beside the
+            // stream and never fails the run.
+            const coverage = requestCoverage;
+            const estimating = (async () => {
+                const source = await ctx.fns.compaction.tokenizer({ model: agent.model }) ? 'tokenizer' as const : 'heuristic' as const;
+                const request = await ctx.fns.agent.buildLlmRequest({ agent, preview: true });
+                const endpoint = await ctx.fns.llm.resolveEndpoint({ model: agent.model });
+                const tools = ctx.fns.agent.wireTools({ agent, api: endpoint.api });
+                coverage.estimatedPromptTokens = await ctx.fns.compaction.estimateTokens({ model: agent.model, messages: [
+                    ...request.messages,
+                    ...(request.system ? [{ role: 'system', content: request.system }] : []),
+                    ...(tools.length ? [{ role: 'system', content: JSON.stringify(tools) }] : []),
+                ] });
+                coverage.estimateSource = source;
+            })().catch(() => { /* calibration sample is optional */ });
             streamed = await ctx.fns.llm.stream({ agent, signal: sampling.signal, onEvent });
+            await estimating;
             await ctx.fns.procs.db.run({ sql: 'UPDATE agents SET llm_retry_attempt = 0, llm_retry_pending = NULL WHERE id = ? AND stopped_at IS NULL AND (?::text IS NULL OR run_token = ?)', params: [agent.id, runToken ?? null, runToken ?? null] });
             if (goalRun) goalResult = await ctx.fns.goal.runUsageRecord({ state: goalRun, provider: goalProvider, requestId: goalRequestId, format: goalFormat, usage: streamed.usage });
         } catch (error: any) {

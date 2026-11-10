@@ -6,6 +6,8 @@
  * @param opts.usage Provider-reported request and completion token counts, or absent usage.
  * @param opts.model Provider-qualified model route that served the request; lets readers discard usage from another model.
  * @param opts.coveredIdx Highest own transcript message idx persisted before the request was sent; later messages are the unmeasured delta. @minimum -1
+ * @param opts.estimatedPromptTokens Local uncalibrated estimate of the same request, stored so compaction.calibration can relate it to prompt_tokens. @minimum 0
+ * @param opts.estimateSource Whether estimatedPromptTokens came from the model tokenizer or the chars/4 heuristic; calibration compares like with like.
  */
 export default async function (
     ctx: Context,
@@ -21,6 +23,10 @@ export default async function (
         model?: string;
         /** Highest own transcript message idx persisted before the request was sent; -1 for an empty transcript. @minimum -1 */
         coveredIdx?: number;
+        /** Local uncalibrated estimate of the same request, stored so compaction.calibration can relate it to prompt_tokens. @minimum 0 */
+        estimatedPromptTokens?: number;
+        /** Whether estimatedPromptTokens came from the model tokenizer or the chars/4 heuristic; calibration compares like with like. */
+        estimateSource?: 'tokenizer' | 'heuristic';
     },
 ): Promise<{ idx: number }> {
     const usage = opts.usage;
@@ -29,5 +35,5 @@ export default async function (
     const valid = typeof prompt === 'number' && Number.isFinite(prompt) && prompt >= 0 && typeof completion === 'number' && Number.isFinite(completion) && completion >= 0;
     const finite = (n: number | null | undefined) => typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null;
     const cached = finite(usage?.cache_read_tokens ?? usage?.prompt_tokens_details?.cached_tokens);
-    return ctx.fns.session.appendEvent({ id: opts.id, event: { type: 'context_usage', usage: valid ? { prompt_tokens: prompt, completion_tokens: completion, cache_read_tokens: cached !== null && cached <= prompt ? cached : null, cache_write_tokens: finite(usage?.cache_write_tokens) } : null, metrics: opts.metrics ? { llmTimeMs: finite(opts.metrics.llmTimeMs), ttftMs: finite(opts.metrics.ttftMs) } : null, ...(typeof opts.model === 'string' && opts.model ? { model: opts.model } : {}), ...(Number.isSafeInteger(opts.coveredIdx) && Number(opts.coveredIdx) >= -1 ? { coveredIdx: opts.coveredIdx } : {}) } });
+    return ctx.fns.session.appendEvent({ id: opts.id, event: { type: 'context_usage', usage: valid ? { prompt_tokens: prompt, completion_tokens: completion, cache_read_tokens: cached !== null && cached <= prompt ? cached : null, cache_write_tokens: finite(usage?.cache_write_tokens) } : null, metrics: opts.metrics ? { llmTimeMs: finite(opts.metrics.llmTimeMs), ttftMs: finite(opts.metrics.ttftMs) } : null, ...(typeof opts.model === 'string' && opts.model ? { model: opts.model } : {}), ...(Number.isSafeInteger(opts.coveredIdx) && Number(opts.coveredIdx) >= -1 ? { coveredIdx: opts.coveredIdx } : {}), ...(typeof opts.estimatedPromptTokens === 'number' && Number.isFinite(opts.estimatedPromptTokens) && opts.estimatedPromptTokens > 0 ? { estimatedPromptTokens: Math.round(opts.estimatedPromptTokens), estimateSource: opts.estimateSource === 'tokenizer' ? 'tokenizer' : 'heuristic' } : {}) } });
 }

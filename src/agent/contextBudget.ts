@@ -3,7 +3,7 @@
  *
  * Use for the context meter. Reads durable model, compact metadata and history, then assembles the same request as inference in preview mode, including bootstrap, repaired tool pairs, attachment contents and cached relevance choices. Estimates message, system and tool-schema tokens without an LLM or relevance-network call. Estimates are not provider tokenization: last successful provider usage is returned separately, never substituted for the current payload. usedTokens is the shared measurement (agent.contextTokens) used for compaction thresholds and the meter. Returns why a compact checkpoint cannot be used.
  * @param opts.agentId Existing agent whose next outgoing context should be measured without changing its transcript.
- * @param opts.breakdown Include separately rounded component estimates from the same request preview. @default false
+ * @param opts.breakdown Include component estimates from the same request preview; when usedSource is provider they are scaled proportionally so they sum to usedTokens. @default false
  */
 export default async function (
     ctx: Context,
@@ -11,7 +11,7 @@ export default async function (
     opts: {
         /** Existing agent whose next outgoing context should be measured without changing its transcript. */
         agentId: string;
-        /** Include aggregate component estimates without building another preview. @default false */
+        /** Include component estimates without building another preview; scaled to usedTokens when usedSource is provider. @default false */
         breakdown?: boolean;
     },
 ): Promise<{ estimatedTokens: number; /** Shared context measurement: latest provider prompt plus estimated newer messages, or a full estimate when no fresh usage exists. */ usedTokens: number; usedSource: "provider" | "estimate"; contextWindow: number | null; mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null; messageCount: number; lastReportedTokens: number | null; lastReportedAt: number | null; breakdown?: NonNullable<types.agent.ContextUsageDetails['breakdown']> }> {
@@ -28,16 +28,18 @@ export default async function (
         ...request.messages,
         ...(request.system ? [{ role: "system", content: request.system }] : []),
         ...(tools.length ? [{ role: "system", content: JSON.stringify(tools) }] : []),
-    ] });
+    ], model: snapshot.model });
     let breakdown: NonNullable<types.agent.ContextUsageDetails['breakdown']> | undefined;
     if (opts.breakdown) {
         // Partition system-role messages too: providers may inline the system prompt.
         const [systemPrompt, toolDefinitions, messages] = await Promise.all([
-            ctx.fns.compaction.estimateTokens({ messages: [...request.messages.filter((m, index) => index < (request.bootstrapMessageCount ?? 0) || m.role === 'system'), ...(request.system ? [{ role: 'system', content: request.system }] : [])] }),
-            ctx.fns.compaction.estimateTokens({ messages: tools.length ? [{ role: 'system', content: JSON.stringify(tools) }] : [] }),
-            ctx.fns.compaction.estimateTokens({ messages: request.messages.filter((m, index) => index >= (request.bootstrapMessageCount ?? 0) && m.role !== 'system') }),
+            ctx.fns.compaction.estimateTokens({ model: snapshot.model, messages: [...request.messages.filter((m, index) => index < (request.bootstrapMessageCount ?? 0) || m.role === 'system'), ...(request.system ? [{ role: 'system', content: request.system }] : [])] }),
+            ctx.fns.compaction.estimateTokens({ model: snapshot.model, messages: tools.length ? [{ role: 'system', content: JSON.stringify(tools) }] : [] }),
+            ctx.fns.compaction.estimateTokens({ model: snapshot.model, messages: request.messages.filter((m, index) => index >= (request.bootstrapMessageCount ?? 0) && m.role !== 'system') }),
         ]);
-        breakdown = { systemPrompt, toolDefinitions, messages };
+        // Calibrate the local split per model; with provider usage it is then fitted to the exact total below.
+        const { factor } = await ctx.fns.compaction.calibration({ model: snapshot.model });
+        breakdown = { systemPrompt: Math.round(systemPrompt * factor), toolDefinitions: Math.round(toolDefinitions * factor), messages: Math.round(messages * factor) };
     }
     const usageRows = await ctx.fns.procs.db.select({ sql: "SELECT payload, ts FROM events WHERE agent_id = ? AND type = 'context_usage' ORDER BY idx DESC LIMIT 1", params: [opts.agentId] }) as Array<{ payload: string; ts: number }>;
     let lastReportedTokens: number | null = null, lastReportedAt: number | null = null;
@@ -49,5 +51,14 @@ export default async function (
         }
     } catch { /* Missing or malformed prior usage is not a current budget. */ }
     const used = await ctx.fns.agent.contextTokens({ agentId: opts.agentId, model: snapshot.model, fallbackTokens: estimatedTokens });
+    // Providers report only a total; scale the local split so its parts add up to it.
+    if (breakdown && used.source === 'provider') {
+        const sum = breakdown.systemPrompt + breakdown.toolDefinitions + breakdown.messages;
+        if (sum > 0) {
+            const factor = used.tokens / sum;
+            const systemPrompt = Math.round(breakdown.systemPrompt * factor), toolDefinitions = Math.round(breakdown.toolDefinitions * factor);
+            breakdown = { systemPrompt, toolDefinitions, messages: Math.max(0, used.tokens - systemPrompt - toolDefinitions) };
+        }
+    }
     return { estimatedTokens, usedTokens: used.tokens, usedSource: used.source, contextWindow: await ctx.fns.compaction.contextWindow({ model: snapshot.model }), ...request.context, messageCount: request.messages.length, lastReportedTokens, lastReportedAt, ...(breakdown ? { breakdown } : {}) };
 }
