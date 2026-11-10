@@ -27,8 +27,7 @@ export default async function (
     const value = String(opts.value ?? "");
     if (!value) throw new Error("secret value is required");
     const result = await ctx.fns.secrets.putLocal({ namespace, name, value, source: String(opts.source ?? "agent") });
-    const root = ((ctx.state as any).secrets ??= {});
-    const cache: Map<string, string> = (root.values ??= new Map());
-    cache.set(`${namespace}/${name}`, value);
+    // Do not cache plaintext: putLocal may be part of an uncommitted transaction.
+    // secret:// readers resolve the database snapshot on every call.
     return { ref: `secret://${namespace}/${name}`, version: result.version };
 }

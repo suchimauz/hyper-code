@@ -8,8 +8,8 @@
 import { SQL } from "bun";
 
 /**
- * Get this context's Postgres pool or the connection bound by db.transaction.
- * Closed transaction scopes throw instead of silently writing outside the transaction.
+ * Get the transaction connection, pinned session connection, or this context's Postgres pool, in that order.
+ * Closed transaction and session scopes throw instead of silently using a released connection.
  */
 export default async function (ctx: Context, _session: Session | null, _opts?: {}): Promise<SQL> {
     const st = ((ctx.state.procs ??= {} as any).db ??= {});
@@ -17,6 +17,12 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
     if (scope) {
         if (!scope.active) throw new Error("Database transaction scope is closed");
         return scope.connection;
+    }
+    // mauzcode: session locks span sequential transactions on ONE reserved connection.
+    const pinned = st.connectionStorage?.getStore();
+    if (pinned) {
+        if (!pinned.active) throw new Error("Database session connection scope is closed");
+        return pinned.connection;
     }
     if (st.sql) return st.sql;
     const url = ctx.fns.procs.db.url();

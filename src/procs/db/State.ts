@@ -7,4 +7,6 @@ export type State = {
     url?: string;
     /** Per-context async binding; never replace the shared pool with a transaction. */
     transactionStorage?: AsyncLocalStorage<{ connection: SQL; active: boolean }>;
+    /** mauzcode: reserved session connection across sequential transactions; closed async scopes must not reuse it. */
+    connectionStorage?: AsyncLocalStorage<{ connection: SQL; active: boolean }>;
 };

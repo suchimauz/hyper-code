@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { useNavigation } from '../hooks/useNavigation';
 import { getNavigation, getProfile } from '../lib/navigation';
 vi.mock('../lib/navigation', async original => ({ ...await original<typeof import('../lib/navigation')>(), getNavigation: vi.fn(), getProfile: vi.fn() }));
-let subscriptions: Array<Parameters<NonNullable<Window['mauzCodeLive']>['subscribe']>[0]>;
+let subscriptions: Array<Parameters<NonNullable<Window['mauzcodeLive']>['subscribe']>[0]>;
 const data = (running = false, unread = true) => ({ projects: [{ id: 'p', title: 'P', dir: '/p', host: null, unreadCount: Number(unread), chats: [{ id: 'a', title: 'A', model: '', runState: running ? 'running' : 'idle', hasUnread: unread, lastReplyAt: 100 }] }] });
 beforeEach(() => {
   vi.useFakeTimers(); subscriptions = []; vi.mocked(getNavigation).mockResolvedValue(data()); vi.mocked(getProfile).mockResolvedValue({ authenticated: true, canManage: false, user: null });

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { liveRefresh } from '../lib/liveRefresh';
 import type { LiveEvent, LiveStatus } from '../lib/live';
-let subscriptions: Array<Parameters<NonNullable<Window['mauzCodeLive']>['subscribe']>[0]>;
+let subscriptions: Array<Parameters<NonNullable<Window['mauzcodeLive']>['subscribe']>[0]>;
 let statuses: Array<(status: LiveStatus) => void>;
 let status: LiveStatus;
 let hidden = false;

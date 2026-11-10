@@ -2,7 +2,7 @@ export type LiveStatus = 'connecting' | 'connected' | 'disconnected';
 export type LiveEvent = { type?: string; topic?: string; agentId?: string };
 declare global {
   interface Window {
-    mauzCodeLive?: {
+    mauzcodeLive?: {
       subscribe: (options: { name: string; types?: string[]; onEvent: (event: LiveEvent) => void; resync: (reason: string) => void }) => () => void;
       refreshTopics?: () => void;
       getStatus?: () => LiveStatus;
