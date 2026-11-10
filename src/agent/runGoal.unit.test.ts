@@ -1,5 +1,6 @@
 import {expect,test} from 'bun:test';
 import run from './run';
+import classifyError from '../llm/classifyError';
 import barrier from '../goal/ownerBarrier';
 function harness(turns:any[],status='active'){
  const messages:any[]=[],calls:any[]=[];
@@ -11,14 +12,14 @@ function harness(turns:any[],status='active'){
  input:{isWaiting:async()=>false},
  planning:{read:async({agentId}:any)=>({version:1,agentId,mode:'execute',revision:0,scope:'session',advisory:true,runningPolicy:'reject',pending:null,proposal:null})},
  session:{forAgent:()=>({}),appendUserMessage:noop,appendMessage:async({message}:any)=>{messages.push(message);return {idx:idx++}},syncAgentState:noop,updateMessageContent:noop,appendAssistantEvent:async()=>({idx:idx++}),appendToolCallEvent:noop,recordContextUsage:noop,appendErrorEvent:noop},
- agent:{recordRunLifecycle:noop,statusLineForTurn:async()=>'',autoCompactIfNeeded:async()=>({status:'not_needed'}),stashResult:async({output}:any)=>({content:output}),sanitizeHtmlBody:({html}:any)=>html},
- procs:{db:{select:async()=>[{i:0,stopped_at:null,run_state:'running',run_token:'token'}]},events:{emit:noop},log:{warn:noop}},
+ agent:{retrySchedule:async()=>false,retryWait:async()=>{},recordRunLifecycle:noop,statusLineForTurn:async()=>'',autoCompactIfNeeded:async()=>({status:'not_needed'}),stashResult:async({output}:any)=>({content:output}),sanitizeHtmlBody:({html}:any)=>html},
+ procs:{db:{run:async()=>({changes:0}),select:async()=>[{i:0,stopped_at:null,run_state:'running',run_token:'token'}]},events:{emit:noop},log:{warn:noop}},
  goal:{ownerBarrier:(o:any)=>barrier(ctx,null,o),delegationScope:async({fn}:any)=>fn(),forkRelease:async(o:any)=>{expect(calls[0][0]).toBe('capture');expect(o.baselineAvailable).toBe(true);expect(o.goalId).toBe(state.binding.goalId);return false;},runBindingCapture:async(o:any)=>{calls.push(['capture',o]);return {kind:'bound',state}},runStopRegistry:noop,runUsageRecord:async(o:any)=>{calls.push(['usage',o]);state.pendingRequests.delete(o.requestId);if(o.format==='unsupported')state.blocked=true;return {kind:'recorded'}},runCheckpointFlush:async()=>{calls.push(['flush']);return state.blocked?{kind:'blocked',allowContinuation:false}:{kind:'committed',checkpointId:'receipt-'+calls.filter(c=>c[0]==='flush').length,sequence:calls.filter(c=>c[0]==='flush').length,revision:7,budgetTransition:status==='budget_limited',status,allowContinuation:status==='active'}},budgetSteer:async()=>{calls.push(['steer'])}},
- llm:{resolveEndpoint:async()=>({provider:'openai',api:'openai'}),stream:async()=>{expect(state.pendingRequests.size).toBe(1);const t=turns.shift();if(t instanceof Error)throw t;return t}},markdown:{render:async({source}:any)=>source},tools:{call:async({name}:any)=>({handlerExecuted:true,output:'ok',...(name==='respondHtml'?{terminal:{type:'html',text:'final',html:'<p>final</p>'}}:{})})
+ llm:{resolveEndpoint:async()=>({provider:'openai',api:'openai'}),classifyError:(opts:any)=>classifyError(ctx,null,opts),stream:async()=>{expect(state.pendingRequests.size).toBe(1);const t=turns.shift();if(t instanceof Error)throw t;return t}},markdown:{render:async({source}:any)=>source},tools:{call:async({name}:any)=>({handlerExecuted:true,output:'ok',...(name==='respondHtml'?{terminal:{type:'html',text:'final',html:'<p>final</p>'}}:{})})
  }}};
  return {calls,messages,agent,state,ctx,execute:(extra:any={})=>run(ctx,null,{agent,userText:'question',...extra})};
 }
-test('ordinary final checkpoints but cannot continue without native goal tool',async()=>{const h=harness([{text:'answer',usage:{prompt_tokens:4}}]);const result=await h.execute();expect(result.goalContinuation).toBeUndefined();expect(h.calls.map(c=>c[0])).toEqual(['capture','usage','flush','flush']);expect(h.calls[1][1].format).toBe('openai-chat');});
+test('ordinary final checkpoints but cannot continue without native goal tool',async()=>{const h=harness([{text:'answer',usage:{prompt_tokens:4}}]);const result=await h.execute();expect(result.goalContinuation).toBeUndefined();expect(h.calls.map(c=>c[0])).toEqual(['capture','usage','flush','flush']);expect(h.calls[1][1].format).toBe('common-stream');});
 test('terminal HTML includes pre-tool and final checkpoints without budget steering',async()=>{const h=harness([{toolCalls:[{id:'t',name:'respondHtml',args:{}}],usage:{}}]);const result=await h.execute();expect(result.terminal).toBe(true);expect(result.goalContinuation).toBeUndefined();expect(h.calls.filter(c=>c[0]==='flush').length).toBe(3);expect(h.calls.some(c=>c[0]==='steer')).toBe(false);});
 test('failed request records unsupported before finally and preserves original failure',async()=>{const h=harness([new Error('provider exploded')]);await expect(h.execute()).rejects.toThrow('provider exploded');expect(h.calls.map(c=>c[0])).toEqual(['capture','usage','flush']);expect(h.calls[1][1].format).toBe('unsupported');expect(h.state.pendingRequests.size).toBe(0);expect(h.agent.abortController).toBeNull();});
 test('disabled feature leaves ordinary return and provider path unchanged',async()=>{const h=harness([{text:'answer'}]);h.ctx.fns.goal.runBindingCapture=async()=>({kind:'disabled',allowContinuation:false});h.ctx.fns.llm.stream=async()=>({text:'answer'});const result=await h.execute();expect(result.goalContinuation).toBeUndefined();expect(h.calls).toEqual([]);});
@@ -57,14 +58,16 @@ for(const status of ['active','budget_limited'])test(`descendant ${status} contr
 test('trusted callback exposes only final drained immutable receipt',async()=>{const h=harness([{text:'answer',usage:{prompt_tokens:4}}]);const proofs:any[]=[];await h.execute({onGoalFinalCheckpoint:(p:any)=>proofs.push(p)});expect(proofs).toHaveLength(1);expect(Object.isFrozen(proofs[0])).toBe(true);expect(proofs[0].sourceRunToken).toBe('token');expect(proofs[0].checkpointId).toBe('receipt-'+h.calls.filter(c=>c[0]==='flush').length);expect(proofs[0].drained).toBe(true);});
 test('failed turn with unknown usage never supplies final receipt',async()=>{const h=harness([new Error('provider failed')]);const proofs:any[]=[];await expect(h.execute({onGoalFinalCheckpoint:(p:any)=>proofs.push(p)})).rejects.toThrow();expect(proofs).toEqual([]);});
 
-test('cycle reserves through tool handler and final flush then releases on terminal response',async()=>{
+// Codex goal_state_permit: the owner boundary is held around each accounting flush only,
+// not across tool handlers, and is free again after the terminal response.
+test('checkpoint flushes hold the owner boundary, tools do not, and it is released on terminal response',async()=>{
  const h=harness([{text:'',toolCalls:[{id:'c',name:'respondHtml',args:{}}],usage:{prompt_tokens:4}}]);
- const busy=()=>h.ctx.fns.goal.ownerBarrier({agentId:'a',runToken:'token',action:'acquire'});
+ const peek=async()=>{const lease=await h.ctx.fns.goal.ownerBarrier({agentId:'a',runToken:'token',action:'acquire'});if(lease)await h.ctx.fns.goal.ownerBarrier({agentId:'a',runToken:'token',action:'release',lease});return lease!==null;};
  const tool=h.ctx.fns.tools.call;
- h.ctx.fns.tools.call=async(o:any)=>{expect(await busy()).toBeNull();return tool(o);};
- const flush=h.ctx.fns.goal.runCheckpointFlush;
- h.ctx.fns.goal.runCheckpointFlush=async()=>{await Promise.resolve();expect(await busy()).toBeNull();return flush();};
- await h.execute();expect(await busy()).not.toBeNull();
+ h.ctx.fns.tools.call=async(o:any)=>{expect(await peek()).toBe(true);return tool(o);};
+ const flush=h.ctx.fns.goal.runCheckpointFlush;let flushes=0;
+ h.ctx.fns.goal.runCheckpointFlush=async()=>{flushes++;await Promise.resolve();expect(await peek()).toBe(false);return flush();};
+ await h.execute();expect(flushes).toBeGreaterThan(0);expect(await peek()).toBe(true);
 });
 test('provider error keeps reservation through final flush and releases afterward',async()=>{
  const h=harness([new Error('provider failed')]);
@@ -109,10 +112,12 @@ test('initial identity drift rejects before provider work',async()=>{
  h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'bad'}};
  await expect(h.execute()).rejects.toThrow('handoff failed');expect(dispatches).toBe(0);
 });
-for(const api of ['anthropic','responses','gemini','mock','unknown'])test(`bound ${api} fails before network`,async()=>{
+// Every transport reports usage through the common stream shape, so a bound Goal run
+// dispatches on any api and records that request in the common-stream format.
+for(const api of ['anthropic','responses','gemini','mock','unknown'])test(`bound ${api} dispatches and records common-stream usage`,async()=>{
  const h=harness([]);let dispatches=0;h.ctx.fns.llm.resolveEndpoint=async()=>({provider:'openai',api});
- h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'bad'}};
- await expect(h.execute()).rejects.toThrow('exact supported transport');expect(dispatches).toBe(0);
+ h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'ok',usage:{prompt_tokens:1}}};
+ await h.execute();expect(dispatches).toBe(1);expect(h.calls.find((c:any)=>c[0]==='usage')?.[1].format).toBe('common-stream');
 });
 
 test('inactive capture cannot race into an unaccounted active goal',async()=>{
@@ -122,10 +127,10 @@ test('inactive capture cannot race into an unaccounted active goal',async()=>{
  h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'bad'}};
  await expect(h.execute()).rejects.toThrow('handoff failed');expect(dispatches).toBe(0);
 });
-for(const provider of ['xai','mauzcode'])test(`bound ${provider} xai adapter fails before network`,async()=>{
+for(const provider of ['xai','mauzcode'])test(`bound ${provider} xai adapter dispatches and records common-stream usage`,async()=>{
  const h=harness([]);let dispatches=0;h.ctx.fns.llm.resolveEndpoint=async()=>({provider,upstream:'xai',api:'openai'});
- h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'bad'}};
- await expect(h.execute()).rejects.toThrow('exact supported transport');expect(dispatches).toBe(0);
+ h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'ok',usage:{prompt_tokens:1}}};
+ await h.execute();expect(dispatches).toBe(1);expect(h.calls.find((c:any)=>c[0]==='usage')?.[1].format).toBe('common-stream');
 });
 
 for (const rogueTools of [false,true]) test(`successful native completion permits one report only (rogue tools=${rogueTools})`,async()=>{

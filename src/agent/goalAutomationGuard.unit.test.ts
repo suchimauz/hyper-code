@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import run from './run';
 import barrier from '../goal/ownerBarrier';
+import classifyError from '../llm/classifyError';
 
 // Entirely mocked run boundary: no live database, providers, tools or migrations.
 function fixture(kind = 'bound', checkpoint = 'active', pending: boolean | 'unknown' = false) {
@@ -10,12 +11,13 @@ function fixture(kind = 'bound', checkpoint = 'active', pending: boolean | 'unkn
  const agent: any = {id:'a',scratchpad:{plan:{tasks:[{id:'work',status:'active',title:'Work'}]}},messages:[],events:[],model:'openai:test',goal:{enabled:true,statement:'legacy'}};
  const noop = async()=>{};
  const ctx: any = {state:{},fns:{
+ input:{isWaiting:async()=>false},
  planning:{read:async({agentId}:any)=>({version:1,agentId,mode:'execute',revision:0,scope:'session',advisory:true,runningPolicy:'reject',pending:null,proposal:null})},
   session:{forAgent:()=>({}),appendUserMessage:noop,appendMessage:async({message}:any)=>{messages.push(message);return {idx:idx++}},syncAgentState:noop,updateMessageContent:noop,appendAssistantEvent:async()=>({idx:idx++}),appendToolCallEvent:noop,recordContextUsage:noop,appendErrorEvent:noop,appendEvent:noop},
-  agent:{recordRunLifecycle:noop,statusLineForTurn:async()=>'',autoCompactIfNeeded:async()=>({status:'not_needed'}),stashResult:async({output}:any)=>({content:output}),sanitizeHtmlBody:({html}:any)=>html,checkGoal:async()=>{checks++;return {status:'achieved',reason:'done'}},recordGoalCheck:noop},
-  procs:{db:{select:async({sql}:any)=>{if(sql.includes('FROM inputs')){inputReads++;if(pending==='unknown')throw Error('unknown input');return [{pending_input:pending}]}return [{i:0,stopped_at:null,run_state:'running'}]}},events:{emit:noop},log:{warn:noop}},
+  agent:{retrySchedule:async()=>false,retryWait:noop,recordRunLifecycle:noop,statusLineForTurn:async()=>'',autoCompactIfNeeded:async()=>({status:'not_needed'}),stashResult:async({output}:any)=>({content:output}),sanitizeHtmlBody:({html}:any)=>html,checkGoal:async()=>{checks++;return {status:'achieved',reason:'done'}},recordGoalCheck:noop},
+  procs:{db:{run:async()=>({changes:0}),select:async({sql}:any)=>{if(sql.includes('FROM inputs')){inputReads++;if(pending==='unknown')throw Error('unknown input');return [{pending_input:pending}]}return [{i:0,stopped_at:null,run_state:'running'}]}},events:{emit:noop},log:{warn:noop}},
   goal:{ownerBarrier:(o:any)=>barrier(ctx,null,o),delegationScope:async({fn}:any)=>fn(),runBindingCapture:async()=>kind==='bound'?{kind,state}:{kind,allowContinuation:false},forkRelease:noop,runStopRegistry:noop,runUsageRecord:async({requestId}:any)=>{state.pendingRequests.delete(requestId);return {kind:'recorded'}},runCheckpointFlush:async()=>{flushes++;return checkpoint==='unknown'?{kind:'blocked',allowContinuation:false}:{kind:'committed',status:checkpoint,allowContinuation:checkpoint==='active'}},budgetSteer:noop},
-  llm:{resolveEndpoint:async()=>({provider:'openai',api:'openai'}),stream:async()=>{streams++;if(streams>4)throw Error('unbounded loop');return {text:'human answer',usage:{}}}},
+  llm:{resolveEndpoint:async()=>({provider:'openai',api:'openai'}),classifyError:(opts:any)=>classifyError(ctx,null,opts),stream:async()=>{streams++;if(streams>4)throw Error('unbounded loop');return {text:'human answer',usage:{}}}},
   markdown:{render:async({source}:any)=>source},tools:{call:async({name}:any)=>{executed.push(name);return {handlerExecuted:true,output:'ok'}}}
  }};
  if(kind==='inactive'){
@@ -35,26 +37,30 @@ for(const pending of [true,'unknown'] as const) test(`absent Goal plan/legacy st
 for(const kind of ['disabled','absent']) test(`${kind} retains ordinary bounded plan and legacy`,async()=>{
  const h=fixture(kind);await h.execute();expect(h.counts().streams).toBe(3);expect(h.counts().checks).toBe(3);expect(h.messages.filter(m=>m.message_type==='plan_feedback')).toHaveLength(2);if(kind==='disabled')expect(h.counts().inputReads).toBe(0);
 });
-for(const boundary of ['unknown','budget_limited','paused']) test(`${boundary} usage/checkpoint allows bounded summary, no tool or extra inference`,async()=>{
+// Unknown accounting answers with a bounded summary; a committed non-active status stops
+// silently because the durable Goal status already explains the stop.
+for(const boundary of ['unknown','budget_limited','paused']) test(`${boundary} usage/checkpoint stops without tool or extra inference`,async()=>{
  const h=fixture('bound',boundary);let calls=0;h.ctx.fns.llm.stream=async()=>{calls++;return {toolCalls:[{id:'t',name:'danger',args:{}}],usage:{}}};
- const result=await h.execute();expect(result.text).toContain('Further automatic work stopped');expect(calls).toBe(1);expect(h.executed).toEqual([]);expect(h.counts().checks).toBe(0);
+ const result=await h.execute();if(boundary==='unknown')expect(result.text).toContain('Further automatic work stopped');else expect(result.text).toBe('');expect(calls).toBe(1);expect(h.executed).toEqual([]);expect(h.counts().checks).toBe(0);
 });
 test('checkpoint budget transition within batch skips remaining tools and inference',async()=>{
  const h=fixture();let flushes=0,calls=0;h.ctx.fns.goal.runCheckpointFlush=async()=>({kind:'committed',allowContinuation:++flushes===1,status:flushes===1?'active':'budget_limited'});
  h.ctx.fns.llm.stream=async()=>{calls++;return {toolCalls:[{id:'t1',name:'first',args:{}},{id:'t2',name:'second',args:{}}],usage:{}}};
- const result=await h.execute();expect(h.executed).toEqual(['first']);expect(calls).toBe(1);expect(result.text).toContain('Further automatic work stopped');
+ const result=await h.execute();expect(h.executed).toEqual(['first']);expect(calls).toBe(1);expect(result.text).toBe('');
 });
 test('confirmed inactive capture permits explicit human tool work, but no synthetic continuation',async()=>{
  const h=fixture('inactive');let calls=0;h.ctx.fns.llm.stream=async()=>++calls===1?{toolCalls:[{id:'t',name:'humanTool',args:{}}]}:{text:'answer'};
  await h.execute();expect(h.executed).toEqual(['humanTool']);expect(calls).toBe(2);expect(h.counts().checks).toBe(0);
 });
-test('unsupported provider usage refuses proposed tools before any substantive work',async()=>{
- const h=fixture();let calls=0;
+// Every provider reports usage through the common stream shape; unusable usage
+// blocks accounting, so proposed tools are refused and only a bounded summary remains.
+test('blocked provider usage refuses proposed tools after one request',async()=>{
+ const h=fixture();let calls=0;const formats:string[]=[];
  h.ctx.fns.llm.resolveEndpoint=async()=>({provider:'anthropic',api:'anthropic'});
- h.ctx.fns.goal.runUsageRecord=async({format,requestId}:any)=>{expect(format).toBe('unsupported');h.state.pendingRequests.delete(requestId);h.state.blocked='Unknown usage';return {kind:'blocked',allowContinuation:false}};
+ h.ctx.fns.goal.runUsageRecord=async({format,requestId}:any)=>{formats.push(format);h.state.pendingRequests.delete(requestId);h.state.blocked='Unknown usage';return {kind:'blocked',allowContinuation:false}};
  h.ctx.fns.goal.runCheckpointFlush=async()=>({kind:'blocked',allowContinuation:false});
  h.ctx.fns.llm.stream=async()=>{calls++;return {toolCalls:[{id:'t',name:'work',args:{}}]}};
- await expect(h.execute()).rejects.toThrow('exact supported transport');expect(calls).toBe(0);expect(h.executed).toEqual([]);
+ const result=await h.execute();expect(formats).toEqual(['common-stream']);expect(calls).toBe(1);expect(h.executed).toEqual([]);expect(result.text).toContain('Further automatic work stopped');
 });
 test('blocked capture refuses human and automatic work before sampling',async()=>{
  const h=fixture('blocked');const result=await h.execute();expect(result.goalAdmissionBlocked).toBe(true);expect(h.counts().streams).toBe(0);expect(h.counts().checks).toBe(0);expect(h.executed).toEqual([]);expect(h.messages.some(m=>m.message_type==='plan_feedback')).toBe(false);
@@ -77,7 +83,8 @@ test('native update receives committed CAS revision and captured claim',async()=
  const h=nativeFixture();let requests=0;
  h.ctx.fns.llm.stream=async()=>++requests===1?{toolCalls:[{id:'t',name:'update_goal',args:{}}],usage:{}}:{text:'done',usage:{}};
  h.ctx.fns.tools.call=async()=>{const scope=h.invocation();expect(scope.binding.runToken).toBe('token');expect(scope.binding.expectedRevision).toBe(2);expect(scope.binding.maxTokenBudget).toBeNull();await scope.onMutation({goalId:'g',revision:3,status:'complete'});h.setSnapshot({goalId:'g',revision:3,status:'complete'});return {handlerExecuted:true,output:'complete'};};
- await h.execute();expect(requests).toBe(1);
+ // A committed completion permits exactly one final report request.
+ await h.execute();expect(requests).toBe(2);
 });
 test('native create explicitly rebinds and bills only following requests',async()=>{
  const h=nativeFixture('absent');let requests=0;const billed:string[]=[];
