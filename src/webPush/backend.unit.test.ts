@@ -14,13 +14,14 @@ test('allowlisted provider keys accepted; SSRF URLs rejected',async()=>{
 function harness(status=201){
  const sub=subscription(), keys={...wp.generateVAPIDKeys(),subject:'https://example.com'};let claimed=false;
  const run=mock(async()=>({changes:1}));const select=mock(async({sql}:any)=>{
- if(sql.startsWith('SELECT i.agent_id'))return [{agent_id:'ab',created_by:'u1'}];
+ if(sql.startsWith('SELECT i.agent_id'))return [{agent_id:'ab',created_by:'u1',created_at:1000}];
  if(sql.startsWith('SELECT created_by'))return [{created_by:'u1'}];
+ if(sql.startsWith('SELECT seen_at'))return [{seen_at:0}];
  if(sql.startsWith('SELECT id,endpoint'))return [{id:'s1',endpoint:sub.endpoint,...sub.keys}];
  if(sql.startsWith('INSERT INTO web_push_deliveries')){if(claimed)return [];claimed=true;return [{input_id:'i1'}];}return [];
  });
  const fetchMock=mock(async()=>new Response(null,{status}));globalThis.fetch=fetchMock as any;
- const ctx:any={fns:{procs:{db:{select,run}},webPush:{preferences:async()=>({eligible:true,input:true,error:true}),validateSubscription:(o:any)=>validate({} as any,null,o),vapid:async()=>keys}}};
+ const ctx:any={fns:{procs:{db:{select,run},events:{presence:()=>[]}},webPush:{preferences:async()=>({eligible:true,input:true,error:true}),validateSubscription:(o:any)=>validate({} as any,null,o),vapid:async()=>keys,shouldSkip:async()=>false}}};
  return {ctx,run,select,fetchMock};
 }
 test('background agent input sends once; no unsafe redirect or plaintext content',async()=>{
@@ -108,4 +109,45 @@ test('input disabled or ineligible main gate never claims or sends',async()=>{
  expect(h.fetchMock).not.toHaveBeenCalled();
  expect(h.select.mock.calls.some((c:any)=>c[0].sql.startsWith('INSERT'))).toBe(false);
  }
+});
+test('owner already in the chat suppresses the notification before any subscription is read',async()=>{
+ const h=harness();h.ctx.fns.webPush.shouldSkip=async()=>true;
+ await notify(h.ctx,{agentId:'ab'},{inputId:'i1'});
+ expect(h.fetchMock).not.toHaveBeenCalled();
+ expect(h.select.mock.calls.some((c:any)=>c[0].sql.startsWith('SELECT id,endpoint'))).toBe(false);
+});
+test('owner not in the chat still receives the notification',async()=>{
+ const h=harness();h.ctx.fns.webPush.shouldSkip=async()=>false;
+ await notify(h.ctx,{agentId:'ab'},{inputId:'i1'});
+ expect(h.fetchMock).toHaveBeenCalledTimes(1);
+});
+test('suppression reads presence and the durable read receipt of the owner',async()=>{
+ const shouldSkip=await import('./shouldSkip').then(m=>m.default);
+ const presence:any={fns:{procs:{db:{select:mock(async({sql,params}:any)=>sql.startsWith('SELECT seen_at')?[{seen_at:params[0]==='u1'?2000:0}]:[])},events:{presence:mock(()=>[{id:'u1',name:'you',tabs:1,agents:['ab']}])}}}};
+ expect(await shouldSkip(presence,null,{agentId:'ab',ownerId:'u1',eventAt:1000})).toBe(true);
+ expect(await shouldSkip(presence,null,{agentId:'ab',ownerId:'other',eventAt:1000})).toBe(false);
+ const durable:any={fns:{procs:{db:{select:mock(async()=>[{seen_at:1500}])},events:{presence:mock(()=>[])}}}};
+ expect(await shouldSkip(durable,null,{agentId:'ab',ownerId:'u1',eventAt:1000})).toBe(true);
+ expect(await shouldSkip(durable,null,{agentId:'ab',ownerId:'u1',eventAt:2000})).toBe(false);
+});
+test('recall withdraws the notification from the devices that received it',async()=>{
+ const keys={...wp.generateVAPIDKeys(),subject:'https://example.com'};const sub=subscription();
+ const select=mock(async({sql}:any)=>sql.startsWith('SELECT d.subscription_id')?[{subscription_id:'s1',endpoint:sub.endpoint,p256dh:sub.keys.p256dh,auth:sub.keys.auth}]:[]);
+ const fetchMock=mock(async()=>new Response(null,{status:201}));globalThis.fetch=fetchMock as any;
+ const ctx:any={fns:{procs:{db:{select,run:mock(async()=>({changes:1}))},log:{warn:mock(()=>{})}},webPush:{vapid:async()=>keys,validateSubscription:(o:any)=>validate({} as any,null,o)}}};
+ const recall=await import('./recall').then(m=>m.default);
+ await recall(ctx,null,{inputId:'i1'});
+ expect(fetchMock).toHaveBeenCalledTimes(1);
+ const call=fetchMock.mock.calls[0] as any;
+ expect(call[0]).toBe(sub.endpoint);
+ expect(call[1].redirect).toBe('error');
+ // The recall reaches the device that received the notification, and nothing else.
+ expect(select.mock.calls.some((c:any)=>c[0].sql.includes('web_push_deliveries')&&c[0].params[0]==='i1')).toBe(true);
+});
+test('recall without a delivered notification sends nothing',async()=>{
+ const fetchMock=mock(async()=>new Response(null,{status:201}));globalThis.fetch=fetchMock as any;
+ const ctx:any={fns:{procs:{db:{select:mock(async()=>[]),run:mock(async()=>({changes:1}))}},webPush:{vapid:async()=>({}),validateSubscription:async()=>({})}}};
+ const recall=await import('./recall').then(m=>m.default);
+ await recall(ctx,null,{inputId:'i1'});
+ expect(fetchMock).not.toHaveBeenCalled();
 });

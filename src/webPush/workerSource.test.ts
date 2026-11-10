@@ -4,15 +4,16 @@ import route from './$route_web-push-sw.js_GET';
 import middleware from '../$middleware';
 
 async function fixture() {
-  const handlers: Record<string, Function> = {}, shown: any[] = [], opened: string[] = [];
+  const handlers: Record<string, Function> = {}, shown: any[] = [], opened: string[] = [], closed: string[] = [];
   let focused = 0;
   const self = { location: { origin: 'https://hyper.test' }, addEventListener: (name: string, fn: Function) => handlers[name] = fn,
-    registration: { showNotification: async (...args: any[]) => { shown.push(args); } },
+    registration: { showNotification: async (...args: any[]) => { shown.push(args); },
+      getNotifications: async () => [{ tag: 'input-i1', close: async () => { closed.push('input-i1'); } }, { tag: 'error-run-1', close: async () => { closed.push('error-run-1'); } }] },
     clients: { matchAll: async () => [{ url: 'https://hyper.test/a/ab', focus: async () => { focused++; } }], openWindow: async (url: string) => { opened.push(url); } } };
   new Function('self', await workerSource({} as Context, null, {}))(self);
   async function push(data: any) { let work: any; handlers.push({ data: { json: () => data }, waitUntil: (p: any) => work = p }); await work; }
   async function click(url: string) { let work: any; handlers.notificationclick({ notification: { data: { url }, close() {} }, waitUntil: (p: any) => work = p }); await work; }
-  return { handlers, shown, opened, push, click, focused: () => focused };
+  return { handlers, shown, opened, push, click, focused: () => focused, closed };
 }
 test('worker parses, registers no fetch handler, ignores injected payload text and rejects unsafe links', async () => {
   const f = await fixture();
@@ -61,4 +62,17 @@ test('typed error has fixed safe body; unknown categories rejected and legacy in
  expect(JSON.stringify(f.shown)).not.toContain('secret');
  await f.push({type:'input',url:'/a/ab',tag:'error-123'});
  expect(f.shown[1][1].tag).toBe('hyper-input');
+});
+test('recall push closes only the notification it names and shows nothing', async () => {
+  const f = await fixture();
+  await f.push({ type: 'recall', tag: 'input-i1' });
+  expect(f.closed).toEqual(['input-i1']);
+  expect(f.shown).toHaveLength(0);
+  await f.push({ type: 'recall', tag: 'error-run-1' });
+  expect(f.closed).toEqual(['input-i1', 'error-run-1']);
+  // A malformed tag closes nothing.
+  await f.push({ type: 'recall', tag: 'not-a-valid-tag' });
+  await f.push({ type: 'recall' });
+  expect(f.closed).toEqual(['input-i1', 'error-run-1']);
+  expect(f.shown).toHaveLength(0);
 });

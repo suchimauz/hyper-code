@@ -16,6 +16,14 @@ VAPID keys are generated during authenticated HTTPS configuration, serialized wi
 
 Only Apple, FCM and Mozilla push endpoints are accepted. Sends use a five-second timeout, refuse redirects, and include no form contents. Delivery rechecks input state, owner, disabled/archived status and session validity. At most ten subscriptions per owner are supported; stale subscriptions are cleaned during registration and provider 404/410 responses remove invalid endpoints.
 
+## One notification, many devices
+
+A notification belongs to the account, but it is shown on devices, and one person reads Hyper on several of them. Two mechanisms keep that from turning into noise.
+
+**Nothing new is sent while the owner is already in the chat.** Before delivery, the server checks whether the owner has this chat open (live presence) or has already read it (the durable read receipt in `user_agent_state.seen_at`). If so, no push is sent at all. The check is account-level, not device-level: the owner has seen the request on the phone, so buzzing the laptop would only repeat it. Both signals are deliberately sticky for the lifetime of the event — an owner who opened the chat and then walked away has still seen it, and a later push for that same event would be noise.
+
+**A notification the owner has acted on is withdrawn from the other devices.** Answering a request, or the agent starting a new run after a failure, sends a `recall` push to exactly the devices that received the notification. The Service Worker closes the notification whose tag it names and nothing else; the device the answer was given on closes its own copy directly. There is no manual recall control — withdrawal follows the action. Recall is best effort and carries no payload text: a failed recall leaves a stale notification, which is harmless. It is not recorded in the delivery tables, so the at-most-once bookkeeping of ordinary pushes is untouched.
+
 This initial version makes **one attempt per input/subscription or terminal-run/subscription**, with durable deduplication receipts and no retry queue. A crash after claiming or a temporary provider failure can lose a notification. Provider acceptance does not prove device display; iOS Focus and notification settings can suppress it. Push expires after 60 seconds at the provider. Delivery failure does not prevent the input form from being created.
 
 ## Validation

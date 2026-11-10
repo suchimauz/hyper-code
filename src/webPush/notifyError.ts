@@ -17,9 +17,11 @@ export default async function (
 ): Promise<void> {
     const preferences = await ctx.fns.webPush.preferences({agentId:opts.agentId});
         if (!preferences.eligible || !preferences.error) return;
-        const rows = await ctx.fns.procs.db.select({sql:"SELECT a.id AS agent_id,a.created_by,a.title,a.workspace_dir,a.workspace_host FROM web_push_failures f JOIN agents a ON a.id=f.agent_id JOIN users u ON u.id=a.created_by WHERE f.agent_id=? AND f.run_token=? AND a.run_state='idle' AND a.run_token IS NULL AND a.next_run_at IS NULL AND a.wake_at IS NULL AND a.updated_at=f.failed_at AND a.last_error IS NOT NULL AND a.last_error NOT LIKE 'stopped by user%' AND a.parent_id IS NULL AND COALESCE(a.visibility,'nav')='nav' AND NOT EXISTS (SELECT 1 FROM web_push_preferences p WHERE p.agent_id=a.id AND p.owner_id=a.created_by AND p.error_enabled=false) AND a.archived_at IS NULL AND u.disabled_at IS NULL",params:[opts.agentId,opts.runToken]});
+        const rows = await ctx.fns.procs.db.select({sql:"SELECT a.id AS agent_id,a.created_by,a.title,a.workspace_dir,a.workspace_host,f.failed_at FROM web_push_failures f JOIN agents a ON a.id=f.agent_id JOIN users u ON u.id=a.created_by WHERE f.agent_id=? AND f.run_token=? AND a.run_state='idle' AND a.run_token IS NULL AND a.next_run_at IS NULL AND a.wake_at IS NULL AND a.updated_at=f.failed_at AND a.last_error IS NOT NULL AND a.last_error NOT LIKE 'stopped by user%' AND a.parent_id IS NULL AND COALESCE(a.visibility,'nav')='nav' AND NOT EXISTS (SELECT 1 FROM web_push_preferences p WHERE p.agent_id=a.id AND p.owner_id=a.created_by AND p.error_enabled=false) AND a.archived_at IS NULL AND u.disabled_at IS NULL",params:[opts.agentId,opts.runToken]});
         if (!rows.length) return;
         const row=rows[0];
+        // The owner already has this chat in front of them somewhere: do not buzz every device for it.
+        if (await ctx.fns.webPush.shouldSkip({agentId:String(row.agent_id),ownerId:String(row.created_by),eventAt:Number(row.failed_at)})) return;
         const subs=await ctx.fns.procs.db.select({sql:'SELECT id,endpoint,p256dh,auth FROM web_push_subscriptions WHERE owner_id=? AND expires_at>? LIMIT 10',params:[row.created_by,Date.now()]});if(!subs.length)return;
         const keys=await ctx.fns.webPush.vapid({}),wp=await import('web-push');
         const label = (value: unknown) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) : '';

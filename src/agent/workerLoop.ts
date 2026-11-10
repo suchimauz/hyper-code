@@ -248,6 +248,9 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
         return;
     }
     agent.isStreaming = true;
+    // The agent moved on, so any error notification it raised earlier is stale: withdraw it
+    // from the owner's other devices.
+    await ctx.fns.webPush.recallStaleError({ agentId }).catch(() => undefined);
     agent.currentJobId = runToken;
     ctx.fns.events.emitAgentsChanged({ agentId, reason: 'run-started' });
     let heartbeatBusy = false;

@@ -126,6 +126,8 @@ async function deliver(ctx: Context, input: types.input.Row, state: string, summ
     if (atomic) await persist();
     else await ctx.fns.procs.db.transaction({ fn: persist });
     if (atomic) return; // Publish only after the enclosing claim transaction commits.
+    // The owner handled this request here: withdraw the notification from their other devices.
+    await ctx.fns.webPush?.recall?.({ inputId: input.id }).catch(() => undefined);
     const live = (ctx.state as any).agent?.[input.agentId];
     if (live) await ctx.fns.session.syncAgentState({ agent: live });
     ctx.fns.procs.events.refresh({ topic: `agent:${input.agentId}`, reason: "input" });

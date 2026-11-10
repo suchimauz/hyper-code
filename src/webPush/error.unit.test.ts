@@ -10,14 +10,14 @@ function fixture(status=201){
  const sub={id:'s1',endpoint:'https://web.push.apple.com/test',p256dh:wp.generateVAPIDKeys().publicKey,auth:Buffer.alloc(16,1).toString('base64url')};
  let claimed=false;
  const select=mock(async({sql}:any)=>{
- if(sql.startsWith('SELECT a.id'))return [{agent_id:'ab',created_by:'u1',title:'Agent',workspace_dir:'/project'}];
+ if(sql.startsWith('SELECT a.id'))return [{agent_id:'ab',created_by:'u1',title:'Agent',workspace_dir:'/project',failed_at:1000}];
  if(sql.startsWith('SELECT title'))return [{title:'Personal project'}];
  if(sql.startsWith('SELECT id,endpoint'))return [sub];
  if(sql.startsWith('INSERT INTO web_push_error_deliveries')){if(claimed)return [];claimed=true;return [{agent_id:'ab'}];}
  return [];
  });
  const fetchMock=mock(async()=>new Response(null,{status}));globalThis.fetch=fetchMock as any;
- const ctx:any={fns:{projects:{identity:async()=>({id:'project-id',dir:'/project'})},procs:{db:{select,run:mock(async()=>({changes:1}))},log:{warn:mock(()=>{})}},webPush:{preferences:async()=>({eligible:true,input:true,error:true}),vapid:async()=>keys,validateSubscription:(o:any)=>validate({} as any,null,o)}}};
+ const ctx:any={fns:{projects:{identity:async()=>({id:'project-id',dir:'/project'})},procs:{db:{select,run:mock(async()=>({changes:1}))},log:{warn:mock(()=>{})}},webPush:{preferences:async()=>({eligible:true,input:true,error:true}),vapid:async()=>keys,validateSubscription:(o:any)=>validate({} as any,null,o),shouldSkip:async()=>false}}};
  return {ctx,select,fetchMock};
 }
 test('error delivery claims concurrently once per durable run and subscription, with owner and state fences',async()=>{

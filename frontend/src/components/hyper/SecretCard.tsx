@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { closeLocalPushNotification } from '../../lib/pushNotifications';
 import '../../styles/scrollbar.css';
 import '../../styles/questions.css';
 
@@ -26,7 +27,11 @@ export function SecretCard({ agentId, input, theme, onDone }: { agentId: string;
       if (data.state === 'ready') { setReady(true); return; }
       setBusy(data.state === 'processing');
       setError(data.error || '');
-      if (data.state === 'submitted' || data.state === 'cancelled') onDone?.();
+      if (data.state === 'submitted' || data.state === 'cancelled') {
+        // This device showed the notification for this request; close it here.
+        void closeLocalPushNotification(input.id);
+        onDone?.();
+      }
     };
     window.addEventListener('message', listen);
     return () => window.removeEventListener('message', listen);

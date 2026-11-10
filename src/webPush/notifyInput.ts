@@ -12,11 +12,13 @@ export default async function (
         inputId: string;
     },
 ): Promise<void> {
-    const rows=await ctx.fns.procs.db.select({sql:"SELECT i.agent_id,a.created_by,a.title,a.workspace_dir,a.workspace_host FROM inputs i JOIN agents a ON a.id=i.agent_id JOIN users u ON u.id=a.created_by WHERE i.id=? AND i.state='open' AND a.parent_id IS NULL AND COALESCE(a.visibility,'nav')='nav' AND NOT EXISTS (SELECT 1 FROM web_push_preferences p WHERE p.agent_id=a.id AND p.owner_id=a.created_by AND p.input_enabled=false) AND a.archived_at IS NULL AND u.disabled_at IS NULL",params:[opts.inputId]});
+    const rows=await ctx.fns.procs.db.select({sql:"SELECT i.agent_id,i.created_at,a.created_by,a.title,a.workspace_dir,a.workspace_host FROM inputs i JOIN agents a ON a.id=i.agent_id JOIN users u ON u.id=a.created_by WHERE i.id=? AND i.state='open' AND a.parent_id IS NULL AND COALESCE(a.visibility,'nav')='nav' AND NOT EXISTS (SELECT 1 FROM web_push_preferences p WHERE p.agent_id=a.id AND p.owner_id=a.created_by AND p.input_enabled=false) AND a.archived_at IS NULL AND u.disabled_at IS NULL",params:[opts.inputId]});
     if(!rows.length)return;const row=rows[0];const user=session?.user?.id,caller=session?.agent?.id??session?.agentId;
     if(user&&user!==row.created_by)return;if(caller){const a=await ctx.fns.procs.db.select({sql:'SELECT created_by FROM agents WHERE id=?',params:[caller]});if(a[0]?.created_by!==row.created_by)return;}if(!user&&!caller)return;
     const preferences = await ctx.fns.webPush.preferences({agentId:String(row.agent_id)});
     if (!preferences.eligible || !preferences.input) return;
+    // The owner already has this chat in front of them somewhere: do not buzz every device for it.
+    if (await ctx.fns.webPush.shouldSkip({agentId:String(row.agent_id),ownerId:String(row.created_by),eventAt:Number(row.created_at)})) return;
     const subs=await ctx.fns.procs.db.select({sql:'SELECT id,endpoint,p256dh,auth FROM web_push_subscriptions WHERE owner_id=? AND expires_at>? LIMIT 10',params:[row.created_by,Date.now()]});if(!subs.length)return;
     const keys=await ctx.fns.webPush.vapid({}),wp=await import('web-push');
     const label = (value: unknown) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) : '';

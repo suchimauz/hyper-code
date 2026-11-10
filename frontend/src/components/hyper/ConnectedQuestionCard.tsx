@@ -8,6 +8,7 @@ import { clearConfirmComment, getConfirmInputs, pendingConfirm, submitConfirmInp
 import { GridCard } from './GridCard';
 import type { HistoryInput } from '../../lib/history';
 import { clearGridPicks, getGridInputs, pendingGrid, submitGridInput, type GridInputsState } from '../../lib/grids';
+import { closeLocalPushNotification } from '../../lib/pushNotifications';
 import { getSecretInputs, type SecretInputsState } from '../../lib/secrets';
 
 /** Owns polling and the submit lock for an agent; key this boundary by agent id. */
@@ -87,11 +88,14 @@ export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs,
       if (state.batch && !('cancel' in answer)) {
         await submitChoiceBatch(agentId, state.batch.revision, episode.map(item => ({ id: item.id, ...choiceAnswer(item, readChoiceDraft(agentId, item.id)) })), state.csrfToken);
         for (const item of episode) clearChoiceDraft(agentId, item.id);
+        // This device showed the notification for these requests; close it here.
+        for (const item of episode) await closeLocalPushNotification(item.id);
         saveChoiceAnswers(agentId, {});
         if (alive.current) { setAnswers({}); setClosed(previous => [...previous, ...episode.map(item => item.id)]); setViewedId(null); onAccepted(); }
         return;
       }
       await submitChoiceInput(agentId, input.id, answer, state.csrfToken);
+      await closeLocalPushNotification(input.id);
       answered.current.set(input.id, { ...input, state: 'cancel' in answer ? 'cancelled' : 'submitted', ...('cancel' in answer ? {} : { result: answer }) });
       setViewedId(null);
       clearChoiceDraft(agentId, input.id);
@@ -117,6 +121,7 @@ setActionError(reason instanceof Error ? reason.message : String(reason));
     lock.current = true; ++generation.current; setBusy(true); setActionError('');
     try {
       await submitConfirmInput(agentId, confirm.id, answer, confirmState.csrfToken);
+      await closeLocalPushNotification(confirm.id);
       clearConfirmComment(agentId, confirm.id);
       if (alive.current) { setConfirmClosed(previous => [...previous, confirm.id]); onAccepted(); }
     } catch (reason) {
@@ -132,6 +137,7 @@ setActionError(reason instanceof Error ? reason.message : String(reason));
     lock.current = true; ++generation.current; setBusy(true); setActionError('');
     try {
       await submitGridInput(agentId, grid.id, answer, gridState.csrfToken);
+      await closeLocalPushNotification(grid.id);
       clearGridPicks(agentId, grid.id);
       if (alive.current) { setGridClosed(previous => [...previous, grid.id]); onAccepted(); }
     } catch (reason) {
