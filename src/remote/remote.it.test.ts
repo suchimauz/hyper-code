@@ -1,12 +1,12 @@
 // remote.* and the host-aware tools against disposable sshd containers.
 //
 // test/ssh/fixture.ts keeps two Alpine sshd containers running (compose project
-// hyper-ssh-<hash of the checkout>): `plain` has no ripgrep (grep/find
+// mauzcode-ssh-<hash of the checkout>): `plain` has no ripgrep (grep/find
 // fallbacks), `rg` has it. They persist between runs; each run starts from a
 // clean remote home.
 // The ctx is pointed at a private ssh_config + ControlMaster dir through
-// HYPER_SSH_CONFIG / HYPER_SSH_CONTROL_DIR, so the developer's ~/.ssh is never
-// read or written. Without Docker (or with HYPER_SKIP_DOCKER_TESTS=1) the whole
+// MAUZCODE_SSH_CONFIG / MAUZCODE_SSH_CONTROL_DIR, so the developer's ~/.ssh is never
+// read or written. Without Docker (or with MAUZCODE_SKIP_DOCKER_TESTS=1) the whole
 // suite is skipped, not failed.
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from "node:fs";
@@ -14,8 +14,8 @@ import { join } from "node:path";
 import { mkTestCtx } from "../_testCtx.entry";
 import { startSshFixture, dockerAvailable, type SshFixture } from "../../test/ssh/fixture";
 
-const enabled = process.env.HYPER_SKIP_DOCKER_TESTS !== "1" && await dockerAvailable();
-if (!enabled) console.warn("[remote.test] Docker unavailable or HYPER_SKIP_DOCKER_TESTS=1 — skipping");
+const enabled = process.env.MAUZCODE_SKIP_DOCKER_TESTS !== "1" && await dockerAvailable();
+if (!enabled) console.warn("[remote.test] Docker unavailable or MAUZCODE_SKIP_DOCKER_TESTS=1 — skipping");
 // Poll instead of sleeping: check every 10ms, give up after 5s.
 async function until<T>(fn: () => Promise<T>, ok: (v: T) => boolean, ms = 5000): Promise<T> {
     const end = Date.now() + ms;
@@ -48,7 +48,7 @@ describe.skipIf(!enabled)("remote over ssh (docker sshd)", () => {
     const R = () => ctx.fns.remote;
     const T = () => ctx.fns.tools;
 
-    test("servers reads HYPER_SSH_CONFIG, not ~/.ssh/config", async () => {
+    test("servers reads MAUZCODE_SSH_CONFIG, not ~/.ssh/config", async () => {
         const list = await R().servers({});
         expect(list.map((s: any) => s.name).sort()).toEqual(["plain", "rg"]);
         expect(list[0]).toMatchObject({ hostname: "127.0.0.1", user: "tester" });
@@ -204,7 +204,7 @@ describe.skipIf(!enabled)("remote over ssh (docker sshd)", () => {
 
     test("background jobs: start, jobs, logs, stop, restart guard", async () => {
         const s = await R().start({ host: "plain", name: "tick", command: "for i in $(seq 1 60); do echo tick $i \"$X\"; sleep 0.05; done", env: { X: "it's" }, wait: 0 });
-        expect(s).toMatchObject({ name: "tick", session: "hyper-tick", running: true });
+        expect(s).toMatchObject({ name: "tick", session: "mauzcode-tick", running: true });
         const first = await until(() => R().logs({ host: "plain", name: "tick", grep: "tick [12] " }), (l: any) => l.tail.includes("tick 2"));
         expect(first.tail).toContain("tick 1 it's");
         await expect(R().start({ host: "plain", name: "tick", command: "true", wait: 0 })).rejects.toThrow("already running");
@@ -260,7 +260,7 @@ describe.skipIf(!enabled)("remote over ssh (docker sshd)", () => {
         const seen = await R().exec({ host: "plain", command: "ps -ww -o args | grep -v grep | grep -c zz-start-secret; tmux list-sessions -F '#{session_name} #{pane_start_command}' 2>/dev/null | grep -c zz-start-secret" });
         expect(seen.stdout.trim().split("\n")).toEqual(["0", "0"]);
         // owner-only access; the directory may also carry a setgid bit from its parent
-        const perm = await R().exec({ host: "plain", command: "stat -c %a ~/.hyper-jobs/sec.sh ~/.hyper-jobs" });
+        const perm = await R().exec({ host: "plain", command: "stat -c %a ~/.mauzcode-jobs/sec.sh ~/.mauzcode-jobs" });
         expect(perm.stdout.trim().split("\n").map((m: string) => m.slice(-3))).toEqual(["700", "700"]);
         await R().stop({ host: "plain", name: "sec", grace: 0 });
     });
@@ -297,7 +297,7 @@ describe.skipIf(!enabled)("remote over ssh (docker sshd)", () => {
         await R().exec({ host: "plain", command: "mkdir -p wm && printf 'a\\n' > wm/run.sh && chmod 700 wm/run.sh && printf 's\\n' > wm/secret && chmod 600 wm/secret && ln -sf secret wm/link" });
         await T().edit({ host: "plain", path: "wm/run.sh", edits: [{ oldText: "a", newText: "b" }] });
         await R().writeFile({ host: "plain", path: "wm/link", content: "t\n" });
-        const r = await R().exec({ host: "plain", command: "stat -c '%n %a' wm/run.sh wm/secret; test -L wm/link && echo link; cat wm/secret; ls -a wm | grep -c hyper || true" });
+        const r = await R().exec({ host: "plain", command: "stat -c '%n %a' wm/run.sh wm/secret; test -L wm/link && echo link; cat wm/secret; ls -a wm | grep -c mauzcode || true" });
         expect(r.stdout.trim().split("\n")).toEqual(["wm/run.sh 700", "wm/secret 600", "link", "t", "0"]);
     });
 
@@ -322,9 +322,9 @@ describe.skipIf(!enabled)("remote over ssh (docker sshd)", () => {
     test("review: read of a remote image leaves no temp files", async () => {
         const { readdirSync } = await import("node:fs");
         const { tmpdir } = await import("node:os");
-        const before = readdirSync(tmpdir()).filter(f => f.startsWith("hyper-remote-")).length;
+        const before = readdirSync(tmpdir()).filter(f => f.startsWith("mauzcode-remote-")).length;
         await T().read({ host: "plain", path: "img/dot.png" });
-        expect(readdirSync(tmpdir()).filter(f => f.startsWith("hyper-remote-")).length).toBe(before);
+        expect(readdirSync(tmpdir()).filter(f => f.startsWith("mauzcode-remote-")).length).toBe(before);
     });
 
     test("close drops the master; the next call reconnects", async () => {

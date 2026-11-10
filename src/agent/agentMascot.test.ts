@@ -27,7 +27,7 @@ test('mascot persists across saves, reloads and forks use the database default',
 
 test('migration randomly backfills legacy agents once and enforces valid future defaults', async () => {
     const ctx = await mkTestCtx();
-    expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('hyper_test_');
+    expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('mauzcode_test_');
     await ctx.fns.procs.db.exec({ sql: 'ALTER TABLE agents DROP COLUMN mascot' });
     await ctx.fns.procs.db.exec({ sql: `INSERT INTO agents (id, model, created_at, updated_at) SELECT 'mascot-old-' || i, 'mock:echo', 1, 1 FROM generate_series(1, 128) AS i` });
     await migration.up(ctx);
@@ -47,7 +47,7 @@ test('migration randomly backfills legacy agents once and enforces valid future 
 
 test('eight-choice upgrade preserves existing assignments and is idempotent', async () => {
     const ctx = await mkTestCtx();
-    expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('hyper_test_');
+    expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('mauzcode_test_');
     await ctx.fns.procs.db.exec({ sql: 'ALTER TABLE agents DROP COLUMN mascot' });
     await migration.up(ctx);
     for (const mascot of legacyChoices) {

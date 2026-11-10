@@ -1,5 +1,5 @@
 /**
- * List client Hypers allowed to relay through this host (never returns tokens)
+ * List client MauzCodes allowed to relay through this host (never returns tokens)
  * @param opts.includeRevoked Include revoked clients. @default false
  */
 export default async function (ctx: Context, _session: Session | null, opts: {

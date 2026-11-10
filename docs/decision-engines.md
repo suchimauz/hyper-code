@@ -1,7 +1,7 @@
 # The decision layer and its engines
 
 Companion to `docs/jev-decision-layer.md`, which argues *why* a typed decision
-model belongs in Hyper. This document describes what is actually built: one
+model belongs in MauzCode. This document describes what is actually built: one
 engine-neutral API in `src/decision/`, and two backends behind it.
 
 ## Why an abstraction appeared

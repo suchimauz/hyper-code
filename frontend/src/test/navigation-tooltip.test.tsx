@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
-import { WorkspaceChatRow } from '../components/hyper/WorkspaceChatRow';
-import { NavigationTooltip, workspaceCreatedLabel, workspaceTooltipPath } from '../components/hyper/NavigationTooltip';
+import { WorkspaceChatRow } from '../components/mauzcode/WorkspaceChatRow';
+import { NavigationTooltip, workspaceCreatedLabel, workspaceTooltipPath } from '../components/mauzcode/NavigationTooltip';
 
 it('shows exact model and effort in a hover preview without selecting a chat', async () => {
   const select = vi.fn();

@@ -1,5 +1,5 @@
 /** Return the next-request context estimate for the authenticated chat's footer meter.
- * Uses the same preview calculation as the main Hyper context ring; never substitutes stale provider usage.
+ * Uses the same preview calculation as the main MauzCode context ring; never substitutes stale provider usage.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
     /** Incoming authenticated HTTP request. */ req: Request;

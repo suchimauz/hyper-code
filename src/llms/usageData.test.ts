@@ -10,7 +10,7 @@ function setup() {
                 expect(opts).toEqual({ connectedOnly: true });
                 return [{ provider: "codex", account: "default", label: "codex", model: "codex:", usedPercent: null, resetsAt: null, planType: null, resetCredits: { secret: "not exported" }, parkedAgents: 0, tone: "neutral", updatedAt: 1 }];
             },
-            listModels: async () => ({ codex: ["codex:a", "codex/team:b"], "hyper/remote": ["hyper/remote:a"] }),
+            listModels: async () => ({ codex: ["codex:a", "codex/team:b"], "mauzcode/remote": ["mauzcode/remote:a"] }),
             gatewayHealth: async () => ({ status: "available", reason: "models-ok", models: ["oneapi:a"], apiKey: "never-export" }),
         },
         node: { list: async () => [{ name: "remote", enabled: true, catalogAt: 1, usageAt: 1, catalog: [{ id: "a", provider: "codex", account: "default" }], usage: [{ provider: "codex", account: "default", usedPercent: 90 }] }] },
@@ -25,7 +25,7 @@ test("nonblocking shared refresh, local unknown, remote stale and narrow gateway
     expect(refreshes()).toBe(1);
     expect(first.entries[0]).toMatchObject({ models: ["codex:a"], usedPercent: null, tone: "neutral" });
     expect(first.entries[0].quotaStatus).toBeUndefined();
-    expect(first.entries[1]).toMatchObject({ models: ["hyper/remote:a"], quotaStatus: "stale", usedPercent: 90, tone: "error", node: "remote" });
+    expect(first.entries[1]).toMatchObject({ models: ["mauzcode/remote:a"], quotaStatus: "stale", usedPercent: 90, tone: "error", node: "remote" });
     expect(first.gateway).toEqual({ status: "available", reason: "models-ok", models: ["oneapi:a"] });
     expect(JSON.stringify(first)).not.toContain("secret");
     expect(JSON.stringify(first)).not.toContain("never-export");
@@ -54,12 +54,12 @@ function inventory(provider: string, account = "default") {
 
 test("connected inventory adds unknown quota, preserves explicit auth state and excludes remote/gateway inventory", async () => {
     const { ctx } = setup();
-    ctx.fns.llm.listAccounts = async () => [inventory("codex"), { ...inventory("xai"), available: false, needsReconnect: true }, inventory("hyper"), inventory("oneapi")];
+    ctx.fns.llm.listAccounts = async () => [inventory("codex"), { ...inventory("xai"), available: false, needsReconnect: true }, inventory("mauzcode"), inventory("oneapi")];
     const data = await usageData(ctx, null, { includeConnected: true });
     expect(data.entries.find(e => e.provider === "xai")).toMatchObject({ usedPercent: null, updatedAt: 0, tone: "neutral", quotaStatus: "unavailable", available: false, needsReconnect: true });
     expect(data.entries.find(e => e.provider === "codex" && !e.node)).toMatchObject({ updatedAt: 1, available: true, needsReconnect: false });
     expect(data.entries.filter(e => e.node)).toHaveLength(1);
-    expect(data.entries.some(e => e.provider === "oneapi" || e.provider === "hyper")).toBe(false);
+    expect(data.entries.some(e => e.provider === "oneapi" || e.provider === "mauzcode")).toBe(false);
     expect(JSON.stringify(data)).not.toContain("inventory-secret");
 });
 

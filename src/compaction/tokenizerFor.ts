@@ -1,7 +1,7 @@
 /**
  * Maps a model route to the local tokenizer that can count its tokens
  *
- * Use before counting tokens locally for a model. Resolves the last segment of a provider-qualified model route (ssh/ and hyper/ prefixes are ignored) to o200k_base for OpenAI GPT/Codex, a Kimi tiktoken vocabulary, a public Hugging Face tokenizer.json repository for Qwen, Gemma, DeepSeek, GLM and MiniMax, or none for Claude and unknown models, which keep the heuristic estimate plus provider calibration.
+ * Use before counting tokens locally for a model. Resolves the last segment of a provider-qualified model route (ssh/ and mauzcode/ prefixes are ignored) to o200k_base for OpenAI GPT/Codex, a Kimi tiktoken vocabulary, a public Hugging Face tokenizer.json repository for Qwen, Gemma, DeepSeek, GLM and MiniMax, or none for Claude and unknown models, which keep the heuristic estimate plus provider calibration.
  * @param opts.model Provider-qualified model route such as ssh/aeza-criminal-amarant:codex/acc:gpt-6-astra or zai-coding:glm-5.3.
  */
 export default async function (

@@ -77,7 +77,7 @@ test("messages from hidden sidecars never create mention notifications", async (
 });
 
 
-test("the composer asks /mentions/people; the agent learns whom it can mention on a shared Hyper", async () => {
+test("the composer asks /mentions/people; the agent learns whom it can mention on a shared MauzCode", async () => {
     const ctx: any = await mkTestCtx();
     const { anna, get } = await people(ctx);
     const res = await get(anna, "/mentions/people");

@@ -16,8 +16,8 @@ export function subscribeLive(options: LiveSubscriptionOptions): () => void {
   let unsubscribe: (() => void) | undefined;
   void loadLiveClient().then(() => {
     if (disposed) return;
-    if (!window.hyperLive) throw new Error('Live transport unavailable');
-    const cleanup = window.hyperLive.subscribe({ name: options.name, types: options.types,
+    if (!window.mauzcodeLive) throw new Error('Live transport unavailable');
+    const cleanup = window.mauzcodeLive.subscribe({ name: options.name, types: options.types,
       onEvent: event => { if (!disposed) options.onEvent(event); },
       resync: reason => { if (!disposed) options.resync(reason); },
     });

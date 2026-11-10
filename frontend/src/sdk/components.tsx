@@ -13,7 +13,7 @@ export function Stack({ direction = 'vertical', gap = 3, wrap = false, style, ..
 export type PanelProps = HTMLAttributes<HTMLElement> & { title: string; actions?: ReactNode };
 export function Panel({ title, actions, children, className = '', ...props }: PanelProps) {
   const id = useId();
-  return <section {...props} aria-labelledby={id} className={`hyper-sdk-panel ${className}`}><header className="hyper-sdk-panel-header"><h2 id={id}>{title}</h2>{actions}</header>{children}</section>;
+  return <section {...props} aria-labelledby={id} className={`mauzcode-sdk-panel ${className}`}><header className="mauzcode-sdk-panel-header"><h2 id={id}>{title}</h2>{actions}</header>{children}</section>;
 }
 export type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   label: string; description?: string; error?: string; type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'number';
@@ -22,10 +22,10 @@ export type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>
 export function TextField({ label, description, error, id, className = '', 'aria-describedby': describedBy, ...props }: TextFieldProps) {
   const generated = useId(); const inputId = id ?? generated;
   const helpId = `${inputId}-help`; const errorId = `${inputId}-error`;
-  return <div className="hyper-sdk-field"><label htmlFor={inputId}>{label}</label><input {...props} id={inputId} className={`hyper-sdk-input ${className}`} aria-invalid={error ? true : props['aria-invalid']} aria-describedby={[describedBy, description ? helpId : '', error ? errorId : ''].filter(Boolean).join(' ') || undefined} />{description && <p id={helpId}>{description}</p>}{error && <p id={errorId} className="hyper-sdk-error" role="alert">{error}</p>}</div>;
+  return <div className="mauzcode-sdk-field"><label htmlFor={inputId}>{label}</label><input {...props} id={inputId} className={`mauzcode-sdk-input ${className}`} aria-invalid={error ? true : props['aria-invalid']} aria-describedby={[describedBy, description ? helpId : '', error ? errorId : ''].filter(Boolean).join(' ') || undefined} />{description && <p id={helpId}>{description}</p>}{error && <p id={errorId} className="mauzcode-sdk-error" role="alert">{error}</p>}</div>;
 }
 export type DialogProps = { open: boolean; onOpenChange: (open: boolean) => void; title: string; description?: string; children: ReactNode; closeLabel?: string };
 /** Accessible modal: Base UI owns focus trapping, Escape, focus return and outside dismissal. */
 export function Dialog({ open, onOpenChange, title, description, children, closeLabel = 'Close' }: DialogProps) {
-  return <BaseDialog.Root open={open} onOpenChange={value => onOpenChange(value)}><BaseDialog.Portal><BaseDialog.Backdrop className="hyper-sdk-dialog-backdrop" /><BaseDialog.Popup className="hyper-sdk-dialog"><header className="hyper-sdk-panel-header"><BaseDialog.Title>{title}</BaseDialog.Title><Button onClick={() => onOpenChange(false)}>{closeLabel}</Button></header>{description && <BaseDialog.Description>{description}</BaseDialog.Description>}{children}</BaseDialog.Popup></BaseDialog.Portal></BaseDialog.Root>;
+  return <BaseDialog.Root open={open} onOpenChange={value => onOpenChange(value)}><BaseDialog.Portal><BaseDialog.Backdrop className="mauzcode-sdk-dialog-backdrop" /><BaseDialog.Popup className="mauzcode-sdk-dialog"><header className="mauzcode-sdk-panel-header"><BaseDialog.Title>{title}</BaseDialog.Title><Button onClick={() => onOpenChange(false)}>{closeLabel}</Button></header>{description && <BaseDialog.Description>{description}</BaseDialog.Description>}{children}</BaseDialog.Popup></BaseDialog.Portal></BaseDialog.Root>;
 }

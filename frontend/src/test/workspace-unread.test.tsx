@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
 const props = { user: null, selected: '', theme: 'light' as const, onTheme: vi.fn(), onToggle: vi.fn(), onSelect: vi.fn(), onRetry: vi.fn() };
 const projects = (unread: boolean) => [{ id: 'unread-project', title: 'Workspace', dir: '/work', host: null, chats: [
   { id: 'a', title: 'Visible chat', model: '', runState: 'idle', hasUnread: false, lastReplyAt: null },

@@ -7,7 +7,7 @@ import status from './status';
 
 // Local synthetic CLI only: no SSH, provider requests, credentials or live flows.
 test('captures browser helper URL when launcher discards output; isolates protocol and cleans FIFO', async()=>{
- const home=await mkdtemp(join(tmpdir(),'hyper-browser-capture-'));
+ const home=await mkdtemp(join(tmpdir(),'mauzcode-browser-capture-'));
  await mkdir(join(home,'bin'));
  await writeFile(join(home,'bin','claude'), '#!/bin/sh\n"$BROWSER" "https://claude.ai/oauth/authorize?state=synthetic" >/dev/null 2>&1\nprintf "One-time browser code\\n"\nsleep 0.05\nexit 1\n', {mode:0o700});
  const spawnReal=Bun.spawn.bind(Bun);
@@ -25,7 +25,7 @@ test('captures browser helper URL when launcher discards output; isolates protoc
   expect(flow.verificationUri==='https://claude.ai/oauth/authorize?state=synthetic').toBe(true);
   expect(flow.status).toBe('failed');
   expect(flow.diagnostics!.stages.map(s=>s.phase)).toEqual(['ssh-preflight','cli-login']);
-  expect(await Bun.file(join(home,'.hyper/ssh-accounts/claude-code/test/no-browser.url-pipe')).exists()).toBe(false);
+  expect(await Bun.file(join(home,'.mauzcode/ssh-accounts/claude-code/test/no-browser.url-pipe')).exists()).toBe(false);
  } finally { child?.kill();spawn.mockRestore();await rm(home,{recursive:true,force:true}); }
 },10000);
 

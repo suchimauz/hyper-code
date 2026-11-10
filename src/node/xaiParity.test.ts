@@ -6,32 +6,32 @@ import upstream from "./upstream";
 import catalog from "./catalog";
 import resolveEndpoint from "../llm/resolveEndpoint";
 
-const ep = { provider: "hyper", upstream: "xai", account: "host", modelId: "xai/named:grok-test", api: "responses", apiKey: "node-token", url: "http://node/responses", kind: "subscription" };
+const ep = { provider: "mauzcode", upstream: "xai", account: "host", modelId: "xai/named:grok-test", api: "responses", apiKey: "node-token", url: "http://node/responses", kind: "subscription" };
 const reasoning = { requested: "auto", applied: "high", mode: "effort" };
 const sse = 'data: {"type":"response.completed","response":{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":2,"output_tokens":1}}}\n\n';
 const forbidden = () => { throw new Error("client must not touch OAuth/Codex"); };
 
-test("Hyper xai dispatcher selects xai, never Codex", async () => {
+test("MauzCode xai dispatcher selects xai, never Codex", async () => {
     const ctx = { fns: { llm: { resolveEndpoint: async () => ep, resolveReasoningEffort: async () => reasoning, streamXai: async () => ({ text: "xai" }), streamCodex: forbidden }, procs: {} } } as unknown as Context;
-    expect((await stream(ctx, null, { agent: { id: "test", model: "hyper/host:xai/named:grok-test" } as any })).text).toBe("xai");
+    expect((await stream(ctx, null, { agent: { id: "test", model: "mauzcode/host:xai/named:grok-test" } as any })).text).toBe("xai");
 });
 
 test("xai stream keeps node bearer, canonical wire model, tools and no Codex identity", async () => {
     let sent: any;
     const ctx = { fns: { llm: { resolveEndpoint: async () => ep, resolveReasoningEffort: async () => reasoning, getXaiOAuthToken: forbidden, accountAuthHealth: forbidden, refreshUsage: forbidden, toCodexInput: () => ({ input: [{ role: "user", content: "hi" }] }), connectFetch: async (o: any) => { sent = o; return new Response(sse); }, parseSSE: async function* () { yield { data: JSON.stringify({ type: "response.completed", response: { usage: { input_tokens: 2, output_tokens: 1 } } }) }; } }, agent: { buildLlmRequest: async () => ({ system: "system", messages: [] }), wireTools: () => [{ type: "function", name: "tool" }], cacheRoot: async () => "root" } } } as unknown as Context;
-    await streamXai(ctx, null, { agent: { id: "test", model: "hyper/host:xai/named:grok-test" } as any });
+    await streamXai(ctx, null, { agent: { id: "test", model: "mauzcode/host:xai/named:grok-test" } as any });
     expect(sent.init.headers.authorization).toBe("Bearer node-token");
     expect(sent.init.headers["chatgpt-account-id"]).toBeUndefined();
     expect(JSON.parse(sent.init.body)).toMatchObject({ model: ep.modelId, reasoning: { effort: "high" }, prompt_cache_key: "root", tools: [{ name: "tool" }] });
 });
 
-for (const provider of ["xai", "codex"]) test(`non-agent Hyper ${provider} call preserves relay credentials`, async () => {
+for (const provider of ["xai", "codex"]) test(`non-agent MauzCode ${provider} call preserves relay credentials`, async () => {
     const original = globalThis.fetch;
     let sent: any;
     const ctx = { fns: { llm: { resolveEndpoint: async () => ({ ...ep, upstream: provider }), getXaiOAuthToken: forbidden, refreshCodex: forbidden, refreshUsage: forbidden } } } as unknown as Context;
     globalThis.fetch = (async (_url: any, init: any) => { sent = init; return new Response(sse); }) as typeof fetch;
     try {
-        const result = await call(ctx, null, { model: `hyper/host:${provider}/named:test`, user: "hi", noFallback: true, max_tokens: 123 });
+        const result = await call(ctx, null, { model: `mauzcode/host:${provider}/named:test`, user: "hi", noFallback: true, max_tokens: 123 });
         expect(result.text).toBe("ok");
         expect(sent.headers.authorization).toBe("Bearer node-token");
         expect(sent.headers["chatgpt-account-id"]).toBeUndefined();

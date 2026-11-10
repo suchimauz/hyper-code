@@ -24,7 +24,7 @@ export default async function (
         const raw = await ctx.fns.llm.oauthEncryptionKey({});
         const key = await crypto.subtle.importKey("raw", Uint8Array.from(raw), "AES-GCM", false, ["encrypt"]);
         const iv = crypto.getRandomValues(new Uint8Array(12));
-        const aad = new TextEncoder().encode(`hyper-code2/local-secret/v1/${namespace}/${name}`);
+        const aad = new TextEncoder().encode(`mauzcode/local-secret/v1/${namespace}/${name}`);
         const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad }, key, new TextEncoder().encode(opts.value));
         return JSON.stringify({ v: 1, iv: Buffer.from(iv).toString("base64url"), data: Buffer.from(data).toString("base64url") });
 }

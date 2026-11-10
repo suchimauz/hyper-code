@@ -1,12 +1,12 @@
-export const DEFAULT_BASE = 'https://hyper.niquola.in.hn.hyper-mesh.xyz';
+export const DEFAULT_BASE = 'https://mauzcode.niquola.in.hn.mauzcode-mesh.xyz';
 
-/** Accept an HTTPS Hyper origin, or loopback HTTP for local development. */
+/** Accept an HTTPS MauzCode origin, or loopback HTTP for local development. */
 export function normalizeBase(value = DEFAULT_BASE) {
   const url = new URL(value);
   const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
   if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) || url.username || url.password
       || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) {
-    throw new Error('Use an HTTPS Hyper origin, or HTTP on localhost');
+    throw new Error('Use an HTTPS MauzCode origin, or HTTP on localhost');
   }
   return url.origin;
 }

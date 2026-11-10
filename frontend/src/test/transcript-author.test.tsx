@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import type { ChatEvent } from '../lib/hyper';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import type { ChatEvent } from '../lib/mauzcode';
 afterEach(cleanup);
 const event: ChatEvent = { idx: 1, ts: 1, type: 'user', text: 'Hello', messageIdx: 1, author: { id: 'person', name: 'Jane Doe', initials: 'JD', hue: 120, picture: 'https://example.com/avatar.png' } };
 test('native human attribution includes visible name and decorative private-loading photo', () => {

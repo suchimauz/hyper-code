@@ -15,7 +15,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const effort = String(form.get("effort") ?? "auto") as types.llm.ReasoningEffort;
     try {
         const result = await ctx.fns.agent.setReasoningEffort({ id: opts.params.id!, effort });
-        return new Response(null, { status: 204, headers: { "HX-Refresh": "true", "x-hyper-effort": result.applied } });
+        return new Response(null, { status: 204, headers: { "HX-Refresh": "true", "x-mauzcode-effort": result.applied } });
     } catch (error: any) {
         return new Response(error?.message ?? "Invalid effort", { status: 400 });
     }

@@ -56,7 +56,7 @@ export default async function (
             client.notify("workspace/didChangeWatchedFiles", { changes });
         }
 
-        const uri = pathToFileURL(join(client.root, "src", "__hyper_virtual_eval__.ts")).href;
+        const uri = pathToFileURL(join(client.root, "src", "__mauzcode_virtual_eval__.ts")).href;
         st.docVersion = (st.docVersion ?? 0) + 1;
         if (st.docVersion === 1) {
             client.notify("textDocument/didOpen", { textDocument: { uri, languageId: "typescript", version: st.docVersion, text } });

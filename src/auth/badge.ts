@@ -3,7 +3,7 @@
  *
  * The color is derived from the user id, so a person always has the same color. Shown only when
  * the instance has more than one active user or signs people in through the control plane (OIDC);
- * a single-user local Hyper looks exactly as before.
+ * a single-user local MauzCode looks exactly as before.
  * @param opts.userId Author user id (messages.author / events.actor); null renders nothing.
  */
 export default async function (
@@ -16,7 +16,7 @@ export default async function (
 ): Promise<string> {
     if (!opts.userId) return "";
     const users = await ctx.fns.auth.listUsers({ includeDisabled: true });
-    // Shown once several people may use this Hyper: two or more active users, or sign-in goes through
+    // Shown once several people may use this MauzCode: two or more active users, or sign-in goes through
     // the control plane (a shared instance even while only its first person has signed in).
     const shared = users.filter((u) => u.disabledAt == null).length >= 2
         || !!String((await ctx.fns.settings.get({ module: "auth", scopeType: "global", key: "oidcIssuer" })) ?? "").trim();

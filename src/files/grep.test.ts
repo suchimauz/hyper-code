@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { mkTestCtx } from '../_testCtx.entry';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 
-const DIR = '/tmp/hyper-grep-test';
+const DIR = '/tmp/mauzcode-grep-test';
 
 beforeAll(async () => {
     await rm(DIR, { recursive: true, force: true });

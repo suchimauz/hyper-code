@@ -1,17 +1,17 @@
 ---
-description: hyper-code2 — procs-based Bun codebase with a self-extending agent at `/`.
+description: mauzcode — procs-based Bun codebase with a self-extending agent at `/`.
 alwaysApply: true
 ---
 
-# hyper-code2 — agent guide
+# mauzcode — agent guide
 
 Procedural TypeScript on Bun, running on the **procs framework** (vendored at `src/procs/` — see `~/health-workspaces/procs` for the upstream). One HTTP server, a multi-agent chat driven by native JSON tool calls, all code hot-reloadable through a tokened external REPL.
 
-## UI design — Hyper only
+## UI design — MauzCode only
 
-Before designing, implementing, or reviewing **Hyper's own UI**, read `docs/skills/apple-design/SKILL.md` and the scope notes in `docs/skills/apple-design/README.md`. Apple Design is the default reference for the Hyper app shell, chat, settings, built-in pages, and plugin surfaces inside Hyper. Follow the user's request and Hyper's existing accessible components and light/dark design tokens; favor clear hierarchy, restraint, immediate feedback, keyboard focus, usable targets, and reduced-motion support over decorative effects.
+Before designing, implementing, or reviewing **MauzCode's own UI**, read `docs/skills/apple-design/SKILL.md` and the scope notes in `docs/skills/apple-design/README.md`. Apple Design is the default reference for the MauzCode app shell, chat, settings, built-in pages, and plugin surfaces inside MauzCode. Follow the user's request and MauzCode's existing accessible components and light/dark design tokens; favor clear hierarchy, restraint, immediate feedback, keyboard focus, usable targets, and reduced-motion support over decorative effects.
 
-This rule is scoped to the **product being edited**, not the agent's host: other projects worked on through Hyper are unaffected unless the user explicitly requests Apple Design there. Do not install or enforce this skill globally. The local copy is pinned, includes the upstream MIT license, and is read on demand rather than pasted into every prompt.
+This rule is scoped to the **product being edited**, not the agent's host: other projects worked on through MauzCode are unaffected unless the user explicitly requests Apple Design there. Do not install or enforce this skill globally. The local copy is pinned, includes the upstream MIT license, and is read on demand rather than pasted into every prompt.
 
 ## Runtime environment
 
@@ -57,7 +57,7 @@ src/
   Context.ts          global Context type (framework)
   Session.ts          global Session type (request session — NOT the agent transcript)
   ctx_ns.d.ts         AUTO-GEN by ctx.fns.procs.dev.genTypes
-  procs/              VENDORED framework — ctx.fns.procs.* (patched: .hyper overlay
+  procs/              VENDORED framework — ctx.fns.procs.* (patched: .mauzcode overlay
                       root in modules/discover, _migrations name→id compat, WAL)
   agent/              native JSON tool-call loop: run, workerLoop, wireTools,
                       routes /agent/:id*, $start.ts (loadAll + workerLoop), SYSTEM_PROMPT_CORE.txt
@@ -66,7 +66,7 @@ src/
   files/ ui/ markdown/ git/ settings/ events/ dev/ skill/ tools/
 script/repl.ts        external REPL client (reads .runtime/port + .runtime/repl-token)
 .runtime/             port, repl-token, signing key, bundled scripts (gitignored)
-.hyper/               runtime-writable overlay — scanned AFTER src/, overrides by name;
+.mauzcode/               runtime-writable overlay — scanned AFTER src/, overrides by name;
                       _runtime/sessions is the LEGACY sqlite file (storage is Postgres now)
 ```
 
@@ -75,11 +75,11 @@ script/repl.ts        external REPL client (reads .runtime/port + .runtime/repl-
 Long-running server on **PORT 3010** (:3000 is a different project), supervised by **launchd**, not tmux:
 
 ```bash
-launchctl list | grep com.niquola.hyper   # pid of script/run-service.ts, which spawns src/$main.ts
-launchctl kickstart -k gui/$(id -u)/com.niquola.hyper   # restart the supervisor and its child
+launchctl list | grep com.suchimauz.mauzcode   # pid of script/run-service.ts, which spawns src/$main.ts
+launchctl kickstart -k gui/$(id -u)/com.suchimauz.mauzcode   # restart the supervisor and its child
 ```
 
-`~/Library/LaunchAgents/com.niquola.hyper.plist` runs `bun script/run-service.ts` with `KeepAlive`, so an
+`~/Library/LaunchAgents/com.suchimauz.mauzcode.plist` runs `bun script/run-service.ts` with `KeepAlive`, so an
 ordinary crash is restarted automatically (`ThrottleInterval` 10s). `run-service.ts` is also the updater: it
 applies a staged fast-forward from `.runtime/update-pending.json`, health-checks the new child and rolls the
 checkout (and the database) back if it fails.
@@ -108,7 +108,7 @@ bun script/repl.ts -f /tmp/play.js                     # from file; stdin works 
 
 ## Database & migrations
 
-- **Storage is Postgres** (paradedb, container `hyper-db`, **127.0.0.1:54393** only, db/user `hyper`, password generated by `script/install.sh` into `~/.hyper/.env` as `HYPER_DB_PASSWORD` and into `.env` as `DATABASE_URL` — there is NO default password and Hyper refuses to start without `DATABASE_URL`). The compose file in the repo root is the source of truth: `cp docker-compose.yml ~/.hyper/docker-compose.yml && cd ~/.hyper && docker compose up -d` (compose reads `~/.hyper/.env`). Never publish the port on all interfaces.
+- **Storage is Postgres** (paradedb, container `mauzcode-db`, **127.0.0.1:54393** only, db/user `mauzcode`, password generated by `script/install.sh` into `~/.mauzcode/.env` as `MAUZCODE_DB_PASSWORD` and into `.env` as `DATABASE_URL` — there is NO default password and MauzCode refuses to start without `DATABASE_URL`). The compose file in the repo root is the source of truth: `cp docker-compose.yml ~/.mauzcode/docker-compose.yml && cd ~/.mauzcode && docker compose up -d` (compose reads `~/.mauzcode/.env`). Never publish the port on all interfaces.
 - **Server-level settings go in `docker-compose.yml` (`command: -c …`), never `ALTER SYSTEM` from a REPL.** `shared_preload_libraries` only applies at server start, and `ALTER SYSTEM SET shared_preload_libraries = 'a,b,c'` writes the whole list as ONE quoted file name — the server then refuses to boot. Restarting the database stops every agent: ask the user first.
 - `ctx.fns.procs.db.*` — ALL ASYNC: `select({sql, params})` → rows, `run({sql, params})` → `{changes, lastInsertRowid: 0, rows}` (use RETURNING + `.rows` or `insert` for ids), `insert({into, values})` → `{id, changes}`, `exec({sql})` (multi-statement DDL, no params), `conn()` → Bun.SQL pool. `?` placeholders are translated to `$n` internally — keep writing `?`.
 - NEVER use bare `Bun.sql`/`new SQL()` in app code — it defaults to localhost:5432, not our db.
@@ -116,7 +116,7 @@ bun script/repl.ts -f /tmp/play.js                     # from file; stdin works 
 - Postgres dialect notes: ms-timestamps are BIGINT (come back as strings — wrap in `Number()`), `COUNT(*)` is bigint-string too, camelCase aliases need quotes (`AS "createdAt"`), `GREATEST` not scalar `MAX`, `ILIKE` not `COLLATE NOCASE`.
 - Tests: each test ctx gets a private **pg_temp** schema on a one-connection pool (self-cleaning); pools are closed per-file by `src/_testPreload.entry.ts` (bunfig `[test].preload`). `max_connections=1000` on the container. CI runs a paradedb service.
 - Migrations: `mod/$migration_<id>.ts` default-exporting `{ up(ctx), down?(ctx) }` (async), tracked in `_migrations(id)`. Ids are `YYYYMMDDHHmmss_name`.
-- One-shot sqlite→pg data copy: `script/migrate-sqlite-to-pg.ts` (already run; old file kept at `.hyper/_runtime/sessions`).
+- One-shot sqlite→pg data copy: `script/migrate-sqlite-to-pg.ts` (already run; old file kept at `.mauzcode/_runtime/sessions`).
 
 ## Agent (unchanged core design)
 
@@ -139,19 +139,19 @@ bun script/repl.ts -f /tmp/play.js                     # from file; stdin works 
   | `*.live.test.ts` | live | the real network and real accounts | `bun run test:live` — by hand only |
 
   `bun run test:all` = fast + integration (never live). Per-test timeout is 20 s via `script/test.ts` (bun's own 5 s times out healthy tests under parallel load); `TEST_TIMEOUT_MS` or `--timeout=` overrides it. A new test is fast unless it needs one of the above; a fast file that takes over ~1 s or spawns processes belongs in `.it`. Paths narrow a run: `bun script/test.ts it ./src/remote`.
-- **Test Postgres:** tests never use the working db (54393). They run on `hyper-db-test` (127.0.0.1:54399, `docker compose up -d db-test` in `~/.hyper`, fsync off) — `TEST_DATABASE_URL`, or `DATABASE_URL` with the port moved to 54399. The core migrations build one template db (`hyper_test_t_<hash>`, rebuilt when a migration changes); each test process gets its own copy, reset (TRUNCATE + drop extra tables) after every test that made a ctx and before each new file. Fast suite: `bun run test` (`--parallel=16 --no-isolate`, ~20–40 s); code is loaded once per worker and every `testCtx()` gets a copy of that state.
+- **Test Postgres:** tests never use the working db (54393). They run on `mauzcode-db-test` (127.0.0.1:54399, `docker compose up -d db-test` in `~/.mauzcode`, fsync off) — `TEST_DATABASE_URL`, or `DATABASE_URL` with the port moved to 54399. The core migrations build one template db (`mauzcode_test_t_<hash>`, rebuilt when a migration changes); each test process gets its own copy, reset (TRUNCATE + drop extra tables) after every test that made a ctx and before each new file. Fast suite: `bun run test` (`--parallel=16 --no-isolate`, ~20–40 s); code is loaded once per worker and every `testCtx()` gets a copy of that state.
 - Shared fixture: `mkTestCtx()` from `src/_testCtx.entry.ts` — boots the real registry (full Proxy ctx, test db, migrations, routes), scrubs env for determinism, and stubs `markdown.highlight/render` + `repl.eval`. Override stubs via `ctx.state.registry.<mod>.<fn> = (_c, _s, opts) => …` (raw signature!).
 - Route tests go through `ctx.fns.procs.http.dispatch({ method, url, body, headers })` → real `Response`.
 - **All tests use `model: 'mock:*'`** (`streamMock`; drive via `agent.scratchpad.mockLLM` — `echoUser`/`userText`/`defaultText`). Never hit real LLM providers in the suite.
-- Fixtures go to `.test-tmp/` (gitignored) — NEVER into `src/` or `.hyper/` (both are scanned roots).
-- **Test against a controlled environment, not live machines.** Anything that talks to an external system (SSH hosts, databases, browsers, HTTP services) gets a disposable fixture — preferably Docker — that the test starts, seeds and tears down itself. Never make the suite depend on the user's servers, `~/.ssh`, real accounts or network state. Example: `test/ssh/` (Dockerfile + compose + `fixture.ts`) keeps two sshd containers running for `src/remote/remote.it.test.ts` (started on first use, reused across runs, remote home reset each run) and points the ctx at a private ssh_config via `HYPER_SSH_CONFIG`/`HYPER_SSH_CONTROL_DIR`. Such suites `describe.skipIf(!dockerAvailable)` so a machine without Docker skips instead of failing; `HYPER_SKIP_DOCKER_TESTS=1` skips them explicitly.
+- Fixtures go to `.test-tmp/` (gitignored) — NEVER into `src/` or `.mauzcode/` (both are scanned roots).
+- **Test against a controlled environment, not live machines.** Anything that talks to an external system (SSH hosts, databases, browsers, HTTP services) gets a disposable fixture — preferably Docker — that the test starts, seeds and tears down itself. Never make the suite depend on the user's servers, `~/.ssh`, real accounts or network state. Example: `test/ssh/` (Dockerfile + compose + `fixture.ts`) keeps two sshd containers running for `src/remote/remote.it.test.ts` (started on first use, reused across runs, remote home reset each run) and points the ctx at a private ssh_config via `MAUZCODE_SSH_CONFIG`/`MAUZCODE_SSH_CONTROL_DIR`. Such suites `describe.skipIf(!dockerAvailable)` so a machine without Docker skips instead of failing; `MAUZCODE_SKIP_DOCKER_TESTS=1` skips them explicitly.
 - Run test files by explicit path (`bun test ./src/remote/`), not as a bare filter (`bun test src/remote`): a filter makes bun scan the whole tree, including `harnesses/`, and the thousands of open descriptors make `Bun.spawn` fail with `EBADF`.
 
 ## Core code placement
 
-**Nothing the app depends on may live in `.hyper/`** — it's the gitignored runtime overlay for agent-written extensions. Core features/migrations/routes/types go under `src/`. The scanner skips `_runtime`, `_test_*`, `_tmp_*`, `tmp_*`, `node_modules` segments.
+**Nothing the app depends on may live in `.mauzcode/`** — it's the gitignored runtime overlay for agent-written extensions. Core features/migrations/routes/types go under `src/`. The scanner skips `_runtime`, `_test_*`, `_tmp_*`, `tmp_*`, `node_modules` segments.
 
-Vendored `src/procs/` is upstream code: keep local patches minimal and marked with a `hyper-code2:` comment; prefer fixing upstream and re-vendoring.
+Vendored `src/procs/` is upstream code: keep local patches minimal and marked with a `mauzcode:` comment; prefer fixing upstream and re-vendoring.
 
 ## Secrets
 
@@ -167,7 +167,7 @@ Vendored `src/procs/` is upstream code: keep local patches minimal and marked wi
 - Guarded on both sides: `src/secrets/callers.test.ts` fails the suite if anything under
   `src/` or `plugins/` calls `secrets.resolve`, and `resolve` itself logs
   `secrets.resolve.direct` naming the caller — that one covers out-of-tree plugins in
-  `~/.hyper/user`, which no repository test can see.
+  `~/.mauzcode/user`, which no repository test can see.
 - A secret never reaches a log, an error message, a tool result or the transcript. Errors
   say that a secret could not be resolved, not which one or why.
 
@@ -183,7 +183,7 @@ Vendored `src/procs/` is upstream code: keep local patches minimal and marked wi
 ## Primary UI and extension contract
 
 - The primary shell is React/Vite in `frontend/src/LiveApp.tsx`, served at `/`. `/old-ui` only redirects supported GET/HEAD entry links; it is not a second application.
-- New trusted React extensions use `@hyper/ui`, the local Vite alias for `frontend/src/sdk/index.ts`, not a published package. Read `docs/ui-architecture.md`, `frontend/src/extensions/{types,registry,installed,pluginRuntime}.ts`, `ExtensionHost.tsx` and the fixture `frontend/src/test/fixtures/sdk-example.tsx` before adding one. Built-in screens live in `frontend/src/core-ui/`; a plugin's UI lives only in its own `ui/index.tsx` (default export, id = plugin name) with grants in `package.json` `procs.ui` — never add plugin UI to frontend sources.
+- New trusted React extensions use `@mauzcode/ui`, the local Vite alias for `frontend/src/sdk/index.ts`, not a published package. Read `docs/ui-architecture.md`, `frontend/src/extensions/{types,registry,installed,pluginRuntime}.ts`, `ExtensionHost.tsx` and the fixture `frontend/src/test/fixtures/sdk-example.tsx` before adding one. Built-in screens live in `frontend/src/core-ui/`; a plugin's UI lives only in its own `ui/index.tsx` (default export, id = plugin name) with grants in `package.json` `procs.ui` — never add plugin UI to frontend sources.
 - Import only the public SDK and host React from extension modules; a plugin UI may also import packages from its own `package.json` `dependencies` (bundled into the approved hash, e.g. xterm in `plugins/terminal`). No deep SDK imports, private host components, remote modules or second React runtime. Vite deduplicates React/React DOM.
 - Extensions declare `apiVersion: 1`, pages, navigation, panels, actions, Canvas kinds and Canvas launchers (buttons on the Canvas Start page that open a local tab with the launcher component; icon defaults to the plugin's `procs.icon`). Core grants live in `extensions/installed.ts`; plugin grants come from `procs.ui`, built at runtime by the backend and served via `/plugins/ui/manifest`. Official plugins are pre-approved; other plugin UIs run only after a person approves the exact bundle hash and grants in the Plugins page.
 - The host owns layout and supplies `agentId`, resolved `theme` and `readOnly` context. Mark mutating actions with `mutates`. These are trusted same-origin modules, not sandboxed plugins; frontend grants and disabled controls never replace backend auth, ownership, CSRF or explicit approval.
@@ -222,8 +222,8 @@ Migration facts: the old `ui.layout` navigation/dock/chat shell is removed; `pro
 
 ## Compatibility UI script routes
 
-- `$script_*.js` files are served as bundled browser assets by `procs/http/$loader_script.ts`, not as fns. After changing one, `ctx.fns.procs.http.loadRoutes({})` (or dev.sync) and verify the actually served HTTP output (e.g. `/agent/chat.js`), including `.hyper` overrides — not just the file on disk.
-- Live updates: browser code never listens to `hyper-events` directly. A server fragment is a live region (`ui.live`); anything else that mirrors server state uses `window.hyperLive.subscribe({ types, onEvent, resync })` — `resync` re-reads the state after a gap in the stream (hidden tab on HTTP/1.1, network drop) and is required. One-shot instructions use `hyperLive.command`. Enforced by the `live-subscribe` code.quality rule. Read `docs/live-updates.md` before adding anything that updates by itself.
+- `$script_*.js` files are served as bundled browser assets by `procs/http/$loader_script.ts`, not as fns. After changing one, `ctx.fns.procs.http.loadRoutes({})` (or dev.sync) and verify the actually served HTTP output (e.g. `/agent/chat.js`), including `.mauzcode` overrides — not just the file on disk.
+- Live updates: browser code never listens to `mauzcode-events` directly. A server fragment is a live region (`ui.live`); anything else that mirrors server state uses `window.mauzcodeLive.subscribe({ types, onEvent, resync })` — `resync` re-reads the state after a gap in the stream (hidden tab on HTTP/1.1, network drop) and is required. One-shot instructions use `mauzCodeLive.command`. Enforced by the `live-subscribe` code.quality rule. Read `docs/live-updates.md` before adding anything that updates by itself.
 - The compatibility SSR layout is `src/ui/layout.ts` (procs `toResponse` picks `registry.ui.layout` over the framework default). String / `{main, title}` returns from routes are wrapped by it; `Response` passes through.
 
 ## Git helpers

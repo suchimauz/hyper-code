@@ -15,7 +15,7 @@ for(const provider of ['codex','claude-code'] as const) for(const failure of ['l
   const id=await startLogin(ctx,null,{instance:'test',provider,account:'test'});
   // SSH command location depends on empty args in this fixture.
   command=String((spawn.mock.calls[0]![0] as string[])[2]);
-  const marker=command.match(/HYPER_LOGIN_[a-f0-9]+/)![0];
+  const marker=command.match(/MAUZCODE_LOGIN_[a-f0-9]+/)![0];
   send(err,`${marker}:login-status:0\nBearer SECRET_TOKEN auth.json {"refresh_token":"SECRET_TOKEN"} https://evil.test/SECRET_TOKEN HTTP 401\n`);
   send(out,`junk ${marker}:login-status:0\n${marker}:cli-login:999\n${marker}:login-status:0\n${marker}:SECRET_TOKEN:0\n`);
   send(out,marker.slice(0,10)); send(out,marker.slice(10)+':cli-login:0\n');

@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 export type ChoiceOption = { value: string; label?: string; description?: string };
 export type ChoiceInput = { batchId?: string; id: string; agentId: string; kind: 'choice'; title: string; message?: string; createdAt?: string; updatedAt?: string; result?: { value?: string; values?: string[]; other?: string } | null; state: 'open' | 'processing' | 'submitted' | 'cancelled'; spec: { options: (string | ChoiceOption)[]; multiple?: boolean; allowOther?: boolean } };
 export type ChoiceDraft = { values: string[]; otherSelected: boolean; other: string };

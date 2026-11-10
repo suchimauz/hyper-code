@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 export type InstalledPlugin = {
   name: string; label: string; description: string; icon: string | null; version: string | null; source: string;
@@ -49,12 +49,12 @@ export async function getPluginDetail(name: string, signal?: AbortSignal) {
 /** SKILL.md front matter is metadata, not prose for the card. */
 export const stripFrontMatter = (text: string) => text.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
 
-/** Opens Hyper's preview-only install review agent; activation needs separate confirmation there. */
+/** Opens MauzCode's preview-only install review agent; activation needs separate confirmation there. */
 export function reviewPluginInstall(csrfToken: string, selection: PluginSelection, operation: 'install' | 'update' | 'rollback' = 'install') {
   return requestJson<{ ok: boolean; agentId: string }>(PATH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ action: 'review', selection, operation }) });
 }
 
-/** Groups by the real Hyper plugin layer, in dsh section order. */
+/** Groups by the real MauzCode plugin layer, in dsh section order. */
 export const PLUGIN_GROUPS = [
   { source: 'official', title: 'Official plugins' },
   { source: 'user', title: 'Installed plugins' },

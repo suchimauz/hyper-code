@@ -1,9 +1,9 @@
-import { ApiError, requestJson } from './hyper';
+import { ApiError, requestJson } from './mauzcode';
 
 export type CommandDescriptor = { name: string; description: string; usage: string[]; inputHint?: string; attachments?: boolean };
 export type CommandCatalogue = { version: 1; commands: CommandDescriptor[]; csrfToken?: string };
 export type CommandResult = { ok: boolean; command: string; operationId: string; status: 'running' | 'completed' | 'failed' | 'interrupted'; error?: string; result?: { status: 'compacted' | 'not_needed' | 'stale' } };
-/** Submit through Hyper's existing dispatcher, retaining the caller's key across uncertain retries. */
+/** Submit through MauzCode's existing dispatcher, retaining the caller's key across uncertain retries. */
 export async function executeCommand(agentId: string, text: string, requestId: string): Promise<CommandResult> {
   const catalogue = await getCommands();
   if (!catalogue.csrfToken) throw new Error('Сервер не выдал токен команды. Обновите страницу.');
@@ -27,4 +27,4 @@ export async function validateCommand(text: string, fileCount = 0): Promise<void
   if (!command) throw new Error('Неизвестная команда. Введите /, чтобы выбрать команду из списка.');
   if (fileCount && !command.attachments) throw new Error(`Команда /${command.name} пока не принимает файлы. Уберите вложения или отправьте их отдельным сообщением.`);
 }
-export function notifyPlanningChanged(agentId: string) { window.dispatchEvent(new CustomEvent('hyper-planning-changed', { detail: agentId })); }
+export function notifyPlanningChanged(agentId: string) { window.dispatchEvent(new CustomEvent('mauzcode-planning-changed', { detail: agentId })); }

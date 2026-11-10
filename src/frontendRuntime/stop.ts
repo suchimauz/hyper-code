@@ -1,7 +1,7 @@
 /**
- * Close the Hyper-owned Vite server during lifecycle shutdown
+ * Close the MauzCode-owned Vite server during lifecycle shutdown
  *
- * Release the Vite HTTP listener, HMR connections and watchers during Hyper shutdown. Safe to call when no frontend server is running.
+ * Release the Vite HTTP listener, HMR connections and watchers during MauzCode shutdown. Safe to call when no frontend server is running.
  */
 export default async function (
     ctx: Context,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Panel, Stack, requestJson, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, Stack, requestJson, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 
 export type TriggerSummary={id:string;kind:string;status:string;prompt:string;nextAt:number|null};
 type Audit={trigger:TriggerSummary & {config:unknown;timezone:string;mode:string;attempts:number;lastError:string|null;timeoutAt:number|null;createdAt:number;finishedAt:number|null};runs:{id:string;outcome:string;scheduledAt:number;createdAt:number;error:string|null;result:unknown;resultRef:unknown}[]};

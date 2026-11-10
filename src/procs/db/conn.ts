@@ -2,7 +2,7 @@
 // state — ctx.state.procs.db.sql, like every module's state. Because state is
 // per-ctx, a forked test env (env.fork) gets its OWN isolated pool.
 //
-// hyper-code2: under NODE_ENV=test the pool is capped at ONE connection; the database is the test process's
+// mauzcode: under NODE_ENV=test the pool is capped at ONE connection; the database is the test process's
 // copy of the migrated template (src/_testDb.entry.ts), reset between tests. Test pools register on globalThis
 // for the harness to close (idle pooled connections would otherwise exhaust max_connections across the suite).
 import { SQL } from "bun";
@@ -26,7 +26,7 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
     // parameterized queries on a saturated pool (server idles in ClientRead,
     // client promises never resolve). The simple protocol has no such bug.
     const sql = new SQL(url, { max: isTest ? 1 : Number(ctx.env.PG_POOL_MAX) || 8, prepare: false });
-    if (isTest) (((globalThis as any).__hyperTestPools ??= new Set()) as Set<SQL>).add(sql);
+    if (isTest) (((globalThis as any).__mauzcodeTestPools ??= new Set()) as Set<SQL>).add(sql);
     st.sql = sql;
     return sql;
 }

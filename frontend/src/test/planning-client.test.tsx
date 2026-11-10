@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ConnectedPlanningPanel } from '../components/hyper/ConnectedPlanningPanel';
-import { MessageInput } from '../components/hyper/MessageInput';
+import { ConnectedPlanningPanel } from '../components/mauzcode/ConnectedPlanningPanel';
+import { MessageInput } from '../components/mauzcode/MessageInput';
 import { getPlanning, reviewPlan, type PlanningState } from '../lib/planning';
 const state: PlanningState = { version: 1, agentId: 'a', mode: 'plan', revision: 7, scope: 'session', advisory: true, runningPolicy: 'reject', csrfToken: 'token', proposal: { id: 'p1', inputId: 'i1', plan: '# Проверить проект\n\nИзучить файлы.', status: 'pending', createdAt: 1 } };
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -20,8 +20,8 @@ it('restores pending review from server and does not approve from ordinary refre
   render(<ConnectedPlanningPanel agentId="a" running={false} readOnly={false} onAccepted={vi.fn()} />);
   expect(await screen.findByRole('heading', { name: 'Проверить проект' })).toBeVisible();
   expect(fetcher.mock.calls).toHaveLength(1); expect(fetcher.mock.calls[0][1]).not.toHaveProperty('method', 'POST');
-  fireEvent(window, new CustomEvent('hyper-planning-changed', { detail: 'other' })); expect(fetcher.mock.calls).toHaveLength(1);
-  fireEvent(window, new CustomEvent('hyper-planning-changed', { detail: 'a' })); await waitFor(() => expect(fetcher.mock.calls).toHaveLength(2));
+  fireEvent(window, new CustomEvent('mauzcode-planning-changed', { detail: 'other' })); expect(fetcher.mock.calls).toHaveLength(1);
+  fireEvent(window, new CustomEvent('mauzcode-planning-changed', { detail: 'a' })); await waitFor(() => expect(fetcher.mock.calls).toHaveLength(2));
 });
 it('approves once and refreshes authoritative mode', async () => {
   let approved = false;
@@ -39,7 +39,7 @@ it('does not clear a failed decision with a successful background refresh', asyn
   render(<ConnectedPlanningPanel agentId="a" running={false} readOnly={false} onAccepted={vi.fn()} />);
   await userEvent.click(await screen.findByRole('button', { name: 'Начать реализацию' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('stale_revision');
-  fireEvent(window, new CustomEvent('hyper-planning-changed', { detail: 'a' }));
+  fireEvent(window, new CustomEvent('mauzcode-planning-changed', { detail: 'a' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Начать реализацию' })).toBeEnabled()); expect(screen.getByRole('alert')).toHaveTextContent('stale_revision');
 });
 it('ignores a delayed state response from the previous session', async () => {

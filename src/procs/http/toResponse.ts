@@ -31,12 +31,12 @@ async function page(ctx: Context, session: Session | null, opts: any, status = 2
     // A history restore (Back/Forward with no local cache) also arrives with
     // HX-Request, but htmx replaces the whole body with the answer — it must be
     // the full document, not a fragment.
-    // hyper-code2: a swap that replaces the whole FRAME (switching agents does
+    // mauzcode: a swap that replaces the whole FRAME (switching agents does
     // this instead of reloading the page) has to receive the frame, so a caller
     // can ask for the full document explicitly. Without it htmx selected from a
     // fragment, found nothing, and left the page empty.
     const wantsFrame = session?.req?.headers.get("hx-select") === "#frame"
-        || session?.req?.headers.get("x-hyper-frame") === "1";
+        || session?.req?.headers.get("x-mauzcode-frame") === "1";
     const partial = session?.req?.headers.get("hx-request") === "true"
         && session?.req?.headers.get("hx-history-restore-request") !== "true"
         && !wantsFrame;

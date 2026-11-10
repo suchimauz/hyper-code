@@ -1,5 +1,5 @@
 /**
- * Returns a service access token for calling the Hyper Control Plane, or null when not connected.
+ * Returns a service access token for calling the MauzCode Control Plane, or null when not connected.
  *
  * Uses the same client ID and secret as sign-in (auth.oidcConfig) with the standard OAuth 2.0
  * client_credentials grant, scoped to the service catalog. Tokens are cached until a minute before

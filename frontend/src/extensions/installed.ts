@@ -10,7 +10,7 @@ import { agentSourceExtension } from '../core-ui/agent-source';
 import { developerCanvasesExtension } from '../core-ui/developer-canvases';
 import { initialPromptExtension } from '../core-ui/initial-prompt';
 
-/** Built-in Hyper surfaces only. Plugin UIs are not listed here: they register
+/** Built-in MauzCode surfaces only. Plugin UIs are not listed here: they register
  * themselves at runtime from their own folder (package.json procs.ui) through
  * /plugins/ui/manifest — see extensions/pluginRuntime.ts. */
 export const coreExtensions: readonly UiExtension[] = [

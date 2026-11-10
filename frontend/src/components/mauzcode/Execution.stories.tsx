@@ -1,0 +1,11 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { CurrentAction } from './CurrentAction';
+import { ActiveToolRow } from './ActiveToolRow';
+import { ToolRow } from './ToolRow';
+import type { EventPage } from '../../lib/mauzcode';
+const page = { isRunning: true, turnStartedAt: Date.now(), activityStartedAt: Date.now(), activeTools: [{ id: 'fixture', name: 'tools_eval', subject: 'Inspect runtime', startedAt: Date.now(), state: 'running', tail: '{\n  "status": "running",\n  "checked": 12\n}' }] } as EventPage;
+const meta = { title: 'MauzCode/Execution', component: CurrentAction, args: { page }, decorators: [Story => <div style={{ maxWidth: 760, padding: 32 }}><Story /></div>] } satisfies Meta<typeof CurrentAction>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Running: Story = { render: () => <><ActiveToolRow run={page.activeTools![0]} /><CurrentAction page={page} /></> };
+export const Eval: Story = { render: () => <ToolRow agentId="fixture" event={{ idx: 1, ts: 1, type: 'tool_call', name: 'tools_eval', text: null }} initialDetails={{ idx: 1, ts: 1, type: 'tool_call', name: 'tools_eval', args: '{"code":"console.log(42)"}', result: '42', argsTruncated: false, resultTruncated: false, isError: false }} /> };

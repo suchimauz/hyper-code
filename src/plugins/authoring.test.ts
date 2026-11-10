@@ -16,7 +16,7 @@ test("authoring returns the canonical core guide from its loaded source location
 
 test("authoring exposes a discoverable documented zero-option runtime API", async () => {
     const metadata = await ctx.fns.runtime.docs.get({ name: "plugins.authoring" });
-    expect(metadata.summary).toContain("creating and configuring Hyper plugins");
+    expect(metadata.summary).toContain("creating and configuring MauzCode plugins");
     expect(metadata.paramsSchema.properties).toEqual({});
     expect(metadata.returnType).toBe("Promise<string>");
 });

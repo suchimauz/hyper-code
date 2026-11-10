@@ -42,7 +42,7 @@ test("stable order ignores status and usage",async()=>{
  const c=context(values);
  const first=await quotaData(c,null,{});
  expect(first.accounts.map(a=>a.provider)).toEqual(["codex","codex","codex","codex","claude-code","kimi-coding","zai-coding","minimax-coding","opencode","oneapi","alpha","zebra"]);
- expect(first.accounts.slice(0,4).map(a=>[a.connection,a.account])).toEqual([["local","a"],["local","z"],["hyper","a"],["ssh","b"]]);
+ expect(first.accounts.slice(0,4).map(a=>[a.connection,a.account])).toEqual([["local","a"],["local","z"],["mauzcode","a"],["ssh","b"]]);
  c.fns.llms.usageData=async()=>({entries:values.toReversed().map(e=>({...e,usedPercent:0,available:false,quotaStatus:"unavailable"})),gateway:null});
  expect((await quotaData(c,null,{})).accounts.map(a=>a.id)).toEqual(first.accounts.map(a=>a.id));
 });

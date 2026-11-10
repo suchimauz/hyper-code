@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Panel, requestJson, type UiExtension } from '@hyper/ui';
+import { Panel, requestJson, type UiExtension } from '@mauzcode/ui';
 type Source = { agentId: string; index: number; role: string; content: string };
 /** Read-only provenance view; message text is never interpreted as HTML. */
 export function AgentSource() {

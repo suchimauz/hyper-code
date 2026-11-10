@@ -70,13 +70,13 @@ export default async function (ctx: Context, session: Session | null, _opts?: {}
     // named "app" on the module manager with nothing to tell them apart.
     if (appSrc !== coreSrc) out.push({ name: await hostName(projectRoot), dir: appSrc, self: true });
 
-    // hyper-code2: `.hyper/` is the runtime-writable overlay (agent-written
-    // extensions). Scanned AFTER src so a `.hyper/<mod>/<fn>.ts` overrides
+    // mauzcode: `.mauzcode/` is the runtime-writable overlay (agent-written
+    // extensions). Scanned AFTER src so a `.mauzcode/<mod>/<fn>.ts` overrides
     // `src/<mod>/<fn>.ts` by the same name. `_runtime`/`_test_*`/`tmp`/`tmp_*` inside
     // it are dropped by the scanner's IGNORED_SEGMENT rule.
-    const hyperDir = resolve(projectRoot, ".hyper");
-    if (await readdir(hyperDir).then(() => true).catch(() => false)) {
-        out.push({ name: "hyper", dir: hyperDir, self: true });
+    const mauzCodeDir = resolve(projectRoot, ".mauzcode");
+    if (await readdir(mauzCodeDir).then(() => true).catch(() => false)) {
+        out.push({ name: "mauzcode", dir: mauzCodeDir, self: true });
     }
 
     // An app declared `runtime: "in-process"` in workspace.json is mounted from

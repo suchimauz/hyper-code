@@ -1,4 +1,4 @@
-/** A Hyper node this instance relays through (client side). */
+/** A MauzCode node this instance relays through (client side). */
 export type NodeEntry = {
     name: string;
     url: string;

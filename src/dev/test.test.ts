@@ -13,7 +13,7 @@ describe("dev test helpers", () => {
         expect(res.ok).toBe(true);
         expect(res.pass).toBeGreaterThan(0);
         expect(res.fail).toBe(0);
-        expect(res.logPath).toContain('.hyper/_runtime/logs/test-');
+        expect(res.logPath).toContain('.mauzcode/_runtime/logs/test-');
         expect((agent as any).scratchpad.dev.lastTestRun.logPath).toBe(res.logPath);
         expect((res as any).stdout).toBeUndefined();
         expect((res as any).stderr).toBeUndefined();

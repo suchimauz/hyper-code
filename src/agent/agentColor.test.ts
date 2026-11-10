@@ -26,7 +26,7 @@ test('random agent colors survive saves and reloads and both directions use the 
 
 test('migration backfills each legacy agent independently and future inserts get their own color', async () => {
     const ctx = await mkTestCtx();
-    expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('hyper_test_');
+    expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('mauzcode_test_');
     // Reconstruct the old schema only in the disposable test database.
     await ctx.fns.procs.db.exec({ sql: 'ALTER TABLE agents DROP COLUMN color_hue' });
     await ctx.fns.procs.db.exec({ sql: `INSERT INTO agents (id, model, created_at, updated_at) SELECT 'color-old-' || i, 'mock:echo', 1, 1 FROM generate_series(1, 64) AS i` });

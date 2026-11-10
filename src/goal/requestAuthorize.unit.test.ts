@@ -18,7 +18,7 @@ test('guard fails closed disabled, invalid frontier and durable denial; one read
 });
 for(const [name,adapter] of Object.entries({anthropic,openai,codex,xai,gemini})) test(`${name}: rebuilt request denied before actual transport`,async()=>{
  let built=0,checks=0,fetches=0;
- const ep={provider:name==='gemini'?'opencode':name==='xai'||name==='codex'?'hyper':'test',upstream:'xai',apiKey:'test',modelId:'model',url:name==='gemini'?'https://opencode.ai/inference/google/v1beta/models/model:generateContent':'https://example.invalid'};
+ const ep={provider:name==='gemini'?'opencode':name==='xai'||name==='codex'?'mauzcode':'test',upstream:'xai',apiKey:'test',modelId:'model',url:name==='gemini'?'https://opencode.ai/inference/google/v1beta/models/model:generateContent':'https://example.invalid'};
  const ctx:any={goalRequestContext:{agentId:'child',authority},state:{},env:{},fns:{agent:{buildLlmRequest:async()=>{built++;return {system:'s',messages:[]};},wireTools:()=>[],cacheRoot:async()=> 'root'},goal:{requestAuthorize:async()=>{checks++;throw Object.assign(Error('denied'),{goalRequestDenied:true});}},llm:{resolveEndpoint:async()=>ep,resolveReasoningEffort:async()=>({applied:'off'}),toAnthropicMessages:()=>[],toOpenAIMessages:()=>[],toCodexInput:()=>({input:[]}),toGeminiContents:async()=>[],geminiGenerationConfig:async()=>({}),accountAuthHealth:async()=>[],codexCliVersion:async()=> '0',connectFetch:async()=>{fetches++;throw Error('network forbidden');},opencodeFetch:async()=>{fetches++;throw Error('network forbidden');}}}};
  ctx.fns.llm.geminiGenerate=(o:any)=>generate(ctx,null,o);
  await expect(adapter(ctx,null,{agent:{id:'child',model:'test:model'} as any})).rejects.toMatchObject({goalRequestDenied:true});
@@ -27,7 +27,7 @@ for(const [name,adapter] of Object.entries({anthropic,openai,codex,xai,gemini}))
 
 test('Codex reauthorizes retry outside transport catch',async()=>{
  let checks=0,fetches=0;
- const ctx:any={goalRequestContext:{agentId:'child',authority},fns:{agent:{buildLlmRequest:async()=>({system:'',messages:[]}),cacheRoot:async()=> 'root',wireTools:()=>[]},goal:{requestAuthorize:async()=>{if(++checks===2) throw Object.assign(Error('revoked'),{goalRequestDenied:true});}},llm:{resolveEndpoint:async()=>({provider:'hyper',apiKey:'test',modelId:'test',url:'https://example.invalid'}),resolveReasoningEffort:async()=>({applied:'off'}),toCodexInput:()=>({input:[]}),codexCliVersion:async()=> '0',connectFetch:async()=>{fetches++;throw Error('temporary transport failure');}}}};
+ const ctx:any={goalRequestContext:{agentId:'child',authority},fns:{agent:{buildLlmRequest:async()=>({system:'',messages:[]}),cacheRoot:async()=> 'root',wireTools:()=>[]},goal:{requestAuthorize:async()=>{if(++checks===2) throw Object.assign(Error('revoked'),{goalRequestDenied:true});}},llm:{resolveEndpoint:async()=>({provider:'mauzcode',apiKey:'test',modelId:'test',url:'https://example.invalid'}),resolveReasoningEffort:async()=>({applied:'off'}),toCodexInput:()=>({input:[]}),codexCliVersion:async()=> '0',connectFetch:async()=>{fetches++;throw Error('temporary transport failure');}}}};
  await expect(codex(ctx,null,{agent:{id:'child',model:'test:model'} as any})).rejects.toMatchObject({goalRequestDenied:true});
  expect(checks).toBe(2);expect(fetches).toBe(1);
 });

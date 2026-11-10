@@ -1,6 +1,6 @@
 # Advisory planning mode
 
-Hyper planning is provider-neutral guidance, **not a sandbox or tool permission boundary**. Tool schemas remain unchanged. In plan mode the model is instructed to research, ask questions and propose an exact implementation plan without changing project files or taking external actions. Arbitrary eval/shell tools are still available: do not use this mode as a security guarantee. This is not Codex app-server `collaborationMode` support.
+MauzCode planning is provider-neutral guidance, **not a sandbox or tool permission boundary**. Tool schemas remain unchanged. In plan mode the model is instructed to research, ask questions and propose an exact implementation plan without changing project files or taking external actions. Arbitrary eval/shell tools are still available: do not use this mode as a security guarantee. This is not Codex app-server `collaborationMode` support.
 
 ## Commands and state
 

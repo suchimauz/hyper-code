@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { CompactionRow } from '../components/hyper/CompactionRow';
-import { coalesceCompactions } from '../components/hyper/compactionEvents';
-import type { ChatEvent } from '../lib/hyper';
+import { CompactionRow } from '../components/mauzcode/CompactionRow';
+import { coalesceCompactions } from '../components/mauzcode/compactionEvents';
+import type { ChatEvent } from '../lib/mauzcode';
 const start: ChatEvent = { idx: 3, ts: 10, type: 'compaction_start', revision: 2, text: null };
 const end: ChatEvent = { idx: 5, ts: 20, type: 'compaction_completed', revision: 2, text: null, summary: 'Summary body', tokensBefore: 3000, tokensAfter: 500 };
 describe('compaction history lifecycle', () => {

@@ -36,7 +36,7 @@ export default async function (
     // Do not insert new tabs into saved personal or instance layouts. An explicit management tab
     // continues to resolve after saving the new default layout.
     if (source === "default" || layout.tabs?.some(t => t.id === "management")) {
-        declared.management = { id: "management", title: "Управление", icon: "ph-sliders-horizontal", order: 2, widgets: [{ id: "management", widget: "pages", size: "wide", config: { section: "management", title: "Управление Hyper" } }] };
+        declared.management = { id: "management", title: "Управление", icon: "ph-sliders-horizontal", order: 2, widgets: [{ id: "management", widget: "pages", size: "wide", config: { section: "management", title: "Управление MauzCode" } }] };
     }
     const sources = state.search ?? {};
     const hidden = new Set(layout.hidden ?? []);

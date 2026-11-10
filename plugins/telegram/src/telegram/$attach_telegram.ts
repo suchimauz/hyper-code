@@ -2,7 +2,7 @@ import { TelegramClient } from "telegram";
 import { NewMessage } from "telegram/events";
 import { StringSession } from "telegram/sessions";
 
-const telegramClientKey = Symbol.for("hyper-code2.telegram.client.singleton");
+const telegramClientKey = Symbol.for("mauzcode.telegram.client.singleton");
 type TelegramCache = { client?: TelegramClient; connecting?: Promise<TelegramClient> | null };
 
 async function secret(ctx: Context, ref: string): Promise<string> {
@@ -21,8 +21,8 @@ async function connected(ctx: Context): Promise<TelegramClient> {
     if (cache.connecting) return await cache.connecting;
     cache.connecting = (async () => {
         const [configRaw, sessionString] = await Promise.all([
-            secret(ctx, "op://hyper/telegram config.json/value"),
-            secret(ctx, "op://hyper/telegram session.txt/value"),
+            secret(ctx, "op://mauzcode/telegram config.json/value"),
+            secret(ctx, "op://mauzcode/telegram session.txt/value"),
         ]);
         const config = JSON.parse(configRaw);
         if (!Number.isInteger(config.apiId) || !config.apiHash) throw new Error("Telegram MTProto config is invalid");

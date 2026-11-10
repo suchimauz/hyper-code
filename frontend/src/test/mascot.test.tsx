@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CrabMascot } from '../components/hyper/CrabMascot';
-import type { EventPage } from '../lib/hyper';
+import { CrabMascot } from '../components/mauzcode/CrabMascot';
+import type { EventPage } from '../lib/mauzcode';
 const animate = vi.fn(() => ({ cancel: vi.fn() }));
 const page = (mascot: EventPage['mascot'], agentId = 'one'): EventPage => ({ mascot, agentId, events: [], olderBefore: null, hasOlder: false, isRunning: false, runState: 'idle', lastError: null, partial: null });
 beforeEach(() => { animate.mockClear(); Element.prototype.animate = animate as unknown as typeof Element.prototype.animate; });

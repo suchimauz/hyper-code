@@ -1,5 +1,5 @@
 /**
- * Maps one finished spoken phrase to a single Hyper runtime call (command name + opts) without executing it.
+ * Maps one finished spoken phrase to a single MauzCode runtime call (command name + opts) without executing it.
  * Rule-based, Russian and English: "switch to/открой <agent>" → ui.openAgent, "stop/стоп" → agent.stop,
  * "new agent/новый агент ..." → ui.createAgent, "кто ждёт/непрочитанные" → whisper.waiting, "отмена/cancel" → cancel of the
  * pending dictation, anything else → ui.sendToAgent to the focused agent. `confident` marks commands that are safe to act on

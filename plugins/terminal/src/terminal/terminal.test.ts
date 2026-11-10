@@ -6,7 +6,7 @@ import {join} from 'node:path';
 const {default: authorize} = await import('./authorize');
 const {default: endpoint} = await import('./$ws_socket');
 const ORIGIN = 'http://127.0.0.1:5198';
-const dir = mkdtempSync(join(tmpdir(), 'hyper-term-'));
+const dir = mkdtempSync(join(tmpdir(), 'mauzcode-term-'));
 const agents: Record<string, {workspace_dir: string; workspace_host: string}> = {
  a: {workspace_dir: dir, workspace_host: ''},
  remote: {workspace_dir: '/srv', workspace_host: 'box'},
@@ -18,7 +18,7 @@ const ctx: any = {fns: {
  procs: {db: {select: async ({params}: any) => agents[params[0]] ? [agents[params[0]]] : []}},
  terminal: {authorize: ({req}: any) => authorize(ctx, owner, {req})},
 }};
-const req = (query: string, {origin = ORIGIN, protocol = 'hyper-terminal', path = '/terminal/socket'}: {origin?: string | null; protocol?: string; path?: string} = {}) =>
+const req = (query: string, {origin = ORIGIN, protocol = 'mauzcode-terminal', path = '/terminal/socket'}: {origin?: string | null; protocol?: string; path?: string} = {}) =>
  new Request(ORIGIN + path + query, {headers: {...(origin ? {origin} : {}), 'sec-websocket-protocol': protocol, upgrade: 'websocket'}});
 
 test('terminal handshake requires owner, same origin, subprotocol, valid agent and local workspace', async () => {
@@ -42,7 +42,7 @@ function serve(port: number) {
  return Bun.serve({hostname: '127.0.0.1', port, async fetch(r, server) {
   const state = await endpoint.upgrade(ctx, owner, {req: r});
   if (state instanceof Response) return state;
-  if (server.upgrade(r, {data: {state, url: r.url}, headers: {'sec-websocket-protocol': 'hyper-terminal'}})) return;
+  if (server.upgrade(r, {data: {state, url: r.url}, headers: {'sec-websocket-protocol': 'mauzcode-terminal'}})) return;
   return new Response('upgrade failed', {status: 400});
  }, websocket: {
   open(ws) { endpoint.open(ctx, owner, {ws}); },
@@ -50,7 +50,7 @@ function serve(port: number) {
   close(ws) { endpoint.close(ctx, owner, {ws}); },
  }});
 }
-const connect = (query = '?agentId=a&cols=90&rows=20') => new WebSocket(`ws://127.0.0.1:5198/terminal/socket${query}`, {protocols: ['hyper-terminal'], headers: {origin: ORIGIN}} as any);
+const connect = (query = '?agentId=a&cols=90&rows=20') => new WebSocket(`ws://127.0.0.1:5198/terminal/socket${query}`, {protocols: ['mauzcode-terminal'], headers: {origin: ORIGIN}} as any);
 
 test('live PTY runs in the workspace, resizes, and its shell dies when the socket closes', async () => {
  const server = serve(5198);
@@ -111,12 +111,12 @@ test('at most four terminals run at once', async () => {
    const ws = connect(); sockets.push(ws);
    await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
   }
-  const res = await fetch('http://127.0.0.1:5198/terminal/socket?agentId=a', {headers: {origin: ORIGIN, 'sec-websocket-protocol': 'hyper-terminal', upgrade: 'websocket', connection: 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13'}});
+  const res = await fetch('http://127.0.0.1:5198/terminal/socket?agentId=a', {headers: {origin: ORIGIN, 'sec-websocket-protocol': 'mauzcode-terminal', upgrade: 'websocket', connection: 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13'}});
   expect(res.status).toBe(429);
  } finally {
   for (const ws of sockets) ws.close();
   await Bun.sleep(300);
   server.stop(true);
  }
- expect(((globalThis as any).__hyperUiTerminals as Set<unknown>).size).toBe(0);
+ expect(((globalThis as any).__mauzcodeUiTerminals as Set<unknown>).size).toBe(0);
 }, 20000);

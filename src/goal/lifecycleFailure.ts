@@ -7,7 +7,7 @@
  * @param opts.expectedRunToken Immutable owner run token captured before execution; must still be valid.
  * @param opts.reason Trusted runtime error classification; admission rejection is not terminal_error.
  * @param opts.terminal Whether retry scheduling is exhausted or forbidden, as decided by the worker.
- * @param opts.codexPlanMode Actual execution Plan-mode flag, not the existence of a Hyper session.plan.
+ * @param opts.codexPlanMode Actual execution Plan-mode flag, not the existence of a MauzCode session.plan.
  */
 export default async function (
     ctx: Context,
@@ -23,7 +23,7 @@ export default async function (
         reason: "terminal_error" | "usage_limit" | "interrupted";
         /** Whether retry scheduling is exhausted or forbidden, as decided by the worker. */
         terminal: boolean;
-        /** Actual execution Plan-mode flag, not the existence of a Hyper session.plan. */
+        /** Actual execution Plan-mode flag, not the existence of a MauzCode session.plan. */
         codexPlanMode: boolean;
     },
 ): Promise<{ changed: boolean; reason: string; revision?: number; status?: types.goal.State["status"] }> {

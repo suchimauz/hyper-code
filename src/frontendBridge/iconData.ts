@@ -3,7 +3,7 @@
  *
  * Use for navigation icons without injecting SVG markup into the document. Custom images preserve colors; provider images are monochrome masks driven by the current UI theme.
  * @param opts.icon Stored custom SVG, preferred when present.
- * @param opts.model Native Hyper model identifier used for the provider fallback.
+ * @param opts.model Native MauzCode model identifier used for the provider fallback.
  */
 export default async function (
     ctx: Context,
@@ -11,7 +11,7 @@ export default async function (
     opts: {
         /** Stored custom SVG, preferred when present. */
         icon?: string | null;
-        /** Native Hyper model identifier used for the provider fallback. */
+        /** Native MauzCode model identifier used for the provider fallback. */
         model?: string | null;
     },
 ): Promise<{src:string;custom:boolean} | null> {

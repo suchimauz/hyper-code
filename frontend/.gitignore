@@ -2,5 +2,5 @@ node_modules/
 dist/
 storybook-static/
 *.tsbuildinfo
-.hyper/tmp/
+.mauzcode/tmp/
 .env*

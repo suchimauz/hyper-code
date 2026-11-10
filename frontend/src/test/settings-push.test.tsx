@@ -9,7 +9,7 @@ function setup(existing = false, permission: 'denied' | 'granted' = 'denied') {
   const subscribe = vi.fn(async () => created);
   const register = vi.fn(async () => ({ pushManager: { getSubscription: async () => null, subscribe } }));
   const sub = { endpoint: 'https://example.test/endpoint', unsubscribe };
-  const getRegistration = vi.fn(async () => ({ active: { scriptURL: 'https://hyper.test/webPush/web-push-sw.js' }, pushManager: { getSubscription: async () => existing ? sub : null } }));
+  const getRegistration = vi.fn(async () => ({ active: { scriptURL: 'https://mauzcode.test/webPush/web-push-sw.js' }, pushManager: { getSubscription: async () => existing ? sub : null } }));
   vi.stubGlobal('isSecureContext', true); vi.stubGlobal('PushManager', class {});
   vi.stubGlobal('Notification', { permission: 'default', requestPermission });
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { getRegistration, register } });
@@ -28,7 +28,7 @@ test('opening settings reads only; permission prompt requires button gesture', a
   await screen.findByText(/Notifications are blocked/); expect(h.register).not.toHaveBeenCalled();
 });
 test('unsubscribe requires explicit confirmation, then uses scoped CSRF transport', async () => {
-  const h = setup(true); localStorage.setItem('hyper-push-binding', 'owner:session'); render(<PushSettingsPanel />);
+  const h = setup(true); localStorage.setItem('mauzcode-push-binding', 'owner:session'); render(<PushSettingsPanel />);
   fireEvent.click(await screen.findByRole('button', { name: 'Disable on this device' }));
   expect(h.unsubscribe).not.toHaveBeenCalled(); expect(h.fetchMock).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Confirm disable' }));
@@ -43,7 +43,7 @@ test('connected devices render named and fallback rows without per-agent toggles
   expect(h.fetchMock).toHaveBeenCalledTimes(1);
 });
 test('removing another device requires confirmation and posts owner-scoped id', async () => {
-  const h = setup(true); localStorage.setItem('hyper-push-binding', 'owner:session'); render(<PushSettingsPanel />);
+  const h = setup(true); localStorage.setItem('mauzcode-push-binding', 'owner:session'); render(<PushSettingsPanel />);
   const own = (await screen.findByText('This device')).closest('li')!;
   expect(within(own).queryByRole('button')).toBeNull();
   const row = screen.getByText('Google push (FCM)').closest('li')!;

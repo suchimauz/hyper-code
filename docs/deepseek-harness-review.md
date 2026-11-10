@@ -1,17 +1,17 @@
 # What to take from DeepSeek Harness
 
 A read of [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)
-(cloned at `~/deepseek-harness`, 12 293 commits) against hyper-code2, written for the
+(cloned at `~/deepseek-harness`, 12 293 commits) against mauzcode, written for the
 people and agents working in this repo. It answers one question: **which of their ideas
 pay for themselves here**, given that we are deliberately a different kind of program.
 
 ## The two shapes
 
-|  | dsh | hyper-code2 |
+|  | dsh | mauzcode |
 |---|---|---|
 | Size | 54 packages, ~453k lines TS, pnpm monorepo | ~32k lines, one package |
 | Runtime | Node ≥22, build step (`tsc` + `tsdown`) | Bun, no build |
-| Composition | Cordis plugin tree assembled from config (profiles → bundles → patch files) | file-name grammar scanned from disk (`$tool_`, `$route_`, `$loader_`) + `.hyper` overlay |
+| Composition | Cordis plugin tree assembled from config (profiles → bundles → patch files) | file-name grammar scanned from disk (`$tool_`, `$route_`, `$loader_`) + `.mauzcode` overlay |
 | Extending it | mount a plugin, restart | save a file, live in ~3s |
 | UI | React app over a JSON-RPC/ACP gateway | server-rendered htmx |
 | Model protocol | native JSON tool calls | native JSON tool calls |
@@ -212,7 +212,7 @@ for the discipline more than for the code.
 
 ## Reading list in their repo
 
-The following paths refer to the reviewed DeepSeek harness repository, not this Hyper checkout:
+The following paths refer to the reviewed DeepSeek harness repository, not this MauzCode checkout:
 
 - `docs/architecture.md` — the plugin tree, seams, and where new behavior goes
 - `docs/defensive-patterns.md` — one page, every rule earned by a shipped bug

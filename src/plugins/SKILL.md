@@ -1,6 +1,6 @@
 ---
 name: plugins-authoring
-description: Create local Hyper plugins with honest discovery metadata, documented runtime functions, routes, app entries and declared settings.
+description: Create local MauzCode plugins with honest discovery metadata, documented runtime functions, routes, app entries and declared settings.
 ---
 
 # Plugin authoring
@@ -13,7 +13,7 @@ For runtime ownership, current lifecycle limitations, and the proposed opt-in lo
 
 - Put substantial private integrations in a direct child of the configured external `USER_PLUGINS` directory, not the repository's official `plugins/` tree. Resolve the configured directory instead of assuming a particular home path. Valid user children are mounted automatically by discovery; adding or changing runtime files still requires loading/reloading.
 - Official plugins live in this repository's `plugins/<name>/`; changes there are shared product work, not private customization.
-- Use `.hyper/<namespace>/<function>.ts` for small project-local procedures. It is an additional runtime root, not a full plugin package.
+- Use `.mauzcode/<namespace>/<function>.ts` for small project-local procedures. It is an additional runtime root, not a full plugin package.
 - Mounted plugins execute trusted server code with the host's authority. Metadata validation and managed-copy checks are not a sandbox. Review code before loading it.
 
 ## Minimal package and honest metadata
@@ -130,9 +130,9 @@ export default {
 } satisfies types.dock.Item;
 ```
 
-`render` runs on every page render with a short timeout (1.5 s); a throw, a timeout or `null` only leaves that entry out. Keep it to a cached read — never network or discovery on the render path. To keep a badge live, ship a small `$script_*.js` that re-fetches your own fragment on a `hyper-events` event you emit, as `mentions/$dock_mentions.ts` does.
+`render` runs on every page render with a short timeout (1.5 s); a throw, a timeout or `null` only leaves that entry out. Keep it to a cached read — never network or discovery on the render path. To keep a badge live, ship a small `$script_*.js` that re-fetches your own fragment on a `mauzcode-events` event you emit, as `mentions/$dock_mentions.ts` does.
 
-Order and visibility are not the plugin's call: the `dock.layout` setting (`{ "top": [ids], "bottom": [ids], "hidden": [ids], "pins": [hrefs] }`) sets them for the instance (env `HYPER_DOCK`) and, per person, the Dock itself saves the person's copy when they drag, hide, pin or reset. Unknown ids are ignored, so removing a plugin never breaks a layout.
+Order and visibility are not the plugin's call: the `dock.layout` setting (`{ "top": [ids], "bottom": [ids], "hidden": [ids], "pins": [hrefs] }`) sets them for the instance (env `MAUZCODE_DOCK`) and, per person, the Dock itself saves the person's copy when they drag, hide, pin or reset. Unknown ids are ignored, so removing a plugin never breaks a layout.
 
 ### Global menu widgets and search
 
@@ -169,7 +169,7 @@ export default {
 
 `render` and `search` must only read and must check access for the current viewer. Each runs with its own timeout (2.5 s / 2 s); a throw or timeout shows "unavailable" in that tile or group only. A source slower than 300 ms gets a placeholder that fills in when it answers, so fast groups never wait. Keep `render` a cached read (use `ttl`) — opening the menu must not fan out to a dozen services.
 
-A plugin widget nobody placed lands on the built-in **Plugins** tab automatically, next to the pages plugins declare with `$app_`. The person arranges the rest from the menu (pencil button): add, move, resize, remove tiles, add/rename/move/remove tabs, reset. That is stored in the `nav.layout` setting — for the instance (env `HYPER_NAV`) and per person. Unknown ids are ignored, so removing a plugin never breaks a layout.
+A plugin widget nobody placed lands on the built-in **Plugins** tab automatically, next to the pages plugins declare with `$app_`. The person arranges the rest from the menu (pencil button): add, move, resize, remove tiles, add/rename/move/remove tabs, reset. That is stored in the `nav.layout` setting — for the instance (env `MAUZCODE_NAV`) and per person. Unknown ids are ignored, so removing a plugin never breaks a layout.
 
 ### Chat UI
 
@@ -190,13 +190,13 @@ export default {
 };
 ```
 
-Use `settings.get`/`settings.set` for values. An instance may fix a plugin's values in `~/.hyper/settings/$settings_<plugin>.json` (see docs/settings.md) — never ship such files inside the plugin. Setting keys come from namespace plus filename. Descriptor fields such as `type`, `default`, `env`, `title`, `description`, `options`, `min` and `max` belong in declarations and must match the consuming settings implementation. Never commit secret values as defaults, environment files, package metadata or SKILL.md examples. Use encrypted secret storage and references through supported consumers; never print secret values to discovery output or logs.
+Use `settings.get`/`settings.set` for values. An instance may fix a plugin's values in `~/.mauzcode/settings/$settings_<plugin>.json` (see docs/settings.md) — never ship such files inside the plugin. Setting keys come from namespace plus filename. Descriptor fields such as `type`, `default`, `env`, `title`, `description`, `options`, `min` and `max` belong in declarations and must match the consuming settings implementation. Never commit secret values as defaults, environment files, package metadata or SKILL.md examples. Use encrypted secret storage and references through supported consumers; never print secret values to discovery output or logs.
 
 ## Plugin UI (React, loaded at runtime)
 
 A plugin's browser UI lives only in its own folder — never in `frontend/src`, never in a host allowlist.
 
-1. Write `ui/index.tsx` with `export default` a `UiExtension` whose `id` equals the plugin name. Import only `react`, `react/jsx-runtime`, `react-dom`, `@hyper/ui`, relative files inside `ui/` and packages listed in the plugin's own `package.json` `dependencies` (run `bun install` in the plugin folder; they are bundled into the approved hash).
+1. Write `ui/index.tsx` with `export default` a `UiExtension` whose `id` equals the plugin name. Import only `react`, `react/jsx-runtime`, `react-dom`, `@mauzcode/ui`, relative files inside `ui/` and packages listed in the plugin's own `package.json` `dependencies` (run `bun install` in the plugin folder; they are bundled into the approved hash).
 2. Declare the requested grants in `package.json`:
 
 ```json
@@ -204,7 +204,7 @@ A plugin's browser UI lives only in its own folder — never in `frontend/src`, 
 ```
 
    Canvas kinds must start with one of the plugin's namespaces; `applications` maps a legacy document path to a requested page. `canvasLaunchers: ["<id>"]` grants buttons on the Canvas Start page: the extension declares `canvasLaunchers: [{ id, title, description?, icon?, component }]`, each click opens a local tab ("Title", "Title 2", …) rendering `component` with `{ context, tabId, active }`, unmounted when the tab closes. The icon defaults to the plugin's `procs.icon`, then a puzzle. Reference: `plugins/terminal`.
-3. Run `plugins.reload({ name })`. Hyper rebuilds the bundle (`plugins.uiCompile`), emits `plugins.changed`, and open tabs pick it up without a page reload or frontend rebuild. Check `ctx.state.plugins.ui[name].error` or `plugins.uiManifest({})` for build errors.
+3. Run `plugins.reload({ name })`. MauzCode rebuilds the bundle (`plugins.uiCompile`), emits `plugins.changed`, and open tabs pick it up without a page reload or frontend rebuild. Check `ctx.state.plugins.ui[name].error` or `plugins.uiManifest({})` for build errors.
 4. Official plugins are pre-approved. A user or other plugin's UI runs only after a person approves the exact bundle hash and grants in the Plugins page; any change to the code or grants sends it back for review. Never approve on a person's behalf.
 
 UI code is trusted same-origin code, not a sandbox: every route it calls still enforces authentication, ownership and CSRF itself.
@@ -265,9 +265,9 @@ Use the same layout for a repository containing one plugin or several:
 
 Each `plugins/<name>` directory is a complete plugin package. Its directory basename must equal its validated `package.json` name (an unscoped lowercase plugin name); do not use repository names or arbitrary paths as substitutes for plugin identity. Each plugin owns independent runtime namespaces and must not require sibling plugins or shared repository-local runtime code. Calling built-in core procedures is still normal. No root bundle manifest, root package.json, shared dependency installation or root README is required. A repository groups source and Git history; it is not a combined runtime plugin.
 
-Publish one selected plugin subtree at a time. Publication must preserve sibling plugins, unrelated root files and existing repository history; it must not replace the repository with the selected package. Legacy repositories with a plugin at the root remain readable for compatibility. Reading or publishing another plugin is not permission to silently move, delete or migrate that legacy root package. See `plugins/hyperhub/SKILL.md` for the provider's publication workflow and registry prerequisites.
+Publish one selected plugin subtree at a time. Publication must preserve sibling plugins, unrelated root files and existing repository history; it must not replace the repository with the selected package. Legacy repositories with a plugin at the root remain readable for compatibility. Reading or publishing another plugin is not permission to silently move, delete or migrate that legacy root package. See `plugins/mauzcodehub/SKILL.md` for the provider's publication workflow and registry prerequisites.
 
-Repository storage and runtime activation are separate. The current HyperHub materializer fetches the whole repository into temporary storage and copies only the selected plugin into the managed destination. This is not a persistent bundle cache or a repository-wide install/enable operation. A persistent repository cache with separately enabled plugin subtrees is planned, not implemented by that workflow. Keep installed managed copies under the configured `USER_PLUGINS` layout; do not manually point discovery at a proposed cache.
+Repository storage and runtime activation are separate. The current MauzCodeHub materializer fetches the whole repository into temporary storage and copies only the selected plugin into the managed destination. This is not a persistent bundle cache or a repository-wide install/enable operation. A persistent repository cache with separately enabled plugin subtrees is planned, not implemented by that workflow. Keep installed managed copies under the configured `USER_PLUGINS` layout; do not manually point discovery at a proposed cache.
 
 ## Discovery is not installation
 

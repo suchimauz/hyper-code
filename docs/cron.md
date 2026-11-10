@@ -1,6 +1,6 @@
 # Embedded cron tasks
 
-Hyper executes durable background runtime functions with an embedded worker in the HTTP Bun process.
+MauzCode executes durable background runtime functions with an embedded worker in the HTTP Bun process.
 
 ## Storage model
 
@@ -9,9 +9,9 @@ Cron uses two Postgres tables:
 - `cron_tasks` — one row per task: function, arguments, schedule, `next_run_at`, operational `enabled` status, worker state, and declaration source;
 - `cron_runs` — immutable execution history with scheduled/start/finish times, status, result, and error.
 
-Recurring definitions live in `$cron_<name>.ts` files. hyper-code itself ships none: a schedule
+Recurring definitions live in `$cron_<name>.ts` files. mauzcode-code itself ships none: a schedule
 is a decision of one workspace, so declare it in a user plugin (`$USER_PLUGINS/<plugin>/src/<mod>/`)
-or in the project `.hyper/` root — every instance running the shared code would otherwise run it too.
+or in the project `.mauzcode/` root — every instance running the shared code would otherwise run it too.
 
 ```ts
 // $USER_PLUGINS/schedules/src/schedules/$cron_rss-sync.ts

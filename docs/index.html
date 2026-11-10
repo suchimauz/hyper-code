@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>hyper-code2 — REPL is all you need</title>
+  <title>mauzcode — REPL is all you need</title>
   <style>
     :root { --fg:#1a1a1a; --muted:#666; --bg:#fafafa; --line:#e5e5e5; --hl:#fffbe6; }
     * { box-sizing: border-box; }
@@ -51,7 +51,7 @@
   <h1>REPL is all you need</h1>
   <p><strong>Let the agent think and act in code.</strong></p>
   <p>Give it the full runtime and one tool — it writes the rest, shaped to you and your project.</p>
-  <p class="muted">github.com/niquola/hyper-code2 · Nikolai Ryzhikov · Health Samurai</p>
+  <p class="muted">github.com/niquola/mauzcode · Nikolai Ryzhikov · Health Samurai</p>
 </section>
 
 <!-- 2. THE REALIZATION -->
@@ -79,7 +79,7 @@
   <p class="lead">Code is both — variables and control flow are <strong>thought</strong>; <code>fetch</code>, <code>git</code>, <code>db</code> calls are <strong>action</strong>. One medium for both.</p>
   <p>MCP and <code>bash</code> give a flat menu of pre-shaped buttons; the agent has to verbalize plans in prose, then translate each step into a tool call. Code skips the translation. One <code>evalCode</code> can do the work of six MCP servers, with composition (loops, parallelism, libraries) for free.</p>
   <p>Take a real fan-out: <em>"triage every open issue in this repo and label it bug / feature / question."</em></p>
-<pre><code>const repo = "niquola/hyper-code2";
+<pre><code>const repo = "niquola/mauzcode";
 const issues = await (await fetch(
   `https://api.github.com/repos/${repo}/issues?state=open`,
   { headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }})).json();
@@ -98,9 +98,9 @@ return { triaged: results.length, by_label: Map.groupBy(results, r =&gt; r.label
   <p class="footnote"><strong>Related work:</strong> <a href="https://arxiv.org/html/2512.24601v2">Recursive Language Models</a> (Zhang/Kraska/Khattab, 2025) make the same architectural bet — long inputs are <strong>data inside a REPL environment</strong>, not text in the LLM context; the model writes code that peeks, slices, and recursively calls sub-LLMs over pieces. Our <code>agent.scratchpad</code> + <code>ctx.fns.repl.eval</code> + <code>ctx.fns.session.fork</code> give the agent the same shape today.</p>
 </section>
 
-<!-- 5. HYPERMEDIA > TUI -->
+<!-- 5. MAUZCODEMEDIA > TUI -->
 <section id="5">
-  <div class="num">05 / WHY HYPERMEDIA</div>
+  <div class="num">05 / WHY MAUZCODEMEDIA</div>
   <h2>HTTP &amp; HTML beat TUI and IDE plugins</h2>
   <p class="lead">The browser is a universal client we already have. The agent extends the UI the same way it writes any other code.</p>
   <ul>
@@ -114,7 +114,7 @@ return { triaged: results.length, by_label: Map.groupBy(results, r =&gt; r.label
     <li><strong>Cross-platform</strong> — desktop, mobile, ssh-tunneled, embedded — anywhere with a browser.</li>
     <li><strong>Composable with the rest of the web</strong> — <code>fetch</code>, <code>iframe</code>, OAuth, file upload, drag-and-drop — all standard.</li>
   </ul>
-  <p>The mechanic in hyper-code2: agent writes <code>.hyper/&lt;mod&gt;/$route_X_GET.ts</code>, calls <code>ctx.fns.http.loadRoutes(ctx)</code>, the route is live. Same trick for <code>$script_*</code> client JS, <code>$type_*</code> shared types, even Bun-bundled <code>.entry.ts</code>.</p>
+  <p>The mechanic in mauzcode: agent writes <code>.mauzcode/&lt;mod&gt;/$route_X_GET.ts</code>, calls <code>ctx.fns.http.loadRoutes(ctx)</code>, the route is live. Same trick for <code>$script_*</code> client JS, <code>$type_*</code> shared types, even Bun-bundled <code>.entry.ts</code>.</p>
 </section>
 
 <!-- 6. SELF-AWARE -->
@@ -122,7 +122,7 @@ return { triaged: results.length, by_label: Map.groupBy(results, r =&gt; r.label
   <div class="num">06 / SELF-AWARENESS</div>
   <h2>An agent that understands itself</h2>
   <p class="lead">Self-extension only works if the agent can <em>see</em> itself first.</p>
-  <p>In hyper-code2 the agent's whole world is a few obvious objects. It can read each one with the same <code>evalCode</code> it uses for anything else:</p>
+  <p>In mauzcode the agent's whole world is a few obvious objects. It can read each one with the same <code>evalCode</code> it uses for anything else:</p>
 <pre><code>// What functions do I have?
 Object.keys(ctx.fns)
 // → ['agent', 'db', 'events', 'files', 'http', 'llm', 'markdown',
@@ -144,9 +144,9 @@ ctx.fns.db.select(ctx,
   <p>The system prompt teaches it the <strong>three places that matter</strong>: <code>ctx.fns</code> (what it can do), <code>ctx.routes</code> (what it exposes), <code>Postgres</code> (what it remembers). Once those are visible, "extending myself" becomes a concrete loop: <em>see the gap → write the file → hot-load → use it</em>. No reflection, no plugin API — the source code <em>is</em> the introspection surface.</p>
 </section>
 
-<!-- 7. HYPER-CODE2 + ARCH -->
+<!-- 7. MAUZCODE-CODE2 + ARCH -->
 <section id="7">
-  <div class="num">07 / HYPER-CODE2</div>
+  <div class="num">07 / MAUZCODE-CODE2</div>
   <h2>A runtime where the agent can live and extend itself</h2>
   <p class="lead">Small enough that the agent holds the architecture in context. Simple enough that it can extend it without breaking anything.</p>
   <ul>
@@ -207,8 +207,8 @@ agent.scratchpad.release = { tag, commits, prs, body };  // off-context
 return { since: tag, commits: commits.length, contributors, prs_linked };</code></pre>
 
   <h3>Turn N — pin the pattern as a project procedure</h3>
-<pre><code>// Save under .hyper/ (gitignored, runtime-writable, agent-owned)
-await Bun.write(".hyper/release/notes.ts", `
+<pre><code>// Save under .mauzcode/ (gitignored, runtime-writable, agent-owned)
+await Bun.write(".mauzcode/release/notes.ts", `
   export default async function (ctx: Context, repo: string) {
     // ... same logic — now a reusable function
     return { tag, commits, prs, body };
@@ -220,7 +220,7 @@ await ctx.fns.repl.load(ctx, "release");
 await ctx.genTypes(ctx);
 
 // Turn N+1: call it like a built-in
-await ctx.fns.release.notes(ctx, "niquola/hyper-code2");</code></pre>
+await ctx.fns.release.notes(ctx, "niquola/mauzcode");</code></pre>
 
   <p>Over weeks the project quietly grows a library of procedures shaped to <strong>this repo</strong>, <strong>this author</strong>, <strong>this team's habits</strong>. The agent learns your codebase, your conventions, your favourite shortcuts — and bakes them in. No fixed harness gives you that, because no fixed harness knows you.</p>
 </section>
@@ -237,7 +237,7 @@ await ctx.fns.release.notes(ctx, "niquola/hyper-code2");</code></pre>
     <li>Ask: <em>"write it and call it!"</em></li>
   </ol>
   <blockquote>Give the model the full runtime and a single tool, then let it write the rest — shaped to you and your project.</blockquote>
-  <p style="text-align:center; margin-top:2em">★ <a href="https://github.com/niquola/hyper-code2">github.com/niquola/hyper-code2</a></p>
+  <p style="text-align:center; margin-top:2em">★ <a href="https://github.com/niquola/mauzcode">github.com/niquola/mauzcode</a></p>
   <p class="muted" style="text-align:center">A green baby. Join the fun.</p>
 </section>
 

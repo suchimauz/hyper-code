@@ -9,7 +9,7 @@ const MAX_MESSAGE = 64 * 1024;
 const MAX_BUFFERED = 1024 * 1024;
 const IDLE_MS = 12 * 60 * 60 * 1000;
 // Survives hot reload of this module, so the session cap cannot be bypassed by reloading.
-const live: Set<Term> = ((globalThis as any).__hyperUiTerminals ??= new Set<Term>());
+const live: Set<Term> = ((globalThis as any).__mauzcodeUiTerminals ??= new Set<Term>());
 
 type Start = {agentId: string; cwd: string; cols: number; rows: number};
 type Term = Start & {proc?: ReturnType<typeof Bun.spawn>; closed: boolean; idle?: ReturnType<typeof setTimeout>};
@@ -43,7 +43,7 @@ export default {
         try {
             term.proc = Bun.spawn([shell, '-i'], {
                 cwd: term.cwd,
-                env: {...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', TERM_PROGRAM: 'hyper-ui'},
+                env: {...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', TERM_PROGRAM: 'mauzcode-ui'},
                 terminal: {
                     cols: term.cols, rows: term.rows,
                     data(_t: unknown, bytes: Uint8Array) {

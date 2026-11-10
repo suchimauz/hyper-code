@@ -9,7 +9,7 @@ function context(role: string | null, csrf = true) {
   const ctx = { fns: { auth: { currentUser: async () => ({ required: true, user: role ? { role } : null }), verifyCsrf: async () => csrf, csrfToken: async () => 'bound' }, telegram: { mirror: async () => ({ dialogs: [] }), send: async (opts: object) => { calls.push(opts); return { id: 1 }; } } } } as any;
   return { ctx, calls };
 }
-const opts = (body: object = {}) => ({ req: new Request('https://hyper.test/telegram/api/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), params: {} });
+const opts = (body: object = {}) => ({ req: new Request('https://mauzcode.test/telegram/api/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), params: {} });
 test('Telegram native page redirect has no HTML client', async () => {
   const result = await page({} as any, null, opts());
   expect(result.status).toBe(302); expect(result.headers.get('location')).toBe('/?view=extension:telegram/overview'); expect(await result.text()).toBe('');

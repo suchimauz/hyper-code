@@ -1,6 +1,6 @@
 // Typecheck one eval body against the live project's declarations before it runs.
 //
-// hyper-code2: tsgo first. The in-process TypeScript Language Service below runs
+// mauzcode: tsgo first. The in-process TypeScript Language Service below runs
 // on the event loop and stalls every agent and request for 100–800 ms per eval;
 // the tsgo language server (src/tsgo) checks out of process in a few ms. The
 // in-process service stays as the fallback when tsgo is off, not installed,
@@ -66,7 +66,7 @@ async function inProcess(ctx: Context, opts: { code: string; bindings?: Record<s
         const config = ts.readConfigFile(configPath, ts.sys.readFile);
         if (config.error) return { ok: false, errors: [formatDiagnostic(ts, config.error, 0)] };
         const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
-        const evalFile = join(root, ".hyper", "_runtime", "eval", "__virtual_eval.ts");
+        const evalFile = join(root, ".mauzcode", "_runtime", "eval", "__virtual_eval.ts");
         holder = { root, configPath, configMtime: Bun.file(configPath).lastModified, ts, evalFile, source: "", version: 0, service: null };
         const h = holder;
         const projectFiles = parsed.fileNames.filter((file: string) => file !== evalFile);

@@ -32,7 +32,7 @@ export default async function (ctx: Context, _session: Session | null, opts?: {
     // last_notifiable_at watermark and the current viewer's seen_at.
     const visibility = opts?.visibility?.length ? opts.visibility : ["nav"];
     // Unread is per viewer (user_agent_state). The shared kv watermark is the fallback only while
-    // there is at most one user, so a single-user Hyper reads exactly as before.
+    // there is at most one user, so a single-user MauzCode reads exactly as before.
     const users = await ctx.fns.auth.listUsers({}).catch(() => [] as types.auth.User[]);
     const viewer = await ctx.fns.auth.viewerId({}).catch(() => null);
     const legacyKv = users.length <= 1;

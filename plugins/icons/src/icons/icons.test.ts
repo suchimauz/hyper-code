@@ -23,7 +23,7 @@ test("exact names, tags, bounds and missing matches", async () => {
         expect((await ctx.fns.icons.search({query:name}))[0].name).toBe(name);
     expect((await ctx.fns.icons.search({query:"watercolor"})).some((r: {name:string}) => r.name === "palette")).toBe(true);
     expect(await ctx.fns.icons.search({query:""})).toEqual([]);
-    expect(await ctx.fns.icons.search({query:"not-an-icon-hyper-xyz"})).toEqual([]);
+    expect(await ctx.fns.icons.search({query:"not-an-icon-mauzcode-xyz"})).toEqual([]);
     expect((await ctx.fns.icons.search({query:"arrow",limit:3})).length).toBe(3);
     for (const limit of [0,31,1.5]) await expect(ctx.fns.icons.search({query:"arrow",limit})).rejects.toThrow();
 });
@@ -34,7 +34,7 @@ test("SVG retrieval, padding and path validation", async () => {
     const padded = await ctx.fns.icons.get({name:"shapes",padded:true});
     expect(padded.svg).toContain('viewBox="0 0 32 32"');
     expect(padded.svg).toContain('translate(7 7) scale(0.75)');
-    for (const name of ["../package", "SHAPES", "missing-hyper-xyz"])
+    for (const name of ["../package", "SHAPES", "missing-mauzcode-xyz"])
         await expect(ctx.fns.icons.get({name})).rejects.toThrow();
 });
 

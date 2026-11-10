@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { BellOff, Check, X } from 'lucide-react';
-import { requestJson } from '../../lib/hyper';
+import { requestJson } from '../../lib/mauzcode';
 import { Button } from '../ui/Button';
 import { PushDevices, type PushDevice } from './PushDevices';
 
 type Config = { enabled: boolean; publicKey: string | null; userId: string; binding: string; devices: PushDevice[]; csrf: string };
 const workerPath = '/webPush/web-push-sw.js';
-const ownerKey = 'hyper-push-binding';
+const ownerKey = 'mauzcode-push-binding';
 const ownsWorker = (registration: ServiceWorkerRegistration) => [registration.active, registration.waiting, registration.installing].some(worker => worker && new URL(worker.scriptURL).pathname === workerPath);
 const binding = (config: Config) => `${config.userId}:${config.binding}`;
 function storedBinding() { try { return localStorage.getItem(ownerKey); } catch { return null; } }
 function remember(value: string | null) { try { if (value) localStorage.setItem(ownerKey, value); else localStorage.removeItem(ownerKey); } catch { /* Storage is not proof of ownership when unavailable. */ } }
 function availability() {
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (ios && !window.matchMedia('(display-mode: standalone)').matches && !(navigator as Navigator & { standalone?: boolean }).standalone) return 'On iPhone/iPad (16.4+), add Hyper to your Home Screen in Safari and open it from that icon.';
+  if (ios && !window.matchMedia('(display-mode: standalone)').matches && !(navigator as Navigator & { standalone?: boolean }).standalone) return 'On iPhone/iPad (16.4+), add MauzCode to your Home Screen in Safari and open it from that icon.';
   if (!window.isSecureContext || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'Push needs HTTPS and a supported browser.';
   return null;
 }

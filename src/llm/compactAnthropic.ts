@@ -28,7 +28,7 @@ export default async function (
     },
 ): Promise<{ block: { type: "compaction"; content: string; signature: string; [key: string]: unknown }; stopReason: string; usage: { prompt_tokens: number; completion_tokens: number } }> {
     const ep = await ctx.fns.llm.resolveEndpoint({ model: opts.model });
-    const upstream = ep.provider === "hyper" ? String(ep.upstream ?? "") : ep.provider;
+    const upstream = ep.provider === "mauzcode" ? String(ep.upstream ?? "") : ep.provider;
     if (ep.api !== "anthropic" || !["anthropic", "claude-code", "anthropic-oauth"].includes(upstream)) throw new Error(`server compaction is not supported for ${ep.provider}`);
     let apiKey = ep.ssh ? "ssh-remote" : ep.apiKey;
     if (!ep.ssh && ep.provider === "claude-code") apiKey = (await ctx.fns.llm.refreshClaudeCode({ account: ep.account })) ?? apiKey;
@@ -36,7 +36,7 @@ export default async function (
     if (!apiKey) throw new Error(`${ep.provider}: no credentials`);
     const subscription = upstream === "claude-code" || upstream === "anthropic-oauth";
     const headers: Record<string, string> = { "content-type": "application/json", "anthropic-version": "2023-06-01" };
-    if (subscription || ep.provider === "hyper") headers.authorization = `Bearer ${apiKey}`; else headers["x-api-key"] = apiKey;
+    if (subscription || ep.provider === "mauzcode") headers.authorization = `Bearer ${apiKey}`; else headers["x-api-key"] = apiKey;
     headers["anthropic-beta"] = [...(subscription ? ["claude-code-20250219", "oauth-2025-04-20"] : []), "compact-2026-09-04"].join(",");
     if (subscription) {
         headers["user-agent"] = ctx.env.CLAUDE_CODE_USER_AGENT ?? `claude-cli/${await ctx.fns.llm.claudeCodeCliVersion({ instance: ep.ssh?.instance })} (external, sdk-cli)`;

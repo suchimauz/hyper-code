@@ -1,4 +1,4 @@
-// Browsers scope cookies by host, never by port (RFC 6265 §8.5), so two Hyper
+// Browsers scope cookies by host, never by port (RFC 6265 §8.5), so two MauzCode
 // instances on localhost:3010 and localhost:3011 would share one "procs_session"
 // and sign each other out on every login. The default name therefore carries the
 // listening port; an explicit AUTH_COOKIE still wins for hosts that want one

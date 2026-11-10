@@ -33,7 +33,7 @@ it('explicit confirmation sends only the authoritative payload with cookie CSRF 
   expect(init?.method).toBe('POST');
   expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json', 'X-CSRF-Token': 'cookie-token' });
   expect(JSON.parse(init?.body as string)).toEqual({ account: 'work', confirmed: true, idempotencyKey: key });
-  expect(sessionStorage.getItem('hyper.codex-reset.pending:work')).toBeNull();
+  expect(sessionStorage.getItem('mauzcode.codex-reset.pending:work')).toBeNull();
 });
 
 it('keeps retry identity across failure, cancellation and remount; no automatic retry', async () => {
@@ -43,7 +43,7 @@ it('keeps retry identity across failure, cancellation and remount; no automatic 
   await screen.findByRole('alert');
   expect(fetcher).toHaveBeenCalledTimes(1);
   const key = JSON.parse(fetcher.mock.calls[0]![1]!.body as string).idempotencyKey;
-  expect(sessionStorage.getItem('hyper.codex-reset.pending:work')).toBe(key);
+  expect(sessionStorage.getItem('mauzcode.codex-reset.pending:work')).toBe(key);
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' })); first.unmount();
   render(<CodexAccountReset account="work" csrfToken="fresh-token" />);
   preview(); authorize(); fireEvent.click(screen.getByRole('button', { name: 'Spend credit and reset' }));

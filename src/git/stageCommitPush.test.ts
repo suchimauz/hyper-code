@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { mkTestCtx } from "../_testCtx.entry";
 
 async function mkRepo() {
-    const dir = await mkdtemp(join(tmpdir(), "hyper-git-"));
+    const dir = await mkdtemp(join(tmpdir(), "mauzcode-git-"));
     const ctx = await mkTestCtx();
     await ctx.fns.git.run({ args: ["init"], dir });
     await ctx.fns.git.run({ args: ["config", "user.email", "test@example.com"], dir });

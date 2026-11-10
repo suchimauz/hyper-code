@@ -5,7 +5,7 @@
 1. Open `/llms` and choose **Connect Claude Pro / Max**.
 2. Open the generated Anthropic authorization link and complete login within ten minutes.
 3. The loopback callback normally completes automatically at `http://localhost:53692/callback`.
-4. If the callback browser and hyper-code2 are on different machines, or port 53692 is unavailable, copy the final redirect URL and paste it into the manual completion form on `/llms`.
+4. If the callback browser and mauzcode are on different machines, or port 53692 is unavailable, copy the final redirect URL and paste it into the manual completion form on `/llms`.
 
 A pending login is process-local and deliberately not durable. Restarting or hot-reloading the process invalidates the old callback because its PKCE verifier is gone. Start a new login rather than retrying an old redirect URL.
 
@@ -22,7 +22,7 @@ The exact available model IDs remain subject to Anthropic subscription support. 
 
 | Prefix | Credential source | Implicit fallback |
 |---|---|---|
-| `anthropic-oauth:` | hyper-code2 managed OAuth, encrypted in Postgres | none |
+| `anthropic-oauth:` | mauzcode managed OAuth, encrypted in Postgres | none |
 | `claude-code:` | official Claude CLI macOS Keychain credential | none |
 | `anthropic:` | declared Anthropic API-key secret | none |
 
@@ -34,9 +34,9 @@ Managed tokens are stored in `oauth_credentials`, encrypted independently with A
 
 Key resolution:
 
-1. `HYPER_OAUTH_ENCRYPTION_KEY`: base64/base64url-encoded 32-byte key.
-2. Otherwise local key file `~/.hyper-code2/oauth.key`, generated with mode `0600` under a `0700` directory.
-3. `HYPER_OAUTH_KEY_FILE` can override the local key path.
+1. `MAUZCODE_OAUTH_ENCRYPTION_KEY`: base64/base64url-encoded 32-byte key.
+2. Otherwise local key file `~/.mauzcode/oauth.key`, generated with mode `0600` under a `0700` directory.
+3. `MAUZCODE_OAUTH_KEY_FILE` can override the local key path.
 
 Back up a stable production key separately. Losing or changing it makes existing encrypted tokens unreadable and requires reconnecting. Never commit the key file.
 

@@ -2,11 +2,11 @@
 // LM Studio is queried live; remote providers return a small curated static list.
 // Missing/unreachable providers are omitted silently.
 /**
- * List available models per provider, including a configured One API gateway and hyper/<node> groups.
- * @param opts.skipNodes Omit hyper/<node> groups and do not refresh node catalogues (host-side catalogue building). @default false
+ * List available models per provider, including a configured One API gateway and mauzcode/<node> groups.
+ * @param opts.skipNodes Omit mauzcode/<node> groups and do not refresh node catalogues (host-side catalogue building). @default false
  */
 export default async function (ctx: Context, _session: Session | null, opts?: { /** Omit node groups. @default false */ skipNodes?: boolean }): Promise<Record<string, string[]>> {
-    // The catalogue asks LM Studio, Groq, every Hyper node and each provider's credentials — seconds of
+    // The catalogue asks LM Studio, Groq, every MauzCode node and each provider's credentials — seconds of
     // work that the model popup and the new-chat form used to wait for on every open. The last answer is
     // returned at once and refreshed in the background once it is a minute old; only the very first call
     // (or a test with a fresh ctx) waits.
@@ -20,7 +20,7 @@ export default async function (ctx: Context, _session: Session | null, opts?: { 
         .finally(() => { entry.pending = undefined; });
     if (!entry.value) return refresh();
     if (Date.now() - entry.at > 60_000) refresh().catch(() => undefined);
-    // CLI logout happens outside Hyper. Never serve a removed local credential
+    // CLI logout happens outside MauzCode. Never serve a removed local credential
     // from the stale-while-revalidate cache; remote node routes are independent.
     if (entry.value.codex) {
         const connected = entry.value.codex.filter(model => {
@@ -157,7 +157,7 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
 
 
     // Query each local credential slot independently: a named-only login has no
-    // default auth.json, and must remain discoverable after selecting a Hyper node.
+    // default auth.json, and must remain discoverable after selecting a MauzCode node.
     // Keep the legacy default probe for hosts without account discovery support.
     const codexAccounts = ctx.fns.llm.listAccounts
         ? await ctx.fns.llm.listAccounts({ provider: "codex" }).catch(() => [])
@@ -263,7 +263,7 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
         }
     } catch { /* migration unavailable / not connected — omit */ }
 
-    // Other Hypers we relay through (docs/hyper-node.md): one group per node,
+    // Other MauzCodes we relay through (docs/mauzcode-node.md): one group per node,
     // from the cached catalogue (refreshed at most every 5 minutes).
     if (!opts?.skipNodes) try {
         for (const node of await ctx.fns.node.list({})) {
@@ -274,7 +274,7 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
             // also remain authoritative (never merge with the previous catalogue).
             if (!fresh || !fresh.enabled || !fresh.catalogAt || /^models 4(?!08:|29:)\d\d:/.test(fresh.lastError ?? "")) continue;
             const catalog = fresh.catalog ?? [];
-            if (catalog.length) out[`hyper/${node.name}`] = catalog.map((e) => `hyper/${node.name}:${e.id}`);
+            if (catalog.length) out[`mauzcode/${node.name}`] = catalog.map((e) => `mauzcode/${node.name}:${e.id}`);
         }
     } catch { /* node tables absent (fresh db) — omit */ }
     if (ctx.state) {

@@ -27,6 +27,6 @@ export default async function (
     } else {const form=await opts.req.formData();instructions=String(form.get('instructions')??'').trim();requestId ||= String(form.get('requestId')??'');}
     const accepted=await ctx.fns.commands.dispatch({agentId:opts.agentId,text:'/compact'+(instructions?' '+instructions:''),requestId:requestId||Bun.randomUUIDv7()});
     const result=accepted.result as Record<string,unknown>|undefined;
-    return Response.json({...accepted,version:1,operationStatus:accepted.status,status:result?.status??accepted.status},{status:accepted.status==='running'?202:200,headers:opts.popup&&accepted.ok?{'HX-Trigger':'hyper-popup-close'}:{}});
+    return Response.json({...accepted,version:1,operationStatus:accepted.status,status:result?.status??accepted.status},{status:accepted.status==='running'?202:200,headers:opts.popup&&accepted.ok?{'HX-Trigger':'mauzcode-popup-close'}:{}});
     } catch(error) {const e=error as Error & {status?:number;code?:string};return Response.json({error:e.code??'compact_failed',message:e.message},{status:e.status??400});}
 }

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "hyper-code2",
+      "name": "mauzcode",
       "dependencies": {
         "@base-ui/react": "1.9.0",
         "@codemirror/autocomplete": "^6.20.1",

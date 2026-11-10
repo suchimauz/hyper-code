@@ -1,7 +1,7 @@
 /**
- * Returns the browser tab icon of this Hyper instance as a data URL
+ * Returns the browser tab icon of this MauzCode instance as a data URL
  *
- * Resolves the favicon every page shell inlines: the instance override stored by ui.setFavicon (setting ui.favicon, or HYPER_FAVICON) when present, otherwise the built-in Hyper terminal-prompt icon. Use it when rendering a standalone HTML document that should carry the instance icon.
+ * Resolves the favicon every page shell inlines: the instance override stored by ui.setFavicon (setting ui.favicon, or MAUZCODE_FAVICON) when present, otherwise the built-in MauzCode terminal-prompt icon. Use it when rendering a standalone HTML document that should carry the instance icon.
  */
 export default async function (
     ctx: Context,

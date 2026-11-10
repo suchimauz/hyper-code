@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Install (or remove) Hyper as a launchd user service.
+# Install (or remove) MauzCode as a launchd user service.
 #
-# Why a service at all: until now Hyper ran inside whatever tmux session someone
+# Why a service at all: until now MauzCode ran inside whatever tmux session someone
 # happened to create. Closing that session sent SIGTERM and the server went away
 # silently — with the agents, the cron schedules and the public tunnel — and
 # nothing brought it back. Every restart this week was done by hand.
 #
 # launchd gives a process an EMPTY environment: no HOME, no PATH from your
-# shell. Hyper needs both — `bun` to run at all, `op` to resolve 1Password
-# secrets, HOME to find ~/.hyper. Those are written into the plist explicitly;
+# shell. MauzCode needs both — `bun` to run at all, `op` to resolve 1Password
+# secrets, HOME to find ~/.mauzcode. Those are written into the plist explicitly;
 # this is the part that is easy to get wrong and hard to notice, because the
 # service then starts and fails in ways that look like application bugs.
 #
@@ -17,7 +17,7 @@
 #   ./script/install-service.sh --status     what launchd thinks right now
 set -euo pipefail
 
-LABEL="com.niquola.hyper"
+LABEL="com.suchimauz.mauzcode"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DOMAIN="gui/$(id -u)"
@@ -51,7 +51,7 @@ esac
 [ -n "$BUN" ] || { echo "не найден bun в PATH" >&2; exit 1; }
 mkdir -p "$HOME/Library/LaunchAgents" "$ROOT/.runtime"
 
-# Refuse to kill an unrelated application. An already-installed Hyper service
+# Refuse to kill an unrelated application. An already-installed MauzCode service
 # is stopped through launchd; the old tmux process is only removed when its cwd
 # and command identify this checkout.
 launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
@@ -69,13 +69,13 @@ if [ -n "$existing" ]; then
         echo "порт $PORT занят посторонним процессом $existing ($command, cwd=$cwd); ничего не останавливаю" >&2
         exit 1
     fi
-    echo "останавливаю прежний Hyper PID $existing"
+    echo "останавливаю прежний MauzCode PID $existing"
     kill "$existing" 2>/dev/null || true
     for _ in $(seq 1 20); do kill -0 "$existing" 2>/dev/null || break; sleep 0.25; done
     if kill -0 "$existing" 2>/dev/null; then kill -9 "$existing"; fi
 fi
 # The tmux session this repo used before the service existed.
-tmux kill-session -t hyperd 2>/dev/null || true
+tmux kill-session -t mauzcoded 2>/dev/null || true
 
 cat > "$PLIST" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -92,10 +92,10 @@ cat > "$PLIST" <<PLIST_EOF
 
     <key>WorkingDirectory</key><string>$ROOT</string>
 
-    <!-- launchd hands over an empty environment. Everything Hyper needs to find
+    <!-- launchd hands over an empty environment. Everything MauzCode needs to find
          has to be named here: bun (Homebrew or ~/.bun/bin, whichever the
-         installer found first), op in Homebrew, the hyper CLI in ~/.local/bin,
-         and HOME is what makes ~/.hyper and 1Password work. -->
+         installer found first), op in Homebrew, the mauzcode CLI in ~/.local/bin,
+         and HOME is what makes ~/.mauzcode and 1Password work. -->
     <key>EnvironmentVariables</key>
     <dict>
         <key>HOME</key><string>$HOME</string>
@@ -133,7 +133,7 @@ for _ in $(seq 1 30); do
 done
 if [ "$ready" -ne 1 ]; then
     echo
-    echo "Hyper не ответил за 60 секунд" >&2
+    echo "MauzCode не ответил за 60 секунд" >&2
     status
     exit 1
 fi

@@ -9,13 +9,13 @@
 // from the checkout path, and the throwaway key lives in .test-tmp/ssh-fixture.
 // Two checkouts get two independent pairs of containers.
 //
-// Point a test ctx at it with ctx.env.HYPER_SSH_CONFIG / HYPER_SSH_CONTROL_DIR —
+// Point a test ctx at it with ctx.env.MAUZCODE_SSH_CONFIG / MAUZCODE_SSH_CONTROL_DIR —
 // remote.sshOptions picks both up, so the user's ~/.ssh is never touched.
 // Each run starts from a clean home (everything but ~/.ssh is removed) and
 // without leftover tmux jobs, so tests need not clean up after themselves.
 //
-//   HYPER_SSH_FIXTURE_DOWN=1   stop() removes the containers after the run
-//   HYPER_SKIP_DOCKER_TESTS=1  skip the suite
+//   MAUZCODE_SSH_FIXTURE_DOWN=1   stop() removes the containers after the run
+//   MAUZCODE_SKIP_DOCKER_TESTS=1  skip the suite
 //   docker compose -p <project> down -v   remove by hand (project printed on start)
 //
 // Returns null (and the suite should skip) when Docker is not available.
@@ -23,8 +23,8 @@ import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from "node
 import { join } from "node:path";
 
 export type SshFixture = {
-    config: string;      // ssh_config path → HYPER_SSH_CONFIG
-    controlDir: string;  // ControlMaster sockets → HYPER_SSH_CONTROL_DIR
+    config: string;      // ssh_config path → MAUZCODE_SSH_CONFIG
+    controlDir: string;  // ControlMaster sockets → MAUZCODE_SSH_CONTROL_DIR
     project: string;     // docker compose project name
     hosts: { plain: string; rg: string };
     env: Record<string, string>;
@@ -34,7 +34,7 @@ export type SshFixture = {
 const HERE = import.meta.dir;
 const CHECKOUT = join(HERE, "..", "..");
 // Stable per checkout, short enough for container names.
-const PROJECT = `hyper-ssh-${Bun.hash(CHECKOUT).toString(36).slice(0, 8)}`;
+const PROJECT = `mauzcode-ssh-${Bun.hash(CHECKOUT).toString(36).slice(0, 8)}`;
 const STATE = join(CHECKOUT, ".test-tmp", "ssh-fixture");
 const SERVICES = ["plain", "rg"] as const;
 
@@ -54,21 +54,21 @@ function buildHash(): string {
 }
 
 export async function startSshFixture(): Promise<SshFixture | null> {
-    if (process.env.HYPER_SKIP_DOCKER_TESTS === "1" || !(await dockerAvailable())) return null;
+    if (process.env.MAUZCODE_SKIP_DOCKER_TESTS === "1" || !(await dockerAvailable())) return null;
 
     mkdirSync(STATE, { recursive: true, mode: 0o700 });
     const keys = join(STATE, "keys");
     mkdirSync(keys, { recursive: true, mode: 0o700 });
     const key = join(keys, "id");
     if (!existsSync(key)) {
-        const kg = await sh(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "hyper-ssh-test", "-f", key]);
+        const kg = await sh(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "mauzcode-ssh-test", "-f", key]);
         if (kg.code !== 0) throw new Error("ssh-keygen failed: " + kg.err);
     }
     // A unix socket path must stay under ~104 bytes and %C is 40 hex chars:
     // the checkout path can be long, so master sockets live under /tmp.
     const controlDir = `/tmp/${PROJECT}-cm`;
     mkdirSync(controlDir, { recursive: true, mode: 0o700 });
-    const env = { HYPER_SSH_KEYS: keys };
+    const env = { MAUZCODE_SSH_KEYS: keys };
     const compose = (...args: string[]) => sh(["docker", "compose", "-p", PROJECT, ...args], env);
 
     // Reuse running containers built from the current files; otherwise (re)create.
@@ -80,7 +80,7 @@ export async function startSshFixture(): Promise<SshFixture | null> {
         const up = await compose("up", "-d", "--build", "--wait", ...(fresh ? [] : ["--force-recreate"]));
         if (up.code !== 0) throw new Error("docker compose up failed:\n" + up.err.slice(-2000));
         writeFileSync(stamp, want);
-        console.warn(`[ssh-fixture] containers up: docker compose -p ${PROJECT} (they stay running; HYPER_SSH_FIXTURE_DOWN=1 removes them after the run)`);
+        console.warn(`[ssh-fixture] containers up: docker compose -p ${PROJECT} (they stay running; MAUZCODE_SSH_FIXTURE_DOWN=1 removes them after the run)`);
     }
 
     const port = async (svc: string) => {
@@ -131,10 +131,10 @@ export async function startSshFixture(): Promise<SshFixture | null> {
         controlDir,
         project: PROJECT,
         hosts: { plain: "plain", rg: "rg" },
-        env: { HYPER_SSH_CONFIG: config, HYPER_SSH_CONTROL_DIR: controlDir },
+        env: { MAUZCODE_SSH_CONFIG: config, MAUZCODE_SSH_CONTROL_DIR: controlDir },
         async stop() {
             for (const h of SERVICES) await sh(["ssh", "-F", config, "-O", "exit", "-o", `ControlPath=${join(controlDir, "%C")}`, h]);
-            if (process.env.HYPER_SSH_FIXTURE_DOWN === "1") {
+            if (process.env.MAUZCODE_SSH_FIXTURE_DOWN === "1") {
                 await compose("down", "-v", "--remove-orphans");
                 rmSync(STATE, { recursive: true, force: true });
                 rmSync(controlDir, { recursive: true, force: true });

@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { CrabMascot } from '../components/hyper/CrabMascot';
-import type { EventPage } from '../lib/hyper';
+import { CrabMascot } from '../components/mauzcode/CrabMascot';
+import type { EventPage } from '../lib/mauzcode';
 const cancel = vi.fn();
 const animate = vi.fn(() => ({ cancel }));
 const page = (mascot: EventPage['mascot']): EventPage => ({ mascot, agentId: 'pet', events: [], olderBefore: null, hasOlder: false, isRunning: false, runState: 'idle', lastError: null, partial: null });

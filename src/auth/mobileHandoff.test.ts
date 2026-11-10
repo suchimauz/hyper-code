@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 
-// Native SSO handoff (/auth/mobile/complete → hypermobile://auth/callback?code → POST /auth/mobile/exchange) for a browser that signed in
+// Native SSO handoff (/auth/mobile/complete → mauzcodemobile://auth/callback?code → POST /auth/mobile/exchange) for a browser that signed in
 // through the control plane (OIDC session cookie, jti "s_…"), including OIDC-only servers where plain password/legacy cookies are refused.
-const ORIGIN = "http://hyper.test";
+const ORIGIN = "http://mauzcode.test";
 const cookieOf = (res: Response, name: string) => res.headers.getSetCookie().find((c) => c.startsWith(name + "="))?.split(";")[0] ?? "";
 
 async function setup(env: Record<string, string> = {}) {
@@ -18,11 +18,11 @@ const exchange = (ctx: any, code: string) => ctx.fns.procs.http.dispatch({ metho
 
 for (const oidcOnly of [false, true]) {
     test(`OIDC browser session → app cookie joins the same control-plane session (oidcOnly=${oidcOnly})`, async () => {
-        const { ctx, nik, name, browser } = await setup(oidcOnly ? { HYPER_OIDC_ONLY: "true" } : {});
+        const { ctx, nik, name, browser } = await setup(oidcOnly ? { MAUZCODE_OIDC_ONLY: "true" } : {});
         const done = await complete(ctx, browser);
         expect(done.status).toBe(303);
         const cb = new URL(done.headers.get("location")!);
-        expect(cb.protocol).toBe("hypermobile:");
+        expect(cb.protocol).toBe("mauzcodemobile:");
         const code = cb.searchParams.get("code")!;
         const ex = await exchange(ctx, code);
         expect(ex.status).toBe(200);
@@ -42,7 +42,7 @@ for (const oidcOnly of [false, true]) {
 }
 
 test("revoked control-plane session before exchange: the code is refused", async () => {
-    const { ctx, browser } = await setup({ HYPER_OIDC_ONLY: "true" });
+    const { ctx, browser } = await setup({ MAUZCODE_OIDC_ONLY: "true" });
     const code = new URL((await complete(ctx, browser)).headers.get("location")!).searchParams.get("code")!;
     await ctx.fns.procs.db.run({ sql: "UPDATE auth_sessions SET revoked_at = ?", params: [Date.now()] });
     expect((await exchange(ctx, code)).status).toBe(401);

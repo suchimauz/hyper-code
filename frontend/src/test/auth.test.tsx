@@ -25,5 +25,5 @@ test('setup preserves current-password requirement without replacement password'
 test('new owner setup keeps password optional and eight-character minimum', () => {
   const html = renderToStaticMarkup(<AuthForm model={{ kind: 'setup', name: '', email: '', needsCurrent: false, error: null }} />);
   expect(html).not.toContain('name="current"'); expect(html).toContain('minLength="8"');
-  expect(html).toContain('autoComplete="new-password"'); expect(html).toContain('without one, Hyper opens without sign-in');
+  expect(html).toContain('autoComplete="new-password"'); expect(html).toContain('without one, MauzCode opens without sign-in');
 });

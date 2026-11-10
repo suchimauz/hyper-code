@@ -1,5 +1,5 @@
 /**
- * List and manage Hyper cron tasks for the UI Lab Automation tasks page
+ * List and manage MauzCode cron tasks for the UI Lab Automation tasks page
  *
  * Use for the React "Automation tasks" screen. GET ?runs=<name> returns the ten latest runs of one task (status, times, clipped result and error). Plain GET returns every cron task (name, function, arguments, schedule, enabled status, worker state, next and last run) plus a cookie-bound CSRF token. POST accepts one JSON action — defer (one-shot delay in every), add (name, dotted fn, interval string, optional JSON-object args and run-now flag; refuses existing names), or enable, disable, run or remove for an exact task name after owner, same-origin, CSRF, content-type and size checks, and delegates to the native cron.add, cron.setEnabled, cron.runNow and cron.remove procedures.
  * @param opts.req Authenticated owner GET, or CSRF-protected JSON POST with name and action.

@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { requestJson, sendMessage, mergeTail, type EventPage } from '../lib/hyper';
-import { LiveComposer } from '../components/hyper/LiveComposer';
+import { requestJson, sendMessage, mergeTail, type EventPage } from '../lib/mauzcode';
+import { LiveComposer } from '../components/mauzcode/LiveComposer';
 vi.mock('../lib/goal', async importOriginal => ({ ...await importOriginal<typeof import('../lib/goal')>(), getGoal: vi.fn().mockResolvedValue({ version: 1, enabled: false }) }));
 vi.mock('../lib/queue', async importOriginal => ({ ...await importOriginal<typeof import('../lib/queue')>(), getQueue: vi.fn().mockResolvedValue({ items: [] }) }));
-import { Transcript } from '../components/hyper/Transcript';
+import { Transcript } from '../components/mauzcode/Transcript';
 
 afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear(); });
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-describe('Live Hyper client', () => {
+describe('Live MauzCode client', () => {
   it('sends form data and stable idempotency headers to existing chat pipeline', async () => {
     const fetcher = vi.fn().mockResolvedValue(json({ ok: true, messageIdx: 1 })); vi.stubGlobal('fetch', fetcher);
     await sendMessage('test-agent', 'Привет', 'key-1');

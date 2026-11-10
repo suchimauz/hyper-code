@@ -15,7 +15,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { s
         return Array.from(rows);
     };
 
-    // hyper-code2: tracing is OPTIONAL here. Reading it off ctx.fns directly
+    // mauzcode: tracing is OPTIONAL here. Reading it off ctx.fns directly
     // made every query — and therefore the whole process, including the REPL
     // used to fix things — fail the moment the telemetry module was absent or
     // not yet loaded. Observability must never be able to take down the thing

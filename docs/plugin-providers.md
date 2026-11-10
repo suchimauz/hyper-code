@@ -4,7 +4,7 @@
 
 `/plugins` is the core plugin manager. Core owns discovery aggregation, installed inventory, source review, confirmation, local drift checks, serialized activation and saved-snapshot rollback. A source provider supplies catalogue entries and inert pinned source files; it does not activate them.
 
-HyperHub is an optional provider for Hyper-git registries. Filesystem is a built-in provider for local plugin directories. Neither provider is a sandbox: mounted provider code is trusted runtime code, while candidate plugin code must remain inert until the user approves activation.
+MauzCodeHub is an optional provider for MauzCode-git registries. Filesystem is a built-in provider for local plugin directories. Neither provider is a sandbox: mounted provider code is trusted runtime code, while candidate plugin code must remain inert until the user approves activation.
 
 ## Declaration
 
@@ -30,9 +30,9 @@ A selection identifies `provider`, `name`, immutable `revision`, and an opaque s
 
 - `search({q?, limit?})` returns `{items, errors}`. Items contain the selection and optional display metadata. Errors from one source must not hide successful results from another.
 - `materialize({selection, destination})` writes candidate files into an empty, core-owned staging directory and returns `{path}`. It must verify the immutable revision and must not mount, import or execute candidate code. It must not write into the live plugin directory.
-- Optional `configurationHref` links to the provider's own settings page. HyperHub owns hub URLs and repository scopes; core does not reinterpret those settings.
+- Optional `configurationHref` links to the provider's own settings page. MauzCodeHub owns hub URLs and repository scopes; core does not reinterpret those settings.
 
-Capabilities follow the handlers actually present. Search-only sources do not acquire install buttons. Mounted filesystem catalogue selections use `mounted:<metadata-sha256>` revisions: these identify displayed package metadata, not content-pinned installable artifacts. The filesystem materializer rejects them. Its separate raw SHA256 selections still require full tree verification; no discovery token bypasses installation validation. Remote publication remains a HyperHub-specific action rather than a mandatory provider capability.
+Capabilities follow the handlers actually present. Search-only sources do not acquire install buttons. Mounted filesystem catalogue selections use `mounted:<metadata-sha256>` revisions: these identify displayed package metadata, not content-pinned installable artifacts. The filesystem materializer rejects them. Its separate raw SHA256 selections still require full tree verification; no discovery token bypasses installation validation. Remote publication remains a MauzCodeHub-specific action rather than a mandatory provider capability.
 
 ## Core lifecycle
 
@@ -44,9 +44,9 @@ Loading trusted code can have irreversible effects. Failed runtime loading must 
 
 ## Compatibility
 
-Legacy HyperHub public entry points remain adapters to core. `/hyperhub` leads to the core catalogue with the HyperHub provider selected; provider-specific configuration stays under `/hyperhub/config`.
+Legacy MauzCodeHub public entry points remain adapters to core. `/mauzcodehub` leads to the core catalogue with the MauzCodeHub provider selected; provider-specific configuration stays under `/mauzcodehub/config`.
 
-Existing HyperHub lock files, digest semantics and snapshot locations must remain readable. Legacy installations without a content digest remain unverified: moving management to core does not silently adopt, overwrite or migrate them. Installed disk state and currently mounted runtime state are separate facts.
+Existing MauzCodeHub lock files, digest semantics and snapshot locations must remain readable. Legacy installations without a content digest remain unverified: moving management to core does not silently adopt, overwrite or migrate them. Installed disk state and currently mounted runtime state are separate facts.
 
 ## Current scope and verification
 
@@ -54,5 +54,5 @@ Filesystem catalogue discovery currently covers already mounted local plugin roo
 
 The installed tab inventories the local `USER_PLUGINS` disk separately from runtime mounts. Catalogue allocation is round-robin across providers with a global cap of twenty; a large filesystem catalogue cannot hide the remote provider. Verified saved-snapshot rollback can work without the original provider mounted.
 
-After this migration, 86 targeted tests passed (380 assertions) across core provider/lifecycle/UI and HyperHub suites. Fifteen core/adapter runtime functions passed strict documentation validation and per-function typechecking. Browser checks covered `/plugins`, `/plugins/config`, the Installed tab, and the `/hyperhub` compatibility redirect. The existing demo package, provenance lock and function retained identical SHA-256 hashes. No candidate was installed or published during migration. Older unrelated core plugin fixtures still depend on missing mounted plugins; this is not a claim that the entire repository test suite passes.
+After this migration, 86 targeted tests passed (380 assertions) across core provider/lifecycle/UI and MauzCodeHub suites. Fifteen core/adapter runtime functions passed strict documentation validation and per-function typechecking. Browser checks covered `/plugins`, `/plugins/config`, the Installed tab, and the `/mauzcodehub` compatibility redirect. The existing demo package, provenance lock and function retained identical SHA-256 hashes. No candidate was installed or published during migration. Older unrelated core plugin fixtures still depend on missing mounted plugins; this is not a claim that the entire repository test suite passes.
 

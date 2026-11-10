@@ -36,7 +36,7 @@ test("allowed peers cannot bypass token validation, scopes or hop limit", async 
     expect(good.status).toBe(200);
     expect(good.result.client.providers).toEqual(["codex"]);
     expect(good.writes).toBe(1);
-    const loop = await check("192.168.0.164", allow, { "x-hyper-hops": "3", authorization: "Bearer fixture" }, true);
+    const loop = await check("192.168.0.164", allow, { "x-mauzcode-hops": "3", authorization: "Bearer fixture" }, true);
     expect(loop.status).toBe(508);
     expect(loop.reads).toBe(0);
 });
@@ -45,7 +45,7 @@ test("forwarded headers including empty values are denied on direct LAN", async 
         for (const value of ["", "127.0.0.1"]) expect((await check("192.168.0.164", ["192.168.0.164"], { [name]: value })).status).toBe(403);
     }
 });
-test("existing loopback, tailnet and local hypermesh ingress remain supported", async () => {
+test("existing loopback, tailnet and local mauzcodemesh ingress remain supported", async () => {
     for (const ip of ["127.0.0.1", "::1", "100.64.0.1", "100.127.255.254"]) expect((await check(ip)).status).toBe(401);
     for (const ip of ["100.63.0.1", "100.128.0.1", "10.77.0.2"]) expect((await check(ip)).status).toBe(403);
     expect((await check("127.0.0.1", [], { "x-hn-id": "fixture", "x-forwarded-for": "10.77.0.2" })).status).toBe(401);

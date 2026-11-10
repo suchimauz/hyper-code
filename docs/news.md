@@ -12,7 +12,7 @@ Included:
 - read and liked state;
 - story details with stored short/long summaries and article text;
 - keyboard slideshow reader;
-- Hyper navigation entry at `/news`.
+- MauzCode navigation entry at `/news`.
 
 Excluded:
 
@@ -23,7 +23,7 @@ Excluded:
 Included operational enrichment:
 
 - `news.summarize` / `news.summarizePending` for stored articles;
-- retry of pending summaries through `news.summarizePending`, scheduled by a workspace `$cron_` declaration (none ships with hyper-code);
+- retry of pending summaries through `news.summarizePending`, scheduled by a workspace `$cron_` declaration (none ships with mauzcode-code);
 - reader/mobile share-target routes.
 
 Independent producer plugins may call `news.put` with an already prepared item.
@@ -74,7 +74,7 @@ The reader uses shared `procs.ui` components for breadcrumbs, tags, badges, card
 
 ## Data migration
 
-The initial migration copied the existing durable archive from the legacy uniskill `news.items` table into Hyper. The migration was verified with a full row-by-row comparison of all durable columns:
+The initial migration copied the existing durable archive from the legacy uniskill `news.items` table into MauzCode. The migration was verified with a full row-by-row comparison of all durable columns:
 
 ```text
 source rows: 1560

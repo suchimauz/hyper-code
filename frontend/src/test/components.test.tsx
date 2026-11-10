@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button } from '../components/ui/Button';
-import { Composer } from '../components/hyper/Composer';
+import { Composer } from '../components/mauzcode/Composer';
 import { SplitPane } from '../components/layout/SplitPane';
 import { Sheet } from '../components/layout/Sheet';
 import { App } from '../App';

@@ -6,7 +6,7 @@ Deepy: original SVG sprite sheets, 50 ms frames, one-pixel cell gutters.
 Whalegirl: original PNG sprite sheets with per-frame durations and no gutters.
 Crab: existing split body/ink sheets, 80 ms frames.
 
-Only mascot artwork and animation metadata are reused. No Sodium engine code is included. Hyper activity and interactions are implemented by the React component; this is not a complete port of dsh's activity scheduler.
+Only mascot artwork and animation metadata are reused. No Sodium engine code is included. MauzCode activity and interactions are implemented by the React component; this is not a complete port of dsh's activity scheduler.
 
 ## Additional local companions
 

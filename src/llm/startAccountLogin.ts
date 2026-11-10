@@ -57,7 +57,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const onData = (chunk: Buffer) => {
         const text = String(chunk);
         flow.output = String(flow.output ?? "") + text;
-        // Claude wraps its fallback URL in OSC-8 terminal hyperlink escapes.
+        // Claude wraps its fallback URL in OSC-8 terminal mauzcodelink escapes.
         // Extract the actual https URL, not the escape sequence around it.
         const clean = flow.output.replace(/\x1b\[[0-9;]*m/g, "");
         flow.verificationUri ??= /https:\/\/[^\s\u0007\u001b]+/.exec(clean)?.[0] ?? URL_RE.exec(clean)?.[1] ?? null;

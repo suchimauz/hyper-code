@@ -2,7 +2,7 @@
  * Launch Chrome with the CDP endpoint open, on the profile that holds the logins.
  *
  * Chrome is started inside a detached tmux session rather than as a child of the
- * runtime. A child shares the server's process group, so every Hyper restart —
+ * runtime. A child shares the server's process group, so every MauzCode restart —
  * and there are many — would take the browser with it, dropping every session
  * the profile exists to keep.
  *

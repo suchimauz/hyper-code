@@ -1,7 +1,7 @@
 /**
  * Decide whether an owner-bound push must not be sent because the owner already has the chat in front of them.
  *
- * Suppression is account-level, not device-level: the owner sees one Hyper account across several devices, so a notification that the owner has already read on the phone must not also buzz the laptop. Two signals are consulted, in this order:
+ * Suppression is account-level, not device-level: the owner sees one MauzCode account across several devices, so a notification that the owner has already read on the phone must not also buzz the laptop. Two signals are consulted, in this order:
  *
  * 1. Presence (in-process): the live event stream records which chats a person currently has open. This is the cheapest signal and the most accurate while the process runs.
  * 2. The durable read receipt in `user_agent_state.seen_at`: it advances when a chat is opened and survives a restart, so a notification created before the owner opened the chat is not delivered afterwards.

@@ -33,7 +33,7 @@ export default async function (
     const all = [...apps, ...agents].filter(item =>
         !item.href.startsWith('/plugins?') && !item.href.startsWith('/plugins/') &&
         item.href !== '/procs/modules' &&
-        item.href !== '/hyperhub' && !item.href.startsWith('/hyperhub/'));
+        item.href !== '/mauzcodehub' && !item.href.startsWith('/mauzcodehub/'));
     const hit = (item: types.nav.Item) => !q || item.label.toLowerCase().includes(q) || item.href.toLowerCase().includes(q) || (item.hint ?? "").toLowerCase().includes(q);
     return all.filter(hit).slice(0, limit);
 }

@@ -6,7 +6,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 /**
  * Returns a cached local token counter for a model, loading its tokenizer in the background
  *
- * Use to count text tokens with the model's own tokenizer when one is public: o200k_base for OpenAI GPT/Codex (bundled), Kimi tiktoken and Hugging Face tokenizer.json files for Qwen, Gemma, DeepSeek, GLM and MiniMax (downloaded once into ~/.hyper/cache/tokenizers). Returns null for Claude or unknown models, while a tokenizer is still loading, or after a load failure (retried at most every 10 minutes), so callers fall back to the heuristic estimate.
+ * Use to count text tokens with the model's own tokenizer when one is public: o200k_base for OpenAI GPT/Codex (bundled), Kimi tiktoken and Hugging Face tokenizer.json files for Qwen, Gemma, DeepSeek, GLM and MiniMax (downloaded once into ~/.mauzcode/cache/tokenizers). Returns null for Claude or unknown models, while a tokenizer is still loading, or after a load failure (retried at most every 10 minutes), so callers fall back to the heuristic estimate.
  * @param opts.model Provider-qualified model route whose tokenizer is requested.
  * @param opts.wait Await a pending load instead of returning null immediately; for tests and warm-up. @default false
  */
@@ -30,7 +30,7 @@ export default async function (
         if (entry.loading) { if (opts.wait) await entry.loading; return entry.count ?? null; }
         // A failed download is retried at most once per 10 minutes; meanwhile callers keep the heuristic.
         if (entry.failedAt && Date.now() - entry.failedAt < 600_000) return null;
-        const dir = join(String(ctx.env.HOME || homedir()), '.hyper', 'cache', 'tokenizers', key.replace(/[^\w.-]+/g, '__'));
+        const dir = join(String(ctx.env.HOME || homedir()), '.mauzcode', 'cache', 'tokenizers', key.replace(/[^\w.-]+/g, '__'));
         const file = async (name: string) => {
             const path = join(dir, name);
             try { return await readFile(path, 'utf8'); } catch { /* not cached yet */ }

@@ -2,7 +2,7 @@
 
 ## Direction
 
-The primary shell is React/Vite in `frontend/`, served at `/`. Trusted browser extensions use the local `@hyper/ui` SDK and explicit grants for pages, navigation, panels and actions. React/React DOM is supplied by the host; private imports and a second runtime are not supported. See [ui-architecture.md](ui-architecture.md) for the actual contract, not the older SSR extension mechanisms below.
+The primary shell is React/Vite in `frontend/`, served at `/`. Trusted browser extensions use the local `@mauzcode/ui` SDK and explicit grants for pages, navigation, panels and actions. React/React DOM is supplied by the host; private imports and a second runtime are not supported. See [ui-architecture.md](ui-architecture.md) for the actual contract, not the older SSR extension mechanisms below.
 
 `/old-ui` redirects supported entry links to the primary shell. Shared SSR, Canvas content and approval compatibility surfaces remain; retirement of that entry does not authorize removal of their renderers/assets. Frontend grants/readOnly are not security boundaries: backend authentication, ownership, CSRF and explicit human approval still apply. SDK writes require a cookie-bound CSRF token; live subscriptions require resync, error handling, topic declarations and cleanup.
 
@@ -16,7 +16,7 @@ A module that owns a user-facing page can publish it to global navigation with a
 
 The left Dock (`dock.render`, called by `ui.layout`) is assembled from `$dock_<name>.ts|json` entries collected by `dock/$loader_dock.ts`, plus the person's pinned chats (`user_agent_state.pinned`) and pages. The global menu button (top) and the person (bottom) are fixed; everything else is placed in a top or bottom zone by the `dock.layout` setting — instance scope `global`, personal scope `user` — over each entry's own `zone`/`order`. Each entry renders in parallel under a timeout and is dropped on error.
 
-The global menu (⌘/, `ui.navMenu` + GET `/nav/items`) is built from tabs (`nav.tabs`): built-in `home` (core widgets chats, shared, pages, projects) and `plugins` (pages declared by plugin `$app_` files plus every plugin widget placed nowhere), then the person's own tabs from the `nav.layout` setting (instance `global` / env `HYPER_NAV`, personal `user`, edited through POST `/nav/layout` → `nav.editLayout`). With an empty query a tab draws its grid of `$widget_<name>.ts` tiles (`nav/$loader_widget.ts`, drawn by `nav.drawWidget` with timeout and ttl cache); with a query `nav.searchAll` asks the tab's `$search_<name>.ts` sources (`nav/$loader_search.ts`) in parallel, inlines those that answer within 300 ms and leaves htmx placeholders (GET `/nav/group/:token`) for the slower ones. All rows are `types.nav.Item`, drawn by `nav.rows`.
+The global menu (⌘/, `ui.navMenu` + GET `/nav/items`) is built from tabs (`nav.tabs`): built-in `home` (core widgets chats, shared, pages, projects) and `plugins` (pages declared by plugin `$app_` files plus every plugin widget placed nowhere), then the person's own tabs from the `nav.layout` setting (instance `global` / env `MAUZCODE_NAV`, personal `user`, edited through POST `/nav/layout` → `nav.editLayout`). With an empty query a tab draws its grid of `$widget_<name>.ts` tiles (`nav/$loader_widget.ts`, drawn by `nav.drawWidget` with timeout and ttl cache); with a query `nav.searchAll` asks the tab's `$search_<name>.ts` sources (`nav/$loader_search.ts`) in parallel, inlines those that answer within 300 ms and leaves htmx placeholders (GET `/nav/group/:token`) for the slower ones. All rows are `types.nav.Item`, drawn by `nav.rows`.
 
 ```json
 {
@@ -226,7 +226,7 @@ The worker condvar is process-wide because there is one driver promise. Parallel
 <div id="msg-tail"
      hx-get="/agent/:id/events.html?offset=N"
      data-live-topic="agent:id"
-     hx-trigger="hyper-live from:body, every 30s"
+     hx-trigger="mauzcode-live from:body, every 30s"
      hx-swap="outerHTML">
 </div>
 ```
@@ -276,7 +276,7 @@ API: `ctx.fns.settings.{get, set, remove, list, getNumber, getString}`. `getNumb
 
 ### Declared settings
 
-See [settings.md](settings.md) for the full picture: declarations, instance files `~/.hyper/settings/$settings_<module>.json` (they win over the database for scope `global`) and resolution order.
+See [settings.md](settings.md) for the full picture: declarations, instance files `~/.mauzcode/settings/$settings_<module>.json` (they win over the database for scope `global`) and resolution order.
 
 Settings are *declared* with a typed descriptor in `$setting_<key>.ts` files (`{ type, default, env, options, min, max, title, description }`). Resolution per consumer:
 

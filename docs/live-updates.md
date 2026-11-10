@@ -1,6 +1,6 @@
 # Live updates in the browser
 
-How a Hyper page learns that something changed on the server, and how it makes sure it never shows stale
+How a MauzCode page learns that something changed on the server, and how it makes sure it never shows stale
 state after missing some of those notices. Read this before adding anything to a page that should
 "update by itself".
 
@@ -17,11 +17,11 @@ be able to re-read that state on its own, and must do so after every gap in the 
 
 ## React SDK subscriptions (primary UI)
 
-New trusted React extensions import `subscribeLive` or `useLiveSubscription` from `@hyper/ui`. Supply `name`, optional event `types`, `onEvent`, and required `resync` and `onError` callbacks. Refetch canonical authorized endpoint data on invalidation and after gaps; report transport/load errors. Return cleanup from the owning effect and abort stale fetches. The hook cleans up its subscription on unmount; the plain helper returns cleanup immediately, even while the transport is loading.
+New trusted React extensions import `subscribeLive` or `useLiveSubscription` from `@mauzcode/ui`. Supply `name`, optional event `types`, `onEvent`, and required `resync` and `onError` callbacks. Refetch canonical authorized endpoint data on invalidation and after gaps; report transport/load errors. Return cleanup from the owning effect and abort stale fetches. The hook cleans up its subscription on unmount; the plain helper returns cleanup immediately, even while the transport is loading.
 
 Declare transport topics on mounted content with `data-live-topic`; `types` filters delivered event types and does not register SSE topics. The SDK example in `frontend/src/test/fixtures/sdk-example.tsx` demonstrates `agents`, an initial fetch, resync and cleanup. Reuse the host transport rather than opening another EventSource. JSON writes through `requestJson` require the existing cookie-bound CSRF token; SSE subscription never grants authorization.
 
-The lower-level `window.hyperLive` and HTMX live-region examples below document the shared transport and compatibility consumers, not the primary extension import API. `/old-ui` redirects, but shared SSR/Canvas content and inline approvals still use compatibility code.
+The lower-level `window.mauzcodeLive` and HTMX live-region examples below document the shared transport and compatibility consumers, not the primary extension import API. `/old-ui` redirects, but shared SSR/Canvas content and inline approvals still use compatibility code.
 
 The SDK example is retained only as a dev/test fixture, with a separate registry in `frontend/src/extensions/example.test.tsx`; production `extensions/installed.ts` does not mount it or its subscription. The shell's plugin UI runtime subscribes to `plugins.changed` (emitted after plugin UI bundles change or an approval is recorded) and re-reads `/plugins/ui/manifest` on resync. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers are removed, not the dynamic HTTP layout or live SSR transports. See the [residual consumer map](ui-architecture.md#remaining-html-consumers) before removing assets or subscriptions.
 
@@ -33,7 +33,7 @@ server                                         browser tab
 write (canvas.show, a message, a presence change…)
   └─ procs.events.emit({ topic?, event })
         │
-GET /procs/events?topics=…  ── SSE ──────────► procs/events/client.js   (window.hyperLive)
+GET /procs/events?topics=…  ── SSE ──────────► procs/events/client.js   (window.mauzcodeLive)
   first message: hello{serverStart}              │  transport: keep the stream or give it back
                                                  │  delivery:  event → matching subscribers
                                                  │  gap      → resync() on every state subscriber
@@ -48,7 +48,7 @@ GET <state route>  ◄────── resync ──────────�
   topic means everybody.
 - `src/procs/events/$route__GET.ts`: the SSE stream. Every connection starts with
   `{ type: "hello", serverStart }`.
-- `src/procs/events/client.js`: the shared browser transport exposing `window.hyperLive`.
+- `src/procs/events/client.js`: the shared browser transport exposing `window.mauzcodeLive`.
   React loads it through `frontend/src/lib/live.ts` (wrapped by the SDK); compatibility SSR loads it from `ui/layout.ts`.
 
 ## Transport: when a tab keeps its stream
@@ -58,7 +58,7 @@ lives. A handful of background tabs used to take all six and every ordinary requ
 (fixed in b79a7ce, Aug 2026, by closing the stream of hidden tabs).
 
 Over **HTTP/2 or HTTP/3** every request of an origin shares one multiplexed connection, so an open stream
-costs nothing. Hyper serves HTTP/2 on its HTTPS port (`src/h2`, default 3443; the hyper-mesh domains are
+costs nothing. MauzCode serves HTTP/2 on its HTTPS port (`src/h2`, default 3443; the mauzcode-mesh domains are
 HTTP/2 too).
 
 `client.js` decides per tab, from the protocol that actually carried the page
@@ -69,16 +69,16 @@ HTTP/2 too).
 | `h2` / `h3` | stream open | **stream stays open** — events keep arriving |
 | `http/1.1` (plain `:3010`) | stream open | stream closed; reconnects on return, then resyncs |
 
-Nothing to configure. `window.hyperLive.keepsStreamWhileHidden()` tells which case a tab is in.
+Nothing to configure. `window.mauzcodeLive.keepsStreamWhileHidden()` tells which case a tab is in.
 
-`window.hyperLive.getStatus()` returns `"connecting" | "connected" | "disconnected"`.
+`window.mauzcodeLive.getStatus()` returns `"connecting" | "connected" | "disconnected"`.
 `onStatus(listener)` returns an unsubscribe function and reports changes only (read `getStatus()`
 for the initial snapshot). Open or hello means connected; errors, page hide, and intentional hidden
 HTTP/1 disconnects mean disconnected; retries mean connecting. Listener failures are isolated.
 Status describes the transport, not whether a state fetch has completed.
 
 After a non-htmx DOM render changes `data-live-topic` regions, call
-`window.hyperLive.refreshTopics(): void`. It reconnects only if the topic set changed and asks every
+`window.mauzcodeLive.refreshTopics(): void`. It reconnects only if the topic set changed and asks every
 state subscriber to resync on the next hello; unchanged sets do not reconnect. Hidden HTTP/1 tabs
 wait until visible. Existing htmx swap handling retains its fresh-markup behavior.
 
@@ -96,13 +96,13 @@ and every state subscriber's `resync(reason)` runs. A hidden tab postpones this 
 first `hello` of a freshly rendered page and the reconnect after a planned topic change are not gaps: that
 markup was just rendered by the server.
 
-## Subscribing: `window.hyperLive`
+## Subscribing: `window.mauzcodeLive`
 
 Browser code never listens to the stream directly. It registers:
 
 ```js
 // Something that mirrors server state: a badge, a panel, the canvas.
-window.hyperLive.subscribe({
+window.mauzcodeLive.subscribe({
     name: 'example-state',           // for error messages
     types: ['example.changed'],         // event types; omit for all
     onEvent: event => refresh(),     // quick reaction to one event
@@ -110,7 +110,7 @@ window.hyperLive.subscribe({
 });
 
 // A one-shot instruction with no state behind it: navigate, show a toast, run code.
-window.hyperLive.command({
+window.mauzcodeLive.command({
     name: 'ui-control',
     types: ['ui.navigate', 'ui.notify'],
     onEvent: applyEvent,
@@ -134,7 +134,7 @@ Current subscribers:
 | subscriber | file | events | resync reads |
 |---|---|---|---|
 | live regions | `procs/events/client.js` (built in) | any event with a `topic` | each region's own `hx-get` |
-| native Canvas | `frontend/src/components/hyper/CanvasPanel.tsx` and host live state | Canvas invalidation | authorized `/canvas/:id/state`; no retired panel fragment |
+| native Canvas | `frontend/src/components/mauzcode/CanvasPanel.tsx` and host live state | Canvas invalidation | authorized `/canvas/:id/state`; no retired panel fragment |
 | People presence | `frontend/src/components/PeoplePage.tsx` | `presence` | `GET /auth/online` |
 | transient secure input (polling, not SSE subscription) | `frontend/src/components/SecureInputDialog.tsx` | abortable 1.5-second refresh | `GET /secureInput/current` |
 | commands | `ui/controlScript.ts` | `ui.navigate`, `ui.notify`, `ui.eval`, `ui.action`, `eval`, `agent.event_appended` | — (command) |
@@ -146,10 +146,10 @@ re-fetching on events and on gaps for free.
 
 ## Guard rails
 
-- **`code.quality` rule `live-subscribe` (error).** `addEventListener('hyper-events' | 'hyper-ui-event')`
+- **`code.quality` rule `live-subscribe` (error).** `addEventListener('mauzcode-events' | 'mauzcode-ui-event')`
   anywhere but `client.js` — in `$script_*.js`, a module's `client.js`, or a script embedded as a string in
   TypeScript. `code.index` runs the text rules over browser scripts for this. For compatibility
-  `client.js` still dispatches the `hyper-events` DOM event, so an old private plugin keeps working, but it
+  `client.js` still dispatches the `mauzcode-events` DOM event, so an old private plugin keeps working, but it
   is flagged.
 - **Browser tests** in headless Chrome against the real page and stream:
   - `src/procs/events/live.browser.it.test.ts` — HTTP/1.1 hidden tab resyncs every subscriber on return;
@@ -165,7 +165,7 @@ re-fetching on events and on gaps for free.
 2. Server: a GET that returns the current state (or markup) — reads must never emit.
 3. React extensions: use SDK `subscribeLive`/`useLiveSubscription` with `resync` calling that GET,
    `onError`, mounted topic declarations and effect cleanup. Compatibility server fragments use
-   `ui.live`; other compatibility scripts use `window.hyperLive.subscribe` with required `resync`.
+   `ui.live`; other compatibility scripts use `window.mauzcodeLive.subscribe` with required `resync`.
 4. The SDK loads the shared client through the host. Compatibility SSR scripts must load after
    `client.js`; do not assume a React extension is running inside `ui.layout`.
 5. Test: hide the page, change the thing on the server, show the page, expect the new state.
@@ -179,5 +179,5 @@ re-fetching on events and on gaps for free.
 - **Oct 12, 2026 — b1f0578.** Canvas listens to `canvas.changed` only; a canvas opened while the tab was
   hidden never showed up.
 - **Oct 16, 2026.** `fb74858` patched the canvas; then this design: streams stay open on HTTP/2, one
-  `resync` after every gap, `hyperLive.subscribe` with mandatory `resync`, the `live-subscribe` rule and the
+  `resync` after every gap, `mauzCodeLive.subscribe` with mandatory `resync`, the `live-subscribe` rule and the
   browser tests.

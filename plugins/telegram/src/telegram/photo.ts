@@ -12,7 +12,7 @@ async function opSecret(ctx: Context, ref: string) {
 }
 
 type TelegramClientSingleton = { client?: TelegramClient; connecting?: Promise<TelegramClient> | null };
-const telegramClientKey = Symbol.for("hyper-code2.telegram.client.singleton");
+const telegramClientKey = Symbol.for("mauzcode.telegram.client.singleton");
 
 async function connected(ctx: Context) {
     const root = globalThis as typeof globalThis & { [telegramClientKey]?: TelegramClientSingleton };
@@ -23,8 +23,8 @@ async function connected(ctx: Context) {
     if (!cache.client?.connected && legacy?.client?.connected) cache.client = legacy.client;
     if (cache.client?.connected) return cache.client;
     const [configRaw, sessionString] = await Promise.all([
-        opSecret(ctx, "op://hyper/telegram config.json/value"),
-        opSecret(ctx, "op://hyper/telegram session.txt/value"),
+        opSecret(ctx, "op://mauzcode/telegram config.json/value"),
+        opSecret(ctx, "op://mauzcode/telegram session.txt/value"),
     ]);
     if (!configRaw || !sessionString) throw new Error("Telegram credentials are not configured");
     const config = JSON.parse(configRaw);

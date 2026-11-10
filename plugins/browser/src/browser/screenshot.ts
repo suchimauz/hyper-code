@@ -22,7 +22,7 @@ export default async function (
     });
     if (!result?.data) throw new Error("screenshot: Chrome returned no image data");
     const base = session?.agent?.workspaceDir || process.cwd();
-    const path = opts.path ? resolve(base, opts.path) : resolve(base, `.hyper/browser-${Date.now()}.png`);
+    const path = opts.path ? resolve(base, opts.path) : resolve(base, `.mauzcode/browser-${Date.now()}.png`);
     await Bun.write(path, Buffer.from(result.data, "base64"));
     return path;
 }

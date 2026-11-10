@@ -1,15 +1,15 @@
 /**
- * Lists the Hyper instances (and other services) registered in the Hyper Control Plane.
+ * Lists the MauzCode instances (and other services) registered in the MauzCode Control Plane.
  *
  * Service discovery: name, URL, owner, description, metadata and last heartbeat for each service.
- * Returns an empty list when this Hyper is not connected to a control plane or it is unreachable.
- * @param opts.kind Only services of this kind, e.g. hyper.
+ * Returns an empty list when this MauzCode is not connected to a control plane or it is unreachable.
+ * @param opts.kind Only services of this kind, e.g. mauzcode.
  */
 export default async function (
     ctx: Context,
     _session: Session | null,
     opts: {
-        /** Only services of this kind, e.g. hyper. */
+        /** Only services of this kind, e.g. mauzcode. */
         kind?: string;
     },
 ): Promise<Array<{ id: string; name: string; kind: string; url: string; ownerEmail: string | null; description: string; metadata: Record<string, unknown>; lastSeenAt: number | null }>> {

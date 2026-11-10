@@ -4,7 +4,7 @@ Opt-in notifications for main agents (no parent and navigation visibility). Sett
 
 ## Enable on iPhone
 
-Use trusted HTTPS on iOS/iPadOS 16.4 or later. In Safari choose Share → Add to Home Screen, launch Hyper from that icon and sign in. Open Settings → **Notifications** → **Enable on this device**, then allow notifications. The same section disables this device after an explicit confirmation. No permission request is made on page load.
+Use trusted HTTPS on iOS/iPadOS 16.4 or later. In Safari choose Share → Add to Home Screen, launch MauzCode from that icon and sign in. Open Settings → **Notifications** → **Enable on this device**, then allow notifications. The same section disables this device after an explicit confirmation. No permission request is made on page load.
 
 The worker shows project and agent names in the title, plus a fixed category-specific message. Names are visible on the lock screen, but form titles, chat text, raw errors and secrets are not included. Tapping opens the associated chat; signing in and network/VPN access may still be required. The worker never intercepts or caches page requests.
 
@@ -18,7 +18,7 @@ Only Apple, FCM and Mozilla push endpoints are accepted. Sends use a five-second
 
 ## One notification, many devices
 
-A notification belongs to the account, but it is shown on devices, and one person reads Hyper on several of them. Two mechanisms keep that from turning into noise.
+A notification belongs to the account, but it is shown on devices, and one person reads MauzCode on several of them. Two mechanisms keep that from turning into noise.
 
 **Nothing new is sent while the owner is already in the chat.** Before delivery, the server checks whether the owner has this chat open (live presence) or has already read it (the durable read receipt in `user_agent_state.seen_at`). If so, no push is sent at all. The check is account-level, not device-level: the owner has seen the request on the phone, so buzzing the laptop would only repeat it. Both signals are deliberately sticky for the lifetime of the event — an owner who opened the chat and then walked away has still seen it, and a later push for that same event would be noise.
 

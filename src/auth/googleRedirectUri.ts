@@ -1,5 +1,5 @@
 /**
- * Returns the absolute Google OAuth redirect URI for this Hyper: <origin>/auth/google/callback.
+ * Returns the absolute Google OAuth redirect URI for this MauzCode: <origin>/auth/google/callback.
  *
  * Honors X-Forwarded-Proto/-Host behind a tunnel so the URI matches what the browser used; this
  * exact value must be registered on the OAuth client.

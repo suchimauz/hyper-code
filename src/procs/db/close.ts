@@ -7,7 +7,7 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
     if (st?.sql) {
         const sql = st.sql;
         st.sql = undefined;
-        ((globalThis as any).__hyperTestPools as Set<any> | undefined)?.delete(sql);
+        ((globalThis as any).__mauzcodeTestPools as Set<any> | undefined)?.delete(sql);
         await sql.close();
     }
     return { ok: true };

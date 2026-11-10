@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 export type DirectoryListing = { path: string; parentPath: string | null; entries: { name: string; path: string }[]; canCreate: boolean; csrfToken: string };
 export function browseDirectories(path: string | undefined, showHidden: boolean, signal: AbortSignal) {

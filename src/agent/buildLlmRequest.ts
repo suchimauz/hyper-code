@@ -100,7 +100,7 @@ export default async function (
     // The status line is a persisted transcript row (see agent.run).
     let system = '';
     let bodyText = fullPrompt;
-    const upstream = ep.provider === 'hyper' ? (ep.upstream ?? '') : ep.provider;
+    const upstream = ep.provider === 'mauzcode' ? (ep.upstream ?? '') : ep.provider;
     if (upstream === 'claude-code' || upstream === 'anthropic-oauth') {
         system = claudeCodeHeader;
         if (bodyText.startsWith(claudeCodeHeader)) {

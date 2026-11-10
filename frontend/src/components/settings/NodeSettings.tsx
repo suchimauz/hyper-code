@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { requestJson } from '../../lib/hyper';
+import { requestJson } from '../../lib/mauzcode';
 import { Button } from '../ui/Button';
 
 type Node = { name: string; url: string; enabled: boolean; modelCount: number };
@@ -22,7 +22,7 @@ export function NodeSettings({ nodes, clients, csrfToken, reload }: { nodes: Nod
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not update node settings.'); }
     finally { setBusy(false); setToken(''); }
   }
-  return <details><summary>Hyper nodes and sharing ({nodes.length})</summary>
+  return <details><summary>MauzCode nodes and sharing ({nodes.length})</summary>
     <div aria-busy={busy}>
       {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
       <ul className="llm-rows">{nodes.map(node => <li key={node.name}><strong>{node.name}</strong> · {node.enabled ? 'Enabled' : 'Disabled'} · {node.modelCount} models
@@ -45,7 +45,7 @@ export function NodeSettings({ nodes, clients, csrfToken, reload }: { nodes: Nod
         <label className="settings-field"><span>Providers (comma-separated; blank shares all eligible providers)</span><input value={providers} onChange={e => setProviders(e.target.value)} /></label>
         <Button type="submit">Review token</Button>
       </fieldset></form>
-      {pending && <section aria-label="Confirm sharing change"><p>{pending.action === 'client-issue' ? `Issue a token for ${pending.name}? Grants access to ${pending.providers.join(', ') || 'all shareable providers'}.` : `Revoke ${pending.name}? This client will no longer be able to relay through this Hyper.`}</p>
+      {pending && <section aria-label="Confirm sharing change"><p>{pending.action === 'client-issue' ? `Issue a token for ${pending.name}? Grants access to ${pending.providers.join(', ') || 'all shareable providers'}.` : `Revoke ${pending.name}? This client will no longer be able to relay through this MauzCode.`}</p>
         <Button disabled={busy} onClick={() => void run({ ...pending, confirmed: true })}>Confirm {pending.action === 'client-issue' ? 'issue token' : 'revoke'}</Button>
         <Button disabled={busy} onClick={() => setPending(null)}>Cancel</Button>
       </section>}

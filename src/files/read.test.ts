@@ -5,7 +5,7 @@ describe("files.read", () => {
     test("reads an existing project file", async () => {
         const ctx = await mkTestCtx();
         const pkg = await ctx.fns.files.read({ path: "package.json" });
-        expect(pkg).toContain("\"name\": \"hyper-code2\"");
+        expect(pkg).toContain("\"name\": \"mauzcode\"");
     });
 
     test("can read a file outside the workspace (sandbox removed)", async () => {
@@ -15,6 +15,6 @@ describe("files.read", () => {
         const { basename } = await import("node:path");
         const self = basename(process.cwd());
         const pkg = await ctx.fns.files.read({ path: `../${self}/package.json` });
-        expect(pkg).toContain("\"name\": \"hyper-code2\"");
+        expect(pkg).toContain("\"name\": \"mauzcode\"");
     });
 });

@@ -1,14 +1,14 @@
-# Hyper
+# MauzCode
 
-[![test](https://github.com/hyper-code-harness/hyper-code/actions/workflows/test.yml/badge.svg)](https://github.com/hyper-code-harness/hyper-code/actions/workflows/test.yml)
+[![test](https://github.com/suchimauz/mauzcode/actions/workflows/test.yml/badge.svg)](https://github.com/suchimauz/mauzcode/actions/workflows/test.yml)
 
 **A self-hosted workspace for AI agents that can extend their own tools.**
 
 Chat with agents, connect tools through plugins, and work with files, documents, and interactive views alongside the conversation. Agents can add new capabilities as TypeScript functions and load them without restarting the server.
 
-Hyper runs on **Bun + Postgres**, with a procedural TypeScript runtime built on [procs](https://github.com/niquola/procs). Conversations and task state persist in the database; functions stay in files you can inspect and change.
+MauzCode runs on **Bun + Postgres**, with a procedural TypeScript runtime built on [procs](https://github.com/niquola/procs). Conversations and task state persist in the database; functions stay in files you can inspect and change.
 
-> Hyper is under active development. UI composition and plugin interfaces are evolving. It is intended for trusted environments, not for running untrusted agents in a sandbox.
+> MauzCode is under active development. UI composition and plugin interfaces are evolving. It is intended for trusted environments, not for running untrusted agents in a sandbox.
 
 ## Watch: Agents on FHIR
 
@@ -24,8 +24,8 @@ A recording of Health Samurai's **Agents on FHIR working group meeting — Octob
 - **Delegate focused work.** Give agents separate tasks and follow their plans and results without putting every detail into one chat.
 - **Bring tools into the conversation.** Discover plugin capabilities for services such as GitHub, Google Workspace, Telegram, and web search. Individual integrations may require credentials or additional software.
 - **See the output beside the chat.** Open files, documents, diagrams, charts, and plugin views in Canvas.
-- **Extend the workspace while it runs.** Hot-reload procedures and HTTP routes without discarding session state. Plugins ship their own React UI in `ui/`; Hyper builds and loads it at runtime, without a frontend rebuild.
-- **Use your existing coding harness.** Give trusted local Claude Code, Codex, and other shell-capable tools access to Hyper through its CLI.
+- **Extend the workspace while it runs.** Hot-reload procedures and HTTP routes without discarding session state. Plugins ship their own React UI in `ui/`; MauzCode builds and loads it at runtime, without a frontend rebuild.
+- **Use your existing coding harness.** Give trusted local Claude Code, Codex, and other shell-capable tools access to MauzCode through its CLI.
 
 For example: ask an agent to review a pull request, research an issue and show its findings in Canvas, or build a small integration you can reuse in later conversations.
 
@@ -43,13 +43,13 @@ For example: ask an agent to review a pull request, research an issue and show i
 Clone the repository so you can inspect the installer before running it:
 
 ```bash
-git clone https://github.com/hyper-code-harness/hyper-code.git ~/hyper-code2
-cd ~/hyper-code2
+git clone https://github.com/suchimauz/mauzcode ~/mauzcode
+cd ~/mauzcode
 # Review script/install.sh, then:
-HYPER_DIR="$PWD" bash script/install.sh
+MAUZCODE_DIR="$PWD" bash script/install.sh
 ```
 
-The installer installs dependencies, starts ParadeDB (Postgres with search extensions), generates a database password, writes `DATABASE_URL` to the checkout's `.env`, and starts Hyper as a background service. It stores the database Compose configuration in `~/.hyper/docker-compose.yml` and binds Postgres to `127.0.0.1:54393`.
+The installer installs dependencies, starts ParadeDB (Postgres with search extensions), generates a database password, writes `DATABASE_URL` to the checkout's `.env`, and starts MauzCode as a background service. It stores the database Compose configuration in `~/.mauzcode/docker-compose.yml` and binds Postgres to `127.0.0.1:54393`.
 
 Open **http://localhost:3010/**. Configure your provider, then create a chat and select a model.
 
@@ -57,15 +57,15 @@ The installer can also update an existing installation: it fast-forwards the che
 
 ### Integrated frontend and hot reload
 
-The React UI lives in `frontend/` and shares the root `package.json`, `bun.lock`, and `node_modules` with Hyper. Install once with `bun install`; start everything with `bun run start` (or the existing Hyper service). Hyper starts and closes an in-process Vite server automatically. Do not run `frontend:dev` alongside the service: both use loopback port 5174.
+The React UI lives in `frontend/` and shares the root `package.json`, `bun.lock`, and `node_modules` with MauzCode. Install once with `bun install`; start everything with `bun run start` (or the existing MauzCode service). MauzCode starts and closes an in-process Vite server automatically. Do not run `frontend:dev` alongside the service: both use loopback port 5174.
 
-The main UI is served at `/`; supported `/old-ui/` entry links now redirect to it. Shared SSR renderers, Canvas content and approval compatibility surfaces remain—this is not complete removal of legacy UI. Frontend edits use Vite Fast Refresh through the same Hyper address; `/ui-lab/` carries assets and the HMR socket, while `/ui-lab-api/` is the integrated UI adapter. Port 5174 is internal, not a separate public entry point. No production bundle is required for this live-development setup; install dev dependencies too.
+The main UI is served at `/`; supported `/old-ui/` entry links now redirect to it. Shared SSR renderers, Canvas content and approval compatibility surfaces remain—this is not complete removal of legacy UI. Frontend edits use Vite Fast Refresh through the same MauzCode address; `/ui-lab/` carries assets and the HMR socket, while `/ui-lab-api/` is the integrated UI adapter. Port 5174 is internal, not a separate public entry point. No production bundle is required for this live-development setup; install dev dependencies too.
 
 - `bun run frontend:test` — React tests.
 - `bun run frontend:build` — optional typecheck and bundle verification.
 - `bun run frontend:storybook` — component development, separately from the main service.
 
-The former private `hyper-ui-bridge` plugin is replaced by `src/frontendBridge/` and disabled in the project configuration. Existing `workspace.json` overrides must also disable that plugin (`"hyper-ui-bridge": false`). Neither the original UI directory nor a private plugin is required on a fresh checkout.
+The former private `mauzcode-ui-bridge` plugin is replaced by `src/frontendBridge/` and disabled in the project configuration. Existing `workspace.json` overrides must also disable that plugin (`"mauzcode-ui-bridge": false`). Neither the original UI directory nor a private plugin is required on a fresh checkout.
 
 ### Connect a model
 
@@ -77,7 +77,7 @@ ANTHROPIC_API_KEY=your-key
 OPENAI_API_KEY=your-key
 ```
 
-Restart the service after changing environment variables. On Linux, use `systemctl --user restart hyper.service`; on macOS, see [service installation](script/install-service.sh).
+Restart the service after changing environment variables. On Linux, use `systemctl --user restart mauzcode.service`; on macOS, see [service installation](script/install-service.sh).
 
 Models use the form `<provider>:<model-id>`. Available adapters include:
 
@@ -111,7 +111,7 @@ Home / global menu
 
 **Layout → Regions → Widgets** is the direction of the UI redesign: the layout defines areas of the screen, plugins supply independent parts, and settings control their composition. Not every UI part is a home widget; Canvas tabs, chat parts, and search sources have separate contracts. The redesign is ongoing—this is a conceptual map, not a screenshot or a promise of a finished drag-and-drop editor.
 
-Runtime plugins can provide more than tools. The `$widget_`, `$search_`, `$app_` and `$dock_` conventions below belong to compatibility SSR navigation; they do not automatically register React pages or grant browser execution. New primary-shell contributions are React UI extensions: a plugin puts its UI in `ui/index.tsx` and declares grants in `package.json` `procs.ui`; Hyper builds and loads it at runtime (see [UI architecture](docs/ui-architecture.md)). Canvas and Markdown renderers have their own contracts and remain separate from React extension slots:
+Runtime plugins can provide more than tools. The `$widget_`, `$search_`, `$app_` and `$dock_` conventions below belong to compatibility SSR navigation; they do not automatically register React pages or grant browser execution. New primary-shell contributions are React UI extensions: a plugin puts its UI in `ui/index.tsx` and declares grants in `package.json` `procs.ui`; MauzCode builds and loads it at runtime (see [UI architecture](docs/ui-architecture.md)). Canvas and Markdown renderers have their own contracts and remain separate from React extension slots:
 
 | Convention | Purpose |
 | --- | --- |
@@ -124,7 +124,7 @@ Runtime plugins can provide more than tools. The `$widget_`, `$search_`, `$app_`
 
 See [plugin authoring](docs/plugin-authoring.md), [plugin runtime architecture](docs/plugin-runtime-architecture.md), and [UI architecture](docs/ui-architecture.md) for contracts and design details. UI design documents may describe work in progress.
 
-Official plugins live in [`plugins/`](plugins/). Private integrations can live outside the repository in the configured `USER_PLUGINS` directory; small project-local procedures belong in `.hyper/`.
+Official plugins live in [`plugins/`](plugins/). Private integrations can live outside the repository in the configured `USER_PLUGINS` directory; small project-local procedures belong in `.mauzcode/`.
 
 ## How it works
 
@@ -145,32 +145,32 @@ await ctx.fns.procs.repl.load({ name: "myModule" });
 
 **Calls resolve through the registry.** Project functions call one another through `ctx.fns`, rather than importing each other's implementations. This makes hot-reload apply to existing call sites. Capitalized type files generate the shared `types.<module>.<Name>` namespace.
 
-**The primary UI is React/Vite.** Bun serves the authenticated shell and APIs. Trusted React extensions use the local `@hyper/ui` alias (not a published package), host React, shared components and explicit grants (declared in a plugin's `package.json` `procs.ui`, approved per bundle) for pages, navigation, panels and actions. No private/deep imports or second React runtime. HTMX, `#main` and `$script` assets remain compatibility mechanisms, not the primary extension contract.
+**The primary UI is React/Vite.** Bun serves the authenticated shell and APIs. Trusted React extensions use the local `@mauzcode/ui` alias (not a published package), host React, shared components and explicit grants (declared in a plugin's `package.json` `procs.ui`, approved per bundle) for pages, navigation, panels and actions. No private/deep imports or second React runtime. HTMX, `#main` and `$script` assets remain compatibility mechanisms, not the primary extension contract.
 
 The SDK example remains a dev/test fixture with a separate test registry; it is not installed in production. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers have been removed, and SSH settings opens the native LLM Connections tab via callback rather than `/llms`. Dynamic HTTP layouts, People and other SSR pages, Canvas kind documents and secure approval transports still have live consumers; see the [concrete compatibility map](docs/ui-architecture.md#residual-compatibility-consumers).
 
-Extensions are trusted same-origin code, not a sandbox. Frontend grants and read-only controls never replace backend authentication, ownership, CSRF or explicit human approval. SDK `requestJson` writes require the existing cookie-bound CSRF token. `subscribeLive`/`useLiveSubscription` require resync and error callbacks, topic declarations and cleanup. Preserve themes, keyboard focus, accessibility and reduced motion; the [Apple Design guidance](docs/skills/apple-design/README.md) applies only to Hyper UI. Start with [UI architecture](docs/ui-architecture.md) and `frontend/src/test/fixtures/sdk-example.tsx`.
+Extensions are trusted same-origin code, not a sandbox. Frontend grants and read-only controls never replace backend authentication, ownership, CSRF or explicit human approval. SDK `requestJson` writes require the existing cookie-bound CSRF token. `subscribeLive`/`useLiveSubscription` require resync and error callbacks, topic declarations and cleanup. Preserve themes, keyboard focus, accessibility and reduced motion; the [Apple Design guidance](docs/skills/apple-design/README.md) applies only to MauzCode UI. Start with [UI architecture](docs/ui-architecture.md) and `frontend/src/test/fixtures/sdk-example.tsx`.
 
 Read more in [architecture](docs/architecture.md), [settings](docs/settings.md), and [tool-call protocols](docs/toolcall-protocols.md).
 
 ## External coding harnesses
 
-The `hyper` CLI exposes the live runtime to trusted local shell-capable harnesses. From a checkout, invoke it with `bun script/hyper.ts`:
+The `mauzcode` CLI exposes the live runtime to trusted local shell-capable harnesses. From a checkout, invoke it with `bun script/mauzcode.ts`:
 
 ```bash
-bun script/hyper.ts plugin search "GitHub pull request review"
-bun script/hyper.ts function read gh.pr
-bun script/hyper.ts tools
-bun script/hyper.ts tool call find --json '{"path":"src","pattern":"*.ts"}'
-bun script/hyper.ts repl 'return await ctx.fns.gh.me({})'
-bun script/hyper.ts skills mount
+bun script/mauzcode.ts plugin search "GitHub pull request review"
+bun script/mauzcode.ts function read gh.pr
+bun script/mauzcode.ts tools
+bun script/mauzcode.ts tool call find --json '{"path":"src","pattern":"*.ts"}'
+bun script/mauzcode.ts repl 'return await ctx.fns.gh.me({})'
+bun script/mauzcode.ts skills mount
 ```
 
 See [external harnesses](docs/external-harnesses.md) for CLI setup, authentication, and usage.
 
 ## Development
 
-After configuring the database and provider, run Hyper in the foreground:
+After configuring the database and provider, run MauzCode in the foreground:
 
 ```bash
 bun install
@@ -197,7 +197,7 @@ Key directories:
 | `src/` | Core procedures, types, routes, and UI |
 | `src/procs/` | Vendored procedural runtime |
 | `plugins/` | Official plugins |
-| `.hyper/` | Project-local runtime extensions |
+| `.mauzcode/` | Project-local runtime extensions |
 | `script/` | Installer, service management, and CLI entry points |
 | `docs/` | Architecture, operations, and design notes |
 
@@ -205,7 +205,7 @@ Key directories:
 
 **An agent with shell and runtime access can execute code with the server's privileges.** It may access files, query stored conversations, and use credentials granted to connected integrations. Plugins and the external REPL are trusted code, not isolation boundaries.
 
-- Run Hyper under an account with only the access it needs.
+- Run MauzCode under an account with only the access it needs.
 - Keep API keys and database credentials out of Git and chat transcripts.
 - Review plugins before enabling them and limit connected-account permissions.
 - Treat confirmations for sending, publishing, deleting, and other external actions as essential safeguards—not as a substitute for access control.
@@ -215,11 +215,11 @@ See [authentication](docs/auth.md) and [HTTPS setup](docs/https.md).
 
 ## Community
 
-Join the [Hyper community on Telegram](https://t.me/+9Q6Ir0piDno1Nzcy) to ask questions, share what you build, and follow updates. Joining requires admin approval. For reproducible bugs and feature requests, please use [GitHub Issues](https://github.com/hyper-code-harness/hyper-code/issues/new/choose).
+Join the [MauzCode community on Telegram](https://t.me/+9Q6Ir0piDno1Nzcy) to ask questions, share what you build, and follow updates. Joining requires admin approval. For reproducible bugs and feature requests, please use [GitHub Issues](https://github.com/suchimauz/mauzcode/issues/new/choose).
 
 
 ## Contributing
 
-[Report a bug or propose a feature](https://github.com/hyper-code-harness/hyper-code/issues/new/choose). Include reproduction steps, relevant logs with secrets removed, and your platform and provider when reporting a problem.
+[Report a bug or propose a feature](https://github.com/suchimauz/mauzcode/issues/new/choose). Include reproduction steps, relevant logs with secrets removed, and your platform and provider when reporting a problem.
 
 For code changes, follow the procedural conventions: one function per file, calls through `ctx.fns`, documented options, and focused tests. Keep credentials and private plugins out of pull requests. Start with [architecture](docs/architecture.md) and [plugin authoring](docs/plugin-authoring.md).

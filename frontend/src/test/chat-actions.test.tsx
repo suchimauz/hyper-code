@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, renderHook, act } from '@testing-library/react';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
-import { LiveComposer } from '../components/hyper/LiveComposer';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
+import { LiveComposer } from '../components/mauzcode/LiveComposer';
 import { filterProjects, updateChat, type NavigationProject } from '../lib/navigation';
 import { useNavigation } from '../hooks/useNavigation';
 const projects: NavigationProject[] = [{id:'project',title:'Workspace',dir:'/test',host:null,chats:[
@@ -40,7 +40,7 @@ it('keeps sidebar unchanged on conflict and applies archive/restore only after a
  fail=false;await act(async()=>{await view.result.current.act('a','archive');});expect(fetcher).toHaveBeenCalled();
 });
 it('archived composer disables typing, sending and all footer buttons without discarding draft',async()=>{
- sessionStorage.setItem('hyper-ui-draft:a',JSON.stringify({text:'draft',key:'saved'}));
+ sessionStorage.setItem('mauzcode-ui-draft:a',JSON.stringify({text:'draft',key:'saved'}));
  const fetcher=vi.fn(async()=>json({budget:null,models:[]}));vi.stubGlobal('fetch',fetcher);
  const view=render(<LiveComposer agentId="a" running={false} readOnly onAccepted={vi.fn()}/>);
  const input=screen.getByRole('textbox');expect(input).toHaveAttribute('contenteditable','false');expect(input).toHaveAttribute('aria-disabled','true');expect(input).toHaveTextContent('draft');

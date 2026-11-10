@@ -6,7 +6,7 @@ test("global navigation keeps plugin applications and one catalogue link, not mo
         state: {
             nav: { apps: {
                 plugins: { label: "Plugins", href: "/plugins", group: "System", order: 55 },
-                hyperhub: { label: "HyperHub", href: "/plugins?provider=hyperhub", group: "Tools", order: 60 },
+                mauzcodehub: { label: "MauzCodeHub", href: "/plugins?provider=mauzcodehub", group: "Tools", order: 60 },
                 news: { label: "News", href: "/news", group: "Pages", order: 10 },
             } },
             procs: { http: { routes: { "/plugins": { GET: () => {} }, "/news": { GET: () => {} }, "/plugins/config": { GET: () => {} }, "/plugins/search": { GET: () => {} } } } },

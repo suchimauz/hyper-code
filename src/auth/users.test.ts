@@ -66,27 +66,27 @@ test("rename keeps the id", async () => {
 });
 
 test("seed: once from env/legacy password, never overwrites", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_USER: "Nikolai", HYPER_USER_EMAIL: "nik@x.test", HYPER_PASSWORD: "legacy-password" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_USER: "Nikolai", MAUZCODE_USER_EMAIL: "nik@x.test", MAUZCODE_PASSWORD: "legacy-password" } });
     const seeded = await ctx.fns.auth.seed({});
     expect(seeded?.name).toBe("Nikolai");
     expect(seeded?.configuredAt).not.toBeNull();
     expect((await ctx.fns.auth.verifyUser({ password: "legacy-password" }))?.id).toBe(seeded!.id);
-    ctx.env.HYPER_PASSWORD = "changed-in-env";
+    ctx.env.MAUZCODE_PASSWORD = "changed-in-env";
     expect(await ctx.fns.auth.seed({})).toBeNull();
     expect(await ctx.fns.auth.verifyUser({ password: "changed-in-env" })).toBeNull();
 });
 
 test("seed from legacy password only does nothing: switching is explicit", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_PASSWORD: "legacy-password" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PASSWORD: "legacy-password" } });
     expect(await ctx.fns.auth.seed({})).toBeNull();
     expect((await ctx.fns.auth.listUsers({})).length).toBe(0);
 });
 
 test("code deployed before the switch keeps legacy shared-password sign-in", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_PASSWORD: "legacy-password" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PASSWORD: "legacy-password" } });
     const anon = await ctx.fns.auth.currentUser({ req: req() });
     expect(anon).toEqual({ user: null, required: true, legacy: false });
-    const token = await ctx.fns.procs.auth.sign({ sub: "password-user", name: "Hyper user", role: "owner", days: 1 });
+    const token = await ctx.fns.procs.auth.sign({ sub: "password-user", name: "MauzCode user", role: "owner", days: 1 });
     const legacy = await ctx.fns.auth.currentUser({ req: req(`${ctx.fns.procs.auth.cookieName({})}=${token}`) });
     expect(legacy.legacy).toBe(true);
     const res = await ctx.fns.procs.http.dispatch({ method: "POST", url: "/auth/login", body: { password: "legacy-password" } });
@@ -99,8 +99,8 @@ test("code deployed before the switch keeps legacy shared-password sign-in", asy
 });
 
 test("after the switch the legacy cookie stops working and the password still signs in", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_PASSWORD: "legacy-password" } });
-    const token = await ctx.fns.procs.auth.sign({ sub: "password-user", name: "Hyper user", role: "owner", days: 1 });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PASSWORD: "legacy-password" } });
+    const token = await ctx.fns.procs.auth.sign({ sub: "password-user", name: "MauzCode user", role: "owner", days: 1 });
     await ctx.fns.auth.createUser({ name: "Nikolai Ryzhikov", email: "niquola@health-samurai.io", password: await ctx.fns.auth.password({}), role: "owner" });
     const stale = await ctx.fns.auth.currentUser({ req: req(`${ctx.fns.procs.auth.cookieName({})}=${token}`) });
     expect(stale.user).toBeNull();
@@ -141,8 +141,8 @@ test("authorship: agent creator, user message author, event actor", async () => 
 });
 
 test("legacy session counts as signed in on /auth/session before the switch", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_PASSWORD: "legacy-password" } });
-    const token = await ctx.fns.procs.auth.sign({ sub: "password-user", name: "Hyper user", role: "owner", days: 1 });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PASSWORD: "legacy-password" } });
+    const token = await ctx.fns.procs.auth.sign({ sub: "password-user", name: "MauzCode user", role: "owner", days: 1 });
     const cookie = `${ctx.fns.procs.auth.cookieName({})}=${token}`;
     const ok = await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/session", headers: { cookie } });
     expect(ok.status).toBe(200);

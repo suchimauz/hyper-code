@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useReadReceipt } from '../hooks/useReadReceipt';
-import { markChatRead, type EventPage } from '../lib/hyper';
-vi.mock('../lib/hyper', async importOriginal => ({ ...await importOriginal<typeof import('../lib/hyper')>(), markChatRead: vi.fn() }));
+import { markChatRead, type EventPage } from '../lib/mauzcode';
+vi.mock('../lib/mauzcode', async importOriginal => ({ ...await importOriginal<typeof import('../lib/mauzcode')>(), markChatRead: vi.fn() }));
 const page = (id: string, ts = 100) => ({ agentId: id, events: [{ idx: 1, ts, type: 'assistant', text: 'hello' }] }) as EventPage;
 let hidden = false;
 beforeEach(() => { vi.useFakeTimers(); hidden = false; vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden); vi.mocked(markChatRead).mockResolvedValue({ ok: true, seenAt: 100 }); });
@@ -27,18 +27,18 @@ it('does not mark hidden or mismatched chats and resumes when visible', async ()
 });
 it('never clears a badge on failure; retries and emits acknowledgement only on success', async () => {
   vi.mocked(markChatRead).mockRejectedValueOnce(new Error('offline'));
-  const listener = vi.fn(); window.addEventListener('hyper-ui:read', listener);
+  const listener = vi.fn(); window.addEventListener('mauzcode-ui:read', listener);
   const view = renderHook(() => useReadReceipt('a', page('a'))); await tick(); expect(listener).not.toHaveBeenCalled();
   await tick(5000); expect(listener).toHaveBeenCalledTimes(1);
-  view.unmount(); window.removeEventListener('hyper-ui:read', listener);
+  view.unmount(); window.removeEventListener('mauzcode-ui:read', listener);
 });
 it('aborts receipt when switching chats and ignores a stale completion', async () => {
   let resolve!: (value: { ok: boolean; seenAt: number }) => void;
   vi.mocked(markChatRead).mockImplementationOnce(() => new Promise(r => { resolve = r; }));
-  const listener = vi.fn(); window.addEventListener('hyper-ui:read', listener);
+  const listener = vi.fn(); window.addEventListener('mauzcode-ui:read', listener);
   const view = renderHook(({ id }) => useReadReceipt(id, page(id)), { initialProps: { id: 'a' } }); await tick();
   const signal = vi.mocked(markChatRead).mock.calls[0][2]!;
   view.rerender({ id: 'b' }); expect(signal.aborted).toBe(true);
   await act(async () => resolve({ ok: true, seenAt: 100 })); expect(listener).not.toHaveBeenCalled();
-  view.unmount(); window.removeEventListener('hyper-ui:read', listener);
+  view.unmount(); window.removeEventListener('mauzcode-ui:read', listener);
 });

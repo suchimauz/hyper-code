@@ -122,7 +122,7 @@ test('inactive capture cannot race into an unaccounted active goal',async()=>{
  h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'bad'}};
  await expect(h.execute()).rejects.toThrow('handoff failed');expect(dispatches).toBe(0);
 });
-for(const provider of ['xai','hyper'])test(`bound ${provider} xai adapter fails before network`,async()=>{
+for(const provider of ['xai','mauzcode'])test(`bound ${provider} xai adapter fails before network`,async()=>{
  const h=harness([]);let dispatches=0;h.ctx.fns.llm.resolveEndpoint=async()=>({provider,upstream:'xai',api:'openai'});
  h.ctx.fns.llm.stream=async()=>{dispatches++;return {text:'bad'}};
  await expect(h.execute()).rejects.toThrow('exact supported transport');expect(dispatches).toBe(0);

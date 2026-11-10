@@ -7,7 +7,7 @@ function fixture(fail = false) {
   procs:{auth:{cookieName:()=> 'session',verify:async()=>({sub:'owner',jti:'s_login'}),cookie:()=> 'session=; Max-Age=0'},db:{run:async()=>{calls.push('revoke-login');}},log:{warn:()=>{calls.push('warning');}}},
   webPush:{revokeSession:async({token}:any)=>{expect(token).toBe('test-token');calls.push('revoke-push');if(fail)throw Error('sensitive detail');}},
  }};
- const req=new Request('https://hyper.example/auth/logout',{method:'POST',headers:{cookie:'session=test-token',accept:'application/json'}});
+ const req=new Request('https://mauzcode.example/auth/logout',{method:'POST',headers:{cookie:'session=test-token',accept:'application/json'}});
  return {ctx,calls,req};
 }
 test('logout revokes push before its stable OIDC binding and clears cookie',async()=>{

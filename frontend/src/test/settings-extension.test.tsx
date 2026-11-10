@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { settingsExtension } from '../core-ui/settings';
-vi.mock('@hyper/ui', async () => { const actual = await vi.importActual<typeof import('@hyper/ui')>('@hyper/ui'); return {...actual, requestJson:vi.fn()}; });
-import { requestJson } from '@hyper/ui';
+vi.mock('@mauzcode/ui', async () => { const actual = await vi.importActual<typeof import('@mauzcode/ui')>('@mauzcode/ui'); return {...actual, requestJson:vi.fn()}; });
+import { requestJson } from '@mauzcode/ui';
 const request=vi.mocked(requestJson);
 const context={agentId:null,theme:'light' as const,readOnly:false};
 const Declared=settingsExtension.pages![1].component;

@@ -66,7 +66,7 @@ export default async function (
      const ssh = /^ssh\.(.+)\.([^.]+)$/.exec(entry.account);
      const host = entry.node ?? ssh?.[1];
      const account = ssh?.[2] ?? entry.account;
-     const connection = entry.node ? "hyper" : ssh ? "ssh" : "local";
+     const connection = entry.node ? "mauzcode" : ssh ? "ssh" : "local";
      const kind = providers.has(entry.provider) || entry.provider === "opencode" && /^(?:opencode\s+)?go(?:\s+subscription)?$/i.test((entry.planType ?? "").trim()) ? "quota" : "status";
      const windows: NonNullable<types.llms.QuotaAccount["windows"]> = {};
      let expired = false;
@@ -91,7 +91,7 @@ export default async function (
     });
     if (gateway) accounts.push({id:"oneapi:default",provider:"oneapi",account:"default",label:"Asoft LLM Gate",model:"oneapi/default:",connection:"local",kind:"status",status:gateway.reason === "disabled" ? "disabled" : gateway.status === "ok" || gateway.status === "available" ? "available" : gateway.status === "disabled" ? "disabled" : gateway.status === "error" || gateway.status === "unavailable" ? "unavailable" : "unknown",tone:"neutral",parkedAgents:0});
     const providerOrder = ["codex","claude-code","kimi-coding","zai-coding","minimax-coding","opencode","oneapi"];
-    const connectionOrder = ["local","hyper","ssh"];
+    const connectionOrder = ["local","mauzcode","ssh"];
     const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
     accounts.sort((a,b) => {
         const ai = providerOrder.indexOf(a.provider), bi = providerOrder.indexOf(b.provider);

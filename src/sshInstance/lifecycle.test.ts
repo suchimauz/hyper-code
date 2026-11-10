@@ -8,7 +8,7 @@ import validate from './validate';
 import authorize from './authorize';
 
 async function harness(){
- const root=await mkdtemp(process.cwd()+'/.hyper/tmp/ssh-lifecycle-');
+ const root=await mkdtemp(process.cwd()+'/.mauzcode/tmp/ssh-lifecycle-');
  const pin=(byte:number)=>{const b=Buffer.alloc(51,byte);b.writeUInt32BE(11,0);b.write('ssh-ed25519',4);b.writeUInt32BE(32,15);return 'ssh-ed25519 '+b.toString('base64');};
  let item:any={name:'test',host:'old.example',user:'alice',port:22,id:crypto.randomUUID(),publicKey:'public identity',pinnedHostKey:pin(1),updatedAt:1};
  let stale=false,denied=false,queries:any[]=[];let accounts=[{instance:'test',status:'connected'},{instance:'other',status:'connected'}];

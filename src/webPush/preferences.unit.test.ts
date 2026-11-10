@@ -4,12 +4,12 @@ import savePreferences from './savePreferences';
 
 function fixture(rows: object[] = [{input_enabled:null,error_enabled:null}]) {
  const calls: any[]=[];
- const ctx:any={fns:{procs:{db:{select:async(o:any)=>{calls.push(o);return rows;}},auth:{cookieName:()=> 'sid'}},webPush:{sessionBinding:async()=>({ownerId:'owner',expiresAt:Date.now()+60000}),preferences:async()=>({input:true,error:true,eligible:true})},http:{publicOrigin:async()=> 'https://hyper.test'},auth:{verifyCsrf:async()=>true,csrfToken:async()=> 'csrf<token'}}};
- const session:any={user:{id:'owner'},req:new Request('https://hyper.test/a/main')};
+ const ctx:any={fns:{procs:{db:{select:async(o:any)=>{calls.push(o);return rows;}},auth:{cookieName:()=> 'sid'}},webPush:{sessionBinding:async()=>({ownerId:'owner',expiresAt:Date.now()+60000}),preferences:async()=>({input:true,error:true,eligible:true})},http:{publicOrigin:async()=> 'https://mauzcode.test'},auth:{verifyCsrf:async()=>true,csrfToken:async()=> 'csrf<token'}}};
+ const session:any={user:{id:'owner'},req:new Request('https://mauzcode.test/a/main')};
  return {ctx,session,calls};
 }
 function request(body='agentId=main&csrf=token&input=true&error=true',headers:Record<string,string>={}) {
- return new Request('https://hyper.test/webPush/preferences',{method:'POST',headers:{cookie:'sid=signed',origin:'https://hyper.test','content-type':'application/x-www-form-urlencoded',...headers},body});
+ return new Request('https://mauzcode.test/webPush/preferences',{method:'POST',headers:{cookie:'sid=signed',origin:'https://mauzcode.test','content-type':'application/x-www-form-urlencoded',...headers},body});
 }
 describe('owner push preferences',()=>{
  test('missing preference defaults both on, owner and main eligibility enforced in SQL',async()=>{

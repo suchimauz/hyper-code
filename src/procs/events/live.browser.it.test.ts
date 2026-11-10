@@ -3,7 +3,7 @@
 //   - HTTP/1.1: a hidden tab gives its stream back; on return EVERY state subscriber re-reads (resync) —
 //     the canvas opens that the agent showed meanwhile, the dock re-fetches itself.
 //   - HTTP/2: a hidden tab keeps its stream, so the change arrives while it is still hidden.
-//   - hyperLive.subscribe refuses a state subscriber without resync.
+//   - mauzCodeLive.subscribe refuses a state subscriber without resync.
 // Hidden is emulated the way the browser signals it (visibilityState + visibilitychange); HTTP/2 is
 // emulated by reporting `h2` as the page's nextHopProtocol before any script runs. Runs in the suite's
 // headless Chrome (test/chrome/headless.ts); skipped when no Chrome is installed.
@@ -37,7 +37,7 @@ async function openPage(path: string, protocol?: string) {
             performance.getEntriesByType = type => type === 'navigation' ? real(type).map(e => new Proxy(e, { get: (t, k) => k === 'nextHopProtocol' ? ${JSON.stringify(protocol)} : (typeof t[k] === 'function' ? t[k].bind(t) : t[k]) })) : real(type); })()` });
     }
     await send("Page.navigate", { url: `http://127.0.0.1:${server.port}${path}` });
-    for (let i = 0; i < 200 && !(await evaluate("!!(window.hyperLive && window.__hyperCanvasInstalled && document.querySelector('[data-canvas-agent]'))")); i++) await Bun.sleep(50);
+    for (let i = 0; i < 200 && !(await evaluate("!!(window.mauzcodeLive && window.__mauzcodeCanvasInstalled && document.querySelector('[data-canvas-agent]'))")); i++) await Bun.sleep(50);
     await Bun.sleep(300);   // the stream's first hello
     const close = async () => { ws.close(); await fetch(`${CDP}/json/close/${tab.id}`).catch(() => null); };
     return { evaluate, close };
@@ -52,8 +52,8 @@ test.skipIf(!CDP)("HTTP/1.1: a hidden tab drops its stream, and on return every 
     const agent = await ctx.fns.agent.start({ model: "mock:test" });
     const page = await openPage(`/agent/${agent.id}`);
     try {
-        expect(await page.evaluate("window.hyperLive.keepsStreamWhileHidden()")).toBe(false);
-        await page.evaluate(`window.__resyncs = []; window.hyperLive.subscribe({ name: 'probe', types: ['probe'], onEvent() {}, resync: reason => window.__resyncs.push(reason) }); true`);
+        expect(await page.evaluate("window.mauzcodeLive.keepsStreamWhileHidden()")).toBe(false);
+        await page.evaluate(`window.__resyncs = []; window.mauzcodeLive.subscribe({ name: 'probe', types: ['probe'], onEvent() {}, resync: reason => window.__resyncs.push(reason) }); true`);
         const dockBefore = await page.evaluate(fetched("/dock"));
 
         await page.evaluate(setVisibility("hidden"));
@@ -74,8 +74,8 @@ test.skipIf(!CDP)("HTTP/2: a hidden tab keeps its stream and receives the change
     const agent = await ctx.fns.agent.start({ model: "mock:test" });
     const page = await openPage(`/agent/${agent.id}`, "h2");
     try {
-        expect(await page.evaluate("window.hyperLive.keepsStreamWhileHidden()")).toBe(true);
-        await page.evaluate(`window.__resyncs = []; window.hyperLive.subscribe({ name: 'probe', types: ['probe'], onEvent() {}, resync: reason => window.__resyncs.push(reason) }); true`);
+        expect(await page.evaluate("window.mauzcodeLive.keepsStreamWhileHidden()")).toBe(true);
+        await page.evaluate(`window.__resyncs = []; window.mauzcodeLive.subscribe({ name: 'probe', types: ['probe'], onEvent() {}, resync: reason => window.__resyncs.push(reason) }); true`);
 
         await page.evaluate(setVisibility("hidden"));
         await ctx.fns.canvas.show({ agentId: agent.id, kind: "html", title: "Drawing", args: { html: "<p>drawing</p>" } });
@@ -94,9 +94,9 @@ test.skipIf(!CDP)("a state subscriber without resync is refused; a command needs
     const agent = await ctx.fns.agent.start({ model: "mock:test" });
     const page = await openPage(`/agent/${agent.id}`);
     try {
-        const refused = await page.evaluate(`(() => { try { window.hyperLive.subscribe({ types: ['x'], onEvent() {} }); return 'accepted'; } catch (e) { return String(e.message); } })()`);
+        const refused = await page.evaluate(`(() => { try { window.mauzcodeLive.subscribe({ types: ['x'], onEvent() {} }); return 'accepted'; } catch (e) { return String(e.message); } })()`);
         expect(refused).toContain("resync() is required");
-        expect(await page.evaluate(`typeof window.hyperLive.command({ types: ['x'], onEvent() {} })`)).toBe("function");
+        expect(await page.evaluate(`typeof window.mauzcodeLive.command({ types: ['x'], onEvent() {} })`)).toBe("function");
     } finally {
         await page.close();
     }

@@ -1,5 +1,5 @@
 /**
- * Returns this Hyper's OIDC redirect URI: <origin>/auth/oidc/callback.
+ * Returns this MauzCode's OIDC redirect URI: <origin>/auth/oidc/callback.
  *
  * Honors X-Forwarded-Proto/-Host behind a proxy so it matches the URI registered in the control plane.
  * @param opts.req Incoming request whose origin is used.

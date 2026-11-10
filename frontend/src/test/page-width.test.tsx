@@ -14,10 +14,10 @@ it('keeps width controls outside the full-panel scroll container', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Страница на всю ширину панели' }));
   expect(viewport.querySelector(':scope > .page-scroll-viewport')).toBe(scroller);
 });
-const key = 'hyper-ui.page-content-width-v1';
+const key = 'mauzcode-ui.page-content-width-v1';
 afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 it('shares the page preference across native and extension pages, independently from chat', () => {
-  localStorage.setItem('hyper-ui.chat-content-width-v2', '704');
+  localStorage.setItem('mauzcode-ui.chat-content-width-v2', '704');
   const view = render(<PageViewport active><section className="plugins-page">Pages</section></PageViewport>);
   fireEvent.click(screen.getByRole('button', { name: 'Страница на всю ширину панели' }));
   expect(localStorage.getItem(key)).toBe('full');
@@ -25,7 +25,7 @@ it('shares the page preference across native and extension pages, independently 
   render(<PageViewport active><ExtensionSurface view={{ key: 'test/page', title: 'Test', component: () => <p>Plugin content</p> }} context={{ agentId: null, theme: 'light', readOnly: true }} onClose={() => {}} /></PageViewport>);
   expect(screen.getByRole('button', { name: 'Обычная ширина страницы' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('Plugin content').closest('.page-width-content')).not.toBeNull();
-  expect(localStorage.getItem('hyper-ui.chat-content-width-v2')).toBe('704');
+  expect(localStorage.getItem('mauzcode-ui.chat-content-width-v2')).toBe('704');
 });
 it('resizes with keyboard from either edge and resets on double click', () => {
   render(<PageViewport active>Page</PageViewport>);

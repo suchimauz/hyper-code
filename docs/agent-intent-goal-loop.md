@@ -1178,7 +1178,7 @@ flowchart TB
     PM --> R
 ```
 
-**Execution loop:** достигает текущей цели.  
+**Execution loop:** достигает текущей цели.
 **Procedural memory loop:** улучшает способы достижения будущих похожих целей.
 
 Цикл памяти может выполняться не после каждого действия, а в естественных точках:
@@ -1318,7 +1318,7 @@ compiled  — после N успехов на разных задачах по�
 ---
 
 
-## 12. Возможное отображение на hyper-code2
+## 12. Возможное отображение на mauzcode
 
 Это направление для проектирования, не описание текущей реализации.
 
@@ -1331,7 +1331,7 @@ compiled  — после N успехов на разных задачах по�
 | ParticipationPolicy | durable user/agent setting: базовый уровень + alwaysAskFor/notifyOn/pauseOn |
 | Goal | расширение видимого plan/meta-состояния или отдельная сущность |
 | World model | структурированная рабочая память с разделением фактов и допущений |
-| Skill | `.hyper/skill/*`: сохранённое Plan Definition с goalPattern, conditions, todoTemplate и helpers |
+| Skill | `.mauzcode/skill/*`: сохранённое Plan Definition с goalPattern, conditions, todoTemplate и helpers |
 | Plan | конкретный durable экземпляр Skill: Goal + conditions + todo list + helpers |
 | Task / Todo | существующий `session.plan.tasks` с task IDs и статусами |
 | Action | tool call с `tool_call_id` и ожидаемым исходом |

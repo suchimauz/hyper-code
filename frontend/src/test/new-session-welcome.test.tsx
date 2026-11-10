@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { NewSessionWelcome } from '../components/hyper/NewSessionWelcome';
+import { NewSessionWelcome } from '../components/mauzcode/NewSessionWelcome';
 import { compactCount, heatmapDays, type WelcomeStats } from '../lib/welcomeStats';
 
 const stats: WelcomeStats = { range: 'all', timezone: 'UTC', asOf: '2026-06-21T10:00:00Z', sessions: 12, messages: 9876, totalTokens: 1250000, activeDays: 3, peakHour: 22, favoriteModel: 'test-model', models: [{ model: 'test-model', messages: 9876, totalTokens: 1250000, inputTokens: 1000000, outputTokens: 250000 }], daily: [{ date: '2026-06-21', messages: 9876, sessions: 12, totalTokens: 1250000, models: [{ model: 'test-model', totalTokens: 1250000 }] }] };

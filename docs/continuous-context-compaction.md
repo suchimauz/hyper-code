@@ -164,7 +164,7 @@ A desired user-visible outcome with completion criteria. A goal may span several
 Examples:
 
 - prevent false stale-run recovery;
-- stop Hyper UI freezing with multiple tabs;
+- stop MauzCode UI freezing with multiple tabs;
 - design continuous context compaction.
 
 ### Track

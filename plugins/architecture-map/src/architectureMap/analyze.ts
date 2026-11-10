@@ -1,7 +1,7 @@
 /**
- * Ranks Hyper modules by change risk and transitive impact
+ * Ranks MauzCode modules by change risk and transitive impact
  *
- * Use this read-only analysis before refactoring or review to find modules with many dependents, weak test reachability, broad reverse impact, or ownership-boundary warnings. It reuses Hyper’s indexed ctx.fns graph and does not parse source again.
+ * Use this read-only analysis before refactoring or review to find modules with many dependents, weak test reachability, broad reverse impact, or ownership-boundary warnings. It reuses MauzCode’s indexed ctx.fns graph and does not parse source again.
  * @param opts.module Module to expand with its complete reverse-impact list, such as agent or session.
  * @param opts.depth Maximum reverse-dependency steps used for impact analysis. @default 3 @minimum 1 @maximum 8
  * @param opts.limit Maximum ranked modules and boundary violations to return. @default 50 @minimum 1 @maximum 500

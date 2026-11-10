@@ -1,7 +1,7 @@
 # Jev decision layer
 
 Design for integrating TypeSafe's Jev (a "System One" typed-decision model) into
-Hyper as a user plugin, and for the four runtime call sites that justify it.
+MauzCode as a user plugin, and for the four runtime call sites that justify it.
 
 Status: design. Nothing implemented yet.
 
@@ -72,11 +72,11 @@ truth. Calibration describes populations of answers, not the answer in hand.
 
 ## 3. Plugin shape
 
-New user plugin at `~/.hyper/user/jev` — a private integration, so it belongs in
-`USER_PLUGINS`, not in `plugins/` and not in project `.hyper/`.
+New user plugin at `~/.mauzcode/user/jev` — a private integration, so it belongs in
+`USER_PLUGINS`, not in `plugins/` and not in project `.mauzcode/`.
 
 ```
-~/.hyper/user/jev/
+~/.mauzcode/user/jev/
   package.json           procs: { src, label: "jev", icon: "ph-gauge",
                                   optional: true, description: ... }
   SKILL.md               workflow overview: when to reach for a typed decision
@@ -156,7 +156,7 @@ Reranking. Deliberately **not** a single batched call: one request per candidate
 issued concurrently with a small pool, each returning a Score or Noul. Sorting
 happens in our code.
 
-## 4. Call sites in Hyper
+## 4. Call sites in MauzCode
 
 Ordered by ratio of value to risk. Each ships behind its own setting, default
 off, with a measured baseline before it is turned on.

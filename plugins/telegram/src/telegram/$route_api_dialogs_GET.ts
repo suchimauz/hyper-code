@@ -1,4 +1,4 @@
-/** Returns recent personal Telegram dialogs for the Hyper Telegram client. */
+/** Returns recent personal Telegram dialogs for the MauzCode Telegram client. */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
 
     const who = await ctx.fns.auth.currentUser({ req: opts.req });

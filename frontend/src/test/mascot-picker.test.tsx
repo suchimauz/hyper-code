@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { MascotPicker } from '../components/hyper/MascotPicker';
+import { MascotPicker } from '../components/mauzcode/MascotPicker';
 import { readNewSessionDraft, persistNewSessionDraft, submitNewSession } from '../lib/newSession';
 import { normalizeMascotChoice } from '../lib/mascots';
 afterEach(() => { sessionStorage.clear(); vi.unstubAllGlobals(); });

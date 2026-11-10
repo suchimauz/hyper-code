@@ -33,7 +33,7 @@ export default async function (
 
     const headers: Record<string, string> = {};
     opts.req.headers.forEach((value, key) => { headers[key] = value; });
-    headers["x-hyper-agent"] = agentId;
+    headers["x-mauzcode-agent"] = agentId;
 
     const method = opts.req.method.toUpperCase();
     const body = method === "GET" || method === "HEAD" ? undefined : await opts.req.text();

@@ -1,12 +1,12 @@
 /**
  * Completes sign-in through the OIDC provider: checks state, exchanges the code with the PKCE verifier,
- * verifies the ID token (signature, issuer, audience, expiry, nonce), finds or creates the Hyper user, and
+ * verifies the ID token (signature, issuer, audience, expiry, nonce), finds or creates the MauzCode user, and
  * starts a server-side session with the provider's refresh token. Any failure returns to the sign-in page.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
     const forwardedProto = opts.req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-    const cookieUrl = forwardedProto === "https" ? "https://hyper.invalid/" : opts.req.url;
-    const clear = ctx.fns.procs.auth.cookie({ name: "hyper_oidc_state", url: cookieUrl });
+    const cookieUrl = forwardedProto === "https" ? "https://mauzcode.invalid/" : opts.req.url;
+    const clear = ctx.fns.procs.auth.cookie({ name: "mauzcode_oidc_state", url: cookieUrl });
     const fail = (message: string) => {
         ctx.fns.procs.log.warn({ event: "auth.oidc.failed", msg: message });
         return new Response(null, { status: 303, headers: { location: `/auth/login?error=${encodeURIComponent(message)}`, "cache-control": "no-store", "set-cookie": clear } });
@@ -15,7 +15,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     if (!cfg) return new Response("Sign-in provider is not configured", { status: 404 });
     const url = new URL(opts.req.url);
     if (url.searchParams.get("error")) return fail(url.searchParams.get("error_description") || "Sign-in was cancelled");
-    const raw = new Bun.CookieMap(opts.req.headers.get("cookie") ?? "").get("hyper_oidc_state");
+    const raw = new Bun.CookieMap(opts.req.headers.get("cookie") ?? "").get("mauzcode_oidc_state");
     const carried: any = raw ? await ctx.fns.procs.auth.verify({ token: raw }) : null;
     const code = url.searchParams.get("code");
     if (!code || !carried || carried.kind !== "oidc-state" || carried.sub !== url.searchParams.get("state")) return fail("Sign-in expired, try again");
@@ -39,7 +39,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     const auto = await ctx.fns.settings.get({ module: "auth", scopeType: "global", key: "oidcAutoCreate" });
     const autoCreate = auto === undefined || auto === null ? true : auto === true || auto === "true";
     const user = await ctx.fns.auth.linkIdentity({ provider: "oidc", sub: String(claims.sub), email, name: String(claims.name ?? email.split("@")[0]), picture: typeof claims.picture === "string" ? claims.picture : null, autoCreate });
-    if (!user) return fail(`${email} is not allowed to sign in to this Hyper`);
+    if (!user) return fail(`${email} is not allowed to sign in to this MauzCode`);
 
     const s = await ctx.fns.auth.oidcSession({ action: "create", req: opts.req, userId: user.id, refreshToken: tokens.refresh_token ?? null });
     let next = String(carried.email || "/");

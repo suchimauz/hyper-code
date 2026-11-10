@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 import type { NavigationIcon } from './navigation';
 
 export type QuotaTone = 'neutral' | 'warning' | 'critical' | 'error';
@@ -8,7 +8,7 @@ export type QuotaPeriod = 'fiveHour' | 'weekly' | 'monthly';
 /** Unified provider quota row from GET /api/v1/quotas. Providers without usage report kind "status". */
 export type QuotaAccount = {
   id: string; provider: string; account: string; label: string; model: string;
-  connection: 'local' | 'hyper' | 'ssh'; host?: string;
+  connection: 'local' | 'mauzcode' | 'ssh'; host?: string;
   kind: 'quota' | 'status';
   windows?: Partial<Record<QuotaPeriod, QuotaWindow>>;
   status?: 'available' | 'unavailable' | 'disabled' | 'unknown';

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// One-shot data migration: copy the pre-Postgres sqlite DB into the hyper
+// One-shot data migration: copy the pre-Postgres sqlite DB into the mauzcode
 // Postgres. Idempotent (ON CONFLICT DO NOTHING). Run the pg migrations first
 // (boot the server once, or bun script/repl.ts 'ctx.fns.procs.migrate.up({})').
 //
@@ -7,7 +7,7 @@
 import { Database } from "bun:sqlite";
 import { SQL } from "bun";
 
-const sqlitePath = process.argv[2] ?? ".hyper/_runtime/sessions";
+const sqlitePath = process.argv[2] ?? ".mauzcode/_runtime/sessions";
 const pgUrl = process.argv[3] ?? process.env.DATABASE_URL;
 if (!pgUrl) throw new Error("pass a Postgres URL or set DATABASE_URL");
 

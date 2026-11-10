@@ -1,7 +1,7 @@
 /**
  * Authorize an owner-only same-origin Terminal plugin WebSocket handshake for one local agent workspace
  *
- * Use from the /terminal/socket upgrade hook after global authentication. Requires a signed-in owner, a GET handshake on exactly /terminal/socket, an Origin equal to the public origin, the hyper-terminal subprotocol, a valid agentId query parameter and integer cols/rows in range. The agent must exist with a local workspace (empty workspace_host) whose directory exists; remote SSH workspaces are refused. Returns the terminal start parameters or a refusal Response; it never spawns a process.
+ * Use from the /terminal/socket upgrade hook after global authentication. Requires a signed-in owner, a GET handshake on exactly /terminal/socket, an Origin equal to the public origin, the mauzcode-terminal subprotocol, a valid agentId query parameter and integer cols/rows in range. The agent must exist with a local workspace (empty workspace_host) whose directory exists; remote SSH workspaces are refused. Returns the terminal start parameters or a refusal Response; it never spawns a process.
  * @param opts.req Incoming browser WebSocket handshake carrying agentId, cols and rows query parameters.
  */
 export default async function (
@@ -20,7 +20,7 @@ export default async function (
     if(req.method!=='GET' || url.pathname!=='/terminal/socket') return new Response('Invalid endpoint',{status:400});
     const origin=req.headers.get('origin');
     if(!origin || origin!==await ctx.fns.http.publicOrigin({req})) return new Response('Cross-origin WebSocket rejected',{status:403});
-    if(req.headers.get('sec-websocket-protocol')!=='hyper-terminal') return new Response('hyper-terminal required',{status:400});
+    if(req.headers.get('sec-websocket-protocol')!=='mauzcode-terminal') return new Response('mauzcode-terminal required',{status:400});
     const agentId=url.searchParams.get('agentId')||'';
     if(!/^[A-Za-z0-9_-]{1,128}$/.test(agentId)) return new Response('Invalid agent',{status:400});
     const size=(name:string,fallback:number,max:number)=>{

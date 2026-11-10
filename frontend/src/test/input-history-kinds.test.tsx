@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { QuestionHistoryContext, QuestionHistoryList, choiceResultId } from '../components/hyper/QuestionHistory';
-import type { ChatEvent } from '../lib/hyper';
+import { QuestionHistoryContext, QuestionHistoryList, choiceResultId } from '../components/mauzcode/QuestionHistory';
+import type { ChatEvent } from '../lib/mauzcode';
 import type { HistoryInput } from '../lib/history';
 afterEach(cleanup);
 const request = (id: string, kind: string): ChatEvent => ({ idx: 1, ts: 1, type: 'input', kind, inputId: id, text: null });

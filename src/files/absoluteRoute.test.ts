@@ -10,7 +10,7 @@ describe("GET /files/absolute — path-based Files URLs", () => {
         // Native document delivery is isolated from the frontend dev server and login.
         ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
         ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
-        const dir = await mkdtemp(join(tmpdir(), "hyper-files-absolute-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-files-absolute-"));
         try {
             await mkdir(join(dir, "images"));
             await writeFile(join(dir, "readme.md"), "# Page\n\n![diagram](./images/diagram.png)\n");
@@ -44,7 +44,7 @@ describe("GET /files/absolute — path-based Files URLs", () => {
         // Native document delivery is isolated from the frontend dev server and login.
         ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
         ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
-        const dir = await mkdtemp(join(tmpdir(), "hyper-files-absolute-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-files-absolute-"));
         try {
             await writeFile(join(dir, "one.md"), "[next](./two.md)");
             await writeFile(join(dir, "two.md"), "# Two");
@@ -67,7 +67,7 @@ describe("GET /files/absolute — path-based Files URLs", () => {
         // Native document delivery is isolated from the frontend dev server and login.
         ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
         ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
-        const dir = await mkdtemp(join(tmpdir(), "hyper-files-absolute-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-files-absolute-"));
         try {
             await writeFile(join(dir, "readme.md"), "# Embedded");
             await ctx.fns.procs.http.loadRoutes({});
@@ -90,7 +90,7 @@ describe("GET /files/absolute — path-based Files URLs", () => {
         // Native document delivery is isolated from the frontend dev server and login.
         ctx.state.registry.auth.currentUser = async () => ({ required: false, user: null, legacy: false });
         ctx.state.registry.frontendBridge.proxy = async (_c: any, _s: any, {req}: {req: Request}) => Response.json({ nativeUrl: req.url });
-        const dir = await mkdtemp(join(tmpdir(), "hyper-files-embed-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-files-embed-"));
         try {
             await writeFile(join(dir, "one.md"), "[next](./two.md)");
             await writeFile(join(dir, "two.md"), "# Embedded two");
@@ -121,7 +121,7 @@ describe("GET /files/absolute — path-based Files URLs", () => {
 
     test("forwards the authenticated cookie and the hub assertion through internal Files dispatch", async () => {
         const ctx: any = await mkTestCtx();
-        const dir = await mkdtemp(join(tmpdir(), "hyper-files-auth-forward-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-files-auth-forward-"));
         try {
             await writeFile(join(dir, "readme.md"), "# Authenticated");
             await ctx.fns.procs.http.loadRoutes({});

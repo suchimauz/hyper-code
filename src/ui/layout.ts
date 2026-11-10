@@ -17,7 +17,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
     /** Reserved compatibility option; documents always omit retired popup assets. @default false */ lean?: boolean;
 }): Promise<string> {
     const esc = (text: string) => ctx.fns.procs.ui.escape({ text });
-    const currentId = opts.currentId ?? session?.req?.headers.get("x-hyper-agent");
+    const currentId = opts.currentId ?? session?.req?.headers.get("x-mauzcode-agent");
     const csrfToken = session?.req ? await ctx.fns.auth.csrfToken({ req: session.req }) : "";
     const favicon = await ctx.fns.ui.faviconUrl({});
     return `<!doctype html>
@@ -25,9 +25,9 @@ export default async function (ctx: Context, session: Session | null, opts: {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csrf-token" content="${esc(csrfToken)}">
-<title>${esc(opts.title ? `${opts.title} · hyper-code2` : "hyper-code2")}</title>
+<title>${esc(opts.title ? `${opts.title} · mauzcode` : "mauzcode")}</title>
 <link rel="icon" href="${esc(favicon)}">
-<script>(function(){var mode='auto';try{var saved=localStorage.getItem('hyper-theme');if(saved==='light'||saved==='dark')mode=saved}catch(error){console.debug('Theme preference unavailable',error)}var theme=mode==='auto'?(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):mode;document.documentElement.dataset.themeMode=mode;document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme})()</script>
+<script>(function(){var mode='auto';try{var saved=localStorage.getItem('mauzcode-theme');if(saved==='light'||saved==='dark')mode=saved}catch(error){console.debug('Theme preference unavailable',error)}var theme=mode==='auto'?(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):mode;document.documentElement.dataset.themeMode=mode;document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme})()</script>
 <meta name="htmx-config" content='{"morphIgnore":["data-htmx-powered","open"]}'>
 <link rel="stylesheet" href="/ui/vendor/phosphor.css">
 <link rel="stylesheet" href="/ui/vendor/medeo.css">

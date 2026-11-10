@@ -1,4 +1,4 @@
-/** Exchanges a native SSO handoff code for the regular Hyper session cookie. */
+/** Exchanges a native SSO handoff code for the regular MauzCode session cookie. */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
     const body = await opts.req.json().catch(() => null) as { code?: unknown } | null;
     const code = typeof body?.code === "string" ? body.code : "";

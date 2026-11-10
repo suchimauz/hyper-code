@@ -41,8 +41,8 @@ describe("llm.modelPolicy", () => {
     test("node relay blocks exact local and chained routes before credential or network dispatch", async () => {
         for (const chained of [false, true]) {
             const { ctx } = fixture();
-            const entry = { id: "codex/work:gpt-test", api: "responses", provider: "codex", account: "work", kind: "subscription", ...(chained ? { via: "hyper/next" } : {}) };
-            const model = chained ? "hyper/next:codex/work:gpt-test" : "codex/work:gpt-test";
+            const entry = { id: "codex/work:gpt-test", api: "responses", provider: "codex", account: "work", kind: "subscription", ...(chained ? { via: "mauzcode/next" } : {}) };
+            const model = chained ? "mauzcode/next:codex/work:gpt-test" : "codex/work:gpt-test";
             await modelPolicy(ctx, null, { action: "set", model, disabled: true });
             let dispatches = 0;
             ctx.fns.node = {
@@ -109,10 +109,10 @@ describe("llm.modelPolicy", () => {
 
     test("named accounts, SSH and node identities remain distinct", async () => {
         const { ctx } = fixture();
-        const routes = ["codex/work:m", "ssh/box:codex/default:m", "hyper/default:codex:m", "hyper/node:codex/work:m"];
+        const routes = ["codex/work:m", "ssh/box:codex/default:m", "mauzcode/default:codex:m", "mauzcode/node:codex/work:m"];
         await Promise.all(routes.map(model => modelPolicy(ctx, null, { action: "set", model, disabled: true })));
         expect((await modelPolicy(ctx, null, { action: "list" })).disabledModels).toEqual([...routes].sort());
-        for (const model of ["codex:m", "codex/personal:m", "ssh/other:codex/default:m", "hyper/other:codex/work:m"]) {
+        for (const model of ["codex:m", "codex/personal:m", "ssh/other:codex/default:m", "mauzcode/other:codex/work:m"]) {
             await modelPolicy(ctx, null, { action: "assert", model });
         }
         for (const model of routes) await expect(modelPolicy(ctx, null, { action: "assert", model })).rejects.toMatchObject({ code: "MODEL_DISABLED_BY_USER" });
@@ -137,7 +137,7 @@ describe("llm.modelPolicy", () => {
 
     test("endpoint guard blocks credential resolution and node/SSH lookup", async () => {
         const { ctx, counters } = fixture();
-        for (const model of ["openai:m", "ssh/box:codex/default:m", "hyper/node:codex:m"]) {
+        for (const model of ["openai:m", "ssh/box:codex/default:m", "mauzcode/node:codex:m"]) {
             await modelPolicy(ctx, null, { action: "set", model, disabled: true });
             await expect(resolveEndpoint(ctx, null, { model })).rejects.toMatchObject({ code: "MODEL_DISABLED_BY_USER" });
         }

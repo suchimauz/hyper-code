@@ -11,7 +11,7 @@ Use `websearch.search` for ranked public-web links and snippets. It returns one 
 
 - `openserp` — optional HTTP search via an operator-run OpenSERP service (tested with 0.8.14). DuckDuckGo first, Bing once only on HTTP/transport/timeout/invalid response or no usable results. Each attempt is bounded to 10 seconds and the requests share a 20-second budget. Both failing throws a concise error, never fabricated results or a Google fallback. `sourceEngine` reports the engine whose results were actually used. Search needs no Chrome or paid API; `answer`, `fetch` and page reading still require the browser.
 
-Configure `websearch.openserpEndpoint` (default `http://127.0.0.1:7000`) with an HTTP(S) base URL, optionally including a base path, without credentials, query or fragment. The service must expose `/duckduckgo/search` and `/bing/search`; redirects and authentication are not supported. Hyper does not start or manage the service. OpenSERP normalizes organic titles, URLs and snippets, accepts HTTP(S) links only, removes duplicates and limits results. Raw response bodies and logs are not returned.
+Configure `websearch.openserpEndpoint` (default `http://127.0.0.1:7000`) with an HTTP(S) base URL, optionally including a base path, without credentials, query or fragment. The service must expose `/duckduckgo/search` and `/bing/search`; redirects and authentication are not supported. MauzCode does not start or manage the service. OpenSERP normalizes organic titles, URLs and snippets, accepts HTTP(S) links only, removes duplicates and limits results. Raw response bodies and logs are not returned.
 
 The engine can be selected per call. When omitted, `websearch.defaultEngine` is used. Search is retrieval-only and does not generate an LLM answer.
 
@@ -31,7 +31,7 @@ const ranked = await ctx.fns.jev.rank({
 const best = ranked.ranked.map((entry) => found.results[Number(entry.id)]);
 ```
 
-Use `websearch.fetch` on a selected result URL with a focused prompt. It opens the URL through Browser, captures readable Markdown, and asks an LLM to apply the prompt. The model can be overridden per call; otherwise `websearch.fetchModel` is used, falling back to Hyper's global default model. Authenticated/private pages are not guaranteed; use a specialized plugin for those.
+Use `websearch.fetch` on a selected result URL with a focused prompt. It opens the URL through Browser, captures readable Markdown, and asks an LLM to apply the prompt. The model can be overridden per call; otherwise `websearch.fetchModel` is used, falling back to MauzCode's global default model. Authenticated/private pages are not guaranteed; use a specialized plugin for those.
 
 Fetch keeps the evidence, not only the summary: `markdown` holds the readable page as captured, so a claim can be quoted instead of trusted. Pass `includeMarkdown: false` when only the generated answer is wanted.
 

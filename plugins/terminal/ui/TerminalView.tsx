@@ -6,9 +6,9 @@ import { viewCss, xtermCss } from './styles';
 /** A plugin bundle is one JS file, so the styles are injected once as a <style> element. */
 function useTerminalStyles() {
   useEffect(() => {
-    if (document.querySelector('style[data-hyper-terminal]')) return;
+    if (document.querySelector('style[data-mauzcode-terminal]')) return;
     const style = document.createElement('style');
-    style.dataset.hyperTerminal = '';
+    style.dataset.mauzcodeTerminal = '';
     style.textContent = `${xtermCss}\n${viewCss}`;
     document.head.append(style);
   }, []);
@@ -67,7 +67,7 @@ export function TerminalView({ agentId, theme, active }: Props) {
       terminal.open(host.current);
       term.current = terminal; fit.current = fitter;
       try { fitter.fit(); } catch { /* hidden tab: fitted when shown */ }
-      const ws = new WebSocket(socketUrl(agentId, Math.max(2, terminal.cols), Math.max(2, terminal.rows)), ['hyper-terminal']);
+      const ws = new WebSocket(socketUrl(agentId, Math.max(2, terminal.cols), Math.max(2, terminal.rows)), ['mauzcode-terminal']);
       ws.binaryType = 'arraybuffer';
       socket.current = ws;
       const send = (message: object) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };

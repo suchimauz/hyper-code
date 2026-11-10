@@ -1,4 +1,4 @@
-// Server-side sign-in sessions for OIDC (Hyper Control Plane). The browser only ever holds a short
+// Server-side sign-in sessions for OIDC (MauzCode Control Plane). The browser only ever holds a short
 // signed cookie with the session id; the control plane's refresh token lives here, encrypted, and
 // is used to silently renew the session (Backend-for-Frontend pattern). Additive and idempotent;
 // nothing reads this table unless OIDC sign-in is configured.

@@ -29,7 +29,7 @@ async function api(action, body = {}, credentials) {
     body: JSON.stringify(body), signal: AbortSignal.timeout(15000), credentials: 'omit', redirect: 'error',
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `Hyper returned HTTP ${response.status}`);
+  if (!response.ok) throw new Error(data.error || `MauzCode returned HTTP ${response.status}`);
   return data;
 }
 async function announce(record) {
@@ -66,7 +66,7 @@ async function closeTab(tabId) {
   if (!record) return;
   delete state.tabs[tabId];
   if (record.opened) state.closes.push({tabId});
-  await announce({...record, closed: true, status: 'Tab closed; browser access revoked when Hyper is reachable'});
+  await announce({...record, closed: true, status: 'Tab closed; browser access revoked when MauzCode is reachable'});
   await flushCloses();
 }
 async function refresh(tabId, opening = false) {
@@ -160,7 +160,7 @@ chrome.commands.onCommand.addListener(event(async command => {
   }
 
 
-  if (command === 'open-hyper-tab') {
+  if (command === 'open-mauzcode-tab') {
     const {base} = await config();
     const url = normalizeBase(base);
     const matches = await chrome.tabs.query({url: `${new URL(url).origin}/*`});

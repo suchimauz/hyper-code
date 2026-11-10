@@ -1,4 +1,4 @@
-// People who can sign in. One user = single-user Hyper; more = multiuser (DESIGN §34).
+// People who can sign in. One user = single-user MauzCode; more = multiuser (DESIGN §34).
 //
 // Runs automatically at boot (procs/migrate $start), so it must be safe on a live, large
 // database without anyone watching:

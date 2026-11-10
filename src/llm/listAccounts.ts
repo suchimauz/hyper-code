@@ -116,15 +116,15 @@ export default async function (
         }
     }
 
-    // Hyper nodes (docs/hyper-node.md): one row per node; quota is the node's
+    // MauzCode nodes (docs/mauzcode-node.md): one row per node; quota is the node's
     // most-used provider we are allowed to use, from its cached usage snapshot.
-    if (!filter || filter === "hyper") {
+    if (!filter || filter === "mauzcode") {
         let nodes: types.node.NodeEntry[] = [];
         try { nodes = await ctx.fns.node.list({}); } catch { nodes = []; }
         for (const node of nodes) {
-            const item = entry("hyper", node.name, "node", byKey, reconnectKeys);
-            item.label = `hyper/${node.name}`;
-            item.model = `hyper/${node.name}:`;
+            const item = entry("mauzcode", node.name, "node", byKey, reconnectKeys);
+            item.label = `mauzcode/${node.name}`;
+            item.model = `mauzcode/${node.name}:`;
             const worst = [...(node.usage ?? [])].filter(u => !node.lastError && Number(u.updatedAt) > 0 && now - Number(u.updatedAt) <= 300_000 && (!u.resetsAt || u.resetsAt > now) && typeof u.usedPercent === "number" && Number.isFinite(u.usedPercent) && u.usedPercent >= 0 && u.usedPercent <= 100).sort((a, b) => (b.usedPercent ?? 0) - (a.usedPercent ?? 0))[0];
             if (worst) { item.usedPercent = worst.usedPercent; item.resetsAt = worst.resetsAt; item.planType = worst.planType; }
             if (!node.enabled || node.lastError) { item.available = false; item.needsReconnect = Boolean(node.lastError); }
@@ -244,7 +244,7 @@ async function discoverFileAccounts(ctx: Context, provider: "codex" | "kimi-codi
     try {
         const { existsSync, readdirSync } = require("node:fs");
         if (existsSync(`${home}/${relative}`)) accounts.push("default");
-        const root = `${home}/.hyper/accounts/${provider}`;
+        const root = `${home}/.mauzcode/accounts/${provider}`;
         for (const account of readdirSync(root) as string[]) {
             const { file } = ctx.fns.llm.accountCredentialPath({ provider, account });
             if (file && existsSync(file)) accounts.push(account);
@@ -258,7 +258,7 @@ async function discoverDirectoryAccounts(ctx: Context, provider: "claude-code"):
     const accounts = ["default"];
     try {
         const { readdirSync } = require("node:fs");
-        for (const account of readdirSync(`${home}/.hyper/accounts/${provider}`) as string[]) if (account !== "default") accounts.push(account);
+        for (const account of readdirSync(`${home}/.mauzcode/accounts/${provider}`) as string[]) if (account !== "default") accounts.push(account);
     } catch { /* only the default login exists */ }
     return accounts;
 }

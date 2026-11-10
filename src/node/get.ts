@@ -1,5 +1,5 @@
 /**
- * Read one configured Hyper node with its cached catalogue and usage (no token)
+ * Read one configured MauzCode node with its cached catalogue and usage (no token)
  * @param opts.name Node name as configured locally.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { /** Node name. */ name: string }): Promise<types.node.NodeEntry | null> {

@@ -2,8 +2,8 @@ import { expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createExtensionRegistry } from '../extensions/registry';
-import type { UiExtension } from '@hyper/ui';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
+import type { UiExtension } from '@mauzcode/ui';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
 
 const extension: UiExtension = { id: 'example', apiVersion: 1, pages: [{ id: 'main', title: 'Example', component: () => null }], navigation: [{ page: 'main', title: 'Example' }] };
 it('legacy navigation stays a page-menu entry without opting into direct navigation', () => {

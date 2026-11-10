@@ -1,4 +1,4 @@
-/** Sends one explicitly confirmed personal Telegram message from the Hyper Telegram client. */
+/** Sends one explicitly confirmed personal Telegram message from the MauzCode Telegram client. */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
 
     const who = await ctx.fns.auth.currentUser({ req: opts.req });

@@ -8,7 +8,7 @@ import approve from './$route_ui_approve_POST';
 import bundle from './$route_ui_$name_$file_GET';
 
 async function plugin(ui: object, files: Record<string, string>) {
-    const dir = await mkdtemp(join(tmpdir(), 'hyper-ui-'));
+    const dir = await mkdtemp(join(tmpdir(), 'mauzcode-ui-'));
     await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'demo', procs: { src: 'src', ui } }));
     for (const [rel, text] of Object.entries(files)) { await mkdir(join(dir, rel, '..'), { recursive: true }); await writeFile(join(dir, rel), text); }
     return dir;
@@ -21,7 +21,7 @@ function context(dir: string, source = 'user', rows: unknown[] = []) {
     (ctx.fns as any).plugins = { uiCompile: (o: any) => compile(ctx, null, o), uiBuildAll: async () => { await compile(ctx, null, { name: 'demo' }); return { built: [], failed: [], changed: false }; }, uiManifest: () => manifest(ctx, null, {}) };
     return ctx;
 }
-const view = `import { Panel } from '@hyper/ui';\nimport { helper } from './helper';\nexport default { id: 'demo', apiVersion: 1, pages: [{ id: 'main', title: helper, component: () => <Panel title="x">ok</Panel> }] };\n`;
+const view = `import { Panel } from '@mauzcode/ui';\nimport { helper } from './helper';\nexport default { id: 'demo', apiVersion: 1, pages: [{ id: 'main', title: helper, component: () => <Panel title="x">ok</Panel> }] };\n`;
 
 test('builds ESM against host shims and rejects forbidden imports, foreign kinds and unsafe entries', async () => {
     const dir = await plugin({ pages: ['main'], applications: { '/demo': 'main' } }, { 'ui/index.tsx': view, 'ui/helper.ts': "export const helper = 'Demo';" });
@@ -29,7 +29,7 @@ test('builds ESM against host shims and rejects forbidden imports, foreign kinds
         const ctx = context(dir);
         const ok = await compile(ctx, null, { name: 'demo' });
         expect(ok.build?.error).toBeNull();
-        expect(ok.build?.code).toContain('/plugins/ui/runtime/hyper-ui.js');
+        expect(ok.build?.code).toContain('/plugins/ui/runtime/mauzcode-ui.js');
         expect(ok.build?.code).toContain('/plugins/ui/runtime/react-jsx-runtime.js');
         expect(ok.build?.hash).toMatch(/^[0-9a-f]{16}$/);
         expect(ok.build?.applications).toEqual({ '/demo': 'main' });

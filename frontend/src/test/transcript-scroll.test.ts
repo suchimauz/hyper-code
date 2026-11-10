@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { captureTranscriptAnchor, restoreTranscriptAnchor } from '../components/hyper/transcriptScroll';
+import { captureTranscriptAnchor, restoreTranscriptAnchor } from '../components/mauzcode/transcriptScroll';
 it('preserves semantic reader position across changing content above the viewport', () => {
   const root = document.createElement('div');
   root.innerHTML = '<div data-event-idx="1" hidden></div><div data-event-idx="2"></div>';

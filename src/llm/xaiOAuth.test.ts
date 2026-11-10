@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
-async function makeCtx() { return mkTestCtx({ env: { HYPER_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64") } }); }
+async function makeCtx() { return mkTestCtx({ env: { MAUZCODE_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64") } }); }
 describe("managed xAI OAuth", () => {
  test("requests device code using pi-mono fields and validates HTTPS", async () => { const c:any=await makeCtx(); let form:any; globalThis.fetch=(async (_u:any,i:any)=>{form=new URLSearchParams(i.body); return Response.json({device_code:"d",user_code:"U",verification_uri:"https://x.ai/device",expires_in:600,interval:2});}) as any; const d=await c.fns.llm.requestXaiDeviceCode({}); expect(form.get("referrer")).toBe("pi"); expect(form.get("scope")).toContain("grok-cli:access"); expect(d.userCode).toBe("U"); });
  test("refresh preserves unrotated refresh token and applies skew", async () => { const c:any=await makeCtx(); globalThis.fetch=(async ()=>Response.json({access_token:"new",expires_in:3600})) as any; const t=await c.fns.llm.exchangeXaiOAuth({grant:"refresh_token",refreshToken:"keep"}); expect(t.refresh).toBe("keep"); expect(t.expiresAt).toBeGreaterThan(Date.now()+3_290_000); });

@@ -35,22 +35,22 @@ afterAll(() => server?.stop(true));
 const CLIENT = "client-123.apps.googleusercontent.com";
 async function ctxWithGoogle(extra: Record<string, string> = {}) {
     return mkTestCtx({ env: {
-        HYPER_GOOGLE_CLIENT_ID: CLIENT, HYPER_GOOGLE_CLIENT_SECRET: "shh",
-        HYPER_GOOGLE_TOKEN_URL: `http://localhost:${server.port}/token`, HYPER_GOOGLE_JWKS_URL: `http://localhost:${server.port}/certs`,
+        MAUZCODE_GOOGLE_CLIENT_ID: CLIENT, MAUZCODE_GOOGLE_CLIENT_SECRET: "shh",
+        MAUZCODE_GOOGLE_TOKEN_URL: `http://localhost:${server.port}/token`, MAUZCODE_GOOGLE_JWKS_URL: `http://localhost:${server.port}/certs`,
         ...extra,
     } });
 }
 
 async function googleLogin(ctx: any, claims: (nonce: string) => Record<string, unknown>) {
-    const start = await ctx.fns.procs.http.dispatch({ method: "GET", url: "http://hyper.test/auth/google?next=/agent/ab" });
+    const start = await ctx.fns.procs.http.dispatch({ method: "GET", url: "http://mauzcode.test/auth/google?next=/agent/ab" });
     expect(start.status).toBe(303);
     const to = new URL(start.headers.get("location")!);
     expect(to.origin).toBe("https://accounts.google.com");
     expect(to.searchParams.get("hd")).toBe("health-samurai.io");
-    expect(to.searchParams.get("redirect_uri")).toBe("http://hyper.test/auth/google/callback");
+    expect(to.searchParams.get("redirect_uri")).toBe("http://mauzcode.test/auth/google/callback");
     const stateCookie = start.headers.get("set-cookie")!.split(";")[0];
     nextClaims = claims(to.searchParams.get("nonce")!);
-    return ctx.fns.procs.http.dispatch({ method: "GET", url: `http://hyper.test/auth/google/callback?code=abc&state=${to.searchParams.get("state")}`, headers: { cookie: stateCookie } });
+    return ctx.fns.procs.http.dispatch({ method: "GET", url: `http://mauzcode.test/auth/google/callback?code=abc&state=${to.searchParams.get("state")}`, headers: { cookie: stateCookie } });
 }
 const now = () => Math.floor(Date.now() / 1000);
 const good = (nonce: string, over: Record<string, unknown> = {}) => ({
@@ -59,7 +59,7 @@ const good = (nonce: string, over: Record<string, unknown> = {}) => ({
 });
 
 test("Google sign-in is off by default; login page has no Google button", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_PASSWORD: "legacy-password" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PASSWORD: "legacy-password" } });
     expect(await ctx.fns.auth.googleConfig({})).toBeNull();
     expect((await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/google" })).status).toBe(404);
     const page = await (await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/login" })).text();
@@ -114,13 +114,13 @@ test("rejects other domains, unverified email, wrong audience, bad nonce, forged
     expect(await rejected(() => good("other-nonce"))).toContain("nonce");
     expect(await rejected((n) => good(n, { exp: now() - 3600 }))).toContain("expired");
     // No/forged state cookie.
-    const noState = await ctx.fns.procs.http.dispatch({ method: "GET", url: "http://hyper.test/auth/google/callback?code=abc&state=zzz" });
+    const noState = await ctx.fns.procs.http.dispatch({ method: "GET", url: "http://mauzcode.test/auth/google/callback?code=abc&state=zzz" });
     expect(noState.headers.get("location")).toContain("expired");
     expect((await ctx.fns.auth.listUsers({})).length).toBe(1);
 });
 
 test("auto-create off: only users added in advance can sign in with Google", async () => {
-    const ctx = await ctxWithGoogle({ HYPER_GOOGLE_AUTO_CREATE: "false" });
+    const ctx = await ctxWithGoogle({ MAUZCODE_GOOGLE_AUTO_CREATE: "false" });
     await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
     const res = await googleLogin(ctx, (n) => good(n));
     expect(res.headers.get("location")).toContain("not%20allowed");
@@ -143,7 +143,7 @@ test("a lone Google-only user still requires sign-in (not treated as an open ins
     const users = await ctx.fns.auth.listUsers({});
     expect(users.length).toBe(1);
     expect(users[0].role).toBe("owner");
-    const who = await ctx.fns.auth.currentUser({ req: new Request("http://hyper.test/agent/ab") });
+    const who = await ctx.fns.auth.currentUser({ req: new Request("http://mauzcode.test/agent/ab") });
     expect(who.required).toBe(true);
     expect(who.user).toBeNull();
 });

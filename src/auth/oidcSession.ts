@@ -33,7 +33,7 @@ export default async function (
     const SESSION_MAX_MS = 90 * 86400 * 1000; // hard cap regardless of activity
 
     const forwardedProto = opts.req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-    const cookieUrl = forwardedProto === "https" ? "https://hyper.invalid/" : opts.req.url;
+    const cookieUrl = forwardedProto === "https" ? "https://mauzcode.invalid/" : opts.req.url;
     const cookieFor = async (user: types.auth.User, sid: string) => {
         const token = await ctx.fns.procs.auth.sign({ sub: user.id, name: user.name, email: user.email ?? undefined, role: user.role, jti: sid, seconds: ACCESS_SECONDS });
         return ctx.fns.procs.auth.cookie({ token, url: cookieUrl, days: ACCESS_SECONDS / 86400 * 4 }); // cookie outlives the token so renewal can read it

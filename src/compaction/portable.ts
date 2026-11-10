@@ -5,7 +5,7 @@ const SUMMARY_PREFIX = "Another language model started to solve this problem and
 /**
  * Adapts compaction checkpoint messages to the model that will read them
  *
- * Native checkpoints (`anthropic_compaction`, `codex_compaction`) are kept for the same upstream provider and model, ignoring account names and explicit SSH/Hyper route wrappers. Unresolved route aliases are compatible only when identical. This is a routing compatibility policy, not verification that remote credentials can decrypt a checkpoint. For a different identity a Claude block becomes a plain text handoff summary (`compaction_summary`); an opaque Codex item returns null so callers fall back to the root transcript. Use wherever the active compact projection is assembled (buildLlmRequest, compactContext, autoCompactIfNeeded).
+ * Native checkpoints (`anthropic_compaction`, `codex_compaction`) are kept for the same upstream provider and model, ignoring account names and explicit SSH/MauzCode route wrappers. Unresolved route aliases are compatible only when identical. This is a routing compatibility policy, not verification that remote credentials can decrypt a checkpoint. For a different identity a Claude block becomes a plain text handoff summary (`compaction_summary`); an opaque Codex item returns null so callers fall back to the root transcript. Use wherever the active compact projection is assembled (buildLlmRequest, compactContext, autoCompactIfNeeded).
  * @param opts.model Provider-qualified model that will read the projection.
  * @param opts.producedBy Model recorded on the compaction generation that made the checkpoint.
  * @param opts.messages Checkpoint messages of the hidden compaction child.
@@ -26,9 +26,9 @@ export default function (
     const identity = (model: string): string | null => {
         const route = /^([a-z][\w-]*)(?:\/[\w.-]+)?:(\S+)$/.exec(model);
         if (!route) return null;
-        if (route[1] === "ssh" || route[1] === "hyper") {
+        if (route[1] === "ssh" || route[1] === "mauzcode") {
             const upstream = /^([a-z][\w-]*)\/[\w.-]+:([^:\s]+)$/.exec(route[2]!);
-            if (!upstream || upstream[1] === "ssh" || upstream[1] === "hyper") return null;
+            if (!upstream || upstream[1] === "ssh" || upstream[1] === "mauzcode") return null;
             if (route[1] === "ssh" && !["codex", "claude-code", "kimi-coding"].includes(upstream[1]!)) return null;
             return `${upstream[1]}:${upstream[2]}`;
         }

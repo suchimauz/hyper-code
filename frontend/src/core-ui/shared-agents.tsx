@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Panel, TextField, requestJson, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Dialog, Panel, TextField, requestJson, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 
 type Card = { agentId: string; name: string; description: string; capabilities: string[] };
 type Data = { csrfToken: string; agents: { id: string; title: string }[]; cards: Card[]; tasks: { id: string; title: string; task: string; status: string; summary: string; result: unknown }[] };

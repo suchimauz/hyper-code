@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { ChatHeader } from '../components/hyper/ChatHeader';
+import { ChatHeader } from '../components/mauzcode/ChatHeader';
 import { getChatHeader, renameChat } from '../lib/chatHeader';
 vi.mock('../lib/chatHeader', () => ({ getChatHeader: vi.fn(), renameChat: vi.fn() }));
 const child = { tokens: 341000, durationMs: 152000, modelLabel: 'GPT', id: 'ab', title: 'Проверка API', runState: 'idle', colorHue: 40, icon: { src: 'data:image/svg+xml,%3Csvg/%3E', custom: true } };

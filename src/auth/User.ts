@@ -1,4 +1,4 @@
-/** A person who can sign in to this Hyper instance. The password hash never leaves the auth module. */
+/** A person who can sign in to this MauzCode instance. The password hash never leaves the auth module. */
 export type User = {
     /** Stable id written as author on agents, messages and events; never changes on rename. */
     id: string;

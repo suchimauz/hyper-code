@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 export type NavigationIcon = { src: string; custom: boolean };
 export type NavigationChat = { colorHue?: number | null; pinned?: boolean; pinnedAt?: number | null; icon?: NavigationIcon | null; id: string; title: string; model: string; modelLabel?: string; effort?: { requested: string; applied: string; label: string | null; downgraded: boolean } | null; createdAt?: number | null; runState: string; teamRunningCount?: number; hasUnread: boolean; archived?: boolean; lastReplyAt: number | null };
@@ -13,7 +13,7 @@ export type ProjectAction = 'archive' | 'restore';
 export async function updateProject(projectId: string, action: ProjectAction) {
   const { csrfToken } = await requestJson<{ csrfToken: string }>('/ui-lab-api/project-action');
   const result = await requestJson<{ ok: boolean; archived: boolean }>('/ui-lab-api/project-action', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ projectId, action }) });
-  if (!result.ok) throw new Error('Hyper не подтвердил действие. Обновите список.');
+  if (!result.ok) throw new Error('MauzCode не подтвердил действие. Обновите список.');
   return result;
 }
 export type ChatAction = 'pin' | 'unpin' | 'archive' | 'restore';
@@ -22,7 +22,7 @@ export async function updateChat(id: string, action: ChatAction) {
   const agent = encodeURIComponent(id);
   const path = action === 'restore' ? `/agent/${agent}/unarchive` : `/api/v1/agents/${agent}/${action === 'pin' || action === 'unpin' ? 'pin' : 'archive'}`;
   const result = await requestJson<{ ok?: boolean; pinned?: boolean; archived?: boolean }>(path, { method:'POST', ...(action === 'pin' || action === 'unpin' ? { headers:{'Content-Type':'application/json'},body:JSON.stringify({pinned:action === 'pin'}) } : {}) });
-  if (result.ok === false) throw new Error('Hyper не подтвердил действие. Обновите список.');
+  if (result.ok === false) throw new Error('MauzCode не подтвердил действие. Обновите список.');
   return result;
 }
 

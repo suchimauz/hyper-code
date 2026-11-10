@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ChatMarkdown } from '../components/hyper/ChatMarkdown';
-import { ToolBody } from '../components/hyper/ToolBody';
-import { CodeBlock } from '../components/hyper/CodeBlock';
+import { ChatMarkdown } from '../components/mauzcode/ChatMarkdown';
+import { ToolBody } from '../components/mauzcode/ToolBody';
+import { CodeBlock } from '../components/mauzcode/CodeBlock';
 import { codeLanguage } from '../lib/codeLanguage';
 import { highlightCode } from '../lib/highlightCode';
-import { readCodeLines } from '../components/hyper/ToolPreview';
+import { readCodeLines } from '../components/mauzcode/ToolPreview';
 
 afterEach(() => vi.unstubAllGlobals());
 it('resolves language aliases, Clojure files, JSON and inspected objects without guessing prose', () => {

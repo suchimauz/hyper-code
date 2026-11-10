@@ -27,9 +27,9 @@ export default async function (
         // and the mobile strip must colour the same account identically.
         const thresholds = { warnAt: 30, criticalAt: 60, alertAt: 75 };
         if (local.length) Object.assign(thresholds, local[0]?.thresholds ?? {});
-        let entries: types.llms.UsageEntry[] = local.filter(entry => entry.provider !== "hyper").map(({ resetCredits: _resetCredits, ...entry }) => ({ ...entry, models: [] }));
+        let entries: types.llms.UsageEntry[] = local.filter(entry => entry.provider !== "mauzcode").map(({ resetCredits: _resetCredits, ...entry }) => ({ ...entry, models: [] }));
         if (opts.includeConnected) {
-            const inventory = (await ctx.fns.llm.listAccounts({})).filter(account => account.provider !== "hyper" && account.provider !== "oneapi");
+            const inventory = (await ctx.fns.llm.listAccounts({})).filter(account => account.provider !== "mauzcode" && account.provider !== "oneapi");
             const supported = new Set(["codex", "kimi-coding", "claude-code", "anthropic-oauth", "xai", "zai-coding", "minimax-coding", "opencode"]);
             const key = (account: { provider: string; account: string }) => JSON.stringify([account.provider, account.account]);
             const connected = new Set(inventory.map(key));
@@ -154,11 +154,11 @@ export default async function (
         }
         const nodes = await ctx.fns.node.list({}).catch(() => []);
         for (const node of nodes) {
-            const visible = new Set(models[`hyper/${node.name}`] ?? []);
+            const visible = new Set(models[`mauzcode/${node.name}`] ?? []);
             if (!node.enabled || !node.catalogAt || /^models 4(?!08:|29:)\d\d:/.test(node.lastError ?? "")) continue;
             const seen = new Set<string>();
             for (const item of node.catalog ?? []) {
-                if (!visible.has(`hyper/${node.name}:${item.id}`)) continue;
+                if (!visible.has(`mauzcode/${node.name}:${item.id}`)) continue;
                 const key = JSON.stringify([item.provider, item.account]);
                 if (seen.has(key)) continue;
                 seen.add(key);
@@ -169,7 +169,7 @@ export default async function (
                 const stale = Boolean(node.lastError) || !measuredAt || Date.now() - measuredAt > 5 * 60_000 || Boolean(usage?.resetsAt && usage.resetsAt <= Date.now());
                 entries.push({
                     provider: item.provider, account: item.account, node: node.name,
-                    models: (node.catalog ?? []).filter(m => m.provider === item.provider && m.account === item.account && visible.has(`hyper/${node.name}:${m.id}`)).map(m => `hyper/${node.name}:${m.id}`),
+                    models: (node.catalog ?? []).filter(m => m.provider === item.provider && m.account === item.account && visible.has(`mauzcode/${node.name}:${m.id}`)).map(m => `mauzcode/${node.name}:${m.id}`),
                     label: `${node.name} · ${item.account} · ${item.provider}`,
                     model: `${item.provider}:`, usedPercent,
                     resetsAt: usage?.resetsAt ?? null, planType: usage?.planType ?? null,

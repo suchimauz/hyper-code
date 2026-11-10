@@ -2,7 +2,7 @@ import { it, expect, vi, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { InitialPromptPage } from '../core-ui/initial-prompt';
 const request = vi.hoisted(() => vi.fn());
-vi.mock('@hyper/ui', () => ({ requestJson: request, Panel: ({ title, children }: { title: string; children: React.ReactNode }) => <section><h1>{title}</h1>{children}</section> }));
+vi.mock('@mauzcode/ui', () => ({ requestJson: request, Panel: ({ title, children }: { title: string; children: React.ReactNode }) => <section><h1>{title}</h1>{children}</section> }));
 afterEach(() => { cleanup(); request.mockReset(); window.history.replaceState({}, '', '/'); });
 it('reads literal full prompt without interpreting HTML or Markdown', async () => {
   window.history.replaceState({}, '', '/?promptAgent=aa');

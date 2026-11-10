@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { requestJson } from '../../lib/hyper';
+import { requestJson } from '../../lib/mauzcode';
 import { Button } from '../ui/Button';
 import { NodeSettings } from './NodeSettings';
 

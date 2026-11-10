@@ -2,12 +2,12 @@
 import { expect, it, mock } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-const source=readFileSync('/home/suchimauz/.hyper/user/hyper-ui-bridge/src/hyperUiBridge/newSession.ts','utf8');
+const source=readFileSync('/home/suchimauz/.mauzcode/user/mauzcode-ui-bridge/src/mauzCodeUiBridge/newSession.ts','utf8');
 const mod={exports:{} as {default: (ctx:object,session:object|null,opts:{req:Request})=>Promise<Response>}};
 new Function('module','exports',new Bun.Transpiler({loader:'ts'}).transformSync(source.replace('export default async function','exports.default = async function')))(mod,mod.exports);
 function setup(){
  const kv=new Map<string,string>(); const accept=mock(async()=>new Response('{}')); const create=mock(async()=>({agent:{id:'mock'}}));
- const ctx={fns:{projects:{principal:async()=> 'owner',get:async()=>({id:'p'})},auth:{verifyCsrf:async()=>true},llm:{listModels:async()=>({test:['test:model']}),modelPolicy:async()=>({disabledModels:[]}),reasoningCapabilities:async()=>({supported:[]})},settings:{modelDefault:async()=> 'test:model'},hyperUiBridge:{iconData:async()=>null},agent:{createFromValues:create,setReasoningEffort:async()=>{},acceptMessage:accept},procs:{db:{select:async({sql,params}:{sql:string;params:string[]})=>{if(sql.startsWith('SELECT'))return kv.has(params[0])?[{value:kv.get(params[0])}]:[];if(kv.has(params[0]))return [];kv.set(params[0],params[1]);return [{key:params[0]}];},run:async({params}:{params:string[]})=>{kv.set(params[1],params[0]);}}}}};
+ const ctx={fns:{projects:{principal:async()=> 'owner',get:async()=>({id:'p'})},auth:{verifyCsrf:async()=>true},llm:{listModels:async()=>({test:['test:model']}),modelPolicy:async()=>({disabledModels:[]}),reasoningCapabilities:async()=>({supported:[]})},settings:{modelDefault:async()=> 'test:model'},mauzCodeUiBridge:{iconData:async()=>null},agent:{createFromValues:create,setReasoningEffort:async()=>{},acceptMessage:accept},procs:{db:{select:async({sql,params}:{sql:string;params:string[]})=>{if(sql.startsWith('SELECT'))return kv.has(params[0])?[{value:kv.get(params[0])}]:[];if(kv.has(params[0]))return [];kv.set(params[0],params[1]);return [{key:params[0]}];},run:async({params}:{params:string[]})=>{kv.set(params[1],params[0]);}}}}};
  const request=(contents=['one','two'])=>{const body=new FormData();body.set('requestKey','abcdefghijklmnop');body.set('projectId','p');body.set('model','test:model');body.set('text','');contents.forEach(text=>body.append('files',new File([text],'file.txt',{type:'text/plain'})));return new Request('http://localhost/new-session',{method:'POST',body});};
  return {ctx,accept,create,request,call:(req:Request)=>mod.exports.default(ctx,{user:{id:'owner'}},{req})};
 }

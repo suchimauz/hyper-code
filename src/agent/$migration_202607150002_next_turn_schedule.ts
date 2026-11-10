@@ -1,6 +1,6 @@
 /** Reschedule pending next turns in the existing worker finalization transaction, including hot-loaded workers. */
 export default { async up(ctx: Context) {
- await ctx.fns.procs.db.exec({sql:`CREATE OR REPLACE FUNCTION hyper_schedule_next_turn() RETURNS trigger LANGUAGE plpgsql AS $$
+ await ctx.fns.procs.db.exec({sql:`CREATE OR REPLACE FUNCTION mauzcode_schedule_next_turn() RETURNS trigger LANGUAGE plpgsql AS $$
  BEGIN
  IF OLD.run_state='running' AND NEW.run_state='idle'
  AND OLD.run_token IS NOT NULL AND NEW.run_token IS NULL
@@ -14,5 +14,5 @@ export default { async up(ctx: Context) {
  RETURN NEW;
  END $$;
  DROP TRIGGER IF EXISTS agent_next_turn_schedule ON agents;
- CREATE TRIGGER agent_next_turn_schedule BEFORE UPDATE ON agents FOR EACH ROW EXECUTE FUNCTION hyper_schedule_next_turn();`});
+ CREATE TRIGGER agent_next_turn_schedule BEFORE UPDATE ON agents FOR EACH ROW EXECUTE FUNCTION mauzcode_schedule_next_turn();`});
 } };

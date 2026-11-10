@@ -11,7 +11,7 @@ describe("POST /agent/:id/compact", () => {
     const res = await ctx.fns.procs.http.dispatch({ method: "POST", url: "/agent/a1/compact", body });
     // The response returns at once and dismisses the popup; compaction itself runs in the background.
     expect(res.status).toBe(200);
-    expect(res.headers.get("hx-trigger")).toBe("hyper-popup-close");
+    expect(res.headers.get("hx-trigger")).toBe("mauzcode-popup-close");
     await Bun.sleep(10);
 
   });

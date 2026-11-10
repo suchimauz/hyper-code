@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { requestJson, type ExtensionCanvasProps, type ExtensionLauncherProps, type UiExtension } from '@hyper/ui';
+import { requestJson, type ExtensionCanvasProps, type ExtensionLauncherProps, type UiExtension } from '@mauzcode/ui';
 import { Diff, Hunk, parseDiff, tokenize } from 'react-diff-view';
 import refractor from 'refractor';
 import { styles } from './styles';

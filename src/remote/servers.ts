@@ -1,7 +1,7 @@
 /**
  * Lists SSH server aliases declared in the user's ~/.ssh/config with resolved hostname, user and port.
  *
- * Returns the concrete Host aliases (wildcard patterns skipped) from ~/.ssh/config (or the file in HYPER_SSH_CONFIG), each resolved through `ssh -G` so Include/Match defaults apply. Use it to discover which server names can be passed as `host` to remote.exec and to host-aware tools (read, write, edit, bash).
+ * Returns the concrete Host aliases (wildcard patterns skipped) from ~/.ssh/config (or the file in MAUZCODE_SSH_CONFIG), each resolved through `ssh -G` so Include/Match defaults apply. Use it to discover which server names can be passed as `host` to remote.exec and to host-aware tools (read, write, edit, bash).
  */
 export default async function (
     ctx: Context,
@@ -9,7 +9,7 @@ export default async function (
     opts: {},
 ): Promise<Array<{ name: string; hostname: string; user: string; port: number }>> {
     const { configFile, bin } = await ctx.fns.remote.sshOptions({ persist: false });
-    const custom = String(ctx.env.HYPER_SSH_CONFIG ?? "").trim();
+    const custom = String(ctx.env.MAUZCODE_SSH_CONFIG ?? "").trim();
     const file = Bun.file(configFile);
     if (!(await file.exists())) return [];
     const names: string[] = [];

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MessageAttachments } from '../components/hyper/MessageAttachments';
-import { PendingAttachments } from '../components/hyper/PendingAttachments';
-import { LiveComposer } from '../components/hyper/LiveComposer';
+import { MessageAttachments } from '../components/mauzcode/MessageAttachments';
+import { PendingAttachments } from '../components/mauzcode/PendingAttachments';
+import { LiveComposer } from '../components/mauzcode/LiveComposer';
 import { attachmentLimitError, imagePreviewSize, isPreviewImage } from '../lib/attachments';
-vi.mock('../components/hyper/ComposerFooter', () => ({ ComposerFooter: () => null }));
+vi.mock('../components/mauzcode/ComposerFooter', () => ({ ComposerFooter: () => null }));
 vi.mock('../lib/goal', async importOriginal => ({ ...await importOriginal<typeof import('../lib/goal')>(), getGoal: vi.fn().mockResolvedValue({ version: 1, enabled: false }) }));
 vi.mock('../lib/queue', async importOriginal => ({ ...await importOriginal<typeof import('../lib/queue')>(), getQueue: vi.fn().mockResolvedValue({ items: [] }) }));
 const create = vi.fn(), revoke = vi.fn();

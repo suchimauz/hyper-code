@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import previewFile from "../../.hyper/ui/previewFile";
+import previewFile from "../../.mauzcode/ui/previewFile";
 
 // No filesystem, SSH, database or UI writes: all runtime dependencies are mocked.
 function fixture(host: string | null = null, privateResult = false) {

@@ -1,5 +1,5 @@
 /**
- * Lists the people who can be @mentioned on this Hyper instance.
+ * Lists the people who can be @mentioned on this MauzCode instance.
  *
  * Active (not disabled) users with id, display name, email and picture, cached for a few seconds because
  * every rendered message asks. Use it for the composer's @ suggestions and to resolve @id in message text.

@@ -1,7 +1,7 @@
 # pi-mono Anthropic subscription flow — implementation notes
 
 
-> Historical upstream-research snapshot. Client-version literals reflect the reviewed revision; current Hyper detects the installed Claude Code CLI through `llm.claudeCodeCliVersion`.
+> Historical upstream-research snapshot. Client-version literals reflect the reviewed revision; current MauzCode detects the installed Claude Code CLI through `llm.claudeCodeCliVersion`.
 Source reviewed: `~/pi-mono/packages/ai/src/utils/oauth/anthropic.ts`, `pkce.ts`, `providers/anthropic.ts`, and `packages/coding-agent/src/core/auth-storage.ts`.
 
 ## OAuth constants and PKCE
@@ -14,7 +14,7 @@ Source reviewed: `~/pi-mono/packages/ai/src/utils/oauth/anthropic.ts`, `pkce.ts`
   `org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload`.
 - PKCE generates 32 random bytes, base64url-encodes them as the verifier, then uses base64url(SHA-256(verifier)) as the S256 challenge.
 - Authorization parameters are `code=true`, `client_id`, `response_type=code`, `redirect_uri`, `scope`, `code_challenge`, `code_challenge_method=S256`, and `state=verifier`.
-- pi-mono uses the verifier itself as OAuth state. For hyper-code2, state and verifier should preferably be independent random values even though the upstream flow works.
+- pi-mono uses the verifier itself as OAuth state. For mauzcode, state and verifier should preferably be independent random values even though the upstream flow works.
 
 ## Callback and manual fallback
 
@@ -26,7 +26,7 @@ Source reviewed: `~/pi-mono/packages/ai/src/utils/oauth/anthropic.ts`, `pkce.ts`
   - a bare code, with the expected state supplied locally.
 - A manual redirect still exchanges with the fixed localhost redirect URI; tests explicitly protect this behavior.
 - The callback server is always closed in `finally`.
-- Implementation implication for hyper-code2: its existing HTTP server can own callback routes instead of opening port 53692, but the redirect URI must be one registered/accepted for this public client. To remain pi-compatible, a localhost callback plus manual-paste fallback is the conservative option. Pending-login state must be server-side, short-lived, single-use, and never rendered with its PKCE verifier.
+- Implementation implication for mauzcode: its existing HTTP server can own callback routes instead of opening port 53692, but the redirect URI must be one registered/accepted for this public client. To remain pi-compatible, a localhost callback plus manual-paste fallback is the conservative option. Pending-login state must be server-side, short-lived, single-use, and never rendered with its PKCE verifier.
 
 ## Token exchange and refresh
 
@@ -56,7 +56,7 @@ Refresh is also a JSON POST, but deliberately omits `scope`:
 - Both responses are expected to include `access_token`, `refresh_token`, and `expires_in`.
 - pi-mono stores an effective expiry of `Date.now() + expires_in*1000 - 5 minutes`; refresh therefore occurs with a five-minute safety margin.
 - Refreshed credentials replace both access and refresh tokens. Refresh-token rotation must be persisted atomically.
-- Non-2xx and malformed JSON are surfaced as errors. Raw response bodies appear in pi-mono error messages; hyper-code2 should redact them because token endpoints may echo sensitive material.
+- Non-2xx and malformed JSON are surfaced as errors. Raw response bodies appear in pi-mono error messages; mauzcode should redact them because token endpoints may echo sensitive material.
 
 ## Credential shape, storage, and locking
 
@@ -79,7 +79,7 @@ Canonical pi-mono OAuth credential:
 - Lookup precedence is runtime override, stored API key, stored OAuth token, environment variable, then custom fallback.
 - Logout removes the provider credential locally; no upstream token revocation is performed in the reviewed flow.
 
-Implementation implication: hyper-code2 should use Postgres as its durable store and concurrency primitive rather than copy file locking. A transaction plus row lock/advisory lock should re-read expiry, refresh once, and atomically write the rotated pair. Tokens must not be placed in normal declared settings, agent scratchpads, events, logs, or browser HTML. At-rest encryption/secret indirection should be selected during design.
+Implementation implication: mauzcode should use Postgres as its durable store and concurrency primitive rather than copy file locking. A transaction plus row lock/advisory lock should re-read expiry, refresh once, and atomically write the rotated pair. Tokens must not be placed in normal declared settings, agent scratchpads, events, logs, or browser HTML. At-rest encryption/secret indirection should be selected during design.
 
 ## OAuth-specific Anthropic request behavior
 
@@ -98,7 +98,7 @@ pi-mono recognizes an Anthropic OAuth access token when it contains `sk-ant-oat`
   `You are Claude Code, Anthropic's official CLI for Claude.`
 - API-key Anthropic requests do not get OAuth/Claude Code identity betas or Bearer auth.
 
-hyper-code2 already implements most of this in its `claude-code` path: Bearer auth, identity system line, token refresh from the official CLI keychain, and Claude-compatible headers. Managed OAuth should reuse that request path rather than fork transcript conversion.
+mauzcode already implements most of this in its `claude-code` path: Bearer auth, identity system line, token refresh from the official CLI keychain, and Claude-compatible headers. Managed OAuth should reuse that request path rather than fork transcript conversion.
 
 ## Tool-name compatibility
 
@@ -109,7 +109,7 @@ For OAuth calls, pi-mono maps known tool names case-insensitively to Claude Code
 
 On streamed responses it maps the provider-returned name back to the caller's originally declared tool name with a case-insensitive match.
 
-Unknown/custom tool names pass through unchanged. This bidirectional mapping prevents transcript mismatches when local wire names differ only in case. hyper-code2 currently exposes names such as `functions.read`, so blindly renaming only the familiar suffix would be unsafe. The design task must decide whether Claude subscription accepts these custom names unchanged; if normalization is added, schemas, replayed history, returned calls, and tool-result pairing must all use one reversible mapping.
+Unknown/custom tool names pass through unchanged. This bidirectional mapping prevents transcript mismatches when local wire names differ only in case. mauzcode currently exposes names such as `functions.read`, so blindly renaming only the familiar suffix would be unsafe. The design task must decide whether Claude subscription accepts these custom names unchanged; if normalization is added, schemas, replayed history, returned calls, and tool-result pairing must all use one reversible mapping.
 
 ## Constraints and risks to carry into design
 

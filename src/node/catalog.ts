@@ -62,7 +62,7 @@ export default async function (
                 if (entry.via || seen.has(entry.id)) continue;
                 if (allow.size && !allow.has(entry.provider)) continue;
                 seen.add(entry.id);
-                out.push({ id: entry.id, api: entry.api, provider: entry.provider, account: entry.account, kind: entry.kind, via: `hyper/${node.name}` });
+                out.push({ id: entry.id, api: entry.api, provider: entry.provider, account: entry.account, kind: entry.kind, via: `mauzcode/${node.name}` });
             }
         }
     }

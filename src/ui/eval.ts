@@ -1,12 +1,12 @@
 /**
- * Evaluates JavaScript in the currently connected Hyper UI page.
+ * Evaluates JavaScript in the currently connected MauzCode UI page.
  * Use this only for current-page DOM inspection and interaction. It is not
  * browser automation: for navigation, new tabs, arbitrary websites, or a
  * verified Chrome target use `ctx.fns.browser.*` or `ctx.fns.screen.openTab`.
  * `window.open` through this UI transport may be blocked or affect the current
  * page, so it must not be used to open a new browser tab.
  *
- * @param opts.code JavaScript source evaluated by the active Hyper UI page.
+ * @param opts.code JavaScript source evaluated by the active MauzCode UI page.
  * @param opts.agent Agent associated with the operation.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {

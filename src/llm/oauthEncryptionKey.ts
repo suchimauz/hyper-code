@@ -9,19 +9,19 @@ import { dirname } from "node:path";
  * Load and validate the OAuth credential encryption key.
  */
 export default async function (ctx: Context, _session: Session | null, _opts?: {}): Promise<Uint8Array> {
-    const configured = ctx.env.HYPER_OAUTH_ENCRYPTION_KEY;
+    const configured = ctx.env.MAUZCODE_OAUTH_ENCRYPTION_KEY;
     if (configured) return decodeKey(configured);
 
     const home = ctx.env.HOME ?? process.env.HOME ?? "";
     if (!home) throw new Error("OAuth encryption key is unavailable");
-    const service = ctx.env.HYPER_OAUTH_KEYCHAIN_SERVICE ?? "hyper-code2/local-secret-store";
+    const service = ctx.env.MAUZCODE_OAUTH_KEYCHAIN_SERVICE ?? "mauzcode/local-secret-store";
     const account = ctx.env.USER ?? process.env.USER ?? "local";
     if (process.platform === "darwin") {
         const existing = Bun.spawnSync(["security", "find-generic-password", "-s", service, "-a", account, "-w"], { stdout: "pipe", stderr: "ignore" });
         if (existing.exitCode === 0) return decodeKey(existing.stdout.toString().trim());
     }
 
-    const path = ctx.env.HYPER_OAUTH_KEY_FILE ?? `${home}/.hyper-code2/oauth.key`;
+    const path = ctx.env.MAUZCODE_OAUTH_KEY_FILE ?? `${home}/.mauzcode/oauth.key`;
     let encoded: string | null = null;
     try { encoded = readFileSync(path, "utf8").trim(); } catch { /* create below */ }
     if (!encoded) encoded = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");

@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CurrentAction } from '../components/hyper/CurrentAction';
-import { ActiveToolRow } from '../components/hyper/ActiveToolRow';
-import type { EventPage } from '../lib/hyper';
+import { CurrentAction } from '../components/mauzcode/CurrentAction';
+import { ActiveToolRow } from '../components/mauzcode/ActiveToolRow';
+import type { EventPage } from '../lib/mauzcode';
 it('uses a single sweep for the whole tool text group', () => {
   const { container } = render(<ActiveToolRow run={{ id: 'one', name: 'bash', subject: 'bun test', startedAt: 1000, state: 'running', tail: '' }} />);
   expect(container.querySelectorAll('.tool-sweep-band')).toHaveLength(1);

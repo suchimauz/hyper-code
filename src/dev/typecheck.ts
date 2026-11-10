@@ -5,9 +5,9 @@
  * @param opts.agent Agent whose scratchpad stores or locates the run.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { files?: string[]; verbose?: boolean; agent?: any } = {}) {
-    await Bun.write('.hyper/_runtime/logs/.keep', '');
+    await Bun.write('.mauzcode/_runtime/logs/.keep', '');
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    const logPath = '.hyper/_runtime/logs/typecheck-' + ts + '.log';
+    const logPath = '.mauzcode/_runtime/logs/typecheck-' + ts + '.log';
     const targets = Array.isArray(opts.files) && opts.files.length > 0 ? opts.files : ['--noEmit'];
     const useProject = targets.some(x => x === '-p' || x === '--project') || targets.some(x => x.endsWith('.json'));
     const args = ['bun', 'x', 'tsc', ...(useProject ? [] : ['--noEmit']), ...targets];

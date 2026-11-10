@@ -1,7 +1,7 @@
 import { createRef, useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { CommandEditor, type CommandEditorHandle } from '../components/hyper/CommandEditor';
+import { CommandEditor, type CommandEditorHandle } from '../components/mauzcode/CommandEditor';
 
 function at(el: HTMLElement, position: number) {
   const range = document.createRange(); const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);

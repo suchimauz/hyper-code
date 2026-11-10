@@ -42,7 +42,7 @@ export async function testCtx(opts?: { root?: string; workdir?: string; env?: Re
     // wrong thing (this is exactly what happened).
     if (opts?.workdir) ctx.env.WORKDIR = opts.workdir;
     // The repo's own workspace.json is local and untracked: each machine declares
-    // its private ~/.hyper/user plugins there. A test must not mount whatever this
+    // its private ~/.mauzcode/user plugins there. A test must not mount whatever this
     // machine happens to have — only an explicit opts.workdir brings one in.
     if (!opts?.workdir) ctx.env.PROCS_IGNORE_WORKSPACE = "1";
     // Never inherit installed plugins from the developer's environment or the
@@ -50,7 +50,7 @@ export async function testCtx(opts?: { root?: string; workdir?: string; env?: Re
     // opts.env; those fixtures must not migrate persistent/qualified schemas.
     ctx.env.USER_PLUGINS = "";
     ctx.env.PROCS_PLUGINS = "";
-    // Tests never touch the working database: they go to the test Postgres (hyper-db-test, port 54399 in
+    // Tests never touch the working database: they go to the test Postgres (mauzcode-db-test, port 54399 in
     // docker-compose.yml) — TEST_DATABASE_URL, or DATABASE_URL with that port. A suite on the live server used
     // to fill its lock table and fail every query of the running agents (15.10). opts.env may still pin a URL.
     if (ctx.env.DATABASE_URL || ctx.env.TEST_DATABASE_URL) ctx.env.DATABASE_URL = testDatabaseUrl(ctx.env);
@@ -66,12 +66,12 @@ export async function testCtx(opts?: { root?: string; workdir?: string; env?: Re
     const shareable = ctx.state.root === defaultRoot && !opts?.workdir
         && !opts?.env?.USER_PLUGINS && !opts?.env?.PROCS_PLUGINS && opts?.env?.PROCS_PATH === undefined;
     const G = globalThis as any;
-    if (shareable && G.__hyperTestBoot) {
-        ctx.state = copyState(G.__hyperTestBoot);
+    if (shareable && G.__mauzcodeTestBoot) {
+        ctx.state = copyState(G.__mauzcodeTestBoot);
     } else {
         await loadFns(ctx, null, {});
         await ctx.fns.procs.http.loadRoutes({});
-        // Workspace declarations and .hyper overlays can also mount plugins even
+        // Workspace declarations and .mauzcode overlays can also mount plugins even
         // when the environment roots above are disabled. Never run their migrations
         // on the test database. Rebuild from this harness's trusted src tree (not
         // IDs: an external migration could collide with a core migration ID).
@@ -80,7 +80,7 @@ export async function testCtx(opts?: { root?: string; workdir?: string; env?: Re
         const coreMigrations = entries.filter(entry => entry.kind === "migration" && entry.rootDir === coreSrc);
         ctx.state.procs.migrate.list = [];
         await loadMigrations(ctx, null, { entries: coreMigrations });
-        if (shareable) G.__hyperTestBoot = copyState(ctx.state);
+        if (shareable) G.__mauzcodeTestBoot = copyState(ctx.state);
     }
 
     if (pinnedDb) {
@@ -100,12 +100,12 @@ export async function testCtx(opts?: { root?: string; workdir?: string; env?: Re
 // The migration set the template was built from: ids plus the text of their files.
 function migrationHash(ctx: Context): string {
     const G = globalThis as any;
-    if (G.__hyperTestMigrationHash) return G.__hyperTestMigrationHash;
+    if (G.__mauzcodeTestMigrationHash) return G.__mauzcodeTestMigrationHash;
     const list = [...((ctx.state as any).procs?.migrate?.list ?? [])].map((m: any) => m.id).sort();
     const entries = ((ctx.state as any).procs?.boot?.entries ?? []).filter((e: any) => e.kind === "migration" && e.rootDir === resolve(import.meta.dir));
     const texts = entries.map((e: any) => e.abs).sort().map((abs: string) => readFileSync(abs, "utf8"));
     texts.push(readFileSync(resolve(import.meta.dir, "../script/db-test/extensions.sql"), "utf8"));
-    return (G.__hyperTestMigrationHash = Bun.hash(list.join("\n") + "\0" + texts.join("\0")).toString(36));
+    return (G.__mauzcodeTestMigrationHash = Bun.hash(list.join("\n") + "\0" + texts.join("\0")).toString(36));
 }
 
 // A copy of booted state for one ctx: containers copied (so stubbing a registry slot or adding a route stays in
@@ -128,14 +128,14 @@ function copyState(v: any, seen = new Map<any, any>()): any {
 // the next file makes its first ctx). The preload's afterEach calls endTest.
 function trackTestCtx(ctx: Context): void {
     const G = globalThis as any;
-    const t = (G.__hyperTestCtxs ??= { file: "", fileCtxs: [] as Context[], testCtxs: [] as Context[] });
-    if (G.__hyperInTest) t.testCtxs.push(ctx); else t.fileCtxs.push(ctx);
+    const t = (G.__mauzcodeTestCtxs ??= { file: "", fileCtxs: [] as Context[], testCtxs: [] as Context[] });
+    if (G.__mauzcodeInTest) t.testCtxs.push(ctx); else t.fileCtxs.push(ctx);
 }
 
 /** Before a file's first ctx: close the previous file's ctxs and reset the database. */
 export async function beginFileIfNew(): Promise<void> {
     const G = globalThis as any;
-    const t = (G.__hyperTestCtxs ??= { file: "", fileCtxs: [] as Context[], testCtxs: [] as Context[] });
+    const t = (G.__mauzcodeTestCtxs ??= { file: "", fileCtxs: [] as Context[], testCtxs: [] as Context[] });
     if (t.file === Bun.main) return;
     t.file = Bun.main;
     const old = [...t.fileCtxs, ...t.testCtxs];
@@ -147,7 +147,7 @@ export async function beginFileIfNew(): Promise<void> {
 /** After a test: close the ctxs it made and reset the database if it made any. */
 export async function endTest(): Promise<void> {
     const G = globalThis as any;
-    const t = G.__hyperTestCtxs;
+    const t = G.__mauzcodeTestCtxs;
     if (!t?.testCtxs.length) return;
     const mine = t.testCtxs;
     t.testCtxs = [];

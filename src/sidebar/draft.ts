@@ -17,8 +17,8 @@ export default async function (
     const headers={'cache-control':'no-store',vary:'Accept'};
     const deny=(message:string,status=403)=>json?Response.json({error:message},{status,headers}):new Response(message,{status,headers});
     if(!['GET','POST'].includes(req.method))return deny('Method not allowed',405);
-    try{await ctx.fns.sidebar.requestOrigin({req:new Request(req,{headers:new Headers(req.headers)}),extension:false});}catch{if(req.method==='GET'){const h=new Headers(req.headers);h.set('origin',u.origin);try{await ctx.fns.sidebar.requestOrigin({req:new Request(req,{headers:h}),extension:false});}catch{return deny('Trusted Hyper transport required');}}else return deny('Origin rejected');}
-    if(req.headers.has('authorization'))return deny('Use your Hyper owner session');
+    try{await ctx.fns.sidebar.requestOrigin({req:new Request(req,{headers:new Headers(req.headers)}),extension:false});}catch{if(req.method==='GET'){const h=new Headers(req.headers);h.set('origin',u.origin);try{await ctx.fns.sidebar.requestOrigin({req:new Request(req,{headers:h}),extension:false});}catch{return deny('Trusted MauzCode transport required');}}else return deny('Origin rejected');}
+    if(req.headers.has('authorization'))return deny('Use your MauzCode owner session');
     // Same gate as every page: cookies, OIDC sessions, portal trust, open instance (auth.currentUser).
     const who=await ctx.fns.auth.currentUser({req});if(who.required&&!who.user&&!who.legacy)return new Response(null,{status:303,headers:{...headers,location:'/auth/login?next='+encodeURIComponent(u.pathname+u.search)}});
     if(req.method==='POST'&&!req.headers.get('origin'))return deny('Origin rejected');

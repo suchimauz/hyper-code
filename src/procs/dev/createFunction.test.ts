@@ -30,8 +30,8 @@ test("createFunction refuses an existing function without overwrite", async () =
 
 
 const authoring = {module:'demo',name:'ping',summary:'Returns a synthetic test response',description:'Use this synthetic procedure to verify safe source-root authoring.',params:[],returnType:'Promise<string>',body:"return 'pong';",dryRun:true};
-test('createFunction supports src, .hyper and mounted official source roots',async()=>{
- for(const root of ['src','.hyper','plugin:whisper','plugins/whisper/src']) {
+test('createFunction supports src, .mauzcode and mounted official source roots',async()=>{
+ for(const root of ['src','.mauzcode','plugin:whisper','plugins/whisper/src']) {
   const result=await ctx.fns.procs.dev.createFunction({...authoring,root});
   expect(result.ok).toBe(true);expect(result.path).toBe(`${root}/demo/ping.ts`);
  }

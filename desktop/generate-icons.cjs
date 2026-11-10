@@ -1,5 +1,5 @@
 'use strict';
-// Original geometric Hyper H; no downloaded artwork or native conversion tools.
+// Original geometric MauzCode H; no downloaded artwork or native conversion tools.
 // Run: bun run generate-icons.cjs. PNG/ICO/ICNS containers use only Node built-ins.
 const { deflateSync } = require('node:zlib');
 const { mkdirSync, writeFileSync } = require('node:fs');
@@ -70,4 +70,4 @@ const entries = [['icp4', 16], ['icp5', 32], ['icp6', 64], ['ic07', 128], ['ic08
 });
 const header = Buffer.alloc(8); header.write('icns'); header.writeUInt32BE(8 + entries.reduce((sum, entry) => sum + entry.length, 0), 4);
 writeFileSync(path.join(output, 'icon.icns'), Buffer.concat([header, ...entries]));
-console.log('Generated original Hyper icons in desktop/assets');
+console.log('Generated original MauzCode icons in desktop/assets');

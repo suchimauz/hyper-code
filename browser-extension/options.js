@@ -19,13 +19,13 @@ async function load() {
 }
 document.querySelector('#pair-form').addEventListener('submit', event => {
   event.preventDefault();
-  action(async () => { await request('pair', {base: document.querySelector('#base').value}); status.textContent = 'Approval page opened in Hyper. Approve there, then check approval.'; });
+  action(async () => { await request('pair', {base: document.querySelector('#base').value}); status.textContent = 'Approval page opened in MauzCode. Approve there, then check approval.'; });
 });
 document.querySelector('#check').addEventListener('click', () => action(async () => {
   const result = await request('pairStatus');
-  status.textContent = result.revoked ? 'Pairing revoked.' : result.approved ? 'Approved. Reopen the sidebar on your source tab.' : 'Awaiting explicit approval in Hyper.';
+  status.textContent = result.revoked ? 'Pairing revoked.' : result.approved ? 'Approved. Reopen the sidebar on your source tab.' : 'Awaiting explicit approval in MauzCode.';
 }));
 document.querySelector('#revoke').addEventListener('click', () => action(async () => {
-  await request('revoke'); status.textContent = 'Pairing and browser bindings revoked. Hyper chat history is retained.';
+  await request('revoke'); status.textContent = 'Pairing and browser bindings revoked. MauzCode chat history is retained.';
 }));
 action(load);

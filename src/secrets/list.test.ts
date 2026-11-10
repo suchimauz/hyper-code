@@ -3,7 +3,7 @@ import { mkTestCtx } from "../_testCtx.entry";
 
 describe("secrets.list", () => {
   test("returns references and metadata but never encrypted or plain values", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 21).toString("base64") } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 21).toString("base64") } });
     await ctx.fns.secrets.putLocal({ namespace: "service", name: "api-key", value: "super-sensitive-value", source: "test-source" });
     const rows = await ctx.fns.secrets.list({ namespace: "service" });
     expect(rows).toHaveLength(1);
@@ -14,7 +14,7 @@ describe("secrets.list", () => {
   });
 
   test("filters by namespace and escaped case-insensitive query", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 22).toString("base64") } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 22).toString("base64") } });
     await ctx.fns.secrets.putLocal({ namespace: "google", name: "Token_A", value: "a" });
     await ctx.fns.secrets.putLocal({ namespace: "github", name: "token-b", value: "b" });
     expect((await ctx.fns.secrets.list({ query: "token_a" })).map((x: any) => x.ref)).toEqual(["secret://google/Token_A"]);

@@ -1,9 +1,9 @@
 /**
  * Starts a long-running command on an SSH server in a detached tmux session with a log file.
  *
- * Use for servers, watchers, builds and anything that must outlive the call or the SSH connection. Output goes to ~/.hyper-jobs/<name>.log on the remote host; read it with remote.logs, stop with remote.stop, list with remote.jobs. The user can watch live with `ssh <host> -t tmux attach -t hyper-<name>`. Fails if a job with the same name is running unless restart is set. Requires tmux on the remote host.
+ * Use for servers, watchers, builds and anything that must outlive the call or the SSH connection. Output goes to ~/.mauzcode-jobs/<name>.log on the remote host; read it with remote.logs, stop with remote.stop, list with remote.jobs. The user can watch live with `ssh <host> -t tmux attach -t mauzcode-<name>`. Fails if a job with the same name is running unless restart is set. Requires tmux on the remote host.
  * @param opts.host SSH host alias from ~/.ssh/config, as returned by remote.servers.
- * @param opts.name Job name; becomes the tmux session hyper-<name>. Letters, digits, dash and underscore.
+ * @param opts.name Job name; becomes the tmux session mauzcode-<name>. Letters, digits, dash and underscore.
  * @param opts.command Bash command to run (via bash -lc with the extended remote.exec PATH).
  * @param opts.cwd Remote working directory; ~/ allowed.
  * @param opts.env Environment variables exported before the command.
@@ -16,7 +16,7 @@ export default async function (
     opts: {
         /** SSH host alias from ~/.ssh/config, as returned by remote.servers. */
         host: string;
-        /** Job name; becomes the tmux session hyper-<name>. Letters, digits, dash and underscore. */
+        /** Job name; becomes the tmux session mauzcode-<name>. Letters, digits, dash and underscore. */
         name: string;
         /** Bash command to run (via bash -lc with the extended remote.exec PATH). */
         command: string;
@@ -33,10 +33,10 @@ export default async function (
     // Dots and colons are tmux target separators; keep names to a safe alphabet.
     if (!/^[A-Za-z0-9_-]+$/.test(opts.name)) throw new Error("invalid job name (letters, digits, - and _): " + opts.name);
     const shq = (s: string) => ctx.fns.remote.quote({ value: s });
-    const sess = "hyper-" + opts.name;
+    const sess = "mauzcode-" + opts.name;
     // "=name" makes tmux match the session name exactly, not as a prefix.
     const target = "=" + sess;
-    const dir = "$HOME/.hyper-jobs";
+    const dir = "$HOME/.mauzcode-jobs";
     const log = dir + "/" + opts.name + ".log";
     const job = dir + "/" + opts.name + ".sh";
     const lock = dir + "/" + opts.name + ".lock";
@@ -66,5 +66,5 @@ export default async function (
     const r = await ctx.fns.remote.exec({ host: opts.host, command: script.replace('( umask 077; cat > "' + job + '" ) || exit 1', ': > "' + log + '"\n( umask 077; cat > "' + job + '" ) || exit 1'), stdin: body, timeout: (opts.wait ?? 2) + 30 });
     if (r.exitCode !== 0) throw new Error(opts.host + ": " + (r.stderr || r.stdout).trim());
     const [first, ...rest] = r.stdout.split("\n");
-    return { name: opts.name, session: sess, running: first === "RUNNING=1", log: "~/.hyper-jobs/" + opts.name + ".log", tail: rest.join("\n") };
+    return { name: opts.name, session: sess, running: first === "RUNNING=1", log: "~/.mauzcode-jobs/" + opts.name + ".log", tail: rest.join("\n") };
 }

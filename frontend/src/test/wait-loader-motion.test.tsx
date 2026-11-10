@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { StrictMode } from 'react';
 import { act, render } from '@testing-library/react';
-import { WaitLoader } from '../components/hyper/WaitLoader';
+import { WaitLoader } from '../components/mauzcode/WaitLoader';
 
 it.each(['missing', 'pending', 'zero-duration', 'valid', 'disappears', 'throws'] as const)('survives StrictMode and %s CSS motion', mode => {
   vi.useFakeTimers();

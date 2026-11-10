@@ -6,7 +6,7 @@ export type QuotaAccount = {
     label: string;
     /** Provider/account prefix for logo selection, not a transport route. */
     model: string;
-    connection: "local" | "hyper" | "ssh";
+    connection: "local" | "mauzcode" | "ssh";
     host?: string;
     kind: "quota" | "status";
     windows?: Partial<Record<"fiveHour" | "weekly" | "monthly", {

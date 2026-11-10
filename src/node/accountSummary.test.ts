@@ -9,10 +9,10 @@ test("counts distinct provider/account pairs, not model rows or account names al
     expect(await summarize()).toMatchObject({ count: 2, total: 2, status: "catalog" });
 });
 test("visible catalogue intersection accepts qualified IDs and empty selection", async () => {
-    expect((await summarize(base(), ["hyper/test:codex/same:a"])).count).toBe(1);
+    expect((await summarize(base(), ["mauzcode/test:codex/same:a"])).count).toBe(1);
     expect((await summarize(base(), ["codex/same:b"])).count).toBe(1);
     expect((await summarize(base(), [])).count).toBe(0);
-    expect((await summarize(base(), ["hyper/other:codex/same:a"])).count).toBe(0);
+    expect((await summarize(base(), ["mauzcode/other:codex/same:a"])).count).toBe(0);
 });
 test("disabled or forbidden nodes never claim active accounts even with a cached catalogue", async () => {
     expect(await summarize({ ...base(), enabled: false })).toMatchObject({ count: 0, total: 2, status: "disabled", accounts: [] });

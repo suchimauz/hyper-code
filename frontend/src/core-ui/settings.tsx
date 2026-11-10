@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Panel, TextField, requestJson, ApiError, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, TextField, requestJson, ApiError, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 
 type Item = { module: string; key: string; type: string; title?: string; description?: string; source: string; path?: string; value?: string | number | boolean; defaultValue?: unknown; configured?: boolean; options?: string[]; min?: number; max?: number };
 type Snapshot = { status: { openai: { set: boolean }; anthropic: { set: boolean }; kimi: { set: boolean }; groq: { set: boolean }; openrouter: { set: boolean }; kimiCoding: { loggedIn: boolean }; codex: { loggedIn: boolean; email?: string | null } }; flows: Record<string, { status: string; url?: string; userCode?: string; error?: string }> };

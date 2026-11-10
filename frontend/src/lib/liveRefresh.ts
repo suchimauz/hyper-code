@@ -30,7 +30,7 @@ export function liveRefresh(options: {
     try {
       await loadLiveClient();
       if (controller.signal.aborted) return;
-      const live = window.hyperLive!;
+      const live = window.mauzcodeLive!;
       live.refreshTopics?.();
       const changed = (next: LiveStatus) => {
         const previous = status; status = next; options.onStatus?.(next);

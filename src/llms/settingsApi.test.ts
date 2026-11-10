@@ -6,7 +6,7 @@ function setup() {
  const writes: object[] = [];
  const ctx: any = {fns:{
   auth:{currentUser:async()=>({required:true,user}),csrfToken:async()=> 'csrf',verifyCsrf:async({token}:any)=>token==='csrf'},
-  http:{publicOrigin:async()=> 'https://hyper.test'},
+  http:{publicOrigin:async()=> 'https://mauzcode.test'},
   llm:{listModels:async()=>({codex:['codex:a']}),modelPolicy:async(o:any)=>{if(o.action==='set')writes.push(o);return {disabledModels:['codex:b']};},codingInstance:async()=>({instance:null})},
   sshInstance:{list:async()=>[{name:'trusted',pinnedHostKey:'pin'},{name:'untrusted'}]},
   settings:{getString:async()=> 'standard',set:async(o:any)=>{writes.push(o);}},
@@ -14,7 +14,7 @@ function setup() {
  }};
  return {ctx,writes,setUser:(next:{role:string}|null)=>{user=next;}};
 }
-const post=(body:object, token='csrf', origin='https://hyper.test')=>new Request('https://hyper.test/llms/settings',{method:'POST',headers:{'content-type':'application/json','x-csrf-token':token,origin},body:JSON.stringify(body)});
+const post=(body:object, token='csrf', origin='https://mauzcode.test')=>new Request('https://mauzcode.test/llms/settings',{method:'POST',headers:{'content-type':'application/json','x-csrf-token':token,origin},body:JSON.stringify(body)});
 describe('native model settings security and writes',()=>{
  test('requires owner before data reads or writes',async()=>{
   const {ctx,writes,setUser}=setup();
@@ -25,7 +25,7 @@ describe('native model settings security and writes',()=>{
   expect(writes).toEqual([]);
  });
  test('GET allowlists fields and preserves disabled model routes',async()=>{
-  const {ctx}=setup(); const res=await api(ctx,owner,{req:new Request('https://hyper.test/llms/settings')});
+  const {ctx}=setup(); const res=await api(ctx,owner,{req:new Request('https://mauzcode.test/llms/settings')});
   const data=await res.json(); expect(data.models).toEqual(['codex:a','codex:b']);expect(data.instances).toEqual(['trusted']);
   expect(JSON.stringify(data)).not.toContain('SECRET');expect(JSON.stringify(data)).not.toContain('https://user');
   expect(res.headers.get('Cache-Control')).toBe('no-store');

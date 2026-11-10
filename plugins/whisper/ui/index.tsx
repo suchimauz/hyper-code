@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Panel, requestJson, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, requestJson, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 
 type Choices = { models: {name:string}[]; agents: {id:string;title:string}[] };
 type Decision = {kind:string;command:string|null;opts:Record<string,unknown>;reason:string;confident:boolean;preview?:unknown};
@@ -15,7 +15,7 @@ export function whisperWav(chunks: Float32Array[], length: number): ArrayBuffer 
 const junk = (t:string) => !t || /^[\s.,!?…-]*$/.test(t) || /^\[.*\]$|^\(.*\)$|^\*.*\*$/.test(t) || /Продолжение следует|Субтитры|Thank you for watching|аплодисмент|applause/i.test(t);
 export function WhisperPage({context}:ExtensionViewProps) {
   const [choices,setChoices]=useState<Choices>({models:[],agents:[]});
-  const [model,setModel]=useState('large-v3-turbo'), [language,setLanguage]=useState('ru'), [prompt,setPrompt]=useState('hyper, agent, procs.db.select, git commit, steer, delegate, Claude, Postgres');
+  const [model,setModel]=useState('large-v3-turbo'), [language,setLanguage]=useState('ru'), [prompt,setPrompt]=useState('mauzcode, agent, procs.db.select, git commit, steer, delegate, Claude, Postgres');
   const [focus,setFocus]=useState(context.agentId ?? ''), [typed,setTyped]=useState(''), [threshold,setThreshold]=useState(0.35);
   const [status,setStatus]=useState('Off'), [active,setActive]=useState(false), [level,setLevel]=useState(0);
   const [blocks,setBlocks]=useState<Block[]>([{id:1,final:'',partial:''}]), [logs,setLogs]=useState<string[]>([]);

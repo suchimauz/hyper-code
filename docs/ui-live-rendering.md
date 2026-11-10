@@ -2,10 +2,10 @@
 
 ## Primary React UI
 
-`frontend/src/LiveApp.tsx` owns the primary shell. New trusted extensions use `@hyper/ui`, not HTMX fragments or global DOM controllers. See [ui-architecture.md](ui-architecture.md) for registration and security boundaries.
+`frontend/src/LiveApp.tsx` owns the primary shell. New trusted extensions use `@mauzcode/ui`, not HTMX fragments or global DOM controllers. See [ui-architecture.md](ui-architecture.md) for registration and security boundaries.
 
 1. Fetch canonical endpoint data on mount. Events are invalidation hints; never treat them as a complete state snapshot.
-2. Use `subscribeLive` or `useLiveSubscription` from `@hyper/ui`. Supply `name`, optional event `types`, `onEvent`, **`resync` and `onError`**. Re-read authoritative data after reconnect/resume or recovery, and expose load failures rather than silently keeping stale data.
+2. Use `subscribeLive` or `useLiveSubscription` from `@mauzcode/ui`. Supply `name`, optional event `types`, `onEvent`, **`resync` and `onError`**. Re-read authoritative data after reconnect/resume or recovery, and expose load failures rather than silently keeping stale data.
 3. Return subscription cleanup from the owning effect and abort pending requests. Ignore stale responses after unmount or selection changes. The helper also supports cleanup while the transport script is still loading.
 4. Declare required transport topics with `data-live-topic` on mounted content. `types` alone does not add topics. Keep topics narrow, such as `agents` or `agent:<id>`.
 5. Use `requestJson` for JSON reads/writes. Writes need the existing cookie-bound CSRF token and server authorization; frontend grants are not authorization.
@@ -18,7 +18,7 @@ Shared SSR still serves compatibility surfaces, including inline approvals and C
 
 Concrete consumers are mapped in [ui-architecture.md](ui-architecture.md#residual-compatibility-consumers): dynamic HTTP `ui.layout` dispatch, People `/auth/users`, `sidebar.draft`, built-in/plugin SSR pages, Canvas `kind.render` with assets, and secure input transports. Removing dead `legacyUi.rewriteResponse`/`navigationUrl` helpers does not retire these renderers. The SDK example is a dev/test fixture with its own test registry, not a production-mounted subscription consumer.
 
-Where a server-rendered consumer still uses `ui.live`, it declares a canonical fragment URL, `data-live-topic`, and `hx-trigger="hyper-live from:body"` plus a watchdog. The shared client coalesces notifications and asks matching regions to fetch current markup through HTMX. Preserve region-local targets and swap modes. This is a compatibility contract, not the default for new extensions.
+Where a server-rendered consumer still uses `ui.live`, it declares a canonical fragment URL, `data-live-topic`, and `hx-trigger="mauzcode-live from:body"` plus a watchdog. The shared client coalesces notifications and asks matching regions to fetch current markup through HTMX. Preserve region-local targets and swap modes. This is a compatibility contract, not the default for new extensions.
 
 The older chat renderer/controller (`agent/chat.js`, `#chat-panel`, `#msg-head`, `#msg-tail`) has its own disposable lifecycle, offset-based paging, lazy tool-detail popup and scroll anchoring. Its HTMX cleanup/mount hooks and watchdogs apply only to consumers still using that renderer. Do not attach that controller to React-owned DOM or describe its markup as the primary chat contract.
 

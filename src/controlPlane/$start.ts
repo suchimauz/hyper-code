@@ -1,4 +1,4 @@
-/** Sends a heartbeat to the Hyper Control Plane now and every 5 minutes, when connected. Never blocks startup. */
+/** Sends a heartbeat to the MauzCode Control Plane now and every 5 minutes, when connected. Never blocks startup. */
 export default async function (ctx: Context, _session: Session | null, _opts?: {}) {
     const beat = () => ctx.fns.controlPlane.heartbeat({}).then((r) => {
         if (r) ctx.fns.procs.log.debug({ event: "controlPlane.heartbeat", msg: `as ${r.service}` });

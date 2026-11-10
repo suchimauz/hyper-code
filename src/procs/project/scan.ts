@@ -59,12 +59,12 @@ export default async function (ctx: Context, session: Session | null, _opts?: {}
         const glob = new Glob('**/*');
         for await (const rel0 of glob.scan(root.dir)) {
             // Private tool-result payloads are data, never executable runtime files.
-            // Check the absolute path too: a .hyper source root hides that segment
+            // Check the absolute path too: a .mauzcode source root hides that segment
             // from rel0, and a symlink may hide the entire result-store path.
             const absolute = resolve(root.dir, rel0);
-            if ((absolute + '/').includes('/.hyper/results/')) continue;
+            if ((absolute + '/').includes('/.mauzcode/results/')) continue;
             const canonical = await cachedRealpath(absolute);
-            if ((canonical + '/').includes('/.hyper/results/')) continue;
+            if ((canonical + '/').includes('/.mauzcode/results/')) continue;
             if (isIgnoredPath(rel0)) continue;
             // A template's own placeholder, in the PATH. Provisioning fills
             // `{{project}}` into a new workspace's name — including in file names

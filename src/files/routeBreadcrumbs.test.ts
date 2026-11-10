@@ -10,7 +10,7 @@ function mock() {
  ctx.fns.files.browserData=(opts:any)=>data(ctx,null,opts);
  return {ctx,calls};
 }
-const request=(url='/files?path=/work/a.txt',init?:RequestInit)=>({req:new Request('https://hyper.test'+url,init),params:{}});
+const request=(url='/files?path=/work/a.txt',init?:RequestInit)=>({req:new Request('https://mauzcode.test'+url,init),params:{}});
 test('Files document serves React, JSON serves bounded text',async()=>{
  const {ctx,calls}=mock();expect(await (await get(ctx,null,request())).text()).toBe('React entry');expect(calls[0]).toContain('/ui-lab/');
  const response=await get(ctx,null,request('/files?path=/work/a.txt&format=json'));expect(await response.json()).toMatchObject({path:'/work/a.txt',content:'text'});expect(response.headers.get('cache-control')).toBe('no-store');

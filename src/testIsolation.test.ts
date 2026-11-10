@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { testCtx } from "./$test";
 
 test("core testCtx excludes inherited plugin migrations before they execute", async () => {
-    const root = mkdtempSync(join(tmpdir(), "hyper-test-isolation-"));
+    const root = mkdtempSync(join(tmpdir(), "mauzcode-test-isolation-"));
     const previous = { USER_PLUGINS: process.env.USER_PLUGINS, PROCS_PLUGINS: process.env.PROCS_PLUGINS };
     try {
         for (const kind of ["user", "official"]) {

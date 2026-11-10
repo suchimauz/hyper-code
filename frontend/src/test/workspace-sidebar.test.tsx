@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
 import { AppShell } from '../components/layout/AppShell';
 import { filterProjects, replyAge, type NavigationProject } from '../lib/navigation';
 
@@ -78,13 +78,13 @@ it('synchronizes mounted desktop/mobile lists and retains choices after compact 
   expect(screen.getByRole('button', { name: 'UI lab' })).toHaveAttribute('aria-expanded', 'false');
 });
 it('search expansion does not overwrite the saved workspace selection', async () => {
-  localStorage.setItem('hyper.ui.workspace.local', 'closed');
+  localStorage.setItem('mauzcode.ui.workspace.local', 'closed');
   render(<WorkspaceSidebar {...props} />);
   await userEvent.type(screen.getByRole('textbox'), 'navigation');
   const heading = screen.getByRole('button', { name: 'UI lab' });
   expect(heading).toHaveAttribute('aria-expanded', 'true');
   fireEvent.click(heading);
-  expect(localStorage.getItem('hyper.ui.workspace.local')).toBe('closed');
+  expect(localStorage.getItem('mauzcode.ui.workspace.local')).toBe('closed');
   fireEvent.click(screen.getByRole('button', { name: 'Очистить фильтр' }));
   expect(heading).toHaveAttribute('aria-expanded', 'false');
 });

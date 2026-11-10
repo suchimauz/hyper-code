@@ -2,9 +2,9 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, expect, it, vi } from 'vitest';
 import { SshInstancesPanel } from '../components/settings/SshInstancesPanel';
 import { SettingsDialog } from '../components/settings/SettingsDialog';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
 
-const pending = { name: 'box', host: 'h.example', user: 'run', port: 22, publicKey: 'ssh-ed25519 AAAA hyper', pinnedHostKey: null, updatedAt: 1 };
+const pending = { name: 'box', host: 'h.example', user: 'run', port: 22, publicKey: 'ssh-ed25519 AAAA mauzcode', pinnedHostKey: null, updatedAt: 1 };
 const verified = { ...pending, name: 'prod', pinnedHostKey: 'ssh-ed25519 KEY', updatedAt: 2 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
@@ -35,7 +35,7 @@ it('renders instances with status badges and the public key for pending setup', 
   const box = await screen.findByRole('article', { name: 'box' });
   expect(within(box).getByText('Setup required')).toBeVisible();
   expect(within(box).getByText('run@h.example:22')).toBeVisible();
-  expect(within(box).getByLabelText('SSH public key')).toHaveTextContent('ssh-ed25519 AAAA hyper');
+  expect(within(box).getByLabelText('SSH public key')).toHaveTextContent('ssh-ed25519 AAAA mauzcode');
   expect(within(box).getByRole('button', { name: /Test connection/ })).toBeDisabled();
   const prod = screen.getByRole('article', { name: 'prod' });
   expect(within(prod).getByText('Host verified')).toBeVisible();

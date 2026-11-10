@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { revealToolScroll } from '../components/hyper/revealToolScroll';
+import { revealToolScroll } from '../components/mauzcode/revealToolScroll';
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); document.body.innerHTML = ''; });
 function fixture() {
  const scroll = document.createElement('div'), target = document.createElement('section');

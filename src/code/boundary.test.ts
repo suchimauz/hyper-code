@@ -64,14 +64,14 @@ describe("code.boundary", () => {
         expect(r.ok).toBe(true);
     });
 
-    test("the local .hyper glue layer may reach anywhere", async () => {
+    test("the local .mauzcode glue layer may reach anywhere", async () => {
         const ctx = await testCtx({});
         await seed(ctx,
             [{ name: "skill.meetingReady", tier: "local" }, { name: "circleback.sql", tier: "user" }],
             [["skill.meetingReady", "circleback.sql"]]);
 
         const r = await ctx.fns.code.boundary({});
-        // .hyper/ is committed but personal: wiring private plugins is its job,
+        // .mauzcode/ is committed but personal: wiring private plugins is its job,
         // so reporting it would report the feature.
         expect(r.total).toBe(0);
         expect(r.ok).toBe(true);

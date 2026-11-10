@@ -5,7 +5,7 @@ import controlScript from './controlScript';
 test('explicit toast dismissal works while hovered and with details; keyboard also closes', async () => {
  const window = new Window({url:'http://localhost/'});
  try {
-  (window as any).hyperLive = {subscribe:()=>{},command:()=>{}};
+  (window as any).mauzcodeLive = {subscribe:()=>{},command:()=>{}};
   window.eval(await controlScript({} as Context,null,{}));
   const toast=(window as any).toast;
   toast({message:'Ошибка',level:'error',body:'Подробности'});

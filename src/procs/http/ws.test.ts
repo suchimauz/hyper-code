@@ -80,7 +80,7 @@ test("plain GET on a ws-only address is still a 404", async () => {
 });
 
 test("HTTPS door forwards HTTP/1.1 WebSocket upgrades to the plain server", async () => {
-    const dir = `/tmp/hyper-ws-test-${process.pid}`;
+    const dir = `/tmp/mauzcode-ws-test-${process.pid}`;
     const gen = Bun.spawnSync(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-keyout", `${dir}-k.pem`, "-out", `${dir}-c.pem`, "-subj", "/CN=localhost"]);
     expect(gen.exitCode).toBe(0);
     const tls = http2.createSecureServer({ key: await Bun.file(`${dir}-k.pem`).text(), cert: await Bun.file(`${dir}-c.pem`).text(), allowHTTP1: true, ALPNProtocols: ["h2", "http/1.1"] }, (_q, s) => s.end());

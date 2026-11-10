@@ -2,13 +2,13 @@ import { describe, expect, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
 const attachNavigation = require('./navigation.cjs');
 function fixture() {
-  let url = 'https://hyper.test/';
+  let url = 'https://mauzcode.test/';
   const contents = Object.assign(new EventEmitter(), { getURL: () => url });
   const failures: string[] = [], pages: any[] = [];
   let ready = 0;
-  const navigation = attachNavigation({ contents, origin: 'https://hyper.test', fail: (reason: string) => failures.push(reason),
+  const navigation = attachNavigation({ contents, origin: 'https://mauzcode.test', fail: (reason: string) => failures.push(reason),
     ready: () => { ready++; }, pageError: (...args: any[]) => pages.push(args) });
-  function navigate(code = 200, target = 'https://hyper.test/') {
+  function navigate(code = 200, target = 'https://mauzcode.test/') {
     url = target;
     contents.emit('did-start-navigation', {}, url, false, true);
     contents.emit('did-navigate', {}, url, code);
@@ -23,14 +23,14 @@ describe('desktop navigation errors', () => {
       const f = fixture(); f.navigate(code); expect(f.failures).toEqual([`HTTP ${code}.`]); expect(f.ready).toBe(0); expect(f.pages).toEqual([]);
     });
     test(`later HTTP ${code} keeps connection and original response`, () => {
-      const f = fixture(); f.navigate(); f.navigate(code, 'https://hyper.test/redmine401');
+      const f = fixture(); f.navigate(); f.navigate(code, 'https://mauzcode.test/redmine401');
       expect(f.failures).toEqual([]); expect(f.ready).toBe(1); expect(f.pages).toEqual([[`HTTP ${code}.`, { http: true }]]);
       f.failure(-379); expect(f.pages).toHaveLength(1);
       f.navigate(); expect(f.failures).toEqual([]); expect(f.ready).toBe(1);
     });
   }
   test('login page and redirects within origin can finish the initial connection', () => {
-    const f = fixture(); f.navigate(200, 'https://hyper.test/auth?returnTo=%2F'); expect(f.ready).toBe(1); expect(f.failures).toEqual([]);
+    const f = fixture(); f.navigate(200, 'https://mauzcode.test/auth?returnTo=%2F'); expect(f.ready).toBe(1); expect(f.failures).toEqual([]);
   });
   for (const code of [-105, -102, -202, -379]) {
     test(`initial network/TLS/load failure ${code} fails once`, () => {
@@ -49,7 +49,7 @@ describe('desktop navigation errors', () => {
   test('uncommitted, cross-origin and fragment loads do not count as connection success', () => {
     const f = fixture(); f.contents.emit('did-finish-load'); expect(f.ready).toBe(0);
     f.navigate(200, 'https://evil.test/'); expect(f.ready).toBe(0);
-    f.contents.emit('did-start-navigation', {}, 'https://hyper.test/#x', true, true); f.contents.emit('did-finish-load'); expect(f.ready).toBe(0);
+    f.contents.emit('did-start-navigation', {}, 'https://mauzcode.test/#x', true, true); f.contents.emit('did-finish-load'); expect(f.ready).toBe(0);
   });
   test('renderer crash before initial load fails; after load preserves connection for retry', () => {
     const initial = fixture(); initial.contents.emit('render-process-gone', {}, { reason: 'crashed' }); expect(initial.failures).toHaveLength(1);

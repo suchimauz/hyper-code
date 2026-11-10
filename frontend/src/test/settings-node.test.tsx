@@ -9,12 +9,12 @@ function setup(response: object = { ok: true }, status = 200) {
   vi.stubGlobal('fetch', fetch);
   const reload = vi.fn(async () => {});
   render(<NodeSettings nodes={[]} clients={[{ id: 'client-1', name: 'Work laptop', providers: ['codex'], requests: 2, tokenHint: '…1234' }]} csrfToken="node-csrf" reload={reload} />);
-  fireEvent.click(screen.getByText('Hyper nodes and sharing (0)'));
+  fireEvent.click(screen.getByText('MauzCode nodes and sharing (0)'));
   return { fetch, reload };
 }
 
 it('reviews an exact client grant before issuing it with confirmation and CSRF', async () => {
-  const { fetch, reload } = setup({ token: 'new-client-secret', url: 'https://hyper.example/node/v1' });
+  const { fetch, reload } = setup({ token: 'new-client-secret', url: 'https://mauzcode.example/node/v1' });
   fireEvent.change(screen.getByLabelText('Client name'), { target: { value: 'Home' } });
   fireEvent.change(screen.getByLabelText(/Providers \(comma/), { target: { value: 'codex, opencode' } });
   fireEvent.click(screen.getByRole('button', { name: 'Review token' }));

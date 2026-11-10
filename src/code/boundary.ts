@@ -4,10 +4,10 @@
 //
 //   core      src/ — the framework. Everyone has it.
 //   official  plugins/* — shipped in this repo, but mountable and unmountable.
-//   local     .hyper/ — committed, but personal glue for THIS checkout. It is
+//   local     .mauzcode/ — committed, but personal glue for THIS checkout. It is
 //             where private plugins are meant to be wired together, so it is
 //             allowed to reach anywhere.
-//   user      ~/.hyper/user/* — private, per machine, NOT in this repo.
+//   user      ~/.mauzcode/user/* — private, per machine, NOT in this repo.
 //   external  cloned from a git url.
 //
 // The failure this exists to catch actually happened: three committed files in
@@ -37,7 +37,7 @@ const EXEMPT_FROM = new Set(["local"]);
  * Reports calls that cross a module-ownership boundary the wrong way.
  *
  * Flags edges from code the repository ships into code it does not: a function
- * in `src/` or `plugins/` that calls a private `~/.hyper/user` plugin works on
+ * in `src/` or `plugins/` that calls a private `~/.mauzcode/user` plugin works on
  * one machine and throws in a fresh clone. Those are `error`; core reaching into
  * an official plugin is `warn`, since a clone has the code but the dependency is
  * inverted. Reads the indexed graph, so run `code.index` first if the tree

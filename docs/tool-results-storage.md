@@ -5,7 +5,7 @@
 ## Решение
 
 - Маленькие результаты остаются в `messages.content` в Postgres, с `role = tool` и `tool_call_id`.
-- Большие результаты — неизменяемые файлы `.hyper/results/<owner-agent-id>/<result-uuid>.json`. В сообщении — превью и структурированная ссылка.
+- Большие результаты — неизменяемые файлы `.mauzcode/results/<owner-agent-id>/<result-uuid>.json`. В сообщении — превью и структурированная ссылка.
 - Чтение — только через `agent.readResult`, не через прямой доступ к `agent.scratchpad.results`.
 - В памяти — индекс ссылок и короткоживущий кеш результатов. Файлы загружаются лениво. Кеш не сериализуется в БД и не копируется в форки.
 - Из старых scratchpad удаляются только `results` и `resultSeq` верхнего уровня. Планы, история планов, заметки, флаги и любые другие поля сохраняются. Сообщения, события и настройки в отдельных колонках не меняются.
@@ -33,12 +33,12 @@
 ## Файлы
 
 ```text
-<instance-data-root>/.hyper/results/
+<instance-data-root>/.mauzcode/results/
   <owner-agent-id>/
     <result-uuid>.json
 ```
 
-Корень единый для экземпляра Hyper и задаётся настройкой, не зависит от workspace агента и её SSH-хоста. Перед реализацией прочитать `docs/settings.md`. Каталог исключить из Git, runtime-сканирования и публичной файловой раздачи.
+Корень единый для экземпляра MauzCode и задаётся настройкой, не зависит от workspace агента и её SSH-хоста. Перед реализацией прочитать `docs/settings.md`. Каталог исключить из Git, runtime-сканирования и публичной файловой раздачи.
 
 Пример формата:
 
@@ -139,7 +139,7 @@ Backup включает БД и каталог результатов. Неск�
 
 ### Проверки
 
-`bun test src/session/legacyScratchpadMigration.test.ts` использует штатный test harness: отдельный PostgreSQL на :54399, worker database `hyper_test_*`, не live :54393. Тесты проверяют удаление обоих/одного ключа, сохранность plan/history/flags и точности числа, пустые объекты/отсутствие ключей, byte-for-byte сохранность malformed/null/array/string, повторный запуск, атомарный rollback, live guard и реальный lifecycle order с чтением очищенного состояния через loadAll до worker. Общий migrate.up в тесте вызывается только в изолированной тестовой БД.
+`bun test src/session/legacyScratchpadMigration.test.ts` использует штатный test harness: отдельный PostgreSQL на :54399, worker database `mauzcode_test_*`, не live :54393. Тесты проверяют удаление обоих/одного ключа, сохранность plan/history/flags и точности числа, пустые объекты/отсутствие ключей, byte-for-byte сохранность malformed/null/array/string, повторный запуск, атомарный rollback, live guard и реальный lifecycle order с чтением очищенного состояния через loadAll до worker. Общий migrate.up в тесте вызывается только в изолированной тестовой БД.
 
 ### Откат
 
@@ -162,7 +162,7 @@ Backup включает БД и каталог результатов. Неск�
 
 ## Фактическая реализация и проверки
 
-- `resultStore.instanceRoot` / `HYPER_INSTANCE_DATA_ROOT`: абсолютный локальный корень (default — cwd сервера, не workspace/SSH). Под ним `.hyper/results`; конфигурация корня доверенная, canonical root согласован. Owner/file symlinks отвергаются. Files HTTP/raw/embed и UI скрывают приватные файлы и aliases; scanner и git исключают payloads.
+- `resultStore.instanceRoot` / `MAUZCODE_INSTANCE_DATA_ROOT`: абсолютный локальный корень (default — cwd сервера, не workspace/SSH). Под ним `.mauzcode/results`; конфигурация корня доверенная, canonical root согласован. Owner/file symlinks отвергаются. Files HTTP/raw/embed и UI скрывают приватные файлы и aliases; scanner и git исключают payloads.
 - `resultStore.write`: UUID, mode 0700/0600, exclusive temporary file, fsync, rename, fsync каталога. Текст ≤32 МиБ UTF-8; JSON stat limit 200 МиБ. SHA-256/bytes относятся к тексту. Ошибки дают честный bounded failure preview без ссылки.
 - `agent.readResult`: session identity, видимая история и fork offset, UTF-16 диапазоны (default 4000, max16000). Storage read повторно авторизует все поля ссылки до cache hit. Foreign/unknown UUID одинаково not_found; expired зарезервирован, GC отсутствует. rN всегда legacy_unavailable.
 - LRU в ctx.state.resultStore, idle TTL120s/updateAgeOnGet/autopurge, maxSize64МиБ, maxEntrySize8МиБ, UTF-16+metadata accounting. Это fixed v1 defaults, не настройки. Pending loads deduplicated и удаляются finally; reload использует один state/cache. Отдельный индекс истории не кешируется: auth перечитывает историю каждый раз (latency tradeoff, без stale ACL).
@@ -172,7 +172,7 @@ Backup включает БД и каталог результатов. Неск�
 - Независимый агент cdcp (test-result-store, parentId=null) получил preview без контрольной строки, сам вызвал readResult UUID offsets4000/8000 и восстановил orchid-6729-cobalt. После cache.clear повторил disk read300 units; r123→legacy_unavailable. Persisted tool calls/ref проверены, scratchpad без results. Чат оставлен.
 - Runtime функции hot-reloaded и strict docs/typecheck пройдены; genTypes успешен. Общий tsc имеет ошибки вне change set; глобально зелёная сборка не заявляется. code.quality ok:true/errors:0/warnings:487.
 - Deployment incident: stash загрузился до write provider, временно отдавал storage-failure preview без полного output. Provider восстановлен; live stash→DB ref→authorized read/cache smoke успешен. Вывод этого окна не обещается восстановимым.
-- Scope incident: общий migrate.up финальной проверки также применил чужую pending additive 202607170001_initial (CREATE hypermail schema/tables), без удаления данных. Откат не выполнялся. В дальнейшем применять только согласованную migration, не весь pending queue.
+- Scope incident: общий migrate.up финальной проверки также применил чужую pending additive 202607170001_initial (CREATE mauzcodemail schema/tables), без удаления данных. Откат не выполнялся. В дальнейшем применять только согласованную migration, не весь pending queue.
 
 Backup включает Postgres И каталог результатов. DB-only export/import переносит ссылки, не payloads. Multi-server требует shared storage. GC, tombstones/expired, pinned artifacts, метрики, privileged service reader и streaming format вне v1. Boot-only cleanup выше реализован и проверен в test DB; на live не применялся.
 
@@ -180,7 +180,7 @@ Backup включает Postgres И каталог результатов. DB-on
 ## Перенос на другую машину (порядок выкладки)
 
 1. Не переносить локальные `.env`, backups, `.runtime` и payloads через Git. Сначала сохранить согласованный backup Postgres и каталога результатов. Для уже существующих ссылок перенести соответствующие файлы отдельно безопасным способом; DB-only копия недостаточна.
-2. В отдельном release-каталоге выполнить `bun install --frozen-lockfile`: требуется `lru-cache@11.5.3`. Не загружать новый `stashResult` раньше `resultStore` и зависимостей. Зафиксировать абсолютный `HYPER_INSTANCE_DATA_ROOT`, доступный серверному пользователю на запись; смена cwd или настройки сама файлы не переносит. Для нескольких серверов с общей БД нужен общий доступ к тому же хранилищу.
+2. В отдельном release-каталоге выполнить `bun install --frozen-lockfile`: требуется `lru-cache@11.5.3`. Не загружать новый `stashResult` раньше `resultStore` и зависимостей. Зафиксировать абсолютный `MAUZCODE_INSTANCE_DATA_ROOT`, доступный серверному пользователю на запись; смена cwd или настройки сама файлы не переносит. Для нескольких серверов с общей БД нужен общий доступ к тому же хранилищу.
 3. Аддитивный этап схемы — `20330305120000_message_result_ref`: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS result_ref JSONB`. В runtime использовать `ctx.fns.procs.db.exec`; проверить `information_schema.columns` и учёт миграции в `_migrations`. Не запускать весь pending queue вслепую: он может содержать чужие миграции. Старый код совместим с добавленной nullable-колонкой.
 4. Проверенный по исходникам штатный startup: `bun run start` → `src/$main.ts` загружает функции и routes → lifecycle запускает секции `package.json.procs.prod` по порядку: `procs/db`, `procs/migrate`, затем `agent`, затем `procs/http`. Поэтому обычный startup применяет ВСЕ pending migrations до worker/HTTP; заранее проверить их полный список на целевой машине. При hot reload такого барьера нет: сначала схема и providers, потом persistence/readers и guards, последними `stashResult`/`run`. На период переключения остановить/дождаться активных писателей, иначе возможен storage-failure preview без полного вывода.
 5. Проверить малый inline и большой результат: persisted `result_ref`, чтение UUID авторизованным агентом, cold-cache чтение с диска, отказ чужому агенту, запрет HTTP-доступа к payloads; проверить права каталогов/файлов и backup. Только затем возобновить обычную нагрузку. Полный сброс scratchpad запрещён. Новая boot-only миграция удалит только legacy results/resultSeq после остановки всех писателей; остальные поля останутся.

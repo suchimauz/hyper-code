@@ -4,9 +4,9 @@
 // second question, so it is stored next to the first rather than re-derived from
 // a mount table that may have changed since the index was written.
 //
-//   core      src/ and .hyper/ of this repository
+//   core      src/ and .mauzcode/ of this repository
 //   official  plugins/* — shipped and committed here
-//   user      ~/.hyper/user/* — private, mounted per machine, NOT in this repo
+//   user      ~/.mauzcode/user/* — private, mounted per machine, NOT in this repo
 //   external  cloned from a git url
 const upSql = `
 ALTER TABLE code_functions ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'core';

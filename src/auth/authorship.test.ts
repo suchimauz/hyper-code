@@ -87,7 +87,7 @@ test("buildLlmRequest sends the prefix and the one-line explanation to the model
 });
 
 test("control-plane instance shows the author badge even with a single user", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_OIDC_ISSUER: "https://cp.example" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_OIDC_ISSUER: "https://cp.example" } });
     const nik = await ctx.fns.auth.createUser({ name: "Nikolai Ryzhikov", email: "niquola@health-samurai.io", password: "password-123" });
     const html = await ctx.fns.auth.badge({ userId: nik.id });
     expect(html).toContain("Nikolai Ryzhikov");
@@ -95,7 +95,7 @@ test("control-plane instance shows the author badge even with a single user", as
 });
 
 test("photo from the ID token's picture claim is stored and shown as the avatar", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_OIDC_ISSUER: "https://cp.example" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_OIDC_ISSUER: "https://cp.example" } });
     const u = await ctx.fns.auth.linkIdentity({ provider: "oidc", sub: "val", email: "valeria@health-samurai.io", name: "Valeria F", picture: "https://lh3.googleusercontent.com/a/v=s96-c" });
     expect(u?.picture).toBe("https://lh3.googleusercontent.com/a/v=s96-c");
     // a later sign-in without a photo keeps it; a non-https photo is ignored

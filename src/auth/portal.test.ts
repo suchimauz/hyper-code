@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 
-// Portal trust: the hypermesh hub adds X-Hn-Assertion, a short JWT signed with the control plane's
+// Portal trust: the mauzcodemesh hub adds X-Hn-Assertion, a short JWT signed with the control plane's
 // OIDC keys. A local fake issuer serves discovery + JWKS with one RSA and one EC key.
-const AUD = "hn:hr/studio/hyper";
+const AUD = "hn:hr/studio/mauzcode";
 let server: ReturnType<typeof Bun.serve>;
 let issuer = "";
 let rsa: CryptoKeyPair;
@@ -43,40 +43,40 @@ async function sign(claims: Record<string, unknown>, opts: { alg?: "RS256" | "ES
     return `${head}.${body}.${Buffer.from(sig).toString("base64url")}`;
 }
 
-async function hyper(env: Record<string, string> = {}) {
-    const ctx = await mkTestCtx({ env: { HYPER_PORTAL_TRUST: "true", HYPER_PORTAL_AUDIENCE: AUD, HYPER_PORTAL_ISSUER: issuer, ...env } });
+async function mauzcode(env: Record<string, string> = {}) {
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PORTAL_TRUST: "true", MAUZCODE_PORTAL_AUDIENCE: AUD, MAUZCODE_PORTAL_ISSUER: issuer, ...env } });
     // An owner with a password, so the instance requires sign-in like a real deployment.
     await ctx.fns.auth.createUser({ name: "Nik", email: "niquola@health-samurai.io", password: "password-123" });
     return ctx;
 }
 const req = (assertion?: string, extra: Record<string, string> = {}) =>
-    new Request("https://hyper.example/agent/ab", { headers: { accept: "text/html", ...(assertion ? { "x-hn-assertion": assertion } : {}), ...extra } });
+    new Request("https://mauzcode.example/agent/ab", { headers: { accept: "text/html", ...(assertion ? { "x-hn-assertion": assertion } : {}), ...extra } });
 
 test("valid RS256 assertion signs in and auto-creates a member", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const who = await ctx.fns.auth.currentUser({ req: req(await sign({})) });
     expect(who.user?.email).toBe("anna@health-samurai.io");
     expect(who.user?.role).toBe("member");
     expect(who.required).toBe(true);
-    const page = await ctx.fns.procs.http.dispatch({ method: "GET", url: "https://hyper.example/auth/session", headers: { "x-hn-assertion": await sign({}) } });
+    const page = await ctx.fns.procs.http.dispatch({ method: "GET", url: "https://mauzcode.example/auth/session", headers: { "x-hn-assertion": await sign({}) } });
     expect(page.status).not.toBe(303);
 });
 
 test("ES256 assertion is accepted; the same person maps to the same user", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const a = await ctx.fns.auth.currentUser({ req: req(await sign({})) });
     const b = await ctx.fns.auth.currentUser({ req: req(await sign({ iat: Math.floor(Date.now() / 1000) - 1 }, { alg: "ES256" })) });
     expect(b.user?.id).toBe(a.user?.id);
 });
 
-test("first portal user on an empty Hyper is a member, never the owner", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_PORTAL_TRUST: "true", HYPER_PORTAL_AUDIENCE: AUD, HYPER_PORTAL_ISSUER: issuer } });
+test("first portal user on an empty MauzCode is a member, never the owner", async () => {
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PORTAL_TRUST: "true", MAUZCODE_PORTAL_AUDIENCE: AUD, MAUZCODE_PORTAL_ISSUER: issuer } });
     const who = await ctx.fns.auth.currentUser({ req: req(await sign({})) });
     expect(who.user?.role).toBe("member");
 });
 
 test("an existing user is linked by email and keeps their role", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const [nik] = await ctx.fns.auth.listUsers({});
     const who = await ctx.fns.auth.currentUser({ req: req(await sign({ sub: "p-nik", email: "niquola@health-samurai.io", name: "Nikolai" })) });
     expect(who.user?.id).toBe(nik.id);
@@ -84,7 +84,7 @@ test("an existing user is linked by email and keeps their role", async () => {
 });
 
 test("forged signature is rejected: redirect to login", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const forged = await sign({}, { key: attacker.privateKey });
     expect((await ctx.fns.auth.currentUser({ req: req(forged) })).user).toBeNull();
     // Tampered payload with a genuine signature of another payload.
@@ -95,26 +95,26 @@ test("forged signature is rejected: redirect to login", async () => {
     const none = `${b64({ alg: "none", kid: "rsa1" })}.${b64({ iss: issuer, aud: AUD, sub: "x", email: "x@x.io", exp: Math.floor(Date.now() / 1000) + 60 })}.`;
     expect((await ctx.fns.auth.currentUser({ req: req(none) })).user).toBeNull();
     expect((await ctx.fns.auth.currentUser({ req: req(await sign({}, { alg: "ES256", kid: "rsa1" })) })).user).toBeNull();
-    const res = await ctx.fns.procs.http.dispatch({ method: "GET", url: "https://hyper.example/agent/ab", headers: { accept: "text/html", "x-hn-assertion": forged } });
+    const res = await ctx.fns.procs.http.dispatch({ method: "GET", url: "https://mauzcode.example/agent/ab", headers: { accept: "text/html", "x-hn-assertion": forged } });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toStartWith("/auth/login");
 });
 
 test("wrong audience or wrong issuer is ignored", async () => {
-    const ctx = await hyper();
-    expect((await ctx.fns.auth.currentUser({ req: req(await sign({ aud: "hn:cs/studio/hyper" })) })).user).toBeNull();
+    const ctx = await mauzcode();
+    expect((await ctx.fns.auth.currentUser({ req: req(await sign({ aud: "hn:cs/studio/mauzcode" })) })).user).toBeNull();
     expect((await ctx.fns.auth.currentUser({ req: req(await sign({ iss: "https://evil.example" })) })).user).toBeNull();
 });
 
 test("expired assertion, or one valid for more than 120 s, is rejected", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const now = Math.floor(Date.now() / 1000);
     expect((await ctx.fns.auth.currentUser({ req: req(await sign({ iat: now - 300, exp: now - 60 })) })).user).toBeNull();
     expect((await ctx.fns.auth.currentUser({ req: req(await sign({ exp: now + 3600 })) })).user).toBeNull();
 });
 
 test("disabled user stays blocked even with a valid assertion, also after it was cached", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const assertion = await sign({});
     const first = await ctx.fns.auth.currentUser({ req: req(assertion) });
     expect(first.user).not.toBeNull();
@@ -124,29 +124,29 @@ test("disabled user stays blocked even with a valid assertion, also after it was
 });
 
 test("bare X-Hn-* headers are never trusted", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const who = await ctx.fns.auth.currentUser({ req: req(undefined, { "x-hn-user": "niquola@health-samurai.io", "x-hn-email": "niquola@health-samurai.io" }) });
     expect(who.user).toBeNull();
     expect(who.required).toBe(true);
 });
 
 test("mode off (default): a valid assertion changes nothing", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_PORTAL_AUDIENCE: AUD, HYPER_PORTAL_ISSUER: issuer } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_PORTAL_AUDIENCE: AUD, MAUZCODE_PORTAL_ISSUER: issuer } });
     await ctx.fns.auth.createUser({ name: "Nik", email: "niquola@health-samurai.io", password: "password-123" });
     const who = await ctx.fns.auth.currentUser({ req: req(await sign({})) });
     expect(who.user).toBeNull();
     expect(await ctx.fns.auth.listUsers({ includeDisabled: true })).toHaveLength(1);
 });
 
-// Popups (Files, previews…) post to /rpc. It used its own cookie-only check, so on a portal-trust Hyper every
+// Popups (Files, previews…) post to /rpc. It used its own cookie-only check, so on a portal-trust MauzCode every
 // popup answered 401 while the pages around it opened fine.
 test("portal trust: /rpc works with the assertion and the page's csrf token, no cookie", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const assertion = await sign({});
     const csrf = await ctx.fns.auth.csrfToken({ req: req(assertion) });
     expect(csrf.length).toBeGreaterThan(20);
     const rpc = (headers: Record<string, string>) => ctx.fns.procs.http.dispatch({
-        method: "POST", url: "https://hyper.example/rpc",
+        method: "POST", url: "https://mauzcode.example/rpc",
         headers: { "content-type": "application/json", ...headers },
         body: JSON.stringify({ method: "auth.slug", params: { name: "Anna Petrova" } }),
     });

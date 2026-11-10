@@ -25,7 +25,7 @@ export default async function (
     const endpoint=await ctx.fns.sshInstance.validate(opts);
     if((await ctx.fns.sshInstance.list({})).some(r=>r.name===endpoint.name)) throw new Error('Instance name already exists');
     const id=crypto.randomUUID(); const p=await ctx.fns.sshInstance.paths({id});
-    const child=Bun.spawn(['ssh-keygen','-q','-t','ed25519','-N','','-C','hyper:'+endpoint.name,'-f',p.key],{stdout:'pipe',stderr:'pipe'});
+    const child=Bun.spawn(['ssh-keygen','-q','-t','ed25519','-N','','-C','mauzcode:'+endpoint.name,'-f',p.key],{stdout:'pipe',stderr:'pipe'});
     if(await child.exited!==0) throw new Error('Local Ed25519 key generation failed');
     const fs=await import('node:fs/promises'); await fs.chmod(p.key,0o600);
     const publicKey=(await fs.readFile(p.key+'.pub','utf8')).trim();

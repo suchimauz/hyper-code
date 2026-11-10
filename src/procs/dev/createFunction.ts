@@ -6,7 +6,7 @@ export default async function (
     ctx: Context,
     _session: Session | null,
     opts: {
-        /** Source root: src, .hyper, plugin:<mounted-name> (official/user), or plugins/<name>/src (official). @default src */
+        /** Source root: src, .mauzcode, plugin:<mounted-name> (official/user), or plugins/<name>/src (official). @default src */
         root?: string;
         /** Slash-separated module path, such as `gmail` or `runtime/docs`. */
         module: string;
@@ -43,7 +43,7 @@ export default async function (
     if (opts.activate === false && opts.index) throw new TypeError("createFunction: activate:false cannot index");
     const project = ctx.fns.procs.project.projectRoot({});
     let rootDir = join(project, root);
-    if (root !== "src" && root !== ".hyper") {
+    if (root !== "src" && root !== ".mauzcode") {
         if (!/^(plugin:[a-z][a-z0-9-]*|plugins\/[a-z][a-z0-9-]*\/src)$/.test(root)) throw new TypeError("createFunction: invalid runtime root");
         const roots = await ctx.fns.procs.modules.discover({});
         const selected = roots.find(r => !r.prefix && (r.source === "official" || r.source === "user") && (root.startsWith("plugin:") ? r.name === root.slice(7) : r.source === "official" && r.dir === rootDir));

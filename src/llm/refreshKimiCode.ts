@@ -42,7 +42,7 @@ export default async function (ctx: Context, _session: Session | null, opts?: {
         method: "POST",
         headers: {
             "content-type": "application/x-www-form-urlencoded",
-            "X-Msh-Platform": "hyper-code2",
+            "X-Msh-Platform": "mauzcode",
             "X-Msh-Version": "0.1",
             "X-Msh-Device-Id": readDeviceId(home),
         },
@@ -83,7 +83,7 @@ export default async function (ctx: Context, _session: Session | null, opts?: {
 
 function readDeviceId(home: string): string {
     try { return readFileSync(`${home}/.kimi/device_id`, "utf8").trim(); }
-    catch { return "hyper-code2"; }
+    catch { return "mauzcode"; }
 }
 
 function decodeJwtExp(token: string): number | null {

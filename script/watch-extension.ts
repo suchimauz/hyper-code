@@ -31,7 +31,7 @@ async function reload() {
     String(target.url).endsWith("/worker.js")
   );
   if (!worker?.webSocketDebuggerUrl) {
-    throw new Error("Hyper extension worker is not active; open its sidebar once and retry");
+    throw new Error("MauzCode extension worker is not active; open its sidebar once and retry");
   }
   await cdp(worker.webSocketDebuggerUrl, "Runtime.evaluate", {
     expression: "chrome.runtime.reload()",

@@ -22,6 +22,6 @@ export default async function (
     const days = opts.days ?? 30;
     const token = await ctx.fns.procs.auth.sign({ sub: opts.user.id, name: opts.user.name, email: opts.user.email ?? undefined, role: opts.user.role, days });
     const forwardedProto = opts.req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-    const cookieURL = forwardedProto === "https" ? "https://hyper.invalid/" : opts.req.url;
+    const cookieURL = forwardedProto === "https" ? "https://mauzcode.invalid/" : opts.req.url;
     return ctx.fns.procs.auth.cookie({ token, url: cookieURL, days });
 }

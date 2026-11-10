@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { WorkspaceViewMenu, defaultWorkspaceView } from '../components/hyper/WorkspaceViewMenu';
+import { WorkspaceViewMenu, defaultWorkspaceView } from '../components/mauzcode/WorkspaceViewMenu';
 import { readWorkspaceView, saveWorkspaceView, workspaceParent, workspaceViewProjects } from '../lib/workspaceView';
 import type { NavigationProject } from '../lib/navigation';
 const chat = (id: string, time: number, archived = false) => ({ id, title: id, model: '', runState: 'idle', hasUnread: false, lastReplyAt: time, archived });
@@ -14,7 +14,7 @@ afterEach(() => localStorage.clear());
 it('persists validated view preferences and handles malformed storage', () => {
   saveWorkspaceView({ group: 'flat', order: 'manual', filter: 'all' });
   expect(readWorkspaceView()).toEqual({ group: 'flat', order: 'manual', filter: 'all' });
-  localStorage.setItem('hyper.workspace-view', 'not json');
+  localStorage.setItem('mauzcode.workspace-view', 'not json');
   expect(readWorkspaceView()).toEqual(defaultWorkspaceView);
 });
 it('sorts by real reply time and preserves archived flags in mixed mode without mutating data', () => {

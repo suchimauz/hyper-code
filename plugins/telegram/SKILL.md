@@ -5,7 +5,7 @@ description: "Personal Telegram client over MTProto — find chats by title or u
 
 # Telegram
 
-Read-only access to the user's personal Telegram account through GramJS/MTProto. The API credentials and authorized StringSession stay in 1Password vault `hyper`; they are never returned by plugin functions.
+Read-only access to the user's personal Telegram account through GramJS/MTProto. The API credentials and authorized StringSession stay in 1Password vault `mauzcode`; they are never returned by plugin functions.
 
 ## Functions
 
@@ -20,7 +20,7 @@ Read-only access to the user's personal Telegram account through GramJS/MTProto.
 - `telegram.folder({ id })` — chats explicitly included in a folder.
 - `telegram.participants({ chat, limit? })` — members of a group/channel.
 
-- `telegram.reauth({ timeoutMs?, force? })` — idempotent login check. By default it returns `alreadyAuthorized: true` without opening a popup when the saved session is valid. If the session is invalid, it asks for the Telegram code and optional 2FA password in a browser popup and writes the resulting StringSession directly to 1Password vault `hyper`. Use `force: true` only for explicit credential rotation. Cancel terminates the entire login attempt.
+- `telegram.reauth({ timeoutMs?, force? })` — idempotent login check. By default it returns `alreadyAuthorized: true` without opening a popup when the saved session is valid. If the session is invalid, it asks for the Telegram code and optional 2FA password in a browser popup and writes the resulting StringSession directly to 1Password vault `mauzcode`. Use `force: true` only for explicit credential rotation. Cancel terminates the entire login attempt.
 
 The live MTProto client and session are internal and are never returned by plugin functions.
 
@@ -56,4 +56,4 @@ await ctx.fns.telegram.messages({ chat: "-1001951583351", max: 30 });
 
 ## Browser UI
 
-The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["overview"], "applications": {"/telegram": "overview"}}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "telegram" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["overview"], "applications": {"/telegram": "overview"}}). MauzCode builds and loads it at runtime; after editing it run `plugins.reload({ name: "telegram" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

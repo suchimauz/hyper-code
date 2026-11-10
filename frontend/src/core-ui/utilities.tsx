@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Panel, Stack, requestJson, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, Stack, requestJson, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 
 const models = ['codex:gpt-6-luna', 'claude-code:claude-haiku-4-5', 'codex:gpt-5.6-luna', 'groq:openai/gpt-oss-20b', 'groq:openai/gpt-oss-120b', 'groq:qwen/qwen3.8-27b', 'openrouter:z-ai/glm-5.3-flash'];
 function Autotext({ context }: ExtensionViewProps) {

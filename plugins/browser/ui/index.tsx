@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Panel, TextField, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, TextField, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 type Meta={deviceWidth?:number;deviceHeight?:number;pageScaleFactor?:number;offsetTop?:number};
 export function BrowserLive({context}:ExtensionViewProps){
  const canvas=useRef<HTMLCanvasElement>(null),socket=useRef<WebSocket|null>(null),meta=useRef<Meta>({}),[connected,setConnected]=useState(false),[control,setControl]=useState(false),[status,setStatus]=useState('Disconnected'),[tabs,setTabs]=useState<{id:string;title:string;url:string}[]>([]),[target,setTarget]=useState(new URLSearchParams(location.search).get('target')??''),[address,setAddress]=useState(''),[text,setText]=useState(''),[quality,setQuality]=useState('auto');

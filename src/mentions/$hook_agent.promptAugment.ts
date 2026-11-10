@@ -1,4 +1,4 @@
-// Tells the agent who it can @mention. Only on a shared Hyper (two or more people); the block is identical
+// Tells the agent who it can @mention. Only on a shared MauzCode (two or more people); the block is identical
 // turn to turn, so agent.syncWorldState sends it once and again only when the people change.
 /** Answers agent.promptAugment with the people the agent can address with @id in its reply.
  * @param opts.agentId Agent whose turn is being prepared.

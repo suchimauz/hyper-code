@@ -1,4 +1,4 @@
-import type { ExtensionLauncherProps, UiExtension } from '@hyper/ui';
+import type { ExtensionLauncherProps, UiExtension } from '@mauzcode/ui';
 import { TerminalView } from './TerminalView';
 
 /** One Start-page tab: a shell bound to the chat's local workspace, alive while the tab exists. */

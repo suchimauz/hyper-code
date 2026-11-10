@@ -18,7 +18,7 @@ async function rows(ctx: any) {
 describe('boot-only legacy scratchpad cleanup (isolated Postgres)', () => {
     test('removes only two top-level keys, preserves plans/flags/precision and skips invalid/non-objects byte-for-byte; replay is harmless', async () => {
         const ctx = await mkTestCtx();
-        expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('hyper_test_');
+        expect(new URL(ctx.env.DATABASE_URL).pathname).toContain('mauzcode_test_');
         const unchanged = ['{}', ' { "plan": {"title":"keep"}, "flag":true } ', '{broken', 'null', '[{"results":"keep"}]', '"text"', '42', 'true', '', '{"results":1,"other":"\\u0000"}'];
         for (const [i, value] of unchanged.entries()) await seed(ctx, `skip${i}`, value);
         await seed(ctx, 'both', '{"results":{"r1":"large"},"resultSeq":9,"plan":{"title":"keep","results":"nested"},"planHistory":[1],"flag":true,"n":9007199254740993}');

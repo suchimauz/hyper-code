@@ -7,7 +7,7 @@ afterEach(() => { globalThis.fetch = originalFetch; });
 
 async function makeCtx() {
     return await mkTestCtx({ env: {
-        HYPER_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
+        MAUZCODE_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
         ANTHROPIC_OAUTH_REDIRECT_URI: "http://localhost:53692/callback",
     } });
 }

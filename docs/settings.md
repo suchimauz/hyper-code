@@ -7,13 +7,13 @@ the value for the whole instance lives in exactly **one** place, and you can alw
 
 ```ts
 // src/nav/$setting_pages.ts          → key nav.pages
-// ~/.hyper/user/hetzner/src/hetzner/$setting_projects.ts → key hetzner.projects
+// ~/.mauzcode/user/hetzner/src/hetzner/$setting_projects.ts → key hetzner.projects
 export default {
     type: "json",          // string | text | number | boolean | enum | json | secret
     default: undefined,    // value when nothing else sets it
     title: "Menu pages",
     description: "What it does, what values mean, where it is usually set.",
-    // env?: "HYPER_X", options?: [...] (enum), min?/max? (number)
+    // env?: "MAUZCODE_X", options?: [...] (enum), min?/max? (number)
 };
 ```
 
@@ -24,7 +24,7 @@ page and agents read it.
 ## 2. Fix a value for the instance — `$settings_<module>.json` (files of this instance)
 
 ```
-~/.hyper/settings/                 # env HYPER_SETTINGS overrides the directory
+~/.mauzcode/settings/                 # env MAUZCODE_SETTINGS overrides the directory
   $settings_nav.json               # { "pages": ["search", "settings", "plugins"] }
   $settings_hetzner.json           # { "projects": [...] }
 ```
@@ -45,7 +45,7 @@ page and agents read it.
 
 Resolution for `settings.get({ module, scopeType: "global", key })`:
 
-1. instance file `~/.hyper/settings/$settings_<module>.json`
+1. instance file `~/.mauzcode/settings/$settings_<module>.json`
 2. database row (set from the UI or `settings.set`)
 3. `env` named in the declaration
 4. declared `default`
@@ -62,16 +62,16 @@ the `<name>` of its `$app_<name>.json` (`src/$app_search.json` → `search`, `sr
 ids are skipped (a disabled plugin never breaks the list). Hiding a page does not block access to it.
 
 ```json
-// ~/.hyper/settings/$settings_nav.json
+// ~/.mauzcode/settings/$settings_nav.json
 { "pages": ["search", "settings", "plugins", "people", "cron"] }
 ```
 
 List the ids: `Object.keys(ctx.state.nav.apps)`.
 
-**A plugin's own setting** — declare `~/.hyper/user/lisboalive/src/lisboalive/$setting_home.ts`, then fix it
-for the instance in `~/.hyper/settings/$settings_lisboalive.json` as `{ "home": "Cascais" }`.
+**A plugin's own setting** — declare `~/.mauzcode/user/lisboalive/src/lisboalive/$setting_home.ts`, then fix it
+for the instance in `~/.mauzcode/settings/$settings_lisboalive.json` as `{ "home": "Cascais" }`.
 
 ## Not yet in files
 
 `nav.layout` (menu tabs and widgets) and `dock.layout` still keep their instance value in the database or env
-(`HYPER_NAV`, `HYPER_DOCK`); moving them to files is a separate migration.
+(`MAUZCODE_NAV`, `MAUZCODE_DOCK`); moving them to files is a separate migration.

@@ -1,5 +1,5 @@
 /**
- * Remove a configured Hyper node and its stored token
+ * Remove a configured MauzCode node and its stored token
  * @param opts.name Node name.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { /** Node name. */ name: string }): Promise<{ removed: boolean }> {

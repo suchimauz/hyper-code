@@ -20,6 +20,6 @@ describe("files.stat", () => {
 
     test("returns null for missing path", async () => {
         const ctx = await mkTestCtx();
-        expect(await ctx.fns.files.stat({ path: ".hyper/nope-" + Math.random().toString(36).slice(2) })).toBeNull();
+        expect(await ctx.fns.files.stat({ path: ".mauzcode/nope-" + Math.random().toString(36).slice(2) })).toBeNull();
     });
 });

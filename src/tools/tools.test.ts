@@ -217,14 +217,14 @@ describe('bash options', () => {
         const pwd = await ctx.fns.tools.call({ name: 'bash', args: { command: 'pwd', cwd: '/tmp' } });
         expect(pwd.output).toContain('/tmp');
 
-        const env = await ctx.fns.tools.call({ name: 'bash', args: { command: 'echo "[$HYPER_TEST]"', env: { HYPER_TEST: 'yes' } } });
+        const env = await ctx.fns.tools.call({ name: 'bash', args: { command: 'echo "[$MAUZCODE_TEST]"', env: { MAUZCODE_TEST: 'yes' } } });
         expect(env.output).toContain('[yes]');
 
-        ctx.env.HYPER_SECRET_TEST = 'very-secret-value';
+        ctx.env.MAUZCODE_SECRET_TEST = 'very-secret-value';
         const secret = await ctx.fns.tools.call({ name: 'bash', args: {
             command: 'printf "%s" "$TOKEN"',
             env: { TOKEN: 'ordinary' },
-            secrets: { TOKEN: 'env://HYPER_SECRET_TEST' },
+            secrets: { TOKEN: 'env://MAUZCODE_SECRET_TEST' },
         } });
         expect(secret).toEqual({ output: '[REDACTED]', isError: false });
         expect(secret.output).not.toContain('very-secret-value');
@@ -250,7 +250,7 @@ describe('bash options', () => {
         expect(badName.output).toContain('invalid secret environment variable');
 
         const missing = await ctx.fns.tools.call({ name: 'bash', args: {
-            command: 'true', secrets: { TOKEN: 'env://HYPER_MISSING_SECRET' },
+            command: 'true', secrets: { TOKEN: 'env://MAUZCODE_MISSING_SECRET' },
         } });
         expect(missing.output).toContain('could not be resolved');
     });
@@ -258,11 +258,11 @@ describe('bash options', () => {
 
     test('redacts resolved secrets from both stdout and stderr', async () => {
         const ctx: any = await mkTestCtx();
-        ctx.env.HYPER_SECRET_TEST = 'secret-with-special-$-chars';
+        ctx.env.MAUZCODE_SECRET_TEST = 'secret-with-special-$-chars';
 
         const result = await ctx.fns.tools.call({ name: 'bash', args: {
             command: 'printf "%s" "$TOKEN"; printf "%s" "$TOKEN" >&2; exit 3',
-            secrets: { TOKEN: 'env://HYPER_SECRET_TEST' },
+            secrets: { TOKEN: 'env://MAUZCODE_SECRET_TEST' },
         } });
 
         expect(result.isError).toBe(true);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
-const changeEvent = 'hyper:workspace-expanded';
+const changeEvent = 'mauzcode:workspace-expanded';
 // Keep controls usable when browser storage is unavailable.
 const memory = new Map<string, string>();
 function subscribe(notify: () => void) {
@@ -14,7 +14,7 @@ function subscribe(notify: () => void) {
 
 /** Persist explicit choices across reloads; synchronize desktop and mobile sidebars. */
 export function useWorkspaceExpanded(projectId: string, initiallyOpen: boolean) {
-  const key = `hyper.ui.workspace.${projectId}`;
+  const key = `mauzcode.ui.workspace.${projectId}`;
   const [defaultOpen] = useState(initiallyOpen);
   useEffect(() => {
     try {

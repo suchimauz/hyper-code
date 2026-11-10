@@ -4,7 +4,7 @@ import loader from "./$loader_app";
 import items from "./items";
 
 async function tempApp(value: Record<string, any>) {
-    const path = `/tmp/hyper-app-${crypto.randomUUID()}.json`;
+    const path = `/tmp/mauzcode-app-${crypto.randomUUID()}.json`;
     await Bun.write(path, JSON.stringify(value));
     return path;
 }

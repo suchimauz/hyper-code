@@ -23,7 +23,7 @@ function browser(protocol = 'http/1.1', visibility = 'visible') {
     runInNewContext(script, { window, document, EventSource: Source, performance: { getEntriesByType: () => [{ nextHopProtocol: protocol }] },
         console: { error: () => {} }, location: { reload: () => {} }, CustomEvent: class {},
         setTimeout: (fn: Function) => { timers.set(++timer, fn); return timer; }, clearTimeout: (id: number) => timers.delete(id) });
-    return { regions, live: window.hyperLive, document, handlers, sources, retry: () => { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(fn => fn()); } };
+    return { regions, live: window.mauzcodeLive, document, handlers, sources, retry: () => { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(fn => fn()); } };
 }
 
 test('transport status observes open/hello, loss, retry, hidden close; unsubscribe and stale callbacks are safe', () => {

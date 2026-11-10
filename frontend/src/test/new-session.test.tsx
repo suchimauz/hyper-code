@@ -1,13 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, useState } from 'react';
-import { NewSessionComposer } from '../components/hyper/NewSessionComposer';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
+import { NewSessionComposer } from '../components/mauzcode/NewSessionComposer';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
 import { readNewSessionDraft, type NewSessionDraft } from '../lib/newSession';
-import { ApiError } from '../lib/hyper';
-import { useHyper } from '../hooks/useHyper';
-vi.mock('../components/hyper/ModelPicker', () => ({ ModelPicker: ({ draft, onReadyChange }: { draft: { onChange: (m:string,e:string)=>void }; onReadyChange?: (ready: boolean) => void }) => { useEffect(() => { onReadyChange?.(true); }, [onReadyChange]); return <button onClick={() => draft.onChange('test:chosen','high')}>Choose model</button>; } }));
-vi.mock('../components/hyper/CrabMascot', () => ({ CrabMascot: () => null }));
+import { ApiError } from '../lib/mauzcode';
+import { useMauzCode } from '../hooks/useMauzCode';
+vi.mock('../components/mauzcode/ModelPicker', () => ({ ModelPicker: ({ draft, onReadyChange }: { draft: { onChange: (m:string,e:string)=>void }; onReadyChange?: (ready: boolean) => void }) => { useEffect(() => { onReadyChange?.(true); }, [onReadyChange]); return <button onClick={() => draft.onChange('test:chosen','high')}>Choose model</button>; } }));
+vi.mock('../components/mauzcode/CrabMascot', () => ({ CrabMascot: () => null }));
 vi.mock('../lib/newSession', async importOriginal => ({ ...await importOriginal<typeof import('../lib/newSession')>(), getNewSessionDefaults: vi.fn(async () => ({ defaultModel:'test:default',csrfToken:'token' })), submitNewSession: vi.fn() }));
 vi.mock('../lib/live', () => ({ loadLiveClient: async () => {} }));
 const projects = [{id:'p1',title:'First',dir:'/first',host:null,chats:[]}];
@@ -52,7 +52,7 @@ it('New Session action shows a local row without an agent id in its workspace', 
 });
 it('an empty selection never fetches agent events or auto-selects a pre-existing agent', async () => {
   const fetcher=vi.fn(async () => new Response(JSON.stringify({agents:[{id:'existing'}]}),{headers:{'content-type':'application/json'}})); vi.stubGlobal('fetch',fetcher);
-  function State(){ const hyper=useHyper(); return <span data-testid="selected">{hyper.selected || 'draft'}</span>; }
+  function State(){ const mauzcode=useMauzCode(); return <span data-testid="selected">{mauzcode.selected || 'draft'}</span>; }
   render(<State/>); await waitFor(()=>expect(fetcher).toHaveBeenCalled());
   expect(screen.getByTestId('selected')).toHaveTextContent('draft');
   expect(fetcher.mock.calls.every(args=> !String((args as unknown[])[0]).includes('/events'))).toBe(true);
@@ -65,5 +65,5 @@ it('catalog failure keeps a slash draft editable and never creates a session', a
   expect(await screen.findByRole('alert')).toHaveTextContent('catalog offline');
   expect(screen.getByRole('textbox')).toHaveAttribute('contenteditable', 'true'); expect(screen.getByRole('textbox')).toHaveTextContent('/plan task');
   expect(submitNewSession).not.toHaveBeenCalled(); expect(created).not.toHaveBeenCalled();
-  expect(sessionStorage.getItem('hyper-ui-new-session-pending')).toBeNull();
+  expect(sessionStorage.getItem('mauzcode-ui-new-session-pending')).toBeNull();
 });

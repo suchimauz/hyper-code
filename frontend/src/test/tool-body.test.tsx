@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ToolBody } from '../components/hyper/ToolBody';
+import { ToolBody } from '../components/mauzcode/ToolBody';
 const details = { idx: 1, ts: 1, type: 'tool_result', name: 'read', args: '{"path":"test.ts"}', argsTruncated: false, result: Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join('\n'), resultTruncated: false, isError: false };
 it('shows eight read lines first and keeps raw arguments in a separate disclosure', async () => {
   render(<ToolBody details={details} kind="read" args={{ path: 'test.ts' }} />);

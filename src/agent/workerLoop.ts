@@ -538,7 +538,7 @@ async function runOne(ctx: Context, agentId: string, runToken: string): Promise<
 // fired, and the person saw an agent that "hangs" after a reminder. A session
 // advisory lock on a reserved connection makes the second process a standby:
 // it serves HTTP but claims nothing until the holder's connection is gone.
-const WORKER_LOCK_KEY = 'hyper.agent.workerLoop';
+const WORKER_LOCK_KEY = 'mauzcode.agent.workerLoop';
 const LOCK_CHECK_MS = 10_000;
 
 async function holdWorkerLock(ctx: Context): Promise<boolean> {

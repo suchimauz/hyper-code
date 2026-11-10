@@ -40,8 +40,8 @@ export function useNavigation() {
       }) }));
       live.refresh();
     };
-    window.addEventListener('hyper-ui:read', read);
-    return () => { live.dispose(); window.removeEventListener('hyper-ui:read', read); };
+    window.addEventListener('mauzcode-ui:read', read);
+    return () => { live.dispose(); window.removeEventListener('mauzcode-ui:read', read); };
   }, []);
   useEffect(() => {
     const controller = new AbortController();

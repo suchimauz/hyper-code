@@ -31,16 +31,16 @@ export default async function (
     const diagnostics = flow.diagnostics = {startedAt:Date.now(),endedAt:null,exitCode:null,reason:null,httpCode:null,stages:[{phase:'ssh-preflight',startedAt:Date.now(),endedAt:null,exitCode:null}]} as NonNullable<types.sshAccount.LoginFlow['diagnostics']>;
     // The shell owns stdout; CLI output is routed exclusively to stderr. A per-flow
     // marker and exact grammar prevent provider output from becoming diagnostics.
-    const marker = 'HYPER_LOGIN_' + crypto.randomUUID().replaceAll('-','');
+    const marker = 'MAUZCODE_LOGIN_' + crypto.randomUUID().replaceAll('-','');
     const cli = opts.provider === 'codex' ? 'codex' : 'claude';
-    const root = '.hyper/ssh-accounts/' + opts.provider + '/' + opts.account;
+    const root = '.mauzcode/ssh-accounts/' + opts.provider + '/' + opts.account;
     const script = [
      'set -eu', 'umask 077',
      `stage() { printf '${marker}:%s:%s\\n' "$1" "$2"; }`,
      `finish() { rc=$?; if test -n "\${browser_reader:-}"; then kill "$browser_reader" 2>/dev/null || :; wait "$browser_reader" 2>/dev/null || :; fi; if test -n "\${browser_pipe:-}"; then rm -f "$browser_pipe"; fi; stage exit "$rc"; }; trap finish EXIT`,
      'PATH="$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"', 'cli=$(command -v '+cli+')',
      'root="$HOME/'+root+'"',
-     'for p in "$HOME/.hyper" "$HOME/.hyper/ssh-accounts" "$HOME/.hyper/ssh-accounts/'+opts.provider+'" "$root" "$root/.codex" "$root/.claude" "$root/no-browser" "$root/no-browser.url-pipe" "$root/.codex/auth.json" "$root/.claude/.credentials.json"; do test ! -L "$p" || exit 1; done',
+     'for p in "$HOME/.mauzcode" "$HOME/.mauzcode/ssh-accounts" "$HOME/.mauzcode/ssh-accounts/'+opts.provider+'" "$root" "$root/.codex" "$root/.claude" "$root/no-browser" "$root/no-browser.url-pipe" "$root/.codex/auth.json" "$root/.claude/.credentials.json"; do test ! -L "$p" || exit 1; done',
      'mkdir -p "$root/.codex" "$root/.claude"',
      'chmod 700 "$root" "$root/.codex" "$root/.claude"',
      'helper="$root/no-browser"',

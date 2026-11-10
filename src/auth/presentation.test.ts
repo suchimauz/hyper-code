@@ -10,7 +10,7 @@ function context(overrides: Record<string, unknown> = {}): any {
     page: ({ body }: { body: string }) => new Response(body), ...overrides,
   }, procs: { ui: { escape: ({ text }: { text: string }) => Bun.escapeHTML(text) } } } };
 }
-const request = (path: string, json = true) => ({ req: new Request('https://hyper.test/auth/' + path, { headers: { accept: json ? 'application/json' : 'text/html' } }), params: {} });
+const request = (path: string, json = true) => ({ req: new Request('https://mauzcode.test/auth/' + path, { headers: { accept: json ? 'application/json' : 'text/html' } }), params: {} });
 
 test('login JSON contains public presentation only and preserves next', async () => {
   const response = await login(context({ googleConfig: async () => ({ domain: 'test', clientSecret: 'SECRET' }) }), null, request('login?next=%2Fauth%2Fmobile%2Fcomplete'));

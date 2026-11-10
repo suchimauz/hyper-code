@@ -29,4 +29,4 @@ Tests: `bun test --no-isolate plugins/icons/src/icons/icons.test.ts` (offline, n
 
 ## Browser UI
 
-The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "canvasKinds": ["icons.browser"]}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "icons" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "canvasKinds": ["icons.browser"]}). MauzCode builds and loads it at runtime; after editing it run `plugins.reload({ name: "icons" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getEvents, requestJson, type ChatEvent, type EventPage } from '../lib/hyper';
-import type { ChatNavigationItem } from '../components/hyper/ChatNavigation';
+import { getEvents, requestJson, type ChatEvent, type EventPage } from '../lib/mauzcode';
+import type { ChatNavigationItem } from '../components/mauzcode/ChatNavigation';
 
 /** Fetch prompt-only pages; pagination is bounded by a strictly advancing cursor. */
 export async function fetchChatOutline(id: string, signal: AbortSignal): Promise<ChatNavigationItem[]> {

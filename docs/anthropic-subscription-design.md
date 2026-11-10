@@ -1,6 +1,6 @@
 # Managed Anthropic subscription design
 
-Status: implemented architecture and rationale for hyper-code2, based on `docs/anthropic-subscription-pi-mono.md`.
+Status: implemented architecture and rationale for mauzcode, based on `docs/anthropic-subscription-pi-mono.md`.
 
 ## Goals
 
@@ -8,7 +8,7 @@ The implementation provides a managed Claude Pro/Max OAuth connection without ch
 
 - `anthropic:<model>` remains Anthropic API-key billing.
 - `claude-code:<model>` remains reuse of the official Claude CLI's macOS Keychain credential.
-- `anthropic-oauth:<model>` uses credentials obtained, encrypted and stored by hyper-code2.
+- `anthropic-oauth:<model>` uses credentials obtained, encrypted and stored by mauzcode.
 
 All three use the existing Anthropic Messages streamer and canonical transcript/tool loop. Authentication source and OAuth request identity are explicit provider properties, not inferred solely from token text.
 
@@ -64,13 +64,13 @@ Only `provider`, expiry, non-sensitive scopes/metadata, version, and timestamps 
 
 ### Encryption at rest
 
-Encrypt access and refresh tokens independently with AES-256-GCM using Web Crypto. Store a versioned envelope containing random 96-bit IV, ciphertext, and authentication tag. Bind ciphertext with AAD containing at least `hyper-code2/oauth-credential/v1/<provider>/<field>` so values cannot be swapped between providers or fields.
+Encrypt access and refresh tokens independently with AES-256-GCM using Web Crypto. Store a versioned envelope containing random 96-bit IV, ciphertext, and authentication tag. Bind ciphertext with AAD containing at least `mauzcode/oauth-credential/v1/<provider>/<field>` so values cannot be swapped between providers or fields.
 
 The encryption key must not live in Postgres. Resolution order:
 
-1. `HYPER_OAUTH_ENCRYPTION_KEY` — base64url/base64 32-byte key.
+1. `MAUZCODE_OAUTH_ENCRYPTION_KEY` — base64url/base64 32-byte key.
 2. A configured external secret reference resolved through `ctx.fns.secrets` (for example `op://...`).
-3. Local-only fallback file `~/.hyper-code2/oauth.key`, generated from 32 cryptographically random bytes, parent mode `0700`, file mode `0600`.
+3. Local-only fallback file `~/.mauzcode/oauth.key`, generated from 32 cryptographically random bytes, parent mode `0700`, file mode `0600`.
 
 The fallback provides pi-mono-equivalent local security while keeping database backups free of plaintext tokens. Production documentation should recommend env/1Password and stable key backup. If the key is unavailable or malformed, managed login/refresh fails closed with a generic message; existing API-key and CLI providers continue working.
 
@@ -150,7 +150,7 @@ On connect:
 3. Redirect/open the authorization URL.
 4. Callback validates path, state, error, and required code.
 5. Exchange and persist credentials.
-6. Return a small success page linking to hyper-code2's `/llms` page.
+6. Return a small success page linking to mauzcode's `/llms` page.
 7. Close the temporary listener in every terminal path and on timeout.
 
 The callback server must bind loopback only. It must reject non-GET requests, wrong paths, missing parameters, mismatched/expired state, and duplicate callbacks.
@@ -169,7 +169,7 @@ If supplied, state must match. The exchange always uses the fixed localhost redi
 Manual mode is necessary when:
 
 - port 53692 is occupied;
-- hyper-code2 runs remotely but the browser's localhost is a different machine;
+- mauzcode runs remotely but the browser's localhost is a different machine;
 - the browser shows an unreachable localhost callback whose final URL can still be copied.
 
 Errors shown in UI are sanitized categories such as `state mismatch`, `login expired`, `token exchange rejected`, or `connection unavailable`, never raw token-endpoint bodies.
@@ -189,7 +189,7 @@ Centralize the shared header construction so managed OAuth and CLI reuse cannot 
 
 ### Tool names
 
-Do not add pi-mono's canonical casing rewrite in the first implementation. hyper-code2 wire names (`functions.read`, etc.) are custom names and are already accepted by the current `claude-code` path. Partial suffix rewriting risks making declarations, replayed history, returned calls, and registry lookup disagree.
+Do not add pi-mono's canonical casing rewrite in the first implementation. mauzcode wire names (`functions.read`, etc.) are custom names and are already accepted by the current `claude-code` path. Partial suffix rewriting risks making declarations, replayed history, returned calls, and registry lookup disagree.
 
 If Anthropic rejects a specific custom name, add a separate reversible alias layer in `wireTools()` and response parsing, covered by transcript replay tests. Never mutate canonical names stored in Postgres.
 
@@ -216,7 +216,7 @@ LLM UI actions:
 - **Reconnect**: same as connect, replacing credentials only after successful exchange; existing credentials remain usable if a new login is abandoned.
 - **Disconnect**: confirmation POST that deletes only the `anthropic-oauth` credential row and clears pending login state/listener.
 
-Logout is local deletion. Since the reviewed flow has no revocation endpoint, UI copy must say it removes credentials from hyper-code2 and does not revoke other Claude sessions. Use POST plus existing application CSRF/same-origin conventions; never implement logout as GET.
+Logout is local deletion. Since the reviewed flow has no revocation endpoint, UI copy must say it removes credentials from mauzcode and does not revoke other Claude sessions. Use POST plus existing application CSRF/same-origin conventions; never implement logout as GET.
 
 ## Compatibility and precedence
 

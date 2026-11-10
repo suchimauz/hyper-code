@@ -7,7 +7,7 @@ import './page-viewport.css';
 
 /** Full-width scroll region with independently resizable, centered transcript and composer. */
 export function WidthViewport({ children, disabled = false, widthControlTarget, kind = 'chat' }: { children: ReactNode; disabled?: boolean; widthControlTarget?: HTMLElement | null; kind?: 'chat' | 'page' }) {
-  const KEY = kind === 'chat' ? 'hyper-ui.chat-content-width-v2' : 'hyper-ui.page-content-width-v1';
+  const KEY = kind === 'chat' ? 'mauzcode-ui.chat-content-width-v2' : 'mauzcode-ui.page-content-width-v1';
   const label = kind === 'chat' ? 'чата' : 'страницы';
   const root = useRef<HTMLDivElement>(null);
   const [column, setColumn] = useState(1250);

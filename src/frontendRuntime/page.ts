@@ -1,5 +1,5 @@
 /**
- * Serve the integrated React shell at the primary Hyper URL
+ * Serve the integrated React shell at the primary MauzCode URL
  *
  * Use after global authentication to proxy the root document to the managed Vite server. Internally marked legacy requests and API requests pass through unchanged.
  * @param opts.req Incoming browser request after the application authentication gate.

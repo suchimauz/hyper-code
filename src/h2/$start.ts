@@ -2,7 +2,7 @@
 // port (default 3443), next to the untouched plain-HTTP one on procs/http's port.
 //
 // Why: over HTTP/1.1 Chrome allows six connections per origin, and every visible
-// Hyper tab keeps one of them open for the live-update stream. Enough tabs and
+// MauzCode tab keeps one of them open for the live-update stream. Enough tabs and
 // ordinary requests queue behind those streams — pages stop loading scripts. HTTP/2
 // multiplexes every request of an origin over one connection, so the limit is gone.
 // Browsers only speak HTTP/2 over TLS, hence the certificate.
@@ -20,7 +20,7 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
     const on = (v: unknown) => !/^(0|false|off|no)$/i.test(String(v ?? "").trim());
     const port = Number(cfg.port);
     if (!on(cfg.enabled) || !port) {
-        ctx.fns.procs.log.info({ event: "h2.disabled", msg: "HTTPS off (HYPER_HTTPS) — plain HTTP only" });
+        ctx.fns.procs.log.info({ event: "h2.disabled", msg: "HTTPS off (MAUZCODE_HTTPS) — plain HTTP only" });
         return {};
     }
     const dir = `${ctx.fns.procs.project.runtimeDir({})}/tls`;

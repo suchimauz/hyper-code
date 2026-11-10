@@ -23,7 +23,7 @@ const CSP = [
 const json = (value: unknown) => JSON.stringify(value ?? null).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 
 /**
- * Builds the response for an html canvas tab's frame: the page with the window.hyper bridge, its state and
+ * Builds the response for an html canvas tab's frame: the page with the window.mauzcode bridge, its state and
  * fresh `load` data, under a sandboxing CSP header.
  * @param opts.agentId Agent whose canvas holds the tab.
  * @param opts.itemId The html tab.
@@ -46,12 +46,12 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         }
     }
     // The bridge comes first, as its own document head, so it runs before any page script.
-    const bridge = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%}body{font-family:system-ui,sans-serif}</style><script>(()=>{let state=${json(item.state)};const listeners=[];const send=m=>parent.postMessage(Object.assign({hyperCanvas:1},m),'*');
-window.hyper=Object.freeze({get state(){return state},data:${json(data)},
-setState(patch){if(!patch||typeof patch!=='object')throw new Error('hyper.setState: pass an object');state=Object.fromEntries(Object.entries({...state,...patch}).filter(([,v])=>v!==null));send({type:'state',state:patch});},
+    const bridge = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%}body{font-family:system-ui,sans-serif}</style><script>(()=>{let state=${json(item.state)};const listeners=[];const send=m=>parent.postMessage(Object.assign({mauzCodeCanvas:1},m),'*');
+window.mauzcode=Object.freeze({get state(){return state},data:${json(data)},
+setState(patch){if(!patch||typeof patch!=='object')throw new Error('mauzcode.setState: pass an object');state=Object.fromEntries(Object.entries({...state,...patch}).filter(([,v])=>v!==null));send({type:'state',state:patch});},
 ping(text,data){send({type:'ping',text:String(text??''),data});},
 onState(fn){listeners.push(fn);}});
-addEventListener('message',e=>{if(e.source!==parent||!e.data||e.data.hyperCanvas!==1||e.data.type!=='state')return;state=e.data.state||{};for(const fn of listeners){try{fn(state)}catch(err){console.error(err)}}});
+addEventListener('message',e=>{if(e.source!==parent||!e.data||e.data.mauzcodeCanvas!==1||e.data.type!=='state')return;state=e.data.state||{};for(const fn of listeners){try{fn(state)}catch(err){console.error(err)}}});
 addEventListener('error',e=>send({type:'error',message:String(e.message||e.error||'error')}));})();</script></head><body>`;
     return new Response(bridge + String(item.args.html ?? "") + "</body></html>", { headers });
 }

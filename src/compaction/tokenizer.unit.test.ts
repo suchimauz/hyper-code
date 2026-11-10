@@ -27,7 +27,7 @@ describe("compaction.tokenizerFor", () => {
         const cases: Array<[string, string, string?]> = [
             ["codex:gpt-5.5", "tiktoken-o200k"],
             ["ssh/aeza:codex/acc:gpt-6-astra", "tiktoken-o200k"],
-            ["hyper/mini:codex/acc:gpt-6.1-sol", "tiktoken-o200k"],
+            ["mauzcode/mini:codex/acc:gpt-6.1-sol", "tiktoken-o200k"],
             ["ssh/a:kimi-coding/T:kimi-for-coding", "tiktoken-kimi", "moonshotai/Kimi-K3"],
             ["ssh/a:kimi-coding/T:k3.1-pro", "tiktoken-kimi", "moonshotai/Kimi-K3"],
             ["oneapi:qwen3.8-flash-next", "hf", "Qwen/Qwen3.8-Flash-Next"],

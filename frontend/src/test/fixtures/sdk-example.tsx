@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Panel, TextField, requestJson, subscribeLive, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Dialog, Panel, TextField, requestJson, subscribeLive, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 
 /** Read-only dev/test fixture for the public SDK. Never install in the production registry. */
 function Overview({ context }: ExtensionViewProps) {
@@ -20,8 +20,8 @@ function Overview({ context }: ExtensionViewProps) {
     const stop = subscribeLive({ name: 'sdk-example', types: ['agents.changed'], onEvent: refresh, resync: refresh, onError: cause => setError(String(cause)) });
     return () => { disposed = true; controller?.abort(); stop(); };
   }, []);
-  return <div className="hyper-extension-demo"><div hidden data-live-topic="agents" />
-    <Panel title="Пример публичного SDK"><p>Это доверенное React-расширение использует только публичный @hyper/ui.</p>
+  return <div className="mauzcode-extension-demo"><div hidden data-live-topic="agents" />
+    <Panel title="Пример публичного SDK"><p>Это доверенное React-расширение использует только публичный @mauzcode/ui.</p>
       <p>Доступные разговоры: {count ?? '…'}. Текущий агент: {context.agentId ?? 'не выбран'}.</p>
       {error && <p role="alert">{error}</p>}
       <TextField label="Локальная заметка" value={name} onChange={event => setName(event.target.value)} description="Не сохраняется и никуда не отправляется." />

@@ -5,18 +5,18 @@ import { tmpdir } from "node:os";
 import tmp from "./tmp";
 
 async function withRoot(fn: (root: string, ctx: any) => Promise<void>) {
-    const root = await mkdtemp(join(tmpdir(), "hyper-tmp-"));
+    const root = await mkdtemp(join(tmpdir(), "mauzcode-tmp-"));
     const ctx: any = { fns: { procs: { project: { projectRoot: () => root } } } };
     try { await fn(root, ctx); } finally { await rm(root, { recursive: true, force: true }); }
 }
 
-test("workspace.tmp gives each agent its own .hyper/tmp/<agent-id>/ and creates the parent", async () => {
+test("workspace.tmp gives each agent its own .mauzcode/tmp/<agent-id>/ and creates the parent", async () => {
     await withRoot(async (root, ctx) => {
         const path = await tmp(ctx, { agentId: "ab", agent: { id: "ab" } } as any, { path: "dumps/x.json" });
-        expect(path).toBe(join(root, ".hyper/tmp/ab/dumps/x.json"));
-        expect((await stat(join(root, ".hyper/tmp/ab/dumps"))).isDirectory()).toBe(true);
-        expect(await tmp(ctx, { agentId: "cd" } as any, {})).toBe(join(root, ".hyper/tmp/cd"));
-        expect(await tmp(ctx, null, { path: "a.txt", mkdir: false })).toBe(join(root, ".hyper/tmp/shared/a.txt"));
+        expect(path).toBe(join(root, ".mauzcode/tmp/ab/dumps/x.json"));
+        expect((await stat(join(root, ".mauzcode/tmp/ab/dumps"))).isDirectory()).toBe(true);
+        expect(await tmp(ctx, { agentId: "cd" } as any, {})).toBe(join(root, ".mauzcode/tmp/cd"));
+        expect(await tmp(ctx, null, { path: "a.txt", mkdir: false })).toBe(join(root, ".mauzcode/tmp/shared/a.txt"));
     });
 });
 

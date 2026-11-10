@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { PluginUiReview } from '../components/hyper/PluginUiReview';
+import { PluginUiReview } from '../components/mauzcode/PluginUiReview';
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });

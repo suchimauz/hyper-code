@@ -46,7 +46,7 @@ type SqlTx = { unsafe: (sql: string, params?: unknown[]) => Promise<unknown> };
  * `code.slice` read what it writes. Takes about 250ms for the whole tree, so
  * reindexing on demand is cheaper than reasoning about staleness.
  *
- * @param opts.root Limit the scan to one root, such as `core` for `src/`, `hyper` for `.hyper/`, or a plugin name.
+ * @param opts.root Limit the scan to one root, such as `core` for `src/`, `mauzcode` for `.mauzcode/`, or a plugin name.
  * @param opts.rel Re-index just this one project-relative file, such as `agent/run.ts`; a file that no longer exists is removed from the graph.
  * @param opts.dryRun Compute the counts without touching the database. @default false
  */
@@ -72,7 +72,7 @@ export default async function (
     const promptNames = await agentFacingNames(ctx, entries);
 
     // Who owns each scan root: code this repo commits, an official plugin under
-    // plugins/, or a private one mounted from ~/.hyper/user. Stored per function
+    // plugins/, or a private one mounted from ~/.mauzcode/user. Stored per function
     // so `code.boundary` can ask the question later without re-reading mounts.
     const tierByRoot = await tiers(ctx);
 
@@ -460,15 +460,15 @@ async function agentFacingNames(ctx: Context, entries: ScanEntry[]): Promise<Set
     return names;
 }
 
-// Which tier each scan root belongs to. `core` and `hyper` are this repository;
+// Which tier each scan root belongs to. `core` and `mauzcode` are this repository;
 // everything else reports its own source, and a root the mount table does not
 // know is treated as core rather than silently becoming a boundary violation.
 async function tiers(ctx: Context): Promise<Record<string, string>> {
-    // `.hyper/` is the project-local glue layer: small procedures the owner of
+    // `.mauzcode/` is the project-local glue layer: small procedures the owner of
     // this checkout writes for themselves, and the one place that is SUPPOSED
     // to wire private plugins together. It is committed, but it is personal by
     // design, so it gets its own tier rather than being judged as core.
-    const out: Record<string, string> = { core: "core", hyper: "local" };
+    const out: Record<string, string> = { core: "core", mauzcode: "local" };
     // modules.list is synchronous, so this is a plain read, not an await.
     let mods: Array<{ name: string; source?: string; self?: boolean }> = [];
     try {
@@ -480,7 +480,7 @@ async function tiers(ctx: Context): Promise<Record<string, string>> {
         mods = maybe as Array<{ name: string; source?: string; self?: boolean }>;
     } catch { mods = []; }
     for (const m of mods) {
-        if (m.self || m.name === "core" || m.name === "hyper") continue;  // the process itself
+        if (m.self || m.name === "core" || m.name === "mauzcode") continue;  // the process itself
         out[m.name] = m.source ?? "core";
     }
     return out;

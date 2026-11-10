@@ -1,7 +1,7 @@
 /**
  * Streams Grok subscription requests through the xAI Responses API
  *
- * Send an agent turn through the xAI Responses API using a managed SuperGrok or X Premium OAuth token. Use for direct or Hyper-relayed xai model routes that need normalized text, reasoning summaries, native tool calls, usage and subscription error classification.
+ * Send an agent turn through the xAI Responses API using a managed SuperGrok or X Premium OAuth token. Use for direct or MauzCode-relayed xai model routes that need normalized text, reasoning summaries, native tool calls, usage and subscription error classification.
  * @param opts.agent Agent whose model, transcript, tools and session identity are sent.
  * @param opts.signal Abort signal for cancelling the request.
  * @param opts.onEvent Callback receiving normalized stream deltas.
@@ -20,9 +20,9 @@ export default async function (
 ): Promise<{ text: string; thinking: string; finishReason: string | null; usage: { prompt_tokens?: number; completion_tokens?: number }; toolCalls: { id: string; name: string; args: any }[] }> {
     const { agent } = opts;
     const ep = await ctx.fns.llm.resolveEndpoint({ model: agent.model });
-    if ((ep.provider === "hyper" ? ep.upstream : ep.provider) !== "xai") throw new Error("streamXai requires an xai model route");
+    if ((ep.provider === "mauzcode" ? ep.upstream : ep.provider) !== "xai") throw new Error("streamXai requires an xai model route");
     // Node bearer authenticates the relay; only the host may refresh provider OAuth.
-    const apiKey = ep.provider === "hyper" ? ep.apiKey : await ctx.fns.llm.getXaiOAuthToken({ account: ep.account });
+    const apiKey = ep.provider === "mauzcode" ? ep.apiKey : await ctx.fns.llm.getXaiOAuthToken({ account: ep.account });
     if (!apiKey) throw new Error(`${ep.provider}: no credentials`);
     const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort ?? "auto" });
     const { system: instructions, messages: convo } = await ctx.fns.agent.buildLlmRequest({ agent });

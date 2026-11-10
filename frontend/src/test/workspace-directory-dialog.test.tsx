@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { WorkspaceDirectoryDialog } from '../components/hyper/WorkspaceDirectoryDialog';
+import { WorkspaceDirectoryDialog } from '../components/mauzcode/WorkspaceDirectoryDialog';
 import { directoryBreadcrumbs, type DirectoryListing } from '../lib/workspaceDirectories';
 const listing = (path: string, entries: string[] = []): DirectoryListing => ({ path, parentPath: path === '/' ? null : path.slice(0, path.lastIndexOf('/')) || '/', entries: entries.map(name => ({ name, path: `${path === '/' ? '' : path}/${name}` })), canCreate: true, csrfToken: 'test-csrf' });
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });

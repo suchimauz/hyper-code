@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QuotaMatrix } from '../components/hyper/QuotaMatrix';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
+import { QuotaMatrix } from '../components/mauzcode/QuotaMatrix';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
 import { quotaTooltip, worstQuotaTone, type QuotaAccount } from '../lib/quotas';
 
 const codex: QuotaAccount = { id: 'codex:su@srv', provider: 'codex', account: 'su', label: 'codex · ssh.srv.su', model: 'codex/su:', connection: 'ssh', host: 'srv', kind: 'quota', windows: { weekly: { usedPercent: 93.4, resetsAt: 1794383304000, tone: 'error' } }, quotaStatus: 'fresh', tone: 'error', planType: 'pro', parkedAgents: 2 };

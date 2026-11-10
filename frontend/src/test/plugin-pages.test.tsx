@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PluginPages } from '../components/hyper/PluginPages';
+import { PluginPages } from '../components/mauzcode/PluginPages';
 import { getPlugins } from '../lib/plugins';
 
 vi.mock('../lib/plugins', async importOriginal => ({ ...await importOriginal<typeof import('../lib/plugins')>(), getPlugins: vi.fn() }));

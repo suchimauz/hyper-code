@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { reconcileStream } from '../lib/streamHandoff';
-import type { EventPage } from '../lib/hyper';
+import type { EventPage } from '../lib/mauzcode';
 const page: EventPage = { agentId:'a', events:[], olderBefore:null, hasOlder:false, isRunning:true, runState:'running', lastError:null, partial:{text:'Visible answer',revision:1,startedAt:10} };
 it('retains visible prose across an explicit handoff gap and repeated refreshes',()=>{
  const next={...page,partial:null,streamHandoff:true};

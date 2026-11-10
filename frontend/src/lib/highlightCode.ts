@@ -2,7 +2,7 @@ import { createCssVariablesTheme, createHighlighterCore, type ThemedToken } from
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import { bundledLanguages } from 'shiki/langs';
 
-const theme = createCssVariablesTheme({ name: 'hyper-code', variablePrefix: '--syntax-', fontStyle: true });
+const theme = createCssVariablesTheme({ name: 'mauzcode-code', variablePrefix: '--syntax-', fontStyle: true });
 let highlighter: ReturnType<typeof createHighlighterCore> | undefined;
 const loading = new Map<string, Promise<void>>();
 const cache = new Map<string, ThemedToken[][]>();
@@ -21,7 +21,7 @@ export async function highlightCode(text: string, language: string): Promise<The
     }
     await pending;
   }
-  const tokens = engine.codeToTokensBase(text, { lang: language, theme: 'hyper-code', tokenizeMaxLineLength: 1000 });
+  const tokens = engine.codeToTokensBase(text, { lang: language, theme: 'mauzcode-code', tokenizeMaxLineLength: 1000 });
   if (cache.size >= 24) cache.delete(cache.keys().next().value!);
   cache.set(key, tokens);
   return tokens;

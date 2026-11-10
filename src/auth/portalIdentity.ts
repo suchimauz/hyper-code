@@ -1,10 +1,10 @@
 /**
- * Resolves the person the hypermesh hub vouches for from the signed X-Hn-Assertion request header.
+ * Resolves the person the mauzcodemesh hub vouches for from the signed X-Hn-Assertion request header.
  *
- * Portal-trust sign-in (setting auth.portalTrust, env HYPER_PORTAL_TRUST, off by default). The hub asks the
+ * Portal-trust sign-in (setting auth.portalTrust, env MAUZCODE_PORTAL_TRUST, off by default). The hub asks the
  * control plane whether the person may open this service and, when yes, adds a short-lived JWT (RS256/ES256)
  * signed with the control plane's OIDC keys. This verifies signature, issuer, `aud` = auth.portalAudience
- * (e.g. `hn:hr/studio/hyper`), expiry and a lifetime of at most 120 s, then finds or creates the user for
+ * (e.g. `hn:hr/studio/mauzcode`), expiry and a lifetime of at most 120 s, then finds or creates the user for
  * that person as a member (identity provider `oidc`, subject = `sub`, the same row the OIDC button uses).
  * Returns null when the mode is off, the header is missing or invalid, or the user is disabled — the caller
  * then falls back to the ordinary sign-in. Bare X-Hn-User / X-Hn-* headers are never trusted.
@@ -63,7 +63,7 @@ export default async function (
         provider: "oidc", sub: String(claims.sub), email, name: String(claims.name ?? email.split("@")[0]),
         picture: typeof claims.picture === "string" ? claims.picture : null, autoCreate: true, memberOnly: true,
     });
-    if (!user) return fail(`${email} is disabled in this Hyper`);
+    if (!user) return fail(`${email} is disabled in this MauzCode`);
     const device = typeof claims.hn_device === "string" ? claims.hn_device : null;
     for (const [k, v] of seen) if (v.exp < nowSec) seen.delete(k);
     seen.set(assertion, { userId: user.id, device, exp: Number(claims.exp) });

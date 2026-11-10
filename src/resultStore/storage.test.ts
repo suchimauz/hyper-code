@@ -12,7 +12,7 @@ import getFullMessages from '../session/getFullMessages';
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(p => rm(p, { recursive: true, force: true }))); });
 async function fixture() {
-    const instance = await mkdtemp(join(tmpdir(), 'hyper-result-test-')); dirs.push(instance);
+    const instance = await mkdtemp(join(tmpdir(), 'mauzcode-result-test-')); dirs.push(instance);
     const caller = { id: 'owner', scratchpad: { plan: { title: 'unchanged' } } };
     const messages: Record<string, any[]> = { owner: [] };
     const agents: Record<string, any> = { owner: { id: 'owner' } };
@@ -31,7 +31,7 @@ async function fixture() {
         (messages[ownerAgentId] ??= []).push({ role: 'tool', result_ref: ref });
         return ref;
     };
-    const path = (ref: any) => join(instance, '.hyper/results', ref.ownerAgentId, ref.id + '.json');
+    const path = (ref: any) => join(instance, '.mauzcode/results', ref.ownerAgentId, ref.id + '.json');
     return { instance, ctx, caller, messages, agents, put, path, get: (ref: any) => read(ctx, null, { ref }), api: (opts: any) => readResult(ctx, null, opts) };
 }
 
@@ -59,7 +59,7 @@ describe('private immutable result storage', () => {
     test('root is absolute, instance based and independent of workspace/remote host', async () => {
         const f = await fixture();
         f.ctx.state.workspace = { dir: '/other', host: 'remote' };
-        expect(await root(f.ctx, null, {})).toBe(join(f.instance, '.hyper/results'));
+        expect(await root(f.ctx, null, {})).toBe(join(f.instance, '.mauzcode/results'));
         for (const value of ['', 'relative/path']) {
             f.ctx.fns.settings.getString = async () => value;
             await expect(root(f.ctx, null, {})).rejects.toThrow('absolute local directory');
@@ -78,9 +78,9 @@ describe('private immutable result storage', () => {
             expect((await stat(f.path(ref))).mode & 0o777).toBe(0o600);
             expect(await f.get(ref)).toEqual({ text, totalChars: text.length });
         }
-        const ownerDir = join(f.instance, '.hyper/results/owner');
+        const ownerDir = join(f.instance, '.mauzcode/results/owner');
         expect((await stat(ownerDir)).mode & 0o777).toBe(0o700);
-        expect((await stat(join(f.instance, '.hyper/results'))).mode & 0o777).toBe(0o700);
+        expect((await stat(join(f.instance, '.mauzcode/results'))).mode & 0o777).toBe(0o700);
         expect((await readdir(ownerDir)).sort()).toEqual(refs.map(r => r.id + '.json').sort());
         const snapshot = await readFile(f.path(refs[0]), 'utf8');
         await f.put('different');
@@ -93,7 +93,7 @@ describe('private immutable result storage', () => {
         expect((await f.get(await f.put(text))).text.length).toBe(text.length);
         await expect(f.put(text + 'x')).rejects.toThrow('too_large');
         await expect(f.put('🌍'.repeat(8 * 1024 * 1024 + 1))).rejects.toThrow('too_large');
-        expect((await readdir(join(f.instance, '.hyper/results/owner'))).length).toBe(2);
+        expect((await readdir(join(f.instance, '.mauzcode/results/owner'))).length).toBe(2);
     });
     test('malicious owners and ids and invalid references never resolve paths', async () => {
         const f = await fixture(); const ref = await f.put();
@@ -129,7 +129,7 @@ describe('private immutable result storage', () => {
     test('owner and result symlinks cannot escape or alias result paths', async () => {
         const f = await fixture(); const ref = await f.put();
         const outside = join(f.instance, 'outside'); await mkdir(outside);
-        await symlink(outside, join(f.instance, '.hyper/results/evil'));
+        await symlink(outside, join(f.instance, '.mauzcode/results/evil'));
         await expect(f.put('x', 'evil')).rejects.toThrow('invalid owner directory');
         const saved = await readFile(f.path(ref)); await rm(f.path(ref));
         const target = join(outside, 'payload'); await writeFile(target, saved); await symlink(target, f.path(ref));

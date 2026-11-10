@@ -6,7 +6,7 @@ import { mkTestCtx } from "../_testCtx.entry";
 
 test("code.tests reads timings + junit report; null without a run", async () => {
     const ctx: any = await mkTestCtx({ db: false });
-    const root = join(tmpdir(), "hyper-code-tests-" + process.pid);
+    const root = join(tmpdir(), "mauzcode-code-tests-" + process.pid);
     rmSync(root, { recursive: true, force: true });
     mkdirSync(join(root, ".runtime"), { recursive: true });
     mkdirSync(join(root, "src/m"), { recursive: true });
@@ -33,7 +33,7 @@ test("code.tests reads timings + junit report; null without a run", async () => 
 
 test("code.testFiles lists one kind with its last results; a picked run keeps its own report", async () => {
     const ctx: any = await mkTestCtx({ db: false });
-    const root = join(tmpdir(), "hyper-code-testfiles-" + process.pid);
+    const root = join(tmpdir(), "mauzcode-code-testfiles-" + process.pid);
     rmSync(root, { recursive: true, force: true });
     for (const d of [".runtime", "src/m", "script"]) mkdirSync(join(root, d), { recursive: true });
     // the listing comes from the project's own script/test.ts

@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 export type StatsRange = 'all' | '30d' | '7d';
 export type WelcomeModel = { model: string; messages: number; totalTokens: number | null; inputTokens?: number | null; outputTokens?: number | null };

@@ -66,7 +66,7 @@ function secretField(row:types.input.Row,csrf:string,theme:string):string{
         +'input.otp{font-family:var(--font-mono);letter-spacing:.3em}';
     const script='(()=>{const id='+json(row.id)+',token='+json(csrf)+',mode='+json(mode)+';'
         +'const f=document.getElementById("f"),v=f.elements.value;let busy=false;'
-        +'const tell=m=>parent.postMessage(Object.assign({source:"hyper-secret",id},m),location.origin);'
+        +'const tell=m=>parent.postMessage(Object.assign({source:"mauzcode-secret",id},m),location.origin);'
         +'async function send(cancel){if(busy)return;if(!cancel&&!(mode==="password"?v.value:v.value.trim())){tell({state:"open",error:"Введите значение"});v.focus();return}'
         +'busy=true;v.disabled=true;tell({state:"processing"});const body=new FormData();if(cancel)body.set("_action","cancel");else body.set("value",v.value);'
         +'try{const r=await fetch("/input/"+encodeURIComponent(id),{method:"POST",credentials:"same-origin",headers:{"X-CSRF-Token":token,"Accept":"application/json"},body});'
@@ -75,7 +75,7 @@ function secretField(row:types.input.Row,csrf:string,theme:string):string{
         +'v.value="";tell({state:j.state})}catch(e){busy=false;v.disabled=false;tell({state:"open",error:"Сеть недоступна, попробуйте ещё раз"})}}'
         +'f.addEventListener("submit",e=>{e.preventDefault();send(false)});'
         +'v.addEventListener("input",()=>tell({state:"open",filled:v.value.length>0}));'
-        +'addEventListener("message",e=>{if(e.origin!==location.origin||e.source!==parent)return;const d=e.data||{};if(d.target!=="hyper-secret"||d.id!==id)return;'
+        +'addEventListener("message",e=>{if(e.origin!==location.origin||e.source!==parent)return;const d=e.data||{};if(d.target!=="mauzcode-secret"||d.id!==id)return;'
         +'if(d.action==="submit")send(false);else if(d.action==="cancel")send(true);else if(d.action==="focus")v.focus()});'
         +'tell({state:"ready"})})();';
     return '<!doctype html><html lang="ru" data-theme="'+theme+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Секрет</title>'

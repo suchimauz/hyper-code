@@ -1,4 +1,4 @@
-# Switching the live Hyper to users
+# Switching the live MauzCode to users
 
 Branch `multiuser-users`, built **on top of your real code**: base commit `main-wip-snapshot`
 (= `main` + your uncommitted changes in `src/ plugins/ script/ docs/`, a local branch, never pushed).
@@ -7,18 +7,18 @@ schema.
 
 What changes for you: only step 5. Steps 1–4 keep sign-in exactly as today.
 
-Hyper runs as launchd service `com.niquola.hyper` (dir `~/hyper-code2`, KeepAlive).
-Restart: `launchctl kickstart -k gui/$(id -u)/com.niquola.hyper`.
+MauzCode runs as launchd service `com.suchimauz.mauzcode` (dir `~/mauzcode`, KeepAlive).
+Restart: `launchctl kickstart -k gui/$(id -u)/com.suchimauz.mauzcode`.
 
 ---
 
 ## 1. Commit your work on `main` — selectively
 
-Do **not** use `git add -A`: the tree has ~100 unrelated files (screenshots in `.hyper/`, `doonto/`
+Do **not** use `git add -A`: the tree has ~100 unrelated files (screenshots in `.mauzcode/`, `doonto/`
 artifacts). Commit what you mean to keep:
 
 ```bash
-cd ~/hyper-code2
+cd ~/mauzcode
 git add -u src plugins script docs package.json            # tracked changes
 git add src/agent/'$migration_'*.ts                         # your new migrations
 git status --short                                          # review before committing
@@ -53,7 +53,7 @@ bun test src/auth src/session          # expected: 82 pass, 0 fail
 
 ```bash
 bun script/multiuser.ts backup
-launchctl kickstart -k gui/$(id -u)/com.niquola.hyper
+launchctl kickstart -k gui/$(id -u)/com.suchimauz.mauzcode
 ```
 
 On start the migration runs automatically: it adds the `users` table and three empty author columns
@@ -61,7 +61,7 @@ in one transaction (takes < 1 s, gives up after 3 s of waiting for a lock and re
 start). **It creates no user.** With no users, sign-in is the old shared password, `/auth/session`
 still reports you as signed in, `/auth/setup` is closed for this install.
 
-Check: Hyper opens, you are signed in, the phone still works.
+Check: MauzCode opens, you are signed in, the phone still works.
 
 ```bash
 bun script/multiuser.ts verify        # expected here: problems = ["no active user"], everything else ok
@@ -73,12 +73,12 @@ Look first (read-only):
 ```bash
 bun script/multiuser.ts plan --name "Nikolai Ryzhikov" --email niquola@health-samurai.io
 ```
-Expect: database `.../hyper`, migration "already applied", "create first user Nikolai Ryzhikov …
+Expect: database `.../mauzcode`, migration "already applied", "create first user Nikolai Ryzhikov …
 password = current shared password".
 
-Then (the `--db hyper` must match the connected database — guards against confusing it with a copy):
+Then (the `--db mauzcode` must match the connected database — guards against confusing it with a copy):
 ```bash
-bun script/multiuser.ts up --db hyper --name "Nikolai Ryzhikov" --email niquola@health-samurai.io
+bun script/multiuser.ts up --db mauzcode --name "Nikolai Ryzhikov" --email niquola@health-samurai.io
 bun script/multiuser.ts verify
 ```
 `verify` must show `"ok": true`, `"signIn": "password only…"`, `"doonto": "ok"`. `up` checks the exact
@@ -92,7 +92,7 @@ After this:
 
 ## 6. Check
 
-- Browser: sign in with your password, Hyper opens, `/auth/session` shows `Nikolai Ryzhikov`.
+- Browser: sign in with your password, MauzCode opens, `/auth/session` shows `Nikolai Ryzhikov`.
 - Phone: sign in with the same password.
 - Create a chat, write a message → `created_by = 'niquola'`.
 
@@ -103,10 +103,10 @@ After this:
 **Code only. Leave the database as it is.**
 
 ```bash
-cd ~/hyper-code2
+cd ~/mauzcode
 git revert -m 1 --no-edit HEAD          # if the merge is the last commit; otherwise:
 # git checkout pre-users -- src script  # and commit
-launchctl kickstart -k gui/$(id -u)/com.niquola.hyper
+launchctl kickstart -k gui/$(id -u)/com.suchimauz.mauzcode
 ```
 
 The old code ignores the `users` table and the extra nullable columns (rehearsed: old code signs in
@@ -116,20 +116,20 @@ the switch; the shared password works again.
 Do **not** drop the schema while the new code is running — it reads `users` on every request, and
 the next start would re-create it. Optional cleanup, only after the old code is live:
 ```bash
-bun script/multiuser.ts down --db hyper --yes --old-code-running
+bun script/multiuser.ts down --db mauzcode --yes --old-code-running
 ```
 
-Last resort — full dump from before the change (stop Hyper first; everything after the dump is lost):
+Last resort — full dump from before the change (stop MauzCode first; everything after the dump is lost):
 ```bash
 pg_restore --clean --if-exists --no-owner -d "$DATABASE_URL" \
-  ~/hyper-backups/hyper-full-2026-09-25-before-users.dump
+  ~/mauzcode-backups/mauzcode-full-2026-09-25-before-users.dump
 ```
 
 ---
 
 ## Afterwards
 
-- Drop the rehearsal copy: `psql "${DATABASE_URL%/*}/postgres" -c "DROP DATABASE hyper_rehearsal"`.
-- Delete `/tmp/hyper_full.dump`; delete branch `main-wip-snapshot`.
-- `git worktree remove ~/hyper-code2-users`.
+- Drop the rehearsal copy: `psql "${DATABASE_URL%/*}/postgres" -c "DROP DATABASE mauzcode_rehearsal"`.
+- Delete `/tmp/mauzcode_full.dump`; delete branch `main-wip-snapshot`.
+- `git worktree remove ~/mauzcode-users`.
 - Second email (`<personal email>`) is not supported yet (one email per user) — plan step 5.

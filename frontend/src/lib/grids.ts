@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 export type GridInput = { id: string; agentId: string; kind: 'grid'; title: string; message?: string; createdAt?: string; updatedAt?: string; state: 'open' | 'processing' | 'submitted' | 'cancelled'; spec: { columns: { label: string }[]; multiple: boolean }; result?: { rows: string[][] } | null };
 export type GridInputsState = { inputs: GridInput[]; csrfToken: string };
 export type GridRow = { value: string; cells: string[] };

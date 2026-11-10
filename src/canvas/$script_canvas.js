@@ -1,8 +1,8 @@
 // Item-document compatibility only: rich file/plugin content and the sandbox state bridge.
 // Tabs, resizing, mobile presentation and chat navigation belong to React.
 (() => {
-    if (window.__hyperCanvasInstalled) return;
-    window.__hyperCanvasInstalled = true;
+    if (window.__mauzcodeCanvasInstalled) return;
+    window.__mauzcodeCanvasInstalled = true;
     const page = () => document.querySelector('[data-canvas-document][data-canvas-agent]');
     const agentOf = root => root?.getAttribute('data-canvas-agent') || '';
     const documentEndpoint = root => `/canvas/${encodeURIComponent(agentOf(root))}/item/${encodeURIComponent(root.getAttribute('data-canvas-document'))}/document?fragment=1`;
@@ -53,7 +53,7 @@
         if (info.held === canon(state)) return;
         info.held = canon(state);
         frame.closest('[data-canvas-body]')?.setAttribute('data-canvas-state', JSON.stringify(state));
-        frame.contentWindow?.postMessage({ hyperCanvas: 1, type: 'state', state }, '*');
+        frame.contentWindow?.postMessage({ mauzCodeCanvas: 1, type: 'state', state }, '*');
     };
     const pushState = (body, text) => {
         const frame = body.querySelector('iframe[data-canvas-frame]');
@@ -64,7 +64,7 @@
     };
     window.addEventListener('message', event => {
         const msg = event.data;
-        if (!msg || msg.hyperCanvas !== 1) return;
+        if (!msg || msg.mauzcodeCanvas !== 1) return;
         const root = page();
         const frame = root && [...root.querySelectorAll('iframe[data-canvas-frame]')].find(f => f.contentWindow === event.source);
         if (!frame) return;
@@ -102,7 +102,7 @@
         if (state) return refreshPanel(root);
     }).catch(error => console.warn('Canvas navigation failed', error));
     const catchUp = () => { const root = page(); if (root) return refreshPanel(root); };
-    window.hyperLive.subscribe({
+    window.mauzcodeLive.subscribe({
         name: 'canvas-document', types: ['canvas.changed'],
         onEvent: ev => { const root = page(); if (root && agentOf(root) === ev.agentId && ev.rev !== shownRev(root)) return refreshPanel(root); },
         resync: catchUp,

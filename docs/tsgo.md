@@ -24,7 +24,7 @@ Measured on this project (1219 files), main-thread stall per eval:
   `workspace/didChangeWatchedFiles` before the next check (tsgo does not watch
   the disk itself under `--stdio`).
 - `tsgo.check({ code, bindings })` — wraps the eval body exactly like the REPL
-  does, updates one virtual document `src/__hyper_virtual_eval__.ts` (never
+  does, updates one virtual document `src/__mauzcode_virtual_eval__.ts` (never
   written to disk; it must sit under `src/` to see the project's types), pulls
   `textDocument/diagnostic`, keeps error severity only (parse errors alone
   when the code does not parse). Checks are serialized.

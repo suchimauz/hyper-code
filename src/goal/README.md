@@ -26,6 +26,6 @@ Do not invoke global migrate.up casually: it applies all pending migrations, inc
 
 ## Verification and remaining integration
 
-`bun test --config .hyper/tmp/dyv/unit-bunfig.toml ./src/goal/core.test.ts` (config `[test]\npreload=[]`): 25 tests, 60 assertions, no database. Runtime docs strict/typecheck validation passed for all eight functions. Mock fixtures test disabled/no-table access, owner lock ordering, stale run/Stop/archive, audit rollback, CAS, and isolation from simulated legacy overwrites. They do **not** prove SQL engine behavior, actual session.save integration, real concurrent transactions or migration execution.
+`bun test --config .mauzcode/tmp/dyv/unit-bunfig.toml ./src/goal/core.test.ts` (config `[test]\npreload=[]`): 25 tests, 60 assertions, no database. Runtime docs strict/typecheck validation passed for all eight functions. Mock fixtures test disabled/no-table access, owner lock ordering, stale run/Stop/archive, audit rollback, CAS, and isolation from simulated legacy overwrites. They do **not** prove SQL engine behavior, actual session.save integration, real concurrent transactions or migration execution.
 
 Remaining: isolated Postgres DDL/concurrency tests, persisted continuation deferrals and fork barriers, idempotent usage checkpoints/accounting, lifecycle admission/worker integration, tool wrappers, model instructions/provenance, UI and legacy import/cutover. Fresh blocked audit remains an instruction to the model, not a claimed mechanical authorization check. No end-to-end Codex parity is claimed.

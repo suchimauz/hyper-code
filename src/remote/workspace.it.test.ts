@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { mkTestCtx } from "../_testCtx.entry";
 import { startSshFixture, dockerAvailable, type SshFixture } from "../../test/ssh/fixture";
 
-const enabled = process.env.HYPER_SKIP_DOCKER_TESTS !== "1" && await dockerAvailable();
+const enabled = process.env.MAUZCODE_SKIP_DOCKER_TESTS !== "1" && await dockerAvailable();
 
 let fx: SshFixture | null = null;
 let ctx: any;
@@ -31,7 +31,7 @@ describe.skipIf(!enabled)("remote workspace (agent.workspaceHost)", () => {
         await ctx.fns.session.save({ agent });
         actx = Object.create(ctx);
         actx.session = ctx.fns.session.forAgent({ agent });
-        localDir = mkdtempSync(join(tmpdir(), "hyper-remote-ws-"));
+        localDir = mkdtempSync(join(tmpdir(), "mauzcode-remote-ws-"));
     }, 240_000);
 
     afterAll(async () => {

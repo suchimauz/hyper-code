@@ -1,14 +1,14 @@
 import {describe, test, expect} from 'bun:test';
 import {DEFAULT_BASE, normalizeBase, panelPath, parsePanelIdentity, targetForTab, sourceLabel, agentUrl, draftUrl} from './helpers.js';
 
-describe('Hyper origin configuration', () => {
+describe('MauzCode origin configuration', () => {
   test('accepts HTTPS origins and loopback HTTP', () => {
     expect(normalizeBase()).toBe(DEFAULT_BASE);
-    expect(normalizeBase('https://hyper.niquola.in.hn.hyper-mesh.xyz/')).toBe('https://hyper.niquola.in.hn.hyper-mesh.xyz');
+    expect(normalizeBase('https://mauzcode.niquola.in.hn.mauzcode-mesh.xyz/')).toBe('https://mauzcode.niquola.in.hn.mauzcode-mesh.xyz');
     expect(normalizeBase('http://127.0.0.1:3010/')).toBe('http://127.0.0.1:3010');
   });
   test('rejects insecure remote hosts, credentials, scripts and path/query injection', () => {
-    for (const value of ['http://localhost.evil.test', 'http://user:secret@localhost:3010', 'https://hyper.example/a', 'https://hyper.example/?token=x', 'https://hyper.example/#x', 'javascript:alert(1)']) {
+    for (const value of ['http://localhost.evil.test', 'http://user:secret@localhost:3010', 'https://mauzcode.example/a', 'https://mauzcode.example/?token=x', 'https://mauzcode.example/#x', 'javascript:alert(1)']) {
       expect(() => normalizeBase(value)).toThrow();
     }
   });
@@ -65,5 +65,5 @@ test('draft URL accepts only a safe binding identifier on configured loopback or
   expect(draftUrl(DEFAULT_BASE, id)).toBe(`${DEFAULT_BASE}/sidebar/draft/${id}?presentation=sidebar`);
   for (const value of ['../agent/ab', `${id}?token=x`, 'https://evil.test', null]) expect(() => draftUrl(DEFAULT_BASE, value)).toThrow();
   expect(() => draftUrl('http://evil.test', id)).toThrow();
-  expect(draftUrl('https://hyper.example', id)).toBe(`https://hyper.example/sidebar/draft/${id}?presentation=sidebar`);
+  expect(draftUrl('https://mauzcode.example', id)).toBe(`https://mauzcode.example/sidebar/draft/${id}?presentation=sidebar`);
 });

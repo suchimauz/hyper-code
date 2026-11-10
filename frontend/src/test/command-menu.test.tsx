@@ -2,12 +2,12 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MessageInput } from '../components/hyper/MessageInput';
-import { LiveComposer } from '../components/hyper/LiveComposer';
+import { MessageInput } from '../components/mauzcode/MessageInput';
+import { LiveComposer } from '../components/mauzcode/LiveComposer';
 vi.mock('../lib/goal', async importOriginal => ({ ...await importOriginal<typeof import('../lib/goal')>(), getGoal: vi.fn().mockResolvedValue({ version: 1, enabled: false }) }));
 vi.mock('../lib/queue', async importOriginal => ({ ...await importOriginal<typeof import('../lib/queue')>(), getQueue: vi.fn().mockResolvedValue({ items: [] }) }));
 import { validateCommand } from '../lib/commands';
-vi.mock('../components/hyper/ModelPicker', () => ({ ModelPicker: () => null }));
+vi.mock('../components/mauzcode/ModelPicker', () => ({ ModelPicker: () => null }));
 const catalogue = { version: 1, csrfToken: 'test-csrf', commands: [
   { name: 'plan', description: 'Plan', usage: ['/plan'], attachments: false },
   { name: 'compact', description: 'Compact', usage: ['/compact'], attachments: false },
@@ -96,7 +96,7 @@ it('posts commands through the CSRF-protected endpoint, preserving the request I
     bodies.push(JSON.parse(init!.body as string)); if (bodies.length === 1) throw new Error('offline');
     return json({ ok: true, command: 'plan', status: 'completed', operationId: 'operation' });
   }); vi.stubGlobal('fetch', fetcher);
-  const accepted = vi.fn(); const change = vi.fn(); window.addEventListener('hyper-planning-changed', change);
+  const accepted = vi.fn(); const change = vi.fn(); window.addEventListener('mauzcode-planning-changed', change);
   try {
     render(<LiveComposer agentId="slash-test" running={false} onAccepted={accepted} />); input('/plan task');
     await userEvent.click(screen.getByRole('button', { name: 'Отправить сообщение' }));
@@ -105,7 +105,7 @@ it('posts commands through the CSRF-protected endpoint, preserving the request I
     await waitFor(() => expect(accepted).toHaveBeenCalledOnce()); expect(change).toHaveBeenCalledOnce();
     expect(bodies).toHaveLength(2); expect(bodies[0]).toEqual(bodies[1]); expect(bodies[0].text).toBe('/plan task'); expect(bodies[0].requestId).toBeTruthy();
     expect(screen.getByRole('textbox').textContent).toBe('');
-  } finally { window.removeEventListener('hyper-planning-changed', change); }
+  } finally { window.removeEventListener('mauzcode-planning-changed', change); }
 });
 it('rejects command while running and offers explicit stop, preserving draft', async () => {
   const fetcher = vi.fn(async (_url: string) => json({ budget: null })); vi.stubGlobal('fetch', fetcher);

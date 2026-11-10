@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { testCtx } from "../../$test";
 
 function userRoot(name = "hello-user"): string {
-    const root = mkdtempSync(join(tmpdir(), "hyper-user-plugins-"));
+    const root = mkdtempSync(join(tmpdir(), "mauzcode-user-plugins-"));
     const plugin = join(root, name);
     mkdirSync(join(plugin, "src", "userhello"), { recursive: true });
     writeFileSync(join(plugin, "package.json"), JSON.stringify({

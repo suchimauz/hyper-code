@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ConfirmCard } from '../components/hyper/ConfirmCard';
-import { ConnectedQuestionCard } from '../components/hyper/ConnectedQuestionCard';
+import { ConfirmCard } from '../components/mauzcode/ConfirmCard';
+import { ConnectedQuestionCard } from '../components/mauzcode/ConnectedQuestionCard';
 import { clearConfirmComment, type ConfirmInput } from '../lib/confirms';
 import type { ChoiceInput } from '../lib/questions';
 const confirm: ConfirmInput = { id: 'c', agentId: 'a', kind: 'confirm', title: 'Тестовый вопрос 2', message: 'Форма отображается нормально?', state: 'open', spec: { details: '', confirmLabel: 'Да', declineLabel: 'Нет', danger: false } };

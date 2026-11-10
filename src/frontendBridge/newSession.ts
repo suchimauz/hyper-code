@@ -20,7 +20,7 @@ export default async function (
     const owner=await ctx.fns.projects.principal({});
     if(req.method==='POST'&&!await ctx.fns.auth.verifyCsrf({req,token:req.headers.get('x-csrf-token')||''}))return reply({error:'Invalid request token'},403);
     const [groups,defaultModel,policy]=await Promise.all([ctx.fns.llm.listModels({}),ctx.fns.settings.modelDefault({}),ctx.fns.llm.modelPolicy({action:'list'})]);
-    const canonical=(model:string)=>(model.includes(':')?model:'lmstudio:'+model).replace(/^(?!hyper\/)([^/:]+)\/default:/,'$1:');
+    const canonical=(model:string)=>(model.includes(':')?model:'lmstudio:'+model).replace(/^(?!mauzcode\/)([^/:]+)\/default:/,'$1:');
     const disabled=new Set(policy.disabledModels.map(canonical));
     const models=await Promise.all(Object.entries(groups).flatMap(([provider,values])=>values.map(async model=>({provider,model,label:model.slice(model.lastIndexOf(':')+1),disabled:disabled.has(canonical(model)),icon:await ctx.fns.frontendBridge.iconData({model})}))));
     const enabledDefault=models.find(m=>!m.disabled&&m.model===defaultModel)?.model??models.find(m=>!m.disabled)?.model??'';
@@ -70,7 +70,7 @@ export default async function (
         files.forEach(file=>body.append('files',file,file.name));
         return new Request(req.url,{method:'POST',headers:{'idempotency-key':data.requestKey!},body});
     };
-    const key='hyper-ui-new-session:'+owner+':'+data.requestKey;
+    const key='mauzcode-ui-new-session:'+owner+':'+data.requestKey;
     type Claim={fingerprint:string;status:string;agentId?:string;projectId:string;ready?:boolean};
     const read=async()=>{const [row]=await ctx.fns.procs.db.select({sql:'SELECT value FROM kv WHERE key=?',params:[key]});return row?JSON.parse(row.value) as Claim:null;};
     const replay=(claim:Claim)=>claim.fingerprint!==fingerprint?reply({error:'Request key already used for different input'},409):claim.status==='sent'?reply({agentId:claim.agentId,projectId:claim.projectId,status:'sent'},200):reply({error:claim.status==='failed'?'First submission interrupted; inspect the chat before retrying.':'First submission in progress; retry the same request key.',status:claim.status,agentId:claim.agentId??null,projectId:claim.projectId},409);

@@ -1,4 +1,4 @@
-/** @hyper/ui v1 — the only supported import for trusted React extensions.
+/** @mauzcode/ui v1 — the only supported import for trusted React extensions.
  * React and react-dom are supplied by the host. Tokens are inherited from the shell.
  * Backend authorization and explicit approval remain mandatory for outward actions.
  */

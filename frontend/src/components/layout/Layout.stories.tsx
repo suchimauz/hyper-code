@@ -15,9 +15,9 @@ function ResizableExample() {
 }
 function SheetExample() {
   const [open, setOpen] = useState(false);
-  return <><Button onClick={() => setOpen(true)}>Открыть панель</Button><Sheet title="Агенты" open={open} onOpenChange={setOpen}><Sidebar header="Hyper"><Button onClick={() => setOpen(false)}>Выбрать агента</Button></Sidebar></Sheet></>;
+  return <><Button onClick={() => setOpen(true)}>Открыть панель</Button><Sheet title="Агенты" open={open} onOpenChange={setOpen}><Sidebar header="MauzCode"><Button onClick={() => setOpen(false)}>Выбрать агента</Button></Sidebar></Sheet></>;
 }
-export const Shell: Story = { render: () => <div style={{ height: 480 }}><AppShell sidebar={<Sidebar header="Hyper" footer="Рабочее пространство">Список агентов</Sidebar>}><Toolbar title="Новый интерфейс" /><p style={{ padding: 24 }}>Содержимое рабочей области</p></AppShell></div> };
+export const Shell: Story = { render: () => <div style={{ height: 480 }}><AppShell sidebar={<Sidebar header="MauzCode" footer="Рабочее пространство">Список агентов</Sidebar>}><Toolbar title="Новый интерфейс" /><p style={{ padding: 24 }}>Содержимое рабочей области</p></AppShell></div> };
 export const Resizable: Story = { render: () => <ResizableExample /> };
 export const MobileSheet: Story = { render: () => <SheetExample /> };
 export const PanelToolbar: Story = { render: () => <Toolbar title="Canvas" subtitle="Рабочая область" actions={<Button>Открыть</Button>} /> };

@@ -3,7 +3,7 @@
  *
  * Sends Ctrl-C to the job's tmux session, waits up to the grace period, then kills the session. The log file is kept for remote.logs.
  * @param opts.host SSH host alias from ~/.ssh/config, as returned by remote.servers.
- * @param opts.name Job name; becomes the tmux session hyper-<name>. Letters, digits, dash and underscore.
+ * @param opts.name Job name; becomes the tmux session mauzcode-<name>. Letters, digits, dash and underscore.
  * @param opts.grace Seconds to wait after Ctrl-C before killing the session. @default 5 @minimum 0 @maximum 60
  */
 export default async function (
@@ -12,7 +12,7 @@ export default async function (
     opts: {
         /** SSH host alias from ~/.ssh/config, as returned by remote.servers. */
         host: string;
-        /** Job name; becomes the tmux session hyper-<name>. Letters, digits, dash and underscore. */
+        /** Job name; becomes the tmux session mauzcode-<name>. Letters, digits, dash and underscore. */
         name: string;
         /** Seconds to wait after Ctrl-C before killing the session. @default 5 @minimum 0 @maximum 60 */
         grace?: number;
@@ -20,8 +20,8 @@ export default async function (
 ): Promise<{ name: string; wasRunning: boolean; killed: boolean }> {
     if (!/^[A-Za-z0-9_-]+$/.test(opts.name)) throw new Error("invalid job name: " + opts.name);
     const shq = (s: string) => ctx.fns.remote.quote({ value: s });
-    const sess = "hyper-" + opts.name;
-    const log = "$HOME/.hyper-jobs/" + opts.name + ".log";
+    const sess = "mauzcode-" + opts.name;
+    const log = "$HOME/.mauzcode-jobs/" + opts.name + ".log";
     const g = Math.max(0, Math.min(60, opts.grace ?? 5));
     // "=name" is an exact session match (tmux otherwise accepts prefixes); "=name:" targets its active pane.
     const t = "=" + sess;

@@ -53,7 +53,7 @@
 #dock-bottom { flex:1; flex-direction:row; flex-wrap:wrap; justify-content:flex-start; min-width:0; }
 .project-header-controls { display:flex; align-items:center; gap:2px; }
 .project-header-controls>.dock-fixed { width:auto; }
-.project-header-controls #hyper-update-badge { margin-top:0; }
+.project-header-controls #mauzcode-update-badge { margin-top:0; }
 .dock-account-row { display:flex; align-items:center; gap:6px; border-top:1px solid var(--color-ui-border); padding:7px 2px 0; }
 .dock-account { flex:1; min-width:0; }
 .dock-account .account-trigger>img,.dock-account .account-trigger>span:first-child { flex-shrink:0; }

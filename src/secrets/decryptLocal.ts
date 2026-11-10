@@ -24,7 +24,7 @@ export default async function (
         try {
             const raw = await ctx.fns.llm.oauthEncryptionKey({});
             const key = await crypto.subtle.importKey("raw", Uint8Array.from(raw), "AES-GCM", false, ["decrypt"]);
-            const aad = new TextEncoder().encode(`hyper-code2/local-secret/v1/${String(opts.namespace).trim()}/${String(opts.name).trim()}`);
+            const aad = new TextEncoder().encode(`mauzcode/local-secret/v1/${String(opts.namespace).trim()}/${String(opts.name).trim()}`);
             const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: Buffer.from(parsed.iv, "base64url"), additionalData: aad }, key, Buffer.from(parsed.data, "base64url"));
             return new TextDecoder().decode(plain);
         } catch { throw new Error("local secret cannot be decrypted"); }

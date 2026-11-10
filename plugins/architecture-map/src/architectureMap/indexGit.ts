@@ -1,15 +1,15 @@
 /**
- * Indexes and caches per-file Git churn for Hyper source roots
+ * Indexes and caches per-file Git churn for MauzCode source roots
  *
- * Run this before turbulence analysis when repository HEADs change. It discovers Git repositories from Hyper source roots, scans non-merge history with rename detection, excludes each file’s creation commit from churn counts, and caches results in Postgres; unchanged HEADs are reused.
- * @param opts.root Limit indexing to one Hyper source root, such as core or browser.
+ * Run this before turbulence analysis when repository HEADs change. It discovers Git repositories from MauzCode source roots, scans non-merge history with rename detection, excludes each file’s creation commit from churn counts, and caches results in Postgres; unchanged HEADs are reused.
+ * @param opts.root Limit indexing to one MauzCode source root, such as core or browser.
  * @param opts.force Rebuild cached statistics even when the repository HEAD is unchanged. @default false
  */
 export default async function (
     ctx: Context,
     session: Session | null,
     opts: {
-        /** Limit indexing to one Hyper source root, such as core or browser. */
+        /** Limit indexing to one MauzCode source root, such as core or browser. */
         root?: string;
         /** Rebuild cached statistics even when the repository HEAD is unchanged. @default false */
         force?: boolean;

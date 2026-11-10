@@ -21,7 +21,7 @@ export default async function (
     const maxChats = opts.maxChats ?? 100;
     const maxMessages = opts.maxMessages ?? 1000;
     const sessionId = opts.sessionId ?? "default";
-    
+
     const getSecret = async (ref: string) => {
       const name = ref.includes("session.txt") ? "session" : ref.includes("config.json") ? "config" : new Bun.CryptoHasher("sha256").update(ref).digest("hex").slice(0, 32);
       const value = await ctx.fns.secrets.get({ ref, namespace: "telegram", name });
@@ -29,13 +29,13 @@ export default async function (
       return value;
     };
     const root = globalThis as typeof globalThis & { [key: symbol]: any };
-    const key = Symbol.for("hyper-code2.telegram.client.singleton");
+    const key = Symbol.for("mauzcode.telegram.client.singleton");
     const cache = (root[key] ??= {});
     let client = cache.client;
     if (!client?.connected) {
       const { TelegramClient } = await import("telegram");
       const { StringSession } = await import("telegram/sessions");
-      const [configRaw, sessionString] = await Promise.all([getSecret("op://hyper/telegram config.json/value"), getSecret("op://hyper/telegram session.txt/value")]);
+      const [configRaw, sessionString] = await Promise.all([getSecret("op://mauzcode/telegram config.json/value"), getSecret("op://mauzcode/telegram session.txt/value")]);
       const config = JSON.parse(configRaw);
       client = new TelegramClient(new StringSession(sessionString.trim()), config.apiId, String(config.apiHash), { connectionRetries: 5 });
       await client.connect();
@@ -55,7 +55,7 @@ export default async function (
     const attrs = (doc: any) => (Array.isArray(doc?.attributes) ? doc.attributes : []).map((a: any) => ({ className: className(a), fileName: a?.fileName ?? null, duration: a?.duration ?? null, voice: a?.voice ?? null, roundMessage: a?.roundMessage ?? null, w: a?.w ?? null, h: a?.h ?? null }));
     await ctx.fns.procs.db.run({ sql:   "INSERT INTO telegram.sessions(id,self_user_id,dc_id,last_seen_at) VALUES(?,?,?,now()) ON CONFLICT(id) DO UPDATE SET self_user_id=excluded.self_user_id,dc_id=excluded.dc_id,last_seen_at=now()", params: [sessionId, scalar(me.id), Number(me.photo?.dcId ?? 0) || null] });
     await ctx.fns.procs.db.run({ sql:   "INSERT INTO telegram.users(id,access_hash,username,first_name,last_name,phone,raw,updated_at) VALUES(?,?,?,?,?,?,?::jsonb,now()) ON CONFLICT(id) DO UPDATE SET access_hash=excluded.access_hash,username=excluded.username,first_name=excluded.first_name,last_name=excluded.last_name,phone=excluded.phone,raw=excluded.raw,updated_at=now()", params: [scalar(me.id), scalar(me.accessHash), me.username ?? null, me.firstName ?? null, me.lastName ?? null, me.phone ?? null, JSON.stringify({ className: className(me), bot: !!me.bot, verified: !!me.verified })] });
-    
+
     const dialogs: any[] = await client.getDialogs({ limit: Math.max(maxChats * 10, maxChats) });
     const personal = dialogs.filter((d: any) => className(d.entity) === "User" && !d.entity?.bot).slice(0, maxChats);
     let chats = 0, messageCount = 0, mediaCount = 0;

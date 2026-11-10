@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Hyper Sidebar (local prototype)",
+  "name": "MauzCode Sidebar (local prototype)",
   "version": "0.1.0",
   "minimum_chrome_version": "142",
-  "description": "One Hyper agent per Chrome tab, using the existing local Hyper UI.",
+  "description": "One MauzCode agent per Chrome tab, using the existing local MauzCode UI.",
   "permissions": [
     "sidePanel",
     "tabs",
@@ -20,7 +20,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Open Hyper sidebar"
+    "default_title": "Open MauzCode sidebar"
   },
   "commands": {
     "previous-tab": {

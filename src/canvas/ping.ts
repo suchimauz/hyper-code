@@ -2,7 +2,7 @@
  * Wakes the agent with a message from one of its canvas tabs — a click, a submitted form, a finished drawing.
  *
  * The canvas page calls this (canvas.js → POST /canvas/:id/item/:itemId/ping) when its code runs
- * `hyper.ping(text, data)`. The agent gets a user turn `<canvas-ping item title>` with the text and data and
+ * `mauzcode.ping(text, data)`. The agent gets a user turn `<canvas-ping item title>` with the text and data and
  * treats it as input from page code (not the person's instruction); a small card shows it in the chat. Limited to a few pings a minute per
  * agent, so a page in a loop cannot spin the agent.
  * @param opts.itemId Tab the ping comes from.

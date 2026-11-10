@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Panel, requestJson, type UiExtension } from '@hyper/ui';
+import { Panel, requestJson, type UiExtension } from '@mauzcode/ui';
 
 type InitialPrompt = { agentId: string; title: string; prompt: string; characters: number; estimatedTokens: number };
 /** Literal, read-only full-system-prompt reader. Authorization is enforced by the endpoint. */

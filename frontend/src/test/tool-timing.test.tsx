@@ -1,8 +1,8 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ActiveToolRow } from '../components/hyper/ActiveToolRow';
-import { ToolRow } from '../components/hyper/ToolRow';
-import { formatToolDuration, ToolTiming } from '../components/hyper/ToolTiming';
+import { ActiveToolRow } from '../components/mauzcode/ActiveToolRow';
+import { ToolRow } from '../components/mauzcode/ToolRow';
+import { formatToolDuration, ToolTiming } from '../components/mauzcode/ToolTiming';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 const run = { id: 'eval-1', name: 'tools_eval', subject: 'await longTask()', startedAt: 1000, state: 'running' as const, tail: '' };

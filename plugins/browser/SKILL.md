@@ -13,10 +13,10 @@ The plugin attaches to a running Chrome; it does not assume one exists. Bring it
 up through the plugin rather than by hand:
 
 ```sh
-hyper repl 'await ctx.fns.chrome.ensure({})'          # start only if none answers
-hyper repl 'await ctx.fns.chrome.ensure({ noStart: true })'  # health check, never launches
-hyper repl 'await ctx.fns.chrome.start({})'           # force a fresh launch
-hyper repl 'await ctx.fns.chrome.profileDir({})'      # which profile would be used
+mauzcode repl 'await ctx.fns.chrome.ensure({})'          # start only if none answers
+mauzcode repl 'await ctx.fns.chrome.ensure({ noStart: true })'  # health check, never launches
+mauzcode repl 'await ctx.fns.chrome.start({})'           # force a fresh launch
+mauzcode repl 'await ctx.fns.chrome.profileDir({})'      # which profile would be used
 ```
 
 **The profile is the point.** Chrome must open the directory that holds the
@@ -25,11 +25,11 @@ plugins reach through the browser. Starting on the wrong one looks exactly like
 "everything logged itself out". `chrome.profileDir` resolves it in this order:
 
 1. `CDP_USER_DATA_DIR` if set;
-2. `~/.hyper/browser/chrome-profile` — the Hyper-owned location;
+2. `~/.mauzcode/browser/chrome-profile` — the MauzCode-owned location;
 3. `~/uniskill/skills/browser/chrome-profile` — where the real ~3.7 GB of
    sessions still lives after the uniskill migration, reported as `legacy: true`.
 
-Moving that directory into the Hyper-owned path is a deliberate step (copy it
+Moving that directory into the MauzCode-owned path is a deliberate step (copy it
 while Chrome is closed, then verify a login), not something the plugin does on
 its own.
 
@@ -40,7 +40,7 @@ everyday Chrome keeps running untouched.
 
 **Why tmux.** Chrome is launched inside a detached tmux session (`chrome-cdp`,
 override with `CDP_TMUX_SESSION`) instead of as a child of the runtime. A child
-shares the server's process group, so every Hyper restart would close the
+shares the server's process group, so every MauzCode restart would close the
 browser and drop the sessions the profile exists to keep.
 
 | variable | meaning | default |
@@ -54,7 +54,7 @@ browser and drop the sessions the profile exists to keep.
 
 ## Live view: hand a tab to a human
 
-`browser.liveView({ tab })` returns `{ url }` — a page of this Hyper that shows one Chrome tab and lets a
+`browser.liveView({ tab })` returns `{ url }` — a page of this MauzCode that shows one Chrome tab and lets a
 person click, type, scroll and switch tabs in it. Give that link to the human when the page needs a
 person, not the agent:
 
@@ -75,7 +75,7 @@ await ctx.fns.browser.liveView({ tab, cdp: "http://127.0.0.1:9230" }); // anothe
 ```
 
 How it works: `/browser/live` (page) and `/browser/live/socket` (`$ws_` WebSocket route) are ordinary
-Hyper routes behind the same sign-in. Per viewer the socket opens its own CDP connection, attaches to
+MauzCode routes behind the same sign-in. Per viewer the socket opens its own CDP connection, attaches to
 the target, enables `Emulation.setFocusEmulationEnabled` (so a background tab keeps painting) and starts
 `Page.startScreencast`; the JPEG frames go to the viewer unchanged, the viewer's every pointer move,
 button, wheel and key comes back as `Input.dispatchMouseEvent` / `Input.dispatchKeyEvent` /
@@ -96,7 +96,7 @@ tab sends no frames without focus emulation; `probe-bg-scroll.ts`: wheel input a
 | `CDP_BROWSER_URL` | Chrome shown by default — the same one every `browser.*` function drives | `http://127.0.0.1:9222` |
 | `browser.liveCdpAllow` / `BROWSER_LIVE_CDP_ALLOW` | other endpoints a link may name with `?cdp=` (comma-separated) | none |
 | `browser.liveQuality` / `BROWSER_LIVE_QUALITY` | JPEG quality 10–100 | 70 |
-| `BROWSER_LIVE_BASE_URL` | public base of links (e.g. the Hyperlet address) | tailnet HTTPS when reachable, else `http://localhost:<port>` |
+| `BROWSER_LIVE_BASE_URL` | public base of links (e.g. the MauzCodelet address) | tailnet HTTPS when reachable, else `http://localhost:<port>` |
 
 Picture quality: the viewer's toolbar has Auto / High / Low. Chrome scales frames to the viewer's
 window before encoding. High is the configured quality at the viewer's device pixels; Low is quality 30 at
@@ -149,7 +149,7 @@ Actions auto-wait for attachment, visibility and actionability. Target ambiguity
 
 Named sessions default to `main`. High-level Google workflows use task-specific sessions, and multi-page research uses independently named page sessions. Task-created tabs should normally be closed with the tab/session cleanup functions. High-level workflows clean up temporary sessions unless callers intentionally request `keepOpen`.
 
-Plugin-created tabs are automatically closed after ten minutes without CDP activity (checked every thirty seconds). Pending commands and open Hyper live viewers protect the target; activity through any named alias also counts. Attached existing/user tabs and tabs whose ownership is unknown are never auto-closed. `keepOpen` prevents immediate workflow cleanup, not idle expiry. Chrome itself stays running. Expired names retain a closed-target marker: use `browser.sessionForget({ session })` before intentionally starting a fresh task with that name. The timer and ownership registry are process-local; after a server restart, old tabs are not guessed to be owned.
+Plugin-created tabs are automatically closed after ten minutes without CDP activity (checked every thirty seconds). Pending commands and open MauzCode live viewers protect the target; activity through any named alias also counts. Attached existing/user tabs and tabs whose ownership is unknown are never auto-closed. `keepOpen` prevents immediate workflow cleanup, not idle expiry. Chrome itself stays running. Expired names retain a closed-target marker: use `browser.sessionForget({ session })` before intentionally starting a fresh task with that name. The timer and ownership registry are process-local; after a server restart, old tabs are not guessed to be owned.
 
 Prefer the high-level Google search, AI and research workflows for those tasks rather than scraping Google manually. AI-generated answers can be wrong; compare factual claims with source pages. Consent pages, login challenges and CAPTCHA are reported as errors rather than silently returning empty results.
 
@@ -157,4 +157,4 @@ All CDP capabilities remain public. Use `browser.evaluate`, `cdp.send` or `cdp.s
 
 ## Browser UI
 
-The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["live"], "applications": {"/browser/live": "live"}}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "browser" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["live"], "applications": {"/browser/live": "live"}}). MauzCode builds and loads it at runtime; after editing it run `plugins.reload({ name: "browser" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

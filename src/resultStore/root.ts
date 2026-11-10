@@ -11,5 +11,5 @@ export default async function (
     const { resolve, isAbsolute } = await import('node:path');
     const root = await ctx.fns.settings.getString({module:'resultStore',scopeType:'global',key:'instanceRoot',fallback:process.cwd()});
     if (!root || !isAbsolute(root)) throw new Error('resultStore.instanceRoot must be an absolute local directory');
-    return resolve(root, '.hyper/results');
+    return resolve(root, '.mauzcode/results');
 }

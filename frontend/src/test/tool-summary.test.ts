@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { toolSummary } from '../components/hyper/toolSummary';
+import { toolSummary } from '../components/mauzcode/toolSummary';
 it('uses dsh per-tool summary priorities and only the first line', () => {
   expect(toolSummary('bash', { command: 'git diff', description: 'Проверить изменения\nextra' })).toBe('Проверить изменения');
   expect(toolSummary('bash', { command: 'git diff\ngit status' })).toBe('git diff');

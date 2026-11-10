@@ -3,7 +3,7 @@
 // testChrome(): one shared headless Chrome for the whole suite on a fixed port
 // (TEST_CHROME_PORT, default 59222) with its own profile in .runtime/test-chrome.
 // The first worker to need it starts it detached; the others (and later runs)
-// just find it answering, like hyper-db-test. Every test ctx gets its address as
+// just find it answering, like mauzcode-db-test. Every test ctx gets its address as
 // CDP_BROWSER_URL (see src/$test.ts and the test preload), so code that talks to
 // "the browser" in a test talks to this one. Returns null when no Chrome is
 // installed; the URL then points nowhere so nothing falls back to :9222.
@@ -63,7 +63,7 @@ export type HeadlessChrome = { url: string; stop: () => Promise<void> };
 export async function startHeadlessChrome(): Promise<HeadlessChrome | null> {
     const bin = CANDIDATES.find(p => existsSync(p));
     if (!bin) return null;
-    const profile = mkdtempSync(join(tmpdir(), "hyper-chrome-"));
+    const profile = mkdtempSync(join(tmpdir(), "mauzcode-chrome-"));
     const p = Bun.spawn({
         cmd: [bin, ...FLAGS, "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"],
         stdout: "ignore", stderr: "ignore",

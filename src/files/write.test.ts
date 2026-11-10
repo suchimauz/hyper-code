@@ -24,7 +24,7 @@ describe("files.write", () => {
 
     test("can write outside the workspace (sandbox removed)", async () => {
         const ctx = await mkTestCtx();
-        const abs = `/tmp/hyper_write_${Math.random().toString(36).slice(2)}.txt`;
+        const abs = `/tmp/mauzcode_write_${Math.random().toString(36).slice(2)}.txt`;
         try {
             await ctx.fns.files.write({ path: abs, content: "x" });
             expect(await ctx.fns.files.read({ path: abs })).toBe("x");

@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 export type CronTask = {
   name: string; fn: string; args: unknown; scheduleType: string; everyMs: number | null; nextRunAt: number | null;

@@ -11,8 +11,8 @@ export type AuthModel = {
 /** Native pre-auth presentation. Browser form POSTs preserve the existing auth protocol. */
 export function AuthForm({ model }: { model: AuthModel }) {
   return <main className="auth-entry"><section className="auth-card" aria-labelledby="auth-heading">
-    <h1 id="auth-heading">{model.kind === 'setup' ? 'Welcome to Hyper' : 'Hyper'}</h1>
-    <p>{model.kind === 'login' ? model.message : model.needsCurrent ? 'Your existing password stays the same. Confirm who you are.' : 'Tell Hyper who you are.'}</p>
+    <h1 id="auth-heading">{model.kind === 'setup' ? 'Welcome to MauzCode' : 'MauzCode'}</h1>
+    <p>{model.kind === 'login' ? model.message : model.needsCurrent ? 'Your existing password stays the same. Confirm who you are.' : 'Tell MauzCode who you are.'}</p>
     {model.error && <p role="alert" className="auth-error">{model.error}</p>}
     {model.kind === 'login' ? <>
       {model.oidc && <a className="auth-provider" href={`/auth/oidc?next=${encodeURIComponent(model.next)}`}>Sign in with {model.oidc.label}</a>}
@@ -28,7 +28,7 @@ export function AuthForm({ model }: { model: AuthModel }) {
       {model.needsCurrent && <label>Current password<input name="current" type="password" autoComplete="current-password" required autoFocus /></label>}
       <label>Your name<input name="name" defaultValue={model.name} required autoFocus={!model.needsCurrent} /></label>
       <label>Email (optional)<input name="email" type="email" autoComplete="email" defaultValue={model.email} /></label>
-      {!model.needsCurrent && <label>Password (optional — without one, Hyper opens without sign-in)<input name="password" type="password" minLength={8} autoComplete="new-password" /></label>}
+      {!model.needsCurrent && <label>Password (optional — without one, MauzCode opens without sign-in)<input name="password" type="password" minLength={8} autoComplete="new-password" /></label>}
       <button type="submit">Continue</button>
     </form>}
   </section></main>;
@@ -49,10 +49,10 @@ export default function AuthPage() {
       const data = await response.json() as AuthModel;
       if (data.kind !== 'login' && data.kind !== 'setup') throw new Error('Invalid sign-in page response.');
       setModel(data);
-      document.title = `${data.kind === 'login' ? 'Sign in' : 'Setup'} · Hyper`;
+      document.title = `${data.kind === 'login' ? 'Sign in' : 'Setup'} · MauzCode`;
     }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Sign-in page is unavailable.'); });
     return () => controller.abort();
   }, []);
   if (model) return <AuthForm model={model} />;
-  return <main className="auth-entry"><section className="auth-card"><h1>Hyper</h1><p role={error ? 'alert' : 'status'}>{error ?? 'Loading sign-in…'}</p>{error && <a href={window.location.href}>Reload</a>}</section></main>;
+  return <main className="auth-entry"><section className="auth-card"><h1>MauzCode</h1><p role={error ? 'alert' : 'status'}>{error ?? 'Loading sign-in…'}</p>{error && <a href={window.location.href}>Reload</a>}</section></main>;
 }

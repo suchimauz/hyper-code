@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Panel, TextField, requestJson, type ExtensionCanvasProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, TextField, requestJson, type ExtensionCanvasProps, type UiExtension } from '@mauzcode/ui';
 
 type Test = {name:string;file:string;s:number;msg?:string;code?:{line:number;html:string}|null};
 type Report = {tests:number;failures:number;skipped:number;wall:number;at:number|null;top:{f:string;ms:number;tests:Test[]}[];slowTests:Test[];fails:Test[]};

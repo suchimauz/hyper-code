@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { PluginConfiguration } from '../components/hyper/PluginConfiguration';
+import { PluginConfiguration } from '../components/mauzcode/PluginConfiguration';
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 test('native configuration keeps secrets write-only and submits explicit CSRF JSON',async()=>{
  const fetch=vi.fn(async (_url:unknown,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='POST'?{ok:true}:{csrfToken:'csrf',configuration:{settings:[{name:'demo.token',secret:true,configured:true,descriptor:{type:'secret',title:'API token'}},{name:'demo.enabled',secret:false,currentValue:true,descriptor:{type:'boolean',title:'Enabled'}}],secrets:[]}}),{headers:{'Content-Type':'application/json'}}));vi.stubGlobal('fetch',fetch);

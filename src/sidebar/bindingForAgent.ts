@@ -2,13 +2,13 @@
  * Read durable browser binding and page context for an agent.
  *
  * Use in browser guards and prompt assembly. Closed or revoked bindings remain visible to ensure fail-closed guards. Verifies current CDP process identity.
- * @param opts.agentId Existing Hyper agent identifier.
+ * @param opts.agentId Existing MauzCode agent identifier.
  */
 export default async function (
     ctx: Context,
     session: Session | null,
     opts: {
-        /** Existing Hyper agent identifier. */
+        /** Existing MauzCode agent identifier. */
         agentId: string;
     },
 ): Promise<null | {bindingId:string;targetId:string;cdpSessionName:string;state:string;url:string;title:string;contextRevision:number}> {

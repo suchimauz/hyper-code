@@ -1,4 +1,4 @@
-import type { EventPage } from './hyper';
+import type { EventPage } from './mauzcode';
 /** Keep the last visible draft only during an explicit server handoff to storage.
  * Stop/error/discard (no handoff) clears it immediately; no text matching or timers. */
 export function reconcileStream(previous: EventPage | null, next: EventPage): EventPage['partial'] {

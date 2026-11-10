@@ -1,7 +1,7 @@
 /**
  * Resolves the browser-visible request origin behind a trusted local reverse proxy
  *
- * Returns req.url origin normally, or X-Forwarded-Proto plus X-Forwarded-Host only when the immediate TCP peer is loopback. Use for same-origin CSRF checks on browser POST routes served through Hyperlet or Traefik.
+ * Returns req.url origin normally, or X-Forwarded-Proto plus X-Forwarded-Host only when the immediate TCP peer is loopback. Use for same-origin CSRF checks on browser POST routes served through MauzCodelet or Traefik.
  * @param opts.req Incoming browser request whose public origin is needed.
  */
 export default async function (

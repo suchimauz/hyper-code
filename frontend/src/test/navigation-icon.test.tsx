@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import { NavigationChatIcon } from '../components/hyper/NavigationChatIcon';
+import { NavigationChatIcon } from '../components/mauzcode/NavigationChatIcon';
 const src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><script>bad()</script><path d="M0 0"/></svg>');
 it('renders custom SVG only as an inert image and preserves active status', () => {
   const { container } = render(<NavigationChatIcon icon={{ src, custom: true }} active />);

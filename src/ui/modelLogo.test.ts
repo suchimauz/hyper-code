@@ -47,7 +47,7 @@ describe('ui.modelLogo', () => {
 });
 
 test('provider marks explicitly inherit the theme foreground in every size and frame', () => {
-    for (const model of ['codex:gpt', 'claude-code:claude', 'xai:grok', 'kimi:kimi', 'hyper/node:codex:gpt']) {
+    for (const model of ['codex:gpt', 'claude-code:claude', 'xai:grok', 'kimi:kimi', 'mauzcode/node:codex:gpt']) {
         for (const bare of [false, true]) for (const compact of [false, true]) {
             const html = render(model, false, bare, compact);
             expect(html).toContain('text-base-content');
@@ -68,6 +68,6 @@ test('SSH keeps exact provider mark with a small terminal corner badge in every 
         expect(ssh).not.toContain('ph-arrows-left-right');
         expect(local).not.toContain('ph-terminal-window');
     }
-    expect(render('hyper/node:codex/work:o3')).toContain('ph-arrows-left-right');
-    expect(render('hyper/node:codex/work:o3')).not.toContain('ph-terminal-window');
+    expect(render('mauzcode/node:codex/work:o3')).toContain('ph-arrows-left-right');
+    expect(render('mauzcode/node:codex/work:o3')).not.toContain('ph-terminal-window');
 });

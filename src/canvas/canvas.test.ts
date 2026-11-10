@@ -155,7 +155,7 @@ test("html tab runs sandboxed, keeps its state live, and pings wake the agent", 
     await ctx.fns.settings.set({ module: "canvas", scopeType: "global", key: "allowEval", value: true });
     await expect(ctx.fns.canvas.show({ agentId: a.id, kind: "html", args: { html: "<p>x</p>", load: "throw new Error('boom')" } })).rejects.toThrow("boom");
 
-    const it = await ctx.fns.canvas.show({ agentId: a.id, kind: "html", args: { html: "<title>Board</title><canvas id=c></canvas><script>hyper.setState({n:1})</script>", load: "return { rows: [1, 2, 3], tag: '</script>' }" } });
+    const it = await ctx.fns.canvas.show({ agentId: a.id, kind: "html", args: { html: "<title>Board</title><canvas id=c></canvas><script>mauzcode.setState({n:1})</script>", load: "return { rows: [1, 2, 3], tag: '</script>' }" } });
     expect(it.title).toBe("Board");
     const panel = await (await ctx.fns.canvas.itemDocument({ req: new Request("http://localhost/?fragment=1"), agentId: a.id, itemId: it.id })).text();
     const sandbox = panel.match(/sandbox="([^"]*)"/)?.[1] ?? "";
@@ -172,7 +172,7 @@ test("html tab runs sandboxed, keeps its state live, and pings wake the agent", 
     const doc = await frame.text();
     expect(doc).toContain('"rows":[1,2,3]');
     expect(doc).not.toContain("'</script>'");  // load data cannot close the bridge script
-    expect(doc.indexOf("window.hyper")).toBeLessThan(doc.indexOf("<canvas id=c>"));
+    expect(doc.indexOf("window.mauzcode")).toBeLessThan(doc.indexOf("<canvas id=c>"));
 
     // State from the page: saved, the agent sees it, and the body is kept (only the state is posted in).
     const before = await ctx.fns.canvas.revision({ agentId: a.id });

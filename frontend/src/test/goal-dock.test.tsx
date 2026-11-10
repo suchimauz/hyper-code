@@ -1,6 +1,6 @@
 import { expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { GoalDock } from '../components/hyper/GoalDock';
+import { GoalDock } from '../components/mauzcode/GoalDock';
 import { changeGoal, getGoal, type GoalSnapshot } from '../lib/goal';
 vi.mock('../lib/goal', async original => ({ ...await original<typeof import('../lib/goal')>(), getGoal: vi.fn(), changeGoal: vi.fn() }));
 afterEach(() => vi.clearAllMocks());

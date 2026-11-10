@@ -13,7 +13,7 @@ export default async function (
         /** Immutable request and source attribution captured before dispatch; explicit nullable goal identity. */
         binding: types.goal.UsageBinding;
         /** Wire or common-stream format; use unsupported only for legacy erased provenance. */
-        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "hyper-stream-anthropic" | "common-stream" | "unsupported";
+        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "mauzcode-stream-anthropic" | "common-stream" | "unsupported";
         /** One raw provider usage object, never context usage or cumulative session totals. */
         usage: unknown;
     },
@@ -25,7 +25,7 @@ export default async function (
     if (b.goalIdAtBoundary !== null && (typeof b.goalIdAtBoundary !== 'string' || !b.goalIdAtBoundary.trim())) throw new Error('Explicit goal binding required');
     const identity = {provider:b.provider,requestId:b.requestId,sourceAgentId:b.sourceAgentId,runId:b.runId,rootAccountingAgentId:b.rootAccountingAgentId,goalIdAtBoundary:b.goalIdAtBoundary,format:opts.format};
     const fail = (quality: 'unknown' | 'unsupported', reason: string): types.goal.UsageNormalized => Object.freeze({...identity,quality,reason,inputTokens:null,cachedInputTokens:null,outputTokens:null});
-    if (opts.format === 'unsupported' || opts.format === 'hyper-stream-anthropic') return fail('unsupported','Provider stream erased field-presence provenance or has no verified adapter');
+    if (opts.format === 'unsupported' || opts.format === 'mauzcode-stream-anthropic') return fail('unsupported','Provider stream erased field-presence provenance or has no verified adapter');
     const obj = (v: unknown): Record<string,unknown> => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string,unknown> : {};
     const u = obj(opts.usage);
     const max = 9223372036854775807n;

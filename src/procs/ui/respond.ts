@@ -37,7 +37,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const headers: Record<string, string> = { "content-type": "text/html; charset=utf-8" };
     const events: Record<string, unknown> = {};
     for (const name of opts.trigger ?? []) events[name] = true;
-    if (opts.toast) events["hyper-toast"] = { message: opts.toast.message, level: opts.toast.level ?? "info" };
+    if (opts.toast) events["mauzcode-toast"] = { message: opts.toast.message, level: opts.toast.level ?? "info" };
     // Header values must be Latin-1: a Cyrillic toast in raw JSON makes `new Response` throw and the whole
     // action fail with 500. Escape every non-ASCII char as \uXXXX — the same string once htmx JSON.parses it.
     const asciiJson = (value: unknown) => JSON.stringify(value).replace(/[\u007f-\uffff]/g, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));

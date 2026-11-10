@@ -3,7 +3,7 @@
  *
  * Accept the configured HTTPS listener or legacy loopback transport, then validate the caller Origin.
  * @param opts.req Incoming HTTP request to check.
- * @param opts.extension Require Chrome extension origin instead of exact Hyper origin.
+ * @param opts.extension Require Chrome extension origin instead of exact MauzCode origin.
  */
 export default async function (
     ctx: Context,
@@ -11,7 +11,7 @@ export default async function (
     opts: {
         /** Incoming HTTP request to check. */
         req: Request;
-        /** Require Chrome extension origin instead of exact Hyper origin. */
+        /** Require Chrome extension origin instead of exact MauzCode origin. */
         extension: boolean;
     },
 ): Promise<string> {

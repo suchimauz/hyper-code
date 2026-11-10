@@ -7,12 +7,12 @@ import card from '../node/$route_card_GET';
 const owner = { user: { role: 'owner' } } as any;
 test('sharing writes require owner, CSRF, origin and explicit confirmation; tokens are no-store', async () => {
  const writes: object[] = [];
- const ctx: any = { fns: { auth: { verifyCsrf: async ({ token }: any) => token === 'csrf' }, http: { publicOrigin: async () => 'https://hyper.test' }, node: {
+ const ctx: any = { fns: { auth: { verifyCsrf: async ({ token }: any) => token === 'csrf' }, http: { publicOrigin: async () => 'https://mauzcode.test' }, node: {
   issueClient: async (o: object) => { writes.push(o); return { token: 'new-token', url: 'https://node/node/v1' }; },
   revokeClient: async (o: object) => { writes.push(o); return { revoked: true }; },
   add: async (o: object) => { writes.push(o); }, refresh: async (o: object) => { writes.push(o); },
  } } };
- const req = (body: object, token = 'csrf', origin = 'https://hyper.test') => new Request('https://hyper.test/llms/settings', { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': token, origin }, body: JSON.stringify(body) });
+ const req = (body: object, token = 'csrf', origin = 'https://mauzcode.test') => new Request('https://mauzcode.test/llms/settings', { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': token, origin }, body: JSON.stringify(body) });
  const issue = { action: 'client-issue', name: 'laptop', providers: ['codex'], confirmed: true };
  expect((await api(ctx, null, { req: req(issue) })).status).toBe(401);
  expect((await api(ctx, { user: { role: 'member' } } as any, { req: req(issue) })).status).toBe(403);

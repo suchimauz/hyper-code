@@ -1,12 +1,12 @@
 # SSH targets for src/remote/*.test.ts. Started on demand by test/ssh/fixture.ts
-# and left running between test runs; the project name (hyper-ssh-<hash>) is
+# and left running between test runs; the project name (mauzcode-ssh-<hash>) is
 # derived from the checkout path and printed when the containers come up.
 services:
   plain:
     build: { context: ., args: { RG: "0" } }
     ports: ["127.0.0.1::22"]
-    volumes: ["${HYPER_SSH_KEYS:?set HYPER_SSH_KEYS}:/keys:ro"]
+    volumes: ["${MAUZCODE_SSH_KEYS:?set MAUZCODE_SSH_KEYS}:/keys:ro"]
   rg:
     build: { context: ., args: { RG: "1" } }
     ports: ["127.0.0.1::22"]
-    volumes: ["${HYPER_SSH_KEYS:?set HYPER_SSH_KEYS}:/keys:ro"]
+    volumes: ["${MAUZCODE_SSH_KEYS:?set MAUZCODE_SSH_KEYS}:/keys:ro"]

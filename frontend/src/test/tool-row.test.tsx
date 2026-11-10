@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ToolRow } from '../components/hyper/ToolRow';
+import { ToolRow } from '../components/mauzcode/ToolRow';
 const event = { idx: 3, ts: 1, type: 'tool_call', name: 'read', text: null, preview: 'Read App.tsx' };
 const detail = { ...event, args: '{"path":"src/App.tsx"}', argsTruncated: false, result: '<script>bad()</script>', resultTruncated: true, isError: false };
 afterEach(() => vi.unstubAllGlobals());

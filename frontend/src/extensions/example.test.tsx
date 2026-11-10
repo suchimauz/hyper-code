@@ -30,7 +30,7 @@ describe('public-SDK dev/test fixture', () => {
   it('mounts through the registry, reads authenticated data, resyncs and closes its dialog', async () => {
     const unsubscribe = vi.fn();
     let resync: ((reason: string) => void) | undefined;
-    window.hyperLive = { subscribe: options => { resync = options.resync; return unsubscribe; } };
+    window.mauzcodeLive = { subscribe: options => { resync = options.resync; return unsubscribe; } };
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ agents: [{ id: 'one' }] }), { headers: { 'Content-Type': 'application/json' } }));
     fetcher.mockImplementation(async () => new Response(JSON.stringify({agents:[{id:'one'}]}),{headers:{'Content-Type':'application/json'}}));
     vi.stubGlobal('fetch', fetcher);
@@ -42,6 +42,6 @@ describe('public-SDK dev/test fixture', () => {
     expect(screen.getByRole('dialog')).toBeTruthy(); expect(screen.getByText('Example note')).toBeTruthy();
     resync?.('reconnected'); await waitFor(()=>expect(fetcher).toHaveBeenCalledTimes(2));
     result.unmount(); expect(unsubscribe).toHaveBeenCalledOnce();
-    delete window.hyperLive; vi.unstubAllGlobals();
+    delete window.mauzcodeLive; vi.unstubAllGlobals();
   });
 });

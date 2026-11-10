@@ -16,7 +16,7 @@ describe("node relay transport parity", () => {
             };
             const ctx = { fns: { node: {
                 authorize: async () => ({ ok: true, client: { providers: ["codex"], name: "client" }, hops: 1 }),
-                catalog: async () => [{ id: model, provider: "codex", account: "named", api: "responses", ...(chained ? { via: "hyper/next" } : {}) }],
+                catalog: async () => [{ id: model, provider: "codex", account: "named", api: "responses", ...(chained ? { via: "mauzcode/next" } : {}) }],
                 get: async () => ({ url: "http://next/v1" }), token: async () => "next-token",
                 upstream: async () => ({ url: "http://provider", headers: { authorization: "Bearer host-token", "chatgpt-account-id": "host-account" } }),
             }, procs: { log: { info: () => {} } } } } as unknown as Context;
@@ -34,7 +34,7 @@ describe("node relay transport parity", () => {
                 expect(headers.get("x-codex-turn-metadata")).toBe('{"turn_id":"turn-1"}');
                 expect(headers.get("authorization")).toBe(`Bearer ${chained ? "next" : "host"}-token`);
                 expect(headers.get("chatgpt-account-id")).toBe(chained ? null : "host-account");
-                if (chained) expect(headers.get("x-hyper-hops")).toBe("2");
+                if (chained) expect(headers.get("x-mauzcode-hops")).toBe("2");
                 expect(JSON.parse(String(sent?.body))).toEqual({ ...payload, model: chained ? model : "gpt-test" });
                 expect(sent?.signal).toBe(req.signal);
                 controller.abort();

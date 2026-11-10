@@ -29,7 +29,7 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
     // strip out of band, so its own click updates instantly and the broadcast just
     // agrees with it.
     root.fns.procs.events.reload({});
-    // hyper-code2: reload happens on every dev-watcher save, so the LLM
+    // mauzcode: reload happens on every dev-watcher save, so the LLM
     // localization pass is left to the nightly cron. BM25 rows and embeddings
     // still refresh here; only the expensive part is deferred.
     if (root.fns.runtime?.docs?.index) queueMicrotask(async () => {

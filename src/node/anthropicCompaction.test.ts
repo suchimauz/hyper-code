@@ -11,7 +11,7 @@ describe("Anthropic compaction beta relay", () => {
             const payload = { model, messages: [{ role: "user", content: [block, { type: "text", text: "continue" }] }], compaction: { type: "summarize" } };
             const ctx: any = { fns: { node: {
                 authorize: async () => ({ ok: true, client: { providers: [provider], name: "client" }, hops: 0 }),
-                catalog: async () => [{ id: model, provider, account: "named", api: "anthropic", ...(chained ? { via: "hyper/next" } : {}) }],
+                catalog: async () => [{ id: model, provider, account: "named", api: "anthropic", ...(chained ? { via: "mauzcode/next" } : {}) }],
                 get: async () => ({ url: "http://next" }), token: async () => "next-token",
                 upstream: async () => ({ url: "http://mock", headers: { authorization: "Bearer host-token", "anthropic-beta": "oauth-host", "user-agent": "host-agent", "x-app": "host-app" } }),
             }, procs: { log: { info: () => {} } } } };

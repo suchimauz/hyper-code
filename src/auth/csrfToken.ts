@@ -23,7 +23,7 @@ export default async function (
 ): Promise<string> {
     const name = ctx.fns.procs.auth.cookieName({});
     const digest = async (binding: string) =>
-        Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`hyper-csrf-v2:${name}:${binding}`))).toString("base64url");
+        Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`mauzcode-csrf-v2:${name}:${binding}`))).toString("base64url");
 
     const cookie = new Bun.CookieMap(opts.req.headers.get("cookie") ?? "").get(name);
     if (cookie) {
@@ -46,7 +46,7 @@ export default async function (
     let keyed = cache.get(subject);
     if (!keyed) {
         const { privateKey } = await ctx.fns.procs.auth.keys({});
-        const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, new TextEncoder().encode(`hyper-csrf-keyed:${subject}`));
+        const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, new TextEncoder().encode(`mauzcode-csrf-keyed:${subject}`));
         keyed = Buffer.from(sig).toString("base64url");
         cache.set(subject, keyed);
     }

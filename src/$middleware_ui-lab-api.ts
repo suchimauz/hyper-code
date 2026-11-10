@@ -41,6 +41,6 @@ export default async function(ctx: Context, session: Session | null, opts: {
     } catch (error) {
         if (error instanceof Error && error.message === 'Agent not found') return Response.json({error:'Agent not found'},{status:404,headers});
         console.error('UI navigation request failed:',error instanceof Error?error.message:String(error));
-        return Response.json({error:'Не удалось загрузить навигацию Hyper'}, {status:500,headers});
+        return Response.json({error:'Не удалось загрузить навигацию MauzCode'}, {status:500,headers});
     }
 }

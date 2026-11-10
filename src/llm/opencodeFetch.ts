@@ -58,7 +58,7 @@ export default async function (ctx: Context, session: Session | null, opts: {
     const headers = new Headers(opts.init.headers);
     headers.delete('authorization');
     if (key) headers.set('authorization','Bearer '+key);
-    headers.set('user-agent','Hyper/OpenCode');
+    headers.set('user-agent','MauzCode/OpenCode');
     const sid = opts.sessionId ?? headers.get('x-opencode-session') ?? Bun.randomUUIDv7();
     if (!sid || sid.length > 256 || /[\r\n]/.test(sid)) throw new Error('Invalid OpenCode session identifier');
     headers.set('x-opencode-session', sid);

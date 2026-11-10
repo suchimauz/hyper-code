@@ -1,7 +1,7 @@
 /**
- * Start the local Vite frontend development server for the Hyper lifecycle
+ * Start the local Vite frontend development server for the MauzCode lifecycle
  *
- * Start an in-process Vite server on fixed loopback port 5174 before Hyper accepts HTTP traffic. Repeated starts reuse the live server; failed starts close partially created resources.
+ * Start an in-process Vite server on fixed loopback port 5174 before MauzCode accepts HTTP traffic. Repeated starts reuse the live server; failed starts close partially created resources.
  */
 export default async function (
     ctx: Context,

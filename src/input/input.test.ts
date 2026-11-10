@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 
 async function setup() {
-    const ctx: any = await mkTestCtx({ env: { HYPER_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 21).toString("base64") } });
+    const ctx: any = await mkTestCtx({ env: { MAUZCODE_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 21).toString("base64") } });
     const agent = await ctx.fns.agent.start({ model: "test:model", systemPrompt: "" });
     await ctx.fns.session.save({ agent });
     return { ctx, agent };

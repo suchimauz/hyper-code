@@ -27,9 +27,9 @@ export default async function (
 }> {
     const { agent } = opts;
     const ep = await ctx.fns.llm.resolveEndpoint({ model: agent.model });
-    // Through a Hyper node the bearer is our node token and the host adds the
-    // ChatGPT account headers itself (docs/hyper-node.md).
-    const viaNode = ep.provider === "hyper";
+    // Through a MauzCode node the bearer is our node token and the host adds the
+    // ChatGPT account headers itself (docs/mauzcode-node.md).
+    const viaNode = ep.provider === "mauzcode";
     const apiKey = viaNode || ep.provider === "opencode" || ep.ssh ? ep.apiKey : (await ctx.fns.llm.refreshCodex({ account: ep.account }) ?? ep.apiKey);
     const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort ?? "auto" });
     if (!apiKey && ep.provider !== "opencode") throw new Error("codex: no access_token (run /settings → login)");

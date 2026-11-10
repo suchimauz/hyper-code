@@ -19,7 +19,7 @@ export default async function (
     try {
      const cfg = await ctx.fns.auth.oidcConfig({});
      if (!cfg) return reply({ connected: false, instances: [] });
-     const services = await ctx.fns.controlPlane.services({ kind: 'hyper' });
+     const services = await ctx.fns.controlPlane.services({ kind: 'mauzcode' });
      const safeUrl = (value: string) => { try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.origin + url.pathname : null; } catch { return null; } };
      const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
      return reply({ connected: true, issuer: safeUrl(cfg.issuer), instances: services.map(s => ({ id: String(s.id), name: String(s.name), url: safeUrl(s.url), ownerEmail: typeof s.ownerEmail === 'string' ? s.ownerEmail : null, users: count(s.metadata?.users), agents: count(s.metadata?.agents), running: count(s.metadata?.running), version: typeof s.metadata?.version === 'string' ? s.metadata.version : null, lastSeenAt: typeof s.lastSeenAt === 'number' && Number.isFinite(s.lastSeenAt) && Math.abs(s.lastSeenAt) <= 8.64e15 ? s.lastSeenAt : null })) });

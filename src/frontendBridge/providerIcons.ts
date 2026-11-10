@@ -1,7 +1,7 @@
 /**
  * Return inert provider marks for every quota provider, keyed by provider id
  *
- * Use for React quota cards and other provider badges that need native Hyper logos without injecting SVG markup.
+ * Use for React quota cards and other provider badges that need native MauzCode logos without injecting SVG markup.
  * Reads the unified quota list to discover providers and maps each one through frontendBridge.iconData; unknown providers map to null.
  * @param opts.req Incoming authenticated GET request.
  */

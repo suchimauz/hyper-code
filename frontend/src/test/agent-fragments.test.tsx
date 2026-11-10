@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { WorkspaceSuggestions } from '../components/hyper/WorkspaceSuggestions';
+import { WorkspaceSuggestions } from '../components/mauzcode/WorkspaceSuggestions';
 import { TriggerAudit } from '../core-ui/agent-meta';
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 test('custom path autocomplete renders JSON status without HTML execution',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({paths:['/work/alpha'],path:'/work',status:'directory'}),{headers:{'Content-Type':'application/json'}})));render(<WorkspaceSuggestions value="/work" onChange={()=>{}}/>);await screen.findByText('Directory exists');expect(screen.getByLabelText('Custom local workspace')).toHaveValue('/work');expect(document.querySelector('option')?.value).toBe('/work/alpha');});

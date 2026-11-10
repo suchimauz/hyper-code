@@ -2,7 +2,7 @@
 // frame-ancestors); the browser then shows an empty frame, so the tab checks the headers when it is opened
 // and shows a plain notice with an "open in a new tab" link instead.
 
-export const hint = "a web page by address — args `{ url }` (http/https), live in a frame; sites that forbid framing (Google, GitHub, most logins) show a notice with a link to open them in a new browser tab instead, unless the person's Chrome has the Hyper canvas frames extension, which lets them show live too";
+export const hint = "a web page by address — args `{ url }` (http/https), live in a frame; sites that forbid framing (Google, GitHub, most logins) show a notice with a link to open them in a new browser tab instead, unless the person's Chrome has the MauzCode canvas frames extension, which lets them show live too";
 
 /** Reads the response headers of the page and says whether a foreign page may frame it. */
 async function framing(url: string): Promise<{ embeddable: boolean; reason?: string; finalUrl: string }> {
@@ -55,15 +55,15 @@ export default {
         const wrap = (inner: string) => `<div class="flex h-full flex-col">${bar}<div class="relative min-h-0 flex-1">${inner}</div></div>`;
         if (a.embeddable === false) {
             // With the canvas-frames extension (extensions/canvas-frames) the browser drops the framing
-            // headers inside Hyper tabs and marks <html data-hyper-frames>; then the frame shows and the
+            // headers inside MauzCode tabs and marks <html data-mauzcode-frames>; then the frame shows and the
             // notice hides. Without it only the notice is visible.
-            return wrap(`<style>.hyper-url-frame{display:none}html[data-hyper-frames] .hyper-url-frame{display:block}html[data-hyper-frames] .hyper-url-notice{display:none}</style>
-${frame("hyper-url-frame")}
-<div class="hyper-url-notice flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+            return wrap(`<style>.mauzcode-url-frame{display:none}html[data-mauzcode-frames] .mauzcode-url-frame{display:block}html[data-mauzcode-frames] .mauzcode-url-notice{display:none}</style>
+${frame("mauzcode-url-frame")}
+<div class="mauzcode-url-notice flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
   <div class="text-base font-medium">${esc(new URL(url).hostname)} does not allow embedding in another page</div>
   <div class="max-w-md text-sm text-faint">${esc(String(a.reason ?? ""))}</div>
   <a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm">Open in a new tab</a>
-  <div class="max-w-md text-xs text-faint">To open these sites here, install the Hyper canvas frames extension (extensions/canvas-frames directory).</div>
+  <div class="max-w-md text-xs text-faint">To open these sites here, install the MauzCode canvas frames extension (extensions/canvas-frames directory).</div>
 </div>`);
         }
         return wrap(frame("block"));

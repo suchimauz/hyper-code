@@ -15,7 +15,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const scope = String(form.get("scope") ?? "agent") === "provider" ? "provider" : "agent";
     try {
         const result = await ctx.fns.agent.setModel({ id: opts.params.id!, model, scope });
-        return new Response(null, { status: 204, headers: { "HX-Refresh": "true", "x-hyper-changed": String(result.changed.length) } });
+        return new Response(null, { status: 204, headers: { "HX-Refresh": "true", "x-mauzcode-changed": String(result.changed.length) } });
     } catch (error: any) {
         return new Response(error?.message ?? "Invalid model", { status: 400 });
     }

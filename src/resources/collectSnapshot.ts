@@ -1,5 +1,5 @@
 /**
- * Collect cached local machine and Hyper process-tree resources
+ * Collect cached local machine and MauzCode process-tree resources
  *
  * Read Linux procfs on demand using a shared two-second cache with concurrent request coalescing and no subprocesses or timers. Other platforms expose unavailable process metrics and a known server count of one.
  */
@@ -15,7 +15,7 @@ export default async function (
         const os = await import('node:os');
         const fs = await import('node:fs/promises');
         const sampledAt = Date.now(), host = os.hostname(), platform = os.platform(), cpuCount = os.cpus().length;
-        if (platform !== 'linux') return { sampledAt, host, platform, cpuCount, cpu: {machine:null,hyper:null}, memory: {total:os.totalmem(),used:os.totalmem()-os.freemem(),hyper:null}, swap:{total:null,used:null,hyper:null}, processCount:1, groups:[{name:'Hyper (только основной процесс)',count:1,cpu:null,memory:null,swap:null}],memoryBasis:'unavailable',supported:false,note:'Для сбора процессов нужен Linux procfs; показан только основной процесс, а не всё дерево.' };
+        if (platform !== 'linux') return { sampledAt, host, platform, cpuCount, cpu: {machine:null,mauzcode:null}, memory: {total:os.totalmem(),used:os.totalmem()-os.freemem(),mauzcode:null}, swap:{total:null,used:null,mauzcode:null}, processCount:1, groups:[{name:'MauzCode (только основной процесс)',count:1,cpu:null,memory:null,swap:null}],memoryBasis:'unavailable',supported:false,note:'Для сбора процессов нужен Linux procfs; показан только основной процесс, а не всё дерево.' };
         const safe = async (path: string): Promise<string|null> => { try { return await fs.readFile(path,'utf8'); } catch { return null; } };
         let enumerationComplete = true;
         let pids: number[] = [];

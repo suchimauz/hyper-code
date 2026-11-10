@@ -8,7 +8,7 @@
  * - otherwise: a valid session cookie for an active user is required, and the users row is
  *   re-read on every call so a disabled user is rejected immediately.
  * - OIDC-only mode (auth.oidcOnly): always required, and only a server-side OIDC session counts.
- * - portal trust (auth.portalTrust): a valid X-Hn-Assertion from the hypermesh hub signs the person in first.
+ * - portal trust (auth.portalTrust): a valid X-Hn-Assertion from the mauzcodemesh hub signs the person in first.
  * `required` says whether an anonymous request must be turned away.
  * @param opts.req Incoming HTTP request carrying the session cookie.
  */
@@ -20,7 +20,7 @@ export default async function (
         req: Request;
     },
 ): Promise<{ user: types.auth.User | null; required: boolean; legacy?: boolean; setCookie?: string | null }> {
-    // Portal trust (auth.portalTrust): a valid signed assertion from the hypermesh hub IS the session for
+    // Portal trust (auth.portalTrust): a valid signed assertion from the mauzcodemesh hub IS the session for
     // this request — no cookie, so access ends the moment the hub stops vouching. Without one, the rules
     // below apply unchanged (login page, OIDC button, password).
     const portal = await ctx.fns.auth.portalIdentity({ req: opts.req });

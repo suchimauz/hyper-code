@@ -43,7 +43,7 @@ module.exports = function createLifecycle({ app, Tray, Menu, nativeImage, powerM
       if (icon.isEmpty()) throw new Error('Tray icon could not be loaded');
       if (platform === 'darwin') icon.setTemplateImage(true);
       tray = new Tray(icon);
-      tray.setToolTip('Hyper-code2');
+      tray.setToolTip('MauzCode');
       tray.setContextMenu(Menu.buildFromTemplate([
         { label: 'Показать окно', click: show },
         { type: 'separator' },

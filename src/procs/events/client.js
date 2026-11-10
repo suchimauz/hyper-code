@@ -4,13 +4,13 @@
 //   1. Transport — one topic-filtered SSE stream per tab, kept open whenever the
 //      connection can afford it (see `keepWhileHidden`).
 //   2. Delivery — every event goes to the subscribers registered through
-//      `window.hyperLive.subscribe` / `.command`, and after any GAP (the stream was
+//      `window.mauzcodeLive.subscribe` / `.command`, and after any GAP (the stream was
 //      down, the tab was frozen) every state subscriber is told to `resync`:
 //      re-read its state from the server. An event is a hint; the server's GET is
 //      the truth. A subscriber cannot register without saying how it catches up.
 (() => {
-  if (window.__hyperEventsInstalled) return;
-  window.__hyperEventsInstalled = true;
+  if (window.__mauzcodeEventsInstalled) return;
+  window.__mauzcodeEventsInstalled = true;
 
   let es;
   let status = 'disconnected';
@@ -19,7 +19,7 @@
     if (status === next) return;
     status = next;
     for (const listener of [...statusListeners]) {
-      try { listener(status); } catch (error) { console.error('hyperLive status:', error); }
+      try { listener(status); } catch (error) { console.error('mauzCodeLive status:', error); }
     }
   }
   let reconnectTimer = null;
@@ -40,9 +40,9 @@
 
   function register(kind, opts) {
     const { types, onEvent, resync, name } = opts || {};
-    if (types !== undefined && !(Array.isArray(types) && types.every(t => typeof t === 'string'))) throw new TypeError('hyperLive: types must be an array of event type strings');
-    if (typeof onEvent !== 'function') throw new TypeError('hyperLive: onEvent(event) is required');
-    if (kind === 'state' && typeof resync !== 'function') throw new TypeError(`hyperLive.subscribe(${name || types?.join(',') || ''}): resync() is required — say how this subscriber re-reads its state after a gap, or use hyperLive.command for one-shot instructions`);
+    if (types !== undefined && !(Array.isArray(types) && types.every(t => typeof t === 'string'))) throw new TypeError('mauzCodeLive: types must be an array of event type strings');
+    if (typeof onEvent !== 'function') throw new TypeError('mauzCodeLive: onEvent(event) is required');
+    if (kind === 'state' && typeof resync !== 'function') throw new TypeError(`mauzCodeLive.subscribe(${name || types?.join(',') || ''}): resync() is required — say how this subscriber re-reads its state after a gap, or use mauzCodeLive.command for one-shot instructions`);
     const sub = { kind, name: String(name || types?.join(',') || 'anonymous'), types, onEvent, resync: kind === 'state' ? resync : null };
     subscribers.add(sub);
     return () => subscribers.delete(sub);
@@ -51,11 +51,11 @@
   function deliver(data) {
     for (const sub of [...subscribers]) {
       if (!matches(sub, data)) continue;
-      try { sub.onEvent(data); } catch (error) { console.error(`hyperLive ${sub.name}:`, error); }
+      try { sub.onEvent(data); } catch (error) { console.error(`mauzCodeLive ${sub.name}:`, error); }
     }
     // Compatibility: older scripts listened on the DOM event directly. New code
     // must not (code.quality rule `live-subscribe`); it misses the resync.
-    document.dispatchEvent(new CustomEvent('hyper-events', { detail: data }));
+    document.dispatchEvent(new CustomEvent('mauzcode-events', { detail: data }));
   }
 
   // After a gap: live regions re-fetch themselves, every state subscriber re-reads.
@@ -68,18 +68,18 @@
     for (const topic of topics()) refreshSoon(topic);
     for (const sub of [...subscribers]) {
       if (!sub.resync) continue;
-      try { sub.resync(reason); } catch (error) { console.error(`hyperLive ${sub.name} resync:`, error); }
+      try { sub.resync(reason); } catch (error) { console.error(`mauzCodeLive ${sub.name} resync:`, error); }
     }
   }
 
-  window.hyperLive = {
+  window.mauzcodeLive = {
     /** Current transport state: connecting | connected | disconnected. */
     getStatus: () => status,
     /** Recompute DOM topics after non-htmx rendering; reconnect and resync on change. */
     refreshTopics: () => refreshTopics(true),
     /** Listen for state changes (not an immediate snapshot); returns unsubscribe. */
     onStatus: listener => {
-      if (typeof listener !== 'function') throw new TypeError('hyperLive.onStatus: listener must be a function');
+      if (typeof listener !== 'function') throw new TypeError('mauzCodeLive.onStatus: listener must be a function');
       statusListeners.add(listener);
       return () => statusListeners.delete(listener);
     },
@@ -136,7 +136,7 @@
     if (!wanted.size) return;
     for (const el of regions()) {
       // Non-bubbling: only regions of this topic refresh, not every listener on body.
-      if (wanted.has(el.dataset.liveTopic)) el.dispatchEvent(new CustomEvent('hyper-live', { bubbles: false }));
+      if (wanted.has(el.dataset.liveTopic)) el.dispatchEvent(new CustomEvent('mauzcode-live', { bubbles: false }));
     }
   }
 

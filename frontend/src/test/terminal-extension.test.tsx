@@ -51,7 +51,7 @@ describe('CanvasTerminal', () => {
     await settle();
     const ws = FakeSocket.all[0]!; const term = xterm.instances[0];
     expect(ws.url).toBe(`ws://${location.host}/terminal/socket?agentId=a%20b&cols=80&rows=24`);
-    expect(ws.protocols).toEqual(['hyper-terminal']);
+    expect(ws.protocols).toEqual(['mauzcode-terminal']);
     expect(screen.getByRole('status')).toHaveTextContent('Запускаем терминал');
     act(() => ws.onmessage!({ data: JSON.stringify({ type: 'ready', cwd: '/w' }) }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();

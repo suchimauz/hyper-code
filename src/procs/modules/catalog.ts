@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 export default async function (ctx: Context, _session: Session | null, _opts?: {}) {
     // Containers, by the name they are mounted (and excluded) under.
     const mounted = new Set((ctx.state.procs?.modules ?? []).map(m => m.name));
-    // hyper-code2: a path-mounted module may be declared under a different
+    // mauzcode: a path-mounted module may be declared under a different
     // container name (`google-local` → plugins/google). Compare real folders
     // too, otherwise the same plugin appears twice — once mounted, once as
     // available-to-mount.

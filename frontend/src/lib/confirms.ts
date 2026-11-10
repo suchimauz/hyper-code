@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 export type ConfirmInput = { id: string; agentId: string; kind: 'confirm'; title: string; message?: string; createdAt?: string; updatedAt?: string; state: 'open' | 'processing' | 'submitted' | 'cancelled'; result?: { confirmed: boolean; comment?: string } | null; spec: { details: string; confirmLabel: string; declineLabel: string; danger: boolean } };
 export type ConfirmInputsState = { inputs: ConfirmInput[]; csrfToken: string };
 export type ConfirmAnswer = { decision: 'yes' | 'no'; comment?: string };

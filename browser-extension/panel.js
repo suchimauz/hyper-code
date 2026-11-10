@@ -22,7 +22,7 @@ function clearFrame() {
 }
 function render(record) {
   if (!identity || record.tabId !== identity.tabId || record.nonce !== identity.nonce) return;
-  source.textContent = record.label || 'Hyper Sidebar';
+  source.textContent = record.label || 'MauzCode Sidebar';
   source.title = record.label || '';
   status.textContent = record.status;
   showError(record.error || '');
@@ -56,7 +56,7 @@ async function connect() {
   }
   if (!identity) {
     status.textContent = 'No tab identity';
-    showError('Close this default panel, then click the Hyper extension icon on your source tab. If just installed, reload the extension once initialization completes.');
+    showError('Close this default panel, then click the MauzCode extension icon on your source tab. If just installed, reload the extension once initialization completes.');
     return;
   }
   status.textContent = 'Connecting…';
@@ -84,5 +84,5 @@ back.addEventListener('click', async () => {
   finally { back.disabled = false; }
 });
 document.querySelector('#settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
-chat.addEventListener('error', () => showError('Hyper frame could not load. Check the server and open this agent in Hyper to sign in.'));
+chat.addEventListener('error', () => showError('MauzCode frame could not load. Check the server and open this agent in MauzCode to sign in.'));
 connect();

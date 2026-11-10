@@ -1,5 +1,5 @@
 // Resolution chain:
-//   0. Instance settings file ~/.hyper/settings/$settings_<module>.json — only for scope='global'
+//   0. Instance settings file ~/.mauzcode/settings/$settings_<module>.json — only for scope='global'
 //      (settings.files); a key fixed there wins over the database.
 //   1. DB row (explicit override).
 //   2. Declared default — only for scope='global':

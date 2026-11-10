@@ -1,5 +1,5 @@
 // The global menu layout, stored as JSON in the `nav.layout` setting — for the whole instance (scope global,
-// env HYPER_NAV) and per person (scope user). The person's copy wins as a whole.
+// env MAUZCODE_NAV) and per person (scope user). The person's copy wins as a whole.
 export type Layout = {
     /** Format version; bump when the shape changes. @default 1 */
     version?: number;

@@ -2,7 +2,7 @@
 // Any module or plugin may declare one; the file default-exports a
 // types.compaction.Compactor. `$compaction_default.ts` answers every provider
 // without its own file. Later roots override earlier ones by provider name, so
-// a plugin or .hyper can replace the default or add a provider.
+// a plugin or .mauzcode can replace the default or add a provider.
 
 /**
  * Registers `$compaction_<provider>.ts` compactors in ctx.state.compaction.compactors.

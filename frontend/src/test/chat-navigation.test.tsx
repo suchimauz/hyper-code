@@ -1,9 +1,9 @@
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ChatNavigation, navigationAnchor, navigationItems } from '../components/hyper/ChatNavigation';
+import { ChatNavigation, navigationAnchor, navigationItems } from '../components/mauzcode/ChatNavigation';
 import { fetchChatOutline, fetchThrough } from '../hooks/useChatOutline';
-import type { ChatEvent } from '../lib/hyper';
+import type { ChatEvent } from '../lib/mauzcode';
 const user = (idx: number): ChatEvent => ({ idx, ts: 0, type: 'user', text: `Prompt ${idx}`, messageIdx: idx });
 
 describe('configured Claude turn navigation', () => {

@@ -1,7 +1,7 @@
 /**
  * Re-authorize the personal MTProto session. Telegram sends a login code to the
  * user's Telegram app; code and optional 2FA password are collected through a
- * modal form in the current hyper-code browser tab. The resulting StringSession
+ * modal form in the current mauzcode-code browser tab. The resulting StringSession
  * is written directly to 1Password and never returned or persisted on disk.
  */
 import { TelegramClient, Api } from "telegram";
@@ -17,8 +17,8 @@ type ReauthFlight = {
 };
 type ReauthSingleton = { flight?: ReauthFlight; generation: number };
 type TelegramClientSingleton = { client?: TelegramClient; connecting?: Promise<TelegramClient> | null };
-const reauthKey = Symbol.for("hyper-code2.telegram.reauth.singleton");
-const telegramClientKey = Symbol.for("hyper-code2.telegram.client.singleton");
+const reauthKey = Symbol.for("mauzcode.telegram.reauth.singleton");
+const telegramClientKey = Symbol.for("mauzcode.telegram.client.singleton");
 const globalState = globalThis as typeof globalThis & {
     [reauthKey]?: ReauthSingleton;
     [telegramClientKey]?: TelegramClientSingleton;
@@ -35,7 +35,7 @@ async function opSecret(ctx: Context, ref: string) {
 
 async function backupSessionToOnePassword(ctx: Context, session: string): Promise<boolean> {
     try {
-        const get = Bun.spawn(["op", "item", "get", "telegram session.txt", "--vault", "hyper", "--format=json", "--reveal"], { stdout: "pipe", stderr: "pipe" });
+        const get = Bun.spawn(["op", "item", "get", "telegram session.txt", "--vault", "mauzcode", "--format=json", "--reveal"], { stdout: "pipe", stderr: "pipe" });
         const timer = setTimeout(() => { try { get.kill(9); } catch {} }, 15_000);
         const [raw, getCode] = await Promise.all([new Response(get.stdout).text(), get.exited]).finally(() => clearTimeout(timer));
         if (getCode !== 0) return false;
@@ -43,7 +43,7 @@ async function backupSessionToOnePassword(ctx: Context, session: string): Promis
         const field = item.fields?.find((x: any) => x.label === "value");
         if (!field) return false;
         field.value = session;
-        const edit = Bun.spawn(["op", "item", "edit", item.id, "--vault", "hyper"], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+        const edit = Bun.spawn(["op", "item", "edit", item.id, "--vault", "mauzcode"], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
         edit.stdin.write(JSON.stringify(item));
         edit.stdin.end();
         const editTimer = setTimeout(() => { try { edit.kill(9); } catch {} }, 15_000);
@@ -86,7 +86,7 @@ async function performReauth(ctx: Context, opts?: { timeoutMs?: number; force?: 
     }
 
     const timeoutMs = Math.max(30_000, Math.min(opts?.timeoutMs ?? 300_000, 900_000));
-    const configRaw = await opSecret(ctx, "op://hyper/telegram config.json/value");
+    const configRaw = await opSecret(ctx, "op://mauzcode/telegram config.json/value");
     if (!configRaw) throw new Error("Telegram MTProto config is not configured");
     const config = JSON.parse(configRaw);
     if (!Number.isInteger(config.apiId) || !config.apiHash || !config.phone) throw new Error("Telegram config requires apiId, apiHash and phone");

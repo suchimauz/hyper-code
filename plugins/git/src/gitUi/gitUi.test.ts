@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 const load=async(path:string)=>(await import(path)).default;
 const root=resolve(import.meta.dir,'../../../..');
 async function setup(){
- const base=resolve(root,'.hyper/tmp/emh/tests');await mkdir(base,{recursive:true});const dir=await mkdtemp(base+'/repo-');
+ const base=resolve(root,'.mauzcode/tmp/emh/tests');await mkdir(base,{recursive:true});const dir=await mkdtemp(base+'/repo-');
  const ctx:any={fns:{git:{},gitUi:{},remote:{quote:({value}:any)=>"'"+value.replaceAll("'","'\\''")+"'"}},state:{}};
  const run=await load(root+'/src/git/run.ts');ctx.fns.git.run=(o:any)=>run(ctx,null,o);
  for(const name of ['command','snapshot','commit','diff','checkPath','blobSize','handle']){const fn=await load(import.meta.dir+'/'+name+'.ts');ctx.fns.gitUi[name]=(o:any)=>fn(ctx,null,o);}

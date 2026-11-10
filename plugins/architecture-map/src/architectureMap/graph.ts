@@ -1,5 +1,5 @@
 /**
- * Builds a module dependency graph from Hyper's indexed function calls
+ * Builds a module dependency graph from MauzCode's indexed function calls
  *
  * Use this read-only function to explore module coupling, weighted dependencies, entry points, and strongly connected module groups before architecture work or while rendering an interactive Canvas map.
  * @param opts.includeTests Include call edges originating from tests. @default false

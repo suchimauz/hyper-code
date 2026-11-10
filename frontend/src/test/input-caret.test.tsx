@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { MessageInput } from '../components/hyper/MessageInput';
+import { MessageInput } from '../components/mauzcode/MessageInput';
 
 afterEach(() => vi.restoreAllMocks());
 it('keeps the native caret when geometry is unavailable and never intercepts input', () => {

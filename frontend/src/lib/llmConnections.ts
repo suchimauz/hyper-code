@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 import type { NavigationIcon } from './navigation';
 
 export type QuotaWindow = { usedPercent: number; windowMinutes?: number | null; resetsAt?: number | null };

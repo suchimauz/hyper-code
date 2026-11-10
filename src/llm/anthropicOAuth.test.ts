@@ -5,7 +5,7 @@ const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 
 async function ctx() {
-    return await mkTestCtx({ env: { HYPER_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") } });
+    return await mkTestCtx({ env: { MAUZCODE_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") } });
 }
 
 describe("managed Anthropic OAuth", () => {

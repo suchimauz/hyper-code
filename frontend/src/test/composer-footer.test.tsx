@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ComposerFooter } from '../components/hyper/ComposerFooter';
-import { LiveComposer } from '../components/hyper/LiveComposer';
+import { ComposerFooter } from '../components/mauzcode/ComposerFooter';
+import { LiveComposer } from '../components/mauzcode/LiveComposer';
 vi.mock('../lib/goal', async importOriginal => ({ ...await importOriginal<typeof import('../lib/goal')>(), getGoal: vi.fn().mockResolvedValue({ version: 1, enabled: false }) }));
 vi.mock('../lib/queue', async importOriginal => ({ ...await importOriginal<typeof import('../lib/queue')>(), getQueue: vi.fn().mockResolvedValue({ items: [] }) }));
 const json = (body: object) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });

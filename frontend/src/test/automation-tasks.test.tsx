@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { AutomationTasks } from '../components/hyper/AutomationTasks';
+import { AutomationTasks } from '../components/mauzcode/AutomationTasks';
 import { cronSchedule, filterCronTasks, type CronTask } from '../lib/cronTasks';
 
 const task = (over: Partial<CronTask>): CronTask => ({ name: 't', fn: 'mod.fn', args: {}, scheduleType: 'interval', everyMs: 300000, nextRunAt: Date.now() + 60000, enabled: true, state: 'idle', source: 'adhoc', sourceFile: null, lastStatus: 'done', lastStartedAt: null, lastFinishedAt: null, lastError: null, ...over });

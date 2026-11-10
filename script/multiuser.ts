@@ -1,4 +1,4 @@
-// Safe switch of an existing Hyper database to users (DESIGN §34–§36).
+// Safe switch of an existing MauzCode database to users (DESIGN §34–§36).
 //
 //   bun script/multiuser.ts plan      --name "…" --email a@b [--email2 c@d]   # read-only preflight
 //   bun script/multiuser.ts backup                                            # pg_dump of the affected tables
@@ -99,10 +99,10 @@ if (cmd === "plan") {
 }
 
 if (cmd === "backup") {
-    const dir = flag("dir") ?? `${process.env.HOME}/hyper-backups`;
+    const dir = flag("dir") ?? `${process.env.HOME}/mauzcode-backups`;
     await Bun.$`mkdir -p ${dir}`.quiet();
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const file = `${dir}/hyper-before-users-${stamp}.dump`;
+    const file = `${dir}/mauzcode-before-users-${stamp}.dump`;
     // Schema of everything + data of the core tables that the migration touches, plus settings (legacy password).
     console.log(`pg_dump → ${file}`);
     const r = await Bun.$`pg_dump --format=custom --no-owner --file=${file} --table=public.agents --table=public.messages --table=public.events --table=public.settings --table=public._migrations ${url}`.nothrow();
@@ -202,7 +202,7 @@ if (cmd === "verify") {
 }
 
 if (cmd === "down") {
-    // Optional cleanup ONLY. The rollback is: stop Hyper, run the previous code, start (switch.md).
+    // Optional cleanup ONLY. The rollback is: stop MauzCode, run the previous code, start (switch.md).
     // The previous code ignores this schema. Running `down` while the new code serves requests
     // breaks it (it reads `users` on every request) and the next boot re-applies the migration.
     const s = await state();
@@ -210,11 +210,11 @@ if (cmd === "down") {
     const serving = (await Bun.$`lsof -nP -iTCP:3010 -sTCP:LISTEN`.quiet().nothrow()).stdout.toString().trim();
     if (!has("yes")) {
         out({ willRemove: ["table users", "agents.created_by", "messages.author", "events.actor"], users: s.users, somethingListeningOn3010: !!serving });
-        console.log("\nOptional cleanup. Only after the PREVIOUS code is running (or Hyper is stopped).");
+        console.log("\nOptional cleanup. Only after the PREVIOUS code is running (or MauzCode is stopped).");
         console.log("Re-run with --yes --old-code-running to confirm. Recorded authorship will be lost.");
         process.exit(0);
     }
-    if (!has("old-code-running")) fail("confirm with --old-code-running that the previous code is live (or Hyper is stopped)");
+    if (!has("old-code-running")) fail("confirm with --old-code-running that the previous code is live (or MauzCode is stopped)");
     const m = (ctx.state.procs?.migrate?.list ?? []).find((x: any) => x.id === MIGRATION);
     if (!m?.down) fail("migration down() not found in this code");
     await m!.down(ctx);

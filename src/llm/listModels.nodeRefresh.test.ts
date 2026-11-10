@@ -24,19 +24,19 @@ test("node choices survive transient refresh failures, but not revocation, disab
         return Response.json(String(input).endsWith("/models") ? { models: mode === "empty" ? [] : entries } : { usage: [] });
     }) as typeof fetch;
     try {
-        const expected = entries.map(e => `hyper/mini6:${e.id}`);
-        expect((await listModels(ctx, null))["hyper/mini6"]).toEqual(expected);
+        const expected = entries.map(e => `mauzcode/mini6:${e.id}`);
+        expect((await listModels(ctx, null))["mauzcode/mini6"]).toEqual(expected);
         mode = "offline"; node.catalogAt = Date.now() - 600_000;
-        expect((await listModels(ctx, null))["hyper/mini6"]).toEqual(expected);
+        expect((await listModels(ctx, null))["mauzcode/mini6"]).toEqual(expected);
         node.enabled = false;
-        expect((await listModels(ctx, null))["hyper/mini6"]).toBeUndefined();
+        expect((await listModels(ctx, null))["mauzcode/mini6"]).toBeUndefined();
         node.enabled = true; mode = "revoked";
-        expect((await listModels(ctx, null))["hyper/mini6"]).toBeUndefined();
+        expect((await listModels(ctx, null))["mauzcode/mini6"]).toBeUndefined();
         mode = "offline";
-        expect((await listModels(ctx, null))["hyper/mini6"]).toBeUndefined();
+        expect((await listModels(ctx, null))["mauzcode/mini6"]).toBeUndefined();
         mode = "ok";
-        expect((await listModels(ctx, null))["hyper/mini6"]).toEqual(expected);
+        expect((await listModels(ctx, null))["mauzcode/mini6"]).toEqual(expected);
         node.catalogAt = Date.now() - 600_000; mode = "empty";
-        expect((await listModels(ctx, null))["hyper/mini6"]).toBeUndefined();
+        expect((await listModels(ctx, null))["mauzcode/mini6"]).toBeUndefined();
     } finally { globalThis.fetch = originalFetch; }
 });

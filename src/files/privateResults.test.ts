@@ -6,9 +6,9 @@ import { tmpdir } from "node:os";
 
 test("private results reject Files HTTP routes, symlink aliases and directory listing", async () => {
     const ctx = await mkTestCtx();
-    const dir = await mkdtemp(join(tmpdir(), "hyper-private-results-"));
+    const dir = await mkdtemp(join(tmpdir(), "mauzcode-private-results-"));
     try {
-        const store = join(dir, ".hyper/results");
+        const store = join(dir, ".mauzcode/results");
         await mkdir(store, { recursive: true });
         const secret = join(store, "payload.json");
         await writeFile(secret, "PRIVATE_PAYLOAD_SENTINEL");
@@ -27,8 +27,8 @@ test("private results reject Files HTTP routes, symlink aliases and directory li
         }
         const root = await (await ctx.fns.files.browserData({ path: dir })).json();
         expect(root.entries.map((entry: {name: string}) => entry.name)).not.toContain('alias');
-        const hyper = await (await ctx.fns.files.browserData({ path: join(dir, ".hyper") })).json();
-        expect(hyper.entries.map((entry: {name: string}) => entry.name)).not.toContain('results');
+        const mauzcode = await (await ctx.fns.files.browserData({ path: join(dir, ".mauzcode") })).json();
+        expect(mauzcode.entries.map((entry: {name: string}) => entry.name)).not.toContain('results');
         const normal = await ctx.fns.files.rawResponse({ path: join(dir, "public.txt") });
         expect(normal.status).toBe(200);
         expect(await normal.text()).toBe("public");

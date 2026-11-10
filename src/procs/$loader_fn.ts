@@ -47,7 +47,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { e
 // builds a fresh ctx per test in one process. Same file, same mtime → same metadata, so it is kept per process.
 // Entries that carry their own source (bundles, hot reload with text) are always parsed.
 // On globalThis: boot imports this loader cache-busted, so a module-level Map would start empty every boot.
-const reflectCache: Map<string, any> = ((globalThis as any).__hyperReflectCache ??= new Map());
+const reflectCache: Map<string, any> = ((globalThis as any).__mauzcodeReflectCache ??= new Map());
 function reflectCached(ts: any, entry: any): any {
     if (entry.source) return reflectSource(ts, entry);
     let key = "";

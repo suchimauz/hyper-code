@@ -2,7 +2,7 @@
  * Reads the Dock layout that applies to the current viewer.
  *
  * The person's own layout (setting dock.layout, scope user) replaces the instance layout (scope global,
- * env HYPER_DOCK) as a whole; with neither, the layout is empty and entries keep their own zone and order.
+ * env MAUZCODE_DOCK) as a whole; with neither, the layout is empty and entries keep their own zone and order.
  * Malformed JSON is treated as empty so a bad value can never take the page shell down.
  */
 export default async function (

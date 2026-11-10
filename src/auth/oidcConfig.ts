@@ -1,7 +1,7 @@
 /**
  * Returns the OpenID Connect sign-in configuration with the provider's discovered endpoints, or null when off.
  *
- * Sign-in through a provider (the Hyper Control Plane) is optional: it is on only when issuer, client ID and
+ * Sign-in through a provider (the MauzCode Control Plane) is optional: it is on only when issuer, client ID and
  * client secret are set. Endpoints come from the issuer's /.well-known/openid-configuration, cached for 10
  * minutes. The secret may be an op:// or secret:// reference. Password sign-in is unaffected.
  */

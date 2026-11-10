@@ -1,9 +1,9 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 import { normalizeMascotChoice, type MascotChoice } from './mascots';
 export type NewSessionDraft = { title?: string; workspaceDir?: string; createWorkspaceDir?: string; promptPreset?: string[]; systemPrompt?: string; mascot?: MascotChoice; projectId: string; model: string; effort: string; text: string; requestKey: string };
 export type NewSessionDefaults = { version: number; defaultModel: string; csrfToken: string; promptPresets?: Record<string, { label: string; text: string }> };
-const storageKey = 'hyper-ui-new-session';
-const selectionKey = 'hyper-ui-last-session-selection';
+const storageKey = 'mauzcode-ui-new-session';
+const selectionKey = 'mauzcode-ui-last-session-selection';
 export type SessionSelection = { projectId?: string; model?: string };
 /** Local preferences only; always validate these IDs against the current authorized catalogue. */
 export function readSessionSelection(): SessionSelection {

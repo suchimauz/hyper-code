@@ -1,5 +1,5 @@
 /**
- * Revoke a client Hyper's token so this host stops relaying for it
+ * Revoke a client MauzCode's token so this host stops relaying for it
  * @param opts.id Client id from node.clients.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { /** Client id. */ id: string }): Promise<{ revoked: boolean }> {

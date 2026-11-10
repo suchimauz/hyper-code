@@ -19,7 +19,7 @@ export default async function (
         /** Stable unique request ID; reuse only for the same response. */
         requestId: string;
         /** Verified provenance-preserving usage format. */
-        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "hyper-stream-anthropic" | "common-stream" | "unsupported";
+        format: "openai-chat" | "openai-responses" | "anthropic-raw" | "mauzcode-stream-anthropic" | "common-stream" | "unsupported";
         /** Raw provider usage; undefined is intentionally recorded as unknown. */
         usage: unknown;
     },

@@ -1,8 +1,8 @@
 /**
- * Ranks Hyper source files by cached Git churn and code complexity
+ * Ranks MauzCode source files by cached Git churn and code complexity
  *
  * Use this read-only analysis to find refactoring candidates that are both difficult and frequently changed. Run architectureMap.indexGit first after HEAD changes; this function joins that Postgres cache to current source metrics and classifies Danger Zone, Cowboy Code, Fertile Ground, and Healthy files.
- * @param opts.root Limit analysis to one Hyper source root, such as core or browser.
+ * @param opts.root Limit analysis to one MauzCode source root, such as core or browser.
  * @param opts.includeTests Include test files in the ranked results. @default false
  * @param opts.limit Maximum ranked files returned. @default 500 @minimum 1 @maximum 5000
  */
@@ -10,7 +10,7 @@ export default async function (
     ctx: Context,
     session: Session | null,
     opts: {
-        /** Limit analysis to one Hyper source root, such as core or browser. */
+        /** Limit analysis to one MauzCode source root, such as core or browser. */
         root?: string;
         /** Include test files in the ranked results. @default false */
         includeTests?: boolean;

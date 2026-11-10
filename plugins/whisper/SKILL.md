@@ -16,4 +16,4 @@ Test page: `/whisper` — live mic transcription (partial text while speaking, f
 
 ## Browser UI
 
-The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["overview"], "applications": {"/whisper": "overview"}}). Hyper builds and loads it at runtime; after editing it run `plugins.reload({ name: "whisper" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.
+The React UI lives in `ui/index.tsx` (grants in `package.json` `procs.ui`: {"entry": "ui/index.tsx", "pages": ["overview"], "applications": {"/whisper": "overview"}}). MauzCode builds and loads it at runtime; after editing it run `plugins.reload({ name: "whisper" })` — no frontend rebuild. See "Plugin UI" in `src/plugins/SKILL.md`.

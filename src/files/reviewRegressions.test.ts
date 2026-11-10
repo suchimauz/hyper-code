@@ -9,7 +9,7 @@ describe("Files UI: untrusted file contents", () => {
     test("native editor content is transported as JSON, never inline executable HTML", async () => {
         const ctx: any = await mkTestCtx();
         await ctx.fns.procs.http.loadRoutes({});
-        const dir = await mkdtemp(join(tmpdir(), "hyper-xss-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-xss-"));
         try {
             const content = "const a = 1;\n</script><script>window.__pwned = 1</script><!--\n\u2028\n";
             const path = join(dir, "evil.ts");
@@ -60,7 +60,7 @@ describe("files.isPageRequest: page vs raw asset", () => {
     test("an HTML preview's own script is served raw, with its MIME type", async () => {
         const ctx: any = await mkTestCtx();
         await ctx.fns.procs.http.loadRoutes({});
-        const dir = await mkdtemp(join(tmpdir(), "hyper-assets-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-assets-"));
         try {
             await writeFile(join(dir, "app.js"), "console.log(1)\n");
             const url = await ctx.fns.files.browserUrl({ path: join(dir, "app.js") });

@@ -1,6 +1,6 @@
 import { filterProjects, type NavigationChat, type NavigationProject } from './navigation';
-import { defaultWorkspaceView, type WorkspaceView } from '../components/hyper/WorkspaceViewMenu';
-const key = 'hyper.workspace-view';
+import { defaultWorkspaceView, type WorkspaceView } from '../components/mauzcode/WorkspaceViewMenu';
+const key = 'mauzcode.workspace-view';
 export function readWorkspaceView(): WorkspaceView {
   const requestedFilter = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('workspaceFilter');
   const filter = requestedFilter === 'active' || requestedFilter === 'archived' ? requestedFilter : undefined;

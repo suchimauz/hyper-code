@@ -2,11 +2,11 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkTestCtx } from "../_testCtx.entry";
 
-// End-to-end against the real Hyper Control Plane (sibling repo ~/hyper-control-plane) with a fake Google.
+// End-to-end against the real MauzCode Control Plane (sibling repo ~/mauzcode-control-plane) with a fake Google.
 // Skipped when the control plane checkout is not present.
-const CP = process.env.HYPER_CONTROL_PLANE_DIR ?? `${process.env.HOME}/hyper-control-plane`;
+const CP = process.env.MAUZCODE_CONTROL_PLANE_DIR ?? `${process.env.HOME}/mauzcode-control-plane`;
 const available = existsSync(`${CP}/scripts/e2e-server.ts`);
-const ORIGIN = "http://hyper.test";
+const ORIGIN = "http://mauzcode.test";
 
 let cp: { issuer: string; clientId: string; clientSecret: string; admin: string };
 let proc: ReturnType<typeof Bun.spawn> | null = null;
@@ -21,17 +21,17 @@ beforeAll(async () => {
 });
 afterAll(async () => { if (cp) await fetch(cp.admin + "stop").catch(() => {}); proc?.kill(); });
 
-async function hyper() {
-    return mkTestCtx({ env: { HYPER_OIDC_ISSUER: cp.issuer, HYPER_OIDC_CLIENT_ID: cp.clientId, HYPER_OIDC_CLIENT_SECRET: cp.clientSecret, HYPER_OIDC_LABEL: "Health Samurai" } });
+async function mauzcode() {
+    return mkTestCtx({ env: { MAUZCODE_OIDC_ISSUER: cp.issuer, MAUZCODE_OIDC_CLIENT_ID: cp.clientId, MAUZCODE_OIDC_CLIENT_SECRET: cp.clientSecret, MAUZCODE_OIDC_LABEL: "Health Samurai" } });
 }
 const cookieOf = (res: Response, name: string) => res.headers.getSetCookie().find((c) => c.startsWith(name + "="))?.split(";")[0] ?? "";
 
-/** Browser dance: Hyper -> control plane -> (fake) Google -> control plane -> Hyper callback. */
+/** Browser dance: MauzCode -> control plane -> (fake) Google -> control plane -> MauzCode callback. */
 async function signIn(ctx: any, account: Record<string, unknown>) {
     await fetch(cp.admin + "account", { method: "POST", body: JSON.stringify(account) });
     const start = await ctx.fns.procs.http.dispatch({ method: "GET", url: `${ORIGIN}/auth/oidc?next=/agent/ab` });
     expect(start.status).toBe(303);
-    const stateCookie = cookieOf(start, "hyper_oidc_state");
+    const stateCookie = cookieOf(start, "mauzcode_oidc_state");
     let loc = start.headers.get("location")!;
     expect(loc.startsWith(cp.issuer + "/authorize")).toBe(true);
     for (let i = 0; i < 4 && !loc.startsWith(ORIGIN); i++) loc = (await fetch(loc, { redirect: "manual" })).headers.get("location")!;
@@ -40,9 +40,9 @@ async function signIn(ctx: any, account: Record<string, unknown>) {
 }
 
 test.skipIf(!available)("off by default; on with issuer + client: login page shows the button", async () => {
-    const plain = await mkTestCtx({ env: { HYPER_PASSWORD: "x-legacy-pass" } });
+    const plain = await mkTestCtx({ env: { MAUZCODE_PASSWORD: "x-legacy-pass" } });
     expect(await plain.fns.auth.oidcConfig({})).toBeNull();
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const cfg = await ctx.fns.auth.oidcConfig({});
     expect(cfg?.tokenEndpoint).toBe(cp.issuer + "/token");
     await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
@@ -52,7 +52,7 @@ test.skipIf(!available)("off by default; on with issuer + client: login page sho
 });
 
 test.skipIf(!available)("sign in through the control plane: user created, session works, link by email", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     const nik = await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
     const res = await signIn(ctx, { sub: "g-nik", email: "niquola@health-samurai.io", name: "Nikolai R", hd: "health-samurai.io" });
     expect(res.status).toBe(303);
@@ -66,8 +66,8 @@ test.skipIf(!available)("sign in through the control plane: user created, sessio
     expect(annaMe.user.role).toBe("member");
 });
 
-test.skipIf(!available)("gmail refused by the control plane shows on Hyper's login page", async () => {
-    const ctx = await hyper();
+test.skipIf(!available)("gmail refused by the control plane shows on MauzCode's login page", async () => {
+    const ctx = await mauzcode();
     await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
     const res = await signIn(ctx, { sub: "g-x", email: "x@gmail.com", name: "X", hd: undefined });
     expect(res.headers.get("location")).toContain("/auth/login?error=");
@@ -75,7 +75,7 @@ test.skipIf(!available)("gmail refused by the control plane shows on Hyper's log
 });
 
 test.skipIf(!available)("expired short session renews silently; disabling the user at the control plane ends it", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
     const res = await signIn(ctx, { sub: "g-bob", email: "bob@health-samurai.io", name: "Bob", hd: "health-samurai.io" });
     const name = ctx.fns.procs.auth.cookieName({});
@@ -105,7 +105,7 @@ test.skipIf(!available)("expired short session renews silently; disabling the us
 });
 
 test.skipIf(!available)("logout revokes the server-side session", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
     const res = await signIn(ctx, { sub: "g-carol", email: "carol@health-samurai.io", name: "Carol", hd: "health-samurai.io" });
     const cookie = cookieOf(res, ctx.fns.procs.auth.cookieName({}));
@@ -116,7 +116,7 @@ test.skipIf(!available)("logout revokes the server-side session", async () => {
 });
 
 test.skipIf(!available)("OIDC-only mode: no password form, password and legacy sessions refused, only the provider lets in", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_OIDC_ISSUER: cp.issuer, HYPER_OIDC_CLIENT_ID: cp.clientId, HYPER_OIDC_CLIENT_SECRET: cp.clientSecret, HYPER_OIDC_ONLY: "true", HYPER_PASSWORD: "legacy-pass-123" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_OIDC_ISSUER: cp.issuer, MAUZCODE_OIDC_CLIENT_ID: cp.clientId, MAUZCODE_OIDC_CLIENT_SECRET: cp.clientSecret, MAUZCODE_OIDC_ONLY: "true", MAUZCODE_PASSWORD: "legacy-pass-123" } });
     expect(await ctx.fns.auth.oidcOnly({})).toBe(true);
     const name = ctx.fns.procs.auth.cookieName({});
     // No users yet: still closed (no open mode, no setup).
@@ -131,7 +131,7 @@ test.skipIf(!available)("OIDC-only mode: no password form, password and legacy s
     const pw = await ctx.fns.procs.http.dispatch({ method: "POST", url: "/auth/login", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: "legacy-pass-123" }) });
     expect(pw.status).toBe(403);
     // A plain signed cookie (password-style session) does not count.
-    const legacy = `${name}=` + await ctx.fns.procs.auth.sign({ sub: "password-user", name: "Hyper user", role: "owner", days: 1 });
+    const legacy = `${name}=` + await ctx.fns.procs.auth.sign({ sub: "password-user", name: "MauzCode user", role: "owner", days: 1 });
     expect((await ctx.fns.procs.http.dispatch({ method: "GET", url: "/agent/ab", headers: { cookie: legacy, accept: "application/json" } })).status).toBe(401);
     // The control plane lets people in; the first becomes owner.
     const res = await signIn(ctx, { sub: "g-val", email: "valeria@health-samurai.io", name: "Valeria", hd: "health-samurai.io" });
@@ -141,7 +141,7 @@ test.skipIf(!available)("OIDC-only mode: no password form, password and legacy s
 });
 
 test.skipIf(!available)("concurrent requests renew one session once: no refresh-token reuse, nobody is signed out", async () => {
-    const ctx = await hyper();
+    const ctx = await mauzcode();
     await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
     const res = await signIn(ctx, { sub: "g-dan", email: "dan@health-samurai.io", name: "Dan", hd: "health-samurai.io" });
     const name = ctx.fns.procs.auth.cookieName({});
@@ -163,10 +163,10 @@ test.skipIf(!available)("concurrent requests renew one session once: no refresh-
     expect(again.map((r: Response) => r.status)).toEqual([200, 200, 200]);
 });
 
-// Popups (Files, previews…) post to /rpc. It used its own cookie-only check, so on an OIDC-only Hyper a popup
+// Popups (Files, previews…) post to /rpc. It used its own cookie-only check, so on an OIDC-only MauzCode a popup
 // answered 401 as soon as the 15-minute access cookie expired, while pages renewed it and opened fine.
 test.skipIf(!available)("OIDC-only: /rpc accepts the session, renews an expired access cookie, keeps the page's csrf token", async () => {
-    const ctx = await mkTestCtx({ env: { HYPER_OIDC_ISSUER: cp.issuer, HYPER_OIDC_CLIENT_ID: cp.clientId, HYPER_OIDC_CLIENT_SECRET: cp.clientSecret, HYPER_OIDC_ONLY: "true" } });
+    const ctx = await mkTestCtx({ env: { MAUZCODE_OIDC_ISSUER: cp.issuer, MAUZCODE_OIDC_CLIENT_ID: cp.clientId, MAUZCODE_OIDC_CLIENT_SECRET: cp.clientSecret, MAUZCODE_OIDC_ONLY: "true" } });
     const name = ctx.fns.procs.auth.cookieName({});
     const res = await signIn(ctx, { sub: "g-rpc", email: "rpc@health-samurai.io", name: "Rita", hd: "health-samurai.io" });
     const cookie = cookieOf(res, name);

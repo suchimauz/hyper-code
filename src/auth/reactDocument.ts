@@ -8,5 +8,5 @@ export default async function (
     session: Session | null,
     opts: {},
 ): Promise<Response> {
-    return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hyper sign-in</title><link rel="stylesheet" href="/auth/ui.css"></head><body><div id="root"></div><script type="module" src="/auth/ui.js"></script></body></html>`, {headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+    return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MauzCode sign-in</title><link rel="stylesheet" href="/auth/ui.css"></head><body><div id="root"></div><script type="module" src="/auth/ui.js"></script></body></html>`, {headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }

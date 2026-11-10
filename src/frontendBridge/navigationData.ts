@@ -22,7 +22,7 @@ export default async function (
     const lastReply=new Map<string,number>(dates.map(r=>[String(r.agent_id),Number(r.ts)]));
     const iconRows=await ctx.fns.procs.db.select({sql:"SELECT id,icon,model,color_hue,reasoning_effort,created_at FROM agents WHERE visibility='nav'"});
     const icons=new Map(await Promise.all(iconRows.map(async row=>[String(row.id),await ctx.fns.frontendBridge.iconData({icon:row.icon,model:row.model})] as const)));
-    // Native capability resolution is cache-only, including Hyper/OpenCode routes.
+    // Native capability resolution is cache-only, including MauzCode/OpenCode routes.
     // Share one resolution per distinct pair rather than repeating work for every chat.
     const efforts=new Map<string,Promise<{requested:types.llm.ReasoningEffort;applied:types.llm.ReasoningEffort;label:string|null;downgraded:boolean}>>();
     const labels:Record<types.llm.ReasoningEffort,string>={auto:'Default',off:'Off',minimal:'Minimal',low:'Low',medium:'Medium',high:'High',xhigh:'Max'};

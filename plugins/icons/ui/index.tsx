@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Panel, TextField, requestJson, type ExtensionCanvasProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, TextField, requestJson, type ExtensionCanvasProps, type UiExtension } from '@mauzcode/ui';
 
 type Icon = {name:string;tags:string[]};
 function IconsCanvas(){const [rows,setRows]=useState<Icon[]>([]),[query,setQuery]=useState(''),[selected,setSelected]=useState(''),[svg,setSvg]=useState(''),[error,setError]=useState('');useEffect(()=>{const c=new AbortController();void requestJson<Icon[]>('/icons/catalog',{signal:c.signal}).then(setRows).catch(e=>{if(!c.signal.aborted)setError(String(e));});return()=>c.abort();},[]);useEffect(()=>{setSvg('');if(!selected)return;const c=new AbortController();void requestJson<{svg:string}>(`/icons/svg?name=${encodeURIComponent(selected)}`,{signal:c.signal}).then(r=>{if(!c.signal.aborted)setSvg(r.svg);}).catch(e=>{if(!c.signal.aborted)setError(String(e));});return()=>c.abort();},[selected]);const visible=rows.filter(r=>`${r.name} ${r.tags.join(' ')}`.includes(query.toLowerCase()));const src=svg?`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`:undefined;

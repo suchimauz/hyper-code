@@ -1,10 +1,10 @@
-# Apple Design — Hyper UI guidance
+# Apple Design — MauzCode UI guidance
 
-This vendored skill is the default design reference **only for Hyper's own UI**: its app shell, chat, settings, Connections, built-in pages, and plugin surfaces rendered inside Hyper. It does not govern other projects merely because an agent runs inside Hyper. Apply it elsewhere only when the user explicitly asks.
+This vendored skill is the default design reference **only for MauzCode's own UI**: its app shell, chat, settings, Connections, built-in pages, and plugin surfaces rendered inside MauzCode. It does not govern other projects merely because an agent runs inside MauzCode. Apply it elsewhere only when the user explicitly asks.
 
-## Use in Hyper
+## Use in MauzCode
 
-Before designing, implementing, or reviewing Hyper UI, read [`SKILL.md`](./SKILL.md). Use it alongside Hyper's existing components and semantic light/dark design tokens, accessibility requirements, and the user's specific instructions. Preserve functionality and existing visual consistency; do not turn a focused change into a broad redesign.
+Before designing, implementing, or reviewing MauzCode UI, read [`SKILL.md`](./SKILL.md). Use it alongside MauzCode's existing components and semantic light/dark design tokens, accessibility requirements, and the user's specific instructions. Preserve functionality and existing visual consistency; do not turn a focused change into a broad redesign.
 
 Prioritize clear hierarchy, restraint, immediate feedback, usable targets, visible keyboard focus, and reduced-motion support. Use motion only where it clarifies state or interaction. Apple-style guidance is not a requirement for glass, animation, or decorative effects on every control. Where the upstream skill's introductory response applies to a no-task invocation, do not let it replace carrying out a concrete UI request.
 

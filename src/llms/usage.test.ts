@@ -6,13 +6,13 @@ const catalog=Array.from({length:14},(_,i)=>({id:`model-${i}`,provider:'codex',a
 function node(patch={}) {return {name:'mini6',enabled:true,catalogAt:Date.now(),usageAt:Date.now(),lastError:null,catalog,usage:[{provider:'codex',account:'alice',usedPercent:17},{provider:'codex',account:'bob',usedPercent:83}],...patch};}
 async function data(nodes:any[],locals:any[]=[local],groups?:Record<string,string[]>,gateway?:any) {
  let calls=0;
- const ctx:any={state:{llmUsageRefresh:{startedAt:Date.now()}},fns:{llm:{listAccounts:async()=>locals,...(gateway?{gatewayHealth:async()=>gateway}:{}),usageOverview:async()=>locals,listModels:async(opts:any)=>{expect(opts).toEqual({});calls++;return groups??Object.fromEntries(nodes.map(n=>[`hyper/${n.name}`,n.catalog.map((m:any)=>`hyper/${n.name}:${m.id}`)]));}},node:{list:async()=>nodes}}};
+ const ctx:any={state:{llmUsageRefresh:{startedAt:Date.now()}},fns:{llm:{listAccounts:async()=>locals,...(gateway?{gatewayHealth:async()=>gateway}:{}),usageOverview:async()=>locals,listModels:async(opts:any)=>{expect(opts).toEqual({});calls++;return groups??Object.fromEntries(nodes.map(n=>[`mauzcode/${n.name}`,n.catalog.map((m:any)=>`mauzcode/${n.name}:${m.id}`)]));}},node:{list:async()=>nodes}}};
  const result=await usageData(ctx,null,{});expect(calls).toBe(1);return result;
 }
 describe('native quota source preserves account/domain selection',()=>{
  test('gateway remains distinct from measured quota',async()=>{const q=await data([node()],[local],undefined,{status:'available',reason:'models-ok'});expect(q.gateway?.status).toBe('available');expect(q.entries).toHaveLength(3);expect(q.entries.some(e=>e.usedPercent===17)).toBe(true);});
  test('local only is preserved',async()=>{expect((await data([])).entries[0]?.usedPercent).toBe(21);});
- test('relayed snapshots never duplicate remote accounts',async()=>{expect((await data([node()],[local,{...local,provider:'hyper'}])).entries).toHaveLength(3);});
+ test('relayed snapshots never duplicate remote accounts',async()=>{expect((await data([node()],[local,{...local,provider:'mauzcode'}])).entries).toHaveLength(3);});
  test('same account on distinct providers and nodes stays distinct',async()=>{const n=node({catalog:[{id:'a',provider:'codex',account:'same'},{id:'b',provider:'claude-code',account:'same'}]});expect((await data([n,{...n,name:'other'}],[])).entries).toHaveLength(4);});
  test('empty inputs stay empty',async()=>{expect((await data([],[])).entries).toEqual([]);});
  test('14 models collapse to two account observations plus local',async()=>{const q=await data([node()]);expect(q.entries).toHaveLength(3);expect(q.entries.map(e=>e.usedPercent).sort()).toEqual([17,21,83]);});

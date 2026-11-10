@@ -1,5 +1,5 @@
 /**
- * Checks whether this Hyper checkout has a safe fast-forward update available
+ * Checks whether this MauzCode checkout has a safe fast-forward update available
  *
  * Optionally fetches the configured upstream, then reports current and upstream revisions, ahead/behind counts, working-tree cleanliness and whether a guarded update can be requested. Results are cached briefly for navigation UI.
  * @param opts.fetch Fetch the upstream remote before comparing revisions. @default false
@@ -29,7 +29,7 @@ export default async function (
       const clean = tree.stdout.trim() === "";
       const current = head.stdout.trim(), targetSha = target.stdout.trim();
       const state: State = ahead && behind ? "diverged" : behind && !clean ? "dirty" : behind ? "available" : "current";
-      const message = state === "dirty" ? "Update blocked: working tree has changes" : state === "diverged" ? `Update blocked: branch diverged (ahead ${ahead}, behind ${behind})` : state === "available" ? `${behind} update${behind === 1 ? "" : "s"} available` : "Hyper is up to date";
+      const message = state === "dirty" ? "Update blocked: working tree has changes" : state === "diverged" ? `Update blocked: branch diverged (ahead ${ahead}, behind ${behind})` : state === "available" ? `${behind} update${behind === 1 ? "" : "s"} available` : "MauzCode is up to date";
       return cache.status = { state, current, target: targetSha, upstream, ahead: ahead || 0, behind: behind || 0, clean, checkedAt, message };
     } catch (error) { return cache.status = { state: "error" as State, ahead: 0, behind: 0, clean: false, checkedAt, message: String(error instanceof Error ? error.message : error) }; }
 }

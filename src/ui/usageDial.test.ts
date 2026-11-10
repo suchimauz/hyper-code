@@ -8,10 +8,10 @@ async function quotas(entries:any[], gateway:any=null) {
  return (await quotaData(ctx,null,{})).accounts;
 }
 const reset=()=>Date.now()+3600000;
-test('preserves every local, Hyper and SSH account identity',async()=>{
+test('preserves every local, MauzCode and SSH account identity',async()=>{
  const rows=await quotas([base,{...base,node:'mini'},{...base,account:'ssh.box.work'},...Array.from({length:5},(_,i)=>({...base,account:String(i)}))]);
  expect(rows).toHaveLength(8);expect(new Set(rows.map(r=>r.id)).size).toBe(8);
- expect(rows.find(r=>r.connection==='hyper')?.host).toBe('mini');expect(rows.find(r=>r.connection==='ssh')?.host).toBe('box');
+ expect(rows.find(r=>r.connection==='mauzcode')?.host).toBe('mini');expect(rows.find(r=>r.connection==='ssh')?.host).toBe('box');
  expect(rows[0].connection).toBe('local');
 });
 test('gateway reports status and never fabricates subscription measurements',async()=>{

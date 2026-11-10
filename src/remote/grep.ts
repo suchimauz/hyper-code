@@ -69,14 +69,14 @@ export default async function (
     // shell word; error text is printed with a static printf format.
     // The search's own exit status is reported on its own line: 0 = matches,
     // 1 = none, >1 = a real error (bad regex, unreadable path).
-    const run = (cmd: string) => "{ " + cmd + "; echo \"__HYPER_STATUS=$?\" >&2; } | head -n " + cap;
+    const run = (cmd: string) => "{ " + cmd + "; echo \"__MAUZCODE_STATUS=$?\" >&2; } | head -n " + cap;
     const script = "t=" + target + "; [ -e \"$t\" ] || { printf 'no such file or directory: %s\\n' \"$t\" >&2; exit 2; }; "
         + "if [ -d \"$t\" ]; then cd -- \"$t\" || exit 2; s=.; echo KIND=d; else cd -- \"$(dirname -- \"$t\")\" || exit 2; s=\"$(basename -- \"$t\")\"; echo KIND=f; fi; "
         + "if command -v rg >/dev/null; then echo ENGINE=rg; " + run("rg " + rgArgs.join(" ") + " -- " + shq(opts.pattern) + " \"$s\"")
         + "; else echo ENGINE=grep; " + run("grep " + grArgs.join(" ") + " -- " + shq(opts.pattern) + " \"$s\"") + "; fi; exit 0";
     const r = await ctx.fns.remote.exec({ host: opts.host, command: script, timeout: opts.timeout ?? 60 });
-    const statusMatch = /__HYPER_STATUS=(\d+)/.exec(r.stderr);
-    const stderr = r.stderr.replace(/\n?__HYPER_STATUS=\d+\n?/, "").trim();
+    const statusMatch = /__MAUZCODE_STATUS=(\d+)/.exec(r.stderr);
+    const stderr = r.stderr.replace(/\n?__MAUZCODE_STATUS=\d+\n?/, "").trim();
     if (r.exitCode !== 0 && !r.timedOut) throw new Error(opts.host + ": " + (stderr || "exit " + r.exitCode));
     // head closing the pipe early makes the search exit by SIGPIPE (141) — that is "enough found", not an error.
     const searchStatus = statusMatch ? Number(statusMatch[1]) : 0;

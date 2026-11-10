@@ -1,5 +1,5 @@
 /**
- * Finds or creates the Hyper user for a verified external identity (Google or the OIDC control plane).
+ * Finds or creates the MauzCode user for a verified external identity (Google or the OIDC control plane).
  *
  * Looks up the identity by Google's stable subject first. Otherwise links it to an existing active
  * user with the same email; otherwise, when auto-create is on, creates a member (the first user ever
@@ -10,7 +10,7 @@
  * @param opts.name Display name from the ID token.
  * @param opts.picture Profile photo URL from the ID token's `picture` claim; stored only when https.
  * @param opts.autoCreate Create a user on first sign-in when none matches. @default true
- * @param opts.memberOnly Always create new users as members, even the first one (portal trust: the owner is managed in Hyper). @default false
+ * @param opts.memberOnly Always create new users as members, even the first one (portal trust: the owner is managed in MauzCode). @default false
  */
 export default async function (
     ctx: Context,
@@ -28,7 +28,7 @@ export default async function (
         picture?: string | null;
         /** Create a user on first sign-in when none matches. @default true */
         autoCreate?: boolean;
-        /** Always create new users as members, even the first one (portal trust: the owner is managed in Hyper). @default false */
+        /** Always create new users as members, even the first one (portal trust: the owner is managed in MauzCode). @default false */
         memberOnly?: boolean;
     },
 ): Promise<types.auth.User | null> {

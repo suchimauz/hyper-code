@@ -64,4 +64,4 @@ The function must accept one opts object and return:
 { ready: true, result: { /* compact JSON result */ } }
 ```
 
-For project-local checks create `.hyper/<module>/<fn>.ts`, then run `procs.dev.genTypes` and `procs.repl.load`. Although `runtime.fn` permits any registered function, checks should normally be read-only, idempotent, quick, and return compact results. Errors are recorded and polling continues until timeout.
+For project-local checks create `.mauzcode/<module>/<fn>.ts`, then run `procs.dev.genTypes` and `procs.repl.load`. Although `runtime.fn` permits any registered function, checks should normally be read-only, idempotent, quick, and return compact results. Errors are recorded and polling continues until timeout.

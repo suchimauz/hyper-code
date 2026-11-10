@@ -220,7 +220,7 @@ export async function collectStateFile(ctx: Context, entry: any, abs: string): P
         const loader = (await import(abs + bust(abs))).default;
         if (typeof loader !== "function") return;
         loaders[entry.loaderKind] = loader;
-        // hyper-code2: the classified entry handed in by dev.sync carries no
+        // mauzcode: the classified entry handed in by dev.sync carries no
         // `abs` (it arrives as a separate argument), so labelling the source
         // off `entry` threw and hot-adding a $loader_ file was impossible.
         ctx.fns.procs.log.debug({ event: "load.loader", msg: entry.loaderKind, from: source({ ...entry, abs }) });

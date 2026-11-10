@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ModelPicker } from '../components/hyper/ModelPicker';
+import { ModelPicker } from '../components/mauzcode/ModelPicker';
 import type { ModelSettings } from '../lib/models';
 const icon = { src: 'data:image/svg+xml,%3Csvg%3E%3C/svg%3E', custom: false };
 const original: ModelSettings = { agentId:'fixture', model:'openai:gpt-5', label:'gpt-5', icon, models:[{provider:'openai',model:'openai:gpt-4',label:'gpt-4',icon,disabled:false},{provider:'openai',model:'openai:gpt-3',label:'gpt-3',icon,disabled:false},{provider:'openai',model:'openai:gpt-5',label:'gpt-5',icon,disabled:false},{provider:'remote',model:'ssh/host:anthropic:claude',label:'claude',icon,disabled:false},{provider:'remote',model:'disabled',label:'Disabled model',icon:null,disabled:true}],effort:{requested:'high',applied:'high',supported:['low','medium','high'],mode:'openai-effort'} };

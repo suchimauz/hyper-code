@@ -9,7 +9,7 @@ describe("files.exists", () => {
 
     test("false for missing file", async () => {
         const ctx = await mkTestCtx();
-        expect(await ctx.fns.files.exists({ path: ".hyper/nope-" + Math.random().toString(36).slice(2) })).toBe(false);
+        expect(await ctx.fns.files.exists({ path: ".mauzcode/nope-" + Math.random().toString(36).slice(2) })).toBe(false);
     });
 
     test("checks paths outside the workspace (sandbox removed)", async () => {

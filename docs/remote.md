@@ -19,7 +19,7 @@ paths are remote and relative ones resolve against the remote home.
 
 System OpenSSH, not an SSH library — so `~/.ssh/config`, keys, ssh-agent,
 ProxyJump and Tailscale names just work. The first call to a host opens a
-ControlMaster socket in `~/.ssh/hyper-cm/` kept for 30 minutes; every later
+ControlMaster socket in `~/.ssh/mauzcode-cm/` kept for 30 minutes; every later
 call (tools, `remote.*`, rsync) rides it: ~60 ms instead of ~250 ms+.
 `remote.sshOptions` is the single source of those options; `remote.quote` and
 `remote.shellPrelude` are the single source of quoting and the remote PATH.
@@ -48,30 +48,30 @@ call (tools, `remote.*`, rsync) rides it: ~60 ms instead of ~250 ms+.
 | `rsync({ host, direction: "push" \| "pull", local, remote, exclude?, delete?, dryRun? })` | incremental copy; works with GNU rsync and macOS openrsync |
 | `list` / `stat` / `readBytes` | directory entries, metadata, raw bytes (Files UI) |
 | `status({ host })` | reachable?, OS, uptime, load, CPUs, memory, disk, listening ports |
-| `start({ host, name, command, cwd?, env?, restart? })` | long-running job in tmux `hyper-<name>`, log in `~/.hyper-jobs/<name>.log` |
+| `start({ host, name, command, cwd?, env?, restart? })` | long-running job in tmux `mauzcode-<name>`, log in `~/.mauzcode-jobs/<name>.log` |
 | `logs` / `stop` / `jobs` | tail (optional grep), Ctrl-C then kill, list |
 | `close({ host? })` | drop the master connection; next call reconnects |
 | `sshOptions({})` | shared ssh args for your own ssh/scp/rsync calls |
 | `quote({ value, path? })` | bash-quote a value; with `path` a leading `~`/`~/` stays expandable |
 | `shellPrelude({})` | the PATH prelude every remote command starts with |
 
-Watch a job live: `ssh <host> -t tmux attach -t hyper-<name>`.
+Watch a job live: `ssh <host> -t tmux attach -t mauzcode-<name>`.
 
 ## Configuration
 
-- `HYPER_SSH_CONFIG` — use this ssh_config instead of `~/.ssh/config` (passed as `-F`).
-- `HYPER_SSH_CONTROL_DIR` — where master sockets live (default `~/.ssh/hyper-cm`).
+- `MAUZCODE_SSH_CONFIG` — use this ssh_config instead of `~/.ssh/config` (passed as `-F`).
+- `MAUZCODE_SSH_CONTROL_DIR` — where master sockets live (default `~/.ssh/mauzcode-cm`).
 
 ## Tests
 
 `src/remote/remote.it.test.ts` runs against two sshd containers from `test/ssh/`
 (`plain`: no ripgrep → fallbacks; `rg`: with ripgrep). They are started on
-first use and **stay running** (compose project `hyper-ssh-<hash of checkout>`),
+first use and **stay running** (compose project `mauzcode-ssh-<hash of checkout>`),
 so later runs connect in under a second; a change to the Dockerfile rebuilds
 them. Each run resets the remote home. The throwaway key and a private
 ssh_config live in `.test-tmp/ssh-fixture/`, and the ctx is pointed at them via
 the two env vars above — the developer's `~/.ssh` is never touched. No Docker →
-the suite is skipped. `HYPER_SSH_FIXTURE_DOWN=1` removes the containers after
+the suite is skipped. `MAUZCODE_SSH_FIXTURE_DOWN=1` removes the containers after
 the run. Run it by path: `bun test ./src/remote/`.
 
 - `remote.it.test.ts` — `remote.*` and the host-aware tools with an explicit host.

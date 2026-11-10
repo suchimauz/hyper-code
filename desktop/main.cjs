@@ -24,7 +24,7 @@ const lifecycle = require('./lifecycle.cjs')({ app, Tray, Menu, nativeImage, pow
 function updateSetup(message = '') {
   status = message;
   if (!setupWindow || setupWindow.isDestroyed()) {
-    setupWindow = new BrowserWindow({ icon: assets('icon.png'), width: 620, height: 470, minWidth: 480, minHeight: 400, title: 'Hyper-code2 — сервер', webPreferences: { ...preferences, preload: path.join(__dirname, 'preload.cjs') } });
+    setupWindow = new BrowserWindow({ icon: assets('icon.png'), width: 620, height: 470, minWidth: 480, minHeight: 400, title: 'MauzCode — сервер', webPreferences: { ...preferences, preload: path.join(__dirname, 'preload.cjs') } });
     lifecycle.attach(setupWindow);
     setupWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     setupWindow.webContents.on('will-navigate', event => event.preventDefault());
@@ -63,15 +63,15 @@ async function connect(value) {
     updateSetup('Подключение…');
     if (remoteWindow && !remoteWindow.isDestroyed()) remoteWindow.destroy();
     // A separate persistent Chromium profile per origin also isolates cookies across ports.
-    const partition = 'persist:hyper-' + createHash('sha256').update(origin).digest('hex');
+    const partition = 'persist:mauzcode-' + createHash('sha256').update(origin).digest('hex');
     const profile = session.fromPartition(partition);
     profile.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     profile.setPermissionCheckHandler(() => false);
-    if (!profile.__hyperDownloadsBlocked) {
+    if (!profile.__mauzcodeDownloadsBlocked) {
       profile.on('will-download', event => event.preventDefault());
-      profile.__hyperDownloadsBlocked = true;
+      profile.__mauzcodeDownloadsBlocked = true;
     }
-    const window = new BrowserWindow({ icon: assets('icon.png'), width: 1280, height: 850, minWidth: 640, minHeight: 480, show: false, title: 'Hyper-code2', webPreferences: { ...preferences, partition } });
+    const window = new BrowserWindow({ icon: assets('icon.png'), width: 1280, height: 850, minWidth: 640, minHeight: 480, show: false, title: 'MauzCode', webPreferences: { ...preferences, partition } });
     lifecycle.attach(window);
     remoteWindow = window;
     let failed = false;
@@ -109,7 +109,7 @@ async function connect(value) {
         if (options.http || reportingPageError || window.isDestroyed()) return;
         reportingPageError = true;
         void dialog.showMessageBox(window, { type: 'warning', title: 'Не удалось открыть страницу',
-          message: reason, detail: 'Соединение с Hyper сохранено. Можно повторить загрузку или вернуться назад через меню «Вид».',
+          message: reason, detail: 'Соединение с MauzCode сохранено. Можно повторить загрузку или вернуться назад через меню «Вид».',
           buttons: ['Оставить страницу', 'Повторить'], defaultId: 0, cancelId: 0, noLink: true
         }).then(({ response }) => {
           if (response === 1 && !window.isDestroyed()) window.webContents.reload();

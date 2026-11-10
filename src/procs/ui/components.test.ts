@@ -7,7 +7,7 @@ const ui = ctx.fns.procs.ui;
 test("respond carries oob fragments, toast and triggers as htmx headers", async () => {
     const res = ui.respond({ html: "<p>ok</p>", oob: { counter: "3" }, toast: { message: "Saved" }, trigger: ["nav-refresh"] });
     expect(res.headers.get("content-type")).toContain("text/html");
-    expect(JSON.parse(res.headers.get("HX-Trigger")!)).toEqual({ "nav-refresh": true, "hyper-toast": { message: "Saved", level: "info" } });
+    expect(JSON.parse(res.headers.get("HX-Trigger")!)).toEqual({ "nav-refresh": true, "mauzcode-toast": { message: "Saved", level: "info" } });
     expect(await res.text()).toBe(`<p>ok</p><div id="counter" hx-swap-oob="innerHTML">3</div>`);
     const nav = ui.respond({ location: "/tasks/1" });
     expect(JSON.parse(nav.headers.get("HX-Location")!)).toEqual({ path: "/tasks/1", target: "#main", swap: "innerHTML" });
@@ -19,10 +19,10 @@ test("respond survives non-Latin toasts and paths: headers stay ASCII, the brows
     const trigger = res.headers.get("HX-Trigger")!;
     expect(trigger).toMatch(/^[\x20-\x7e]+$/);
     expect(trigger).toContain("\\u0421");
-    expect(JSON.parse(trigger)).toEqual({ "hyper-toast": { message: "Сохранено 👍", level: "success" } });
+    expect(JSON.parse(trigger)).toEqual({ "mauzcode-toast": { message: "Сохранено 👍", level: "success" } });
     expect(JSON.parse(res.headers.get("HX-Location")!).path).toBe("/files/доки");
     expect(res.headers.get("HX-Redirect")).toBe("/files/%D0%B4%D0%BE%D0%BA%D0%B8?q=1");
-    expect(ui.respond({ toast: { message: "Saved" } }).headers.get("HX-Trigger")).toBe('{"hyper-toast":{"message":"Saved","level":"info"}}');
+    expect(ui.respond({ toast: { message: "Saved" } }).headers.get("HX-Trigger")).toBe('{"mauzcode-toast":{"message":"Saved","level":"info"}}');
 });
 
 test("region combines lazy, polling and event triggers", () => {

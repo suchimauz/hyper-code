@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 export type ThemeMode = 'light' | 'dark' | 'system';
-export const themeStorageKey = 'hyper-ui.theme';
+export const themeStorageKey = 'mauzcode-ui.theme';
 const valid = (value: string | null): ThemeMode => value === 'light' || value === 'dark' ? value : 'system';
 function readTheme(): ThemeMode {
   try { return valid(localStorage.getItem(themeStorageKey)); } catch { return 'system'; }

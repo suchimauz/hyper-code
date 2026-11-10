@@ -81,7 +81,7 @@ If there is not enough removable history, return `not_needed` and do not create/
 | `llm/$compaction_anthropic.ts` | `anthropic` | native server block via `llm.compactAnthropic`, `anthropic_compaction` |
 | `llm/$compaction_claude-code.ts`, `$compaction_anthropic-oauth.ts` | Claude subscriptions | same as `anthropic` |
 
-A compactor is `types.compaction.Compactor`: `(ctx, session, { model, sessionId, instructions, focus?, messages, signal? }) → { message, summary }`. `message` is stored in the hidden child and replayed before the tail; `summary` is the human-readable text shown on the `compaction_completed` card. A plugin or `.hyper/` may add a provider or override `default` — later roots win by name, like `$fence_`.
+A compactor is `types.compaction.Compactor`: `(ctx, session, { model, sessionId, instructions, focus?, messages, signal? }) → { message, summary }`. `message` is stored in the hidden child and replayed before the tail; `summary` is the human-readable text shown on the `compaction_completed` card. A plugin or `.mauzcode/` may add a provider or override `default` — later roots win by name, like `$fence_`.
 
 ### default — text handoff summary
 

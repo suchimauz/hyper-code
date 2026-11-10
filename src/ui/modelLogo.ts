@@ -1,9 +1,9 @@
 // Compact provider mark for chat headers. The full model id stays out of the
 // header's visual flow and is available through the native hover tooltip.
-/** Render the usual provider logo with a corner transport marker for Hyper Node or SSH routes. */
+/** Render the usual provider logo with a corner transport marker for MauzCode Node or SSH routes. */
 /**
  * Use in headers and model pickers. Remote routes retain the billed provider mark;
- * a small bottom-right arrow (Hyper) or terminal (SSH) identifies the transport.
+ * a small bottom-right arrow (MauzCode) or terminal (SSH) identifies the transport.
  * @param opts.model Model identifier.
  * @param opts.active Whether to render the active state.
  * @param opts.bare Whether to omit the surrounding container.
@@ -16,7 +16,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
         /** Whether to render the compact variant. */ compact?: boolean }): string {
     const model = String(opts.model ?? '?');
     const esc = (value: string) => ctx.fns.procs.ui.escape({ text: value });
-    const remote = /^hyper\/([^:]+):(.+)$/i.exec(model);
+    const remote = /^mauzcode\/([^:]+):(.+)$/i.exec(model);
     const ssh = /^ssh\/([^:]+):(.+)$/i.exec(model);
     // Unwrap the transport before choosing the billed provider, not the server name.
     const key = (remote?.[2] ?? ssh?.[2] ?? model).toLowerCase();
@@ -66,6 +66,6 @@ export default function (ctx: Context, _session: Session | null, opts: {
     // Keep transport markers outside the provider mark and its active animation.
     const badge = remote ? 'ph-arrows-left-right' : ssh ? 'ph-terminal-window' : '';
     const proxy = badge ? `<i class="ph ${badge} absolute -bottom-1 -right-1 rounded-full bg-base-100 text-[8px] leading-none text-warning" aria-hidden="true"></i>` : '';
-    const title = remote ? `${model} (via Hyper node ${remote[1]})` : ssh ? `${model} (via SSH ${ssh[1]})` : model;
+    const title = remote ? `${model} (via MauzCode node ${remote[1]})` : ssh ? `${model} (via SSH ${ssh[1]})` : model;
     return `<span class="${frame}${proxy ? ' relative' : ''}" title="${esc(title)}" aria-label="Model: ${esc(title)}">${mark}${proxy}</span>`;
 }

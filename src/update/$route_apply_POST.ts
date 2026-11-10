@@ -18,5 +18,5 @@ export default async function(ctx:Context,session:Session|null,opts:{/** Incomin
     await mkdir(runtime,{recursive:true});
     await writeFile(join(runtime,"update-pending.json"),JSON.stringify({version:1,old:s.current,target:s.target,upstream:s.upstream,requestedAt:Date.now(),lockChanged:files.includes("bun.lock")||files.includes("bun.lockb"),migrationsChanged})+"\n",{mode:0o600});
     setTimeout(async()=>{try{await ctx.fns.procs.lifecycle.stop({});}finally{process.exit(75);}},100);
-    return Response.json({message:'Update staged; Hyper is restarting…'},{status:202});
+    return Response.json({message:'Update staged; MauzCode is restarting…'},{status:202});
 }

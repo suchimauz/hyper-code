@@ -1,24 +1,24 @@
-# The hyper Postgres, as the project expects it.
+# The mauzcode Postgres, as the project expects it.
 #
 # This file is the source of truth for server-level settings. A fresh install
-# copies it to ~/.hyper/docker-compose.yml and runs `docker compose up -d`;
+# copies it to ~/.mauzcode/docker-compose.yml and runs `docker compose up -d`;
 # settings that live only in a running container's ALTER SYSTEM are lost the
-# next time somebody rolls Hyper out, so they belong here instead.
+# next time somebody rolls MauzCode out, so they belong here instead.
 #
 # shared_preload_libraries in particular can only be set at server start, and
 # ALTER SYSTEM on a list parameter writes the whole list as ONE quoted file
 # name — which makes the server refuse to boot. Set it here.
-name: hyper
+name: mauzcode
 services:
   db:
     image: paradedb/paradedb:latest-pg18
-    container_name: hyper-db
+    container_name: mauzcode-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: hyper
-      # From ~/.hyper/.env (script/install.sh generates it). No fallback: compose refuses to start without it.
-      POSTGRES_PASSWORD: ${HYPER_DB_PASSWORD:?set HYPER_DB_PASSWORD in ~/.hyper/.env (script/install.sh generates it)}
-      POSTGRES_DB: hyper
+      POSTGRES_USER: mauzcode
+      # From ~/.mauzcode/.env (script/install.sh generates it). No fallback: compose refuses to start without it.
+      POSTGRES_PASSWORD: ${MAUZCODE_DB_PASSWORD:?set MAUZCODE_DB_PASSWORD in ~/.mauzcode/.env (script/install.sh generates it)}
+      POSTGRES_DB: mauzcode
     command:
       - postgres
       # 1000: the test suite opens one connection per test ctx (pg_temp
@@ -48,9 +48,9 @@ services:
       # ufw/nft input rules. Reach it from elsewhere through an SSH tunnel, not by publishing.
       - "127.0.0.1:54393:5432"
     volumes:
-      - hyper_pgdata:/var/lib/postgresql
+      - mauzcode_pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hyper"]
+      test: ["CMD-SHELL", "pg_isready -U mauzcode"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -60,12 +60,12 @@ services:
   # Its own disk volume, fsync off: test data is disposable, durability is not needed.
   db-test:
     image: paradedb/paradedb:latest-pg18
-    container_name: hyper-db-test
+    container_name: mauzcode-db-test
     restart: unless-stopped
     environment:
-      POSTGRES_USER: hyper
-      POSTGRES_PASSWORD: ${HYPER_DB_PASSWORD:?set HYPER_DB_PASSWORD in ~/.hyper/.env (script/install.sh generates it)}
-      POSTGRES_DB: hyper
+      POSTGRES_USER: mauzcode
+      POSTGRES_PASSWORD: ${MAUZCODE_DB_PASSWORD:?set MAUZCODE_DB_PASSWORD in ~/.mauzcode/.env (script/install.sh generates it)}
+      POSTGRES_DB: mauzcode
     command:
       - postgres
       - -c
@@ -93,14 +93,14 @@ services:
     ports:
       - "127.0.0.1:54399:5432"
     volumes:
-      - hyper_pgdata_test:/var/lib/postgresql
+      - mauzcode_pgdata_test:/var/lib/postgresql
       - ./db-test:/docker-entrypoint-initdb.d:ro   # script/install.sh copies script/db-test here
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hyper"]
+      test: ["CMD-SHELL", "pg_isready -U mauzcode"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  hyper_pgdata:
-  hyper_pgdata_test:
+  mauzcode_pgdata:
+  mauzcode_pgdata_test:

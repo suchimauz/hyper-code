@@ -27,7 +27,7 @@ export default async function (
     const identity = await ctx.fns.compaction.modelIdentity({ model: opts.model });
     if (identity?.provider !== "codex") throw new Error("server compaction requires a verified codex model route");
     const ep = await ctx.fns.llm.resolveEndpoint({ model: opts.model });
-    const relay = ep.provider === "hyper" && ep.upstream === "codex" && ep.api === "responses";
+    const relay = ep.provider === "mauzcode" && ep.upstream === "codex" && ep.api === "responses";
     if (ep.provider !== "codex" && !relay) throw new Error("server compaction is only supported for codex models");
     // Node bearer is not a Codex token: credentials and account identity stay on the host.
     const apiKey = ep.ssh ? "ssh-remote" : relay ? ep.apiKey : await ctx.fns.llm.refreshCodex({ account: ep.account }) ?? ep.apiKey;

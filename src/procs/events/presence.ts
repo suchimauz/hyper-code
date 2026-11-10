@@ -6,7 +6,7 @@
 // and closing one tab does not make them leave. That refcount is the whole
 // trick — it is what makes "who is here" survive a reload.
 /**
- * Lists who has Hyper open now: person id, name, open tabs and the chats (agent ids) they are looking at.
+ * Lists who has MauzCode open now: person id, name, open tabs and the chats (agent ids) they are looking at.
  * @param opts.agentId Only people currently looking at this chat.
  */
 export default function (ctx: Context, _session: Session | null, opts?: {

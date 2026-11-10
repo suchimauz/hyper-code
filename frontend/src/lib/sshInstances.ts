@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 /** Secret-free SSH instance descriptor as exposed by the UI Lab bridge. */
 export type SshInstance = { name: string; host: string; user: string; port: number; publicKey: string; pinnedHostKey: string | null; updatedAt: number };

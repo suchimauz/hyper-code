@@ -1,8 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import { Transcript } from '../components/hyper/Transcript';
-import type { EventPage } from '../lib/hyper';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import { Transcript } from '../components/mauzcode/Transcript';
+import type { EventPage } from '../lib/mauzcode';
 
 it('renders user text literally in a right-aligned bubble with time and copy action', async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);

@@ -1,5 +1,5 @@
 /**
- * Issue a token for a client Hyper that may relay through this host; the plain token is returned once and only its hash is stored
+ * Issue a token for a client MauzCode that may relay through this host; the plain token is returned once and only its hash is stored
  * @param opts.name Client label, e.g. "anna" or "macbook".
  * @param opts.providers Own providers the client may use; empty means all shareable ones.
  */

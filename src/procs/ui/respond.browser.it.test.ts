@@ -1,6 +1,6 @@
 // FUNCTIONAL test in a real Chrome: a Russian toast goes through the whole chain
 // a user hits — procs.ui.respond puts it in HX-Trigger, real htmx 4 reads the
-// header and fires `hyper-toast`, the real ui.controlScript shows the toast.
+// header and fires `mauzcode-toast`, the real ui.controlScript shows the toast.
 // Before the fix `new Response` threw on the Cyrillic header: 500, no toast.
 // Runs in the suite's headless Chrome (test/chrome/headless.ts) — never the
 // developer's browser; skipped when no Chrome is installed.
@@ -46,7 +46,7 @@ async function clickInChrome(): Promise<{ toast: string; status: number }> {
         ws.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } }));
     });
     try {
-        for (let i = 0; i < 100 && !(await evaluate("!!(window.htmx && window.__hyperUiControlInstalled && document.getElementById('go'))")); i++) await Bun.sleep(50);
+        for (let i = 0; i < 100 && !(await evaluate("!!(window.htmx && window.__mauzcodeUiControlInstalled && document.getElementById('go'))")); i++) await Bun.sleep(50);
         return await evaluate(`new Promise((done) => {
             let status = 0;
             document.body.addEventListener('htmx:after:request', (e) => { status = e.detail?.ctx?.response?.status ?? status; });

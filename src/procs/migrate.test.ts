@@ -4,7 +4,7 @@ import { testCtx } from "../$test";
 const ctx = await testCtx();
 
 test("migrate: up (in id order, idempotent) + status + down", async () => {
-    // Own world: the host app (hyper-code2) ships real migrations that testCtx
+    // Own world: the host app (mauzcode) ships real migrations that testCtx
     // already applied — a fork gets a fresh pg_temp schema and its own list
     // (replace the state object wholesale so the parent's list is untouched).
     const c = ctx.fns.procs.env.fork({ mode: "test" });

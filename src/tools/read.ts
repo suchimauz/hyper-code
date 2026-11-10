@@ -42,7 +42,7 @@ export default async function (
         const { join, extname } = await import("node:path");
         const { mkdtemp, rm } = await import("node:fs/promises");
         // Private per-call directory, removed once the image is in memory.
-        const dir = await mkdtemp(join(tmpdir(), "hyper-remote-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-remote-"));
         let image: types.tools.Content;
         try {
             const local = join(dir, "image" + extname(opts.path));

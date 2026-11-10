@@ -3,7 +3,7 @@
 // lives in ctx.state.procs.db.sql (set by db.conn). Listed in package.json
 // procs.prod before "http" so the db is ready when traffic starts.
 //
-// hyper-code2: wait for Postgres instead of dying on the first refused
+// mauzcode: wait for Postgres instead of dying on the first refused
 // connection. At login the runtime starts before Docker has finished bringing
 // the database up, so a single ping meant the process exited, launchd restarted
 // it ten seconds later, and that repeated until the container was ready —

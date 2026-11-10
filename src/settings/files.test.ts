@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { mkTestCtx } from "../_testCtx.entry";
 
 async function setup() {
-    const dir = await mkdtemp(join(tmpdir(), "hyper-settings-"));
-    const ctx = await mkTestCtx({ env: { HYPER_SETTINGS: dir } });
+    const dir = await mkdtemp(join(tmpdir(), "mauzcode-settings-"));
+    const ctx = await mkTestCtx({ env: { MAUZCODE_SETTINGS: dir } });
     return { ctx, dir };
 }
 

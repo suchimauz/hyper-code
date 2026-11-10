@@ -8,7 +8,7 @@ function setup(){
  const calls:{fn:string;opts:any}[]=[];
  const rec=(fn:string,result:any)=>async(opts:any)=>{calls.push({fn,opts});if(result instanceof Error)throw result;return result;};
  const ctx:any={state:{sshAccount:{flows:new Map([['r1',{id:'r1',instance:'box',provider:'claude-code',account:'a',status:'pending',verificationUri:'https://claude.ai/oauth/authorize',userCode:null,error:null,expiresAt:Date.now()+60000,process:{},callbackConnection:{bin:'ssh',args:[],host:'h'}}]])}},fns:{
-  http:{publicOrigin:async()=>'https://hyper.test'},auth:{csrfToken:async()=>'csrf',verifyCsrf:async({token}:any)=>token==='csrf'},
+  http:{publicOrigin:async()=>'https://mauzcode.test'},auth:{csrfToken:async()=>'csrf',verifyCsrf:async({token}:any)=>token==='csrf'},
   llm:{listAccounts:async()=>[account],accountLoginStatus:()=>[{provider:'codex',account:'new',status:'pending',verificationUri:'https://auth.openai.com/device',userCode:'ABCD',needsCode:false,error:null}],startAccountLogin:rec('startAccountLogin',{}),startXaiOAuth:rec('startXaiOAuth',{}),accountUsers:rec('accountUsers',[{id:'ag',title:'T',model:null}]),removeAccount:rec('removeAccount',{removed:true,provider:'codex',account:'work',archived:[]})},
   sshInstance:{list:async()=>[{name:'box',pinnedHostKey:'k'},{name:'raw',pinnedHostKey:null}]},
   sshAccount:{startLogin:rec('sshStartLogin',{id:'r2'}),startKimiLogin:rec('kimi',{id:'k1'}),status:async({id}:any)=>({id,instance:id==='r1'?'box':null}),submitCode:rec('submitCode',{ok:true}),cancel:rec('cancel',{ok:true})},
@@ -16,7 +16,7 @@ function setup(){
  }};
  return {ctx,calls};
 }
-const URL_='https://hyper.test/ui-lab-api/llm-connections';
+const URL_='https://mauzcode.test/ui-lab-api/llm-connections';
 const get=()=>new Request(URL_);
 const post=(data:unknown,headers:Record<string,string>={})=>new Request(URL_,{method:'POST',headers:{'content-type':'application/json','x-csrf-token':'csrf',...headers},body:JSON.stringify(data)});
 const run=(s:ReturnType<typeof setup>,req:Request,user:any=owner)=>llm(s.ctx,user,{req});

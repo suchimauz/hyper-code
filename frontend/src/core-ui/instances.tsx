@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Panel, requestJson, type UiExtension } from '@hyper/ui';
+import { Button, Panel, requestJson, type UiExtension } from '@mauzcode/ui';
 
 type Instance = { id: string; name: string; url: string | null; ownerEmail: string | null; users: number | null; agents: number | null; running: number | null; version: string | null; lastSeenAt: number | null };
 type Overview = { connected: boolean; issuer?: string | null; instances: Instance[] };
@@ -20,16 +20,16 @@ function InstancesOverview() {
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [refresh]);
-  return <Panel title="Hyper instances">
+  return <Panel title="MauzCode instances">
     <p>Instances registered in the control plane{data?.issuer ? ` ${data.issuer}` : ''}.</p>
     <Button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</Button>
     {error && <p role="alert">{error}</p>}
     <div aria-live="polite" aria-busy={loading}>
-      {data && !data.connected && <p>This Hyper is not connected to a Hyper Control Plane. Ask the instance owner to configure its connection.</p>}
+      {data && !data.connected && <p>This MauzCode is not connected to a MauzCode Control Plane. Ask the instance owner to configure its connection.</p>}
       {data?.connected && data.instances.length === 0 && <p>No instances visible. The control plane may be unreachable or no instances are registered.</p>}
       {data && data.instances.length > 0 && <div style={{ overflowX: 'auto' }}><table>
-        <caption>Registered Hyper instances</caption>
-        <thead><tr><th scope="col">Hyper</th><th scope="col">Owner</th><th scope="col">Size</th><th scope="col">Version</th><th scope="col">Last seen</th></tr></thead>
+        <caption>Registered MauzCode instances</caption>
+        <thead><tr><th scope="col">MauzCode</th><th scope="col">Owner</th><th scope="col">Size</th><th scope="col">Version</th><th scope="col">Last seen</th></tr></thead>
         <tbody>{data.instances.map(item => <tr key={item.id}>
           <th scope="row">{item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer">{item.name}</a> : item.name}<div>{item.url}</div></th>
           <td>{item.ownerEmail ?? '—'}</td>
@@ -44,6 +44,6 @@ function InstancesOverview() {
 
 export const instancesExtension: UiExtension = {
   id: 'instances', apiVersion: 1,
-  pages: [{ id: 'overview', title: 'Hyper instances', component: InstancesOverview }],
-  navigation: [{ page: 'overview', title: 'Hyper instances' }],
+  pages: [{ id: 'overview', title: 'MauzCode instances', component: InstancesOverview }],
+  navigation: [{ page: 'overview', title: 'MauzCode instances' }],
 };

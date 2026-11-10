@@ -18,7 +18,7 @@ describe('HTML page documents without the retired application shell', () => {
         const { ctx, session } = fixture();
         const html = await layout(ctx, session, { main: '<article>Plugin page</article>', title: '<News>', currentId: 'a"b', headExtra: '<meta name="plugin" content="yes">' });
         for (const text of ['<article>Plugin page</article>', '&lt;News&gt;', 'cookie-bound-token', '/theme.css', '/procs/ui/htmx.js', '/procs/events/client.js', '/ui/control.js', 'data-agent-id="a&quot;b"', 'name="plugin"']) expect(html).toContain(text);
-        for (const text of ['/ui/rpc.js', '/ui/popup.js', 'id="app-popup"', 'id="dock"', 'nav-overlay', 'mobileInspector.js', 'mobileUsage.js', 'mobileMessage.js', '/agent/chat.js', 'hyperLegacyUrl', 'data-presentation="sidebar"']) expect(html).not.toContain(text);
+        for (const text of ['/ui/rpc.js', '/ui/popup.js', 'id="app-popup"', 'id="dock"', 'nav-overlay', 'mobileInspector.js', 'mobileUsage.js', 'mobileMessage.js', '/agent/chat.js', 'mauzCodeLegacyUrl', 'data-presentation="sidebar"']) expect(html).not.toContain(text);
     });
     test('minimal main has no inherited navigation or page-wide swap targets', async () => {
         const { ctx, session } = fixture();
@@ -27,7 +27,7 @@ describe('HTML page documents without the retired application shell', () => {
         expect(html).not.toContain('hx-target=');
         expect(html).not.toContain('id="app-popup"');
         expect(html).toContain('prefers-reduced-motion');
-        expect(html).toContain('hyper-theme');
+        expect(html).toContain('mauzcode-theme');
     });
     test('dynamic HTTP hook preserves document status and HTMX fragment semantics', async () => {
         const { ctx, session } = fixture();

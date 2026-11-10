@@ -1,25 +1,25 @@
-# Hyper Sidebar — результаты реализации и живых проверок
+# MauzCode Sidebar — результаты реализации и живых проверок
 
 Дата: 2026-09-06. Статус: работающий приватный MVP, не security sandbox.
 
 ## Что реализовано
 
-- `browser-extension/` в корне проекта: unpacked Manifest V3, native side panel, settings/pairing, per-tab identity, iframe существующего Hyper UI. Без отдельного чата и сборки.
-- `src/sidebar/`: narrow loopback API, hashed bearer credentials, explicit approval в обычном authenticated Hyper UI, durable Postgres bindings, live target/process/context validation, close/revoke.
+- `browser-extension/` в корне проекта: unpacked Manifest V3, native side panel, settings/pairing, per-tab identity, iframe существующего MauzCode UI. Без отдельного чата и сборки.
+- `src/sidebar/`: narrow loopback API, hashed bearer credentials, explicit approval в обычном authenticated MauzCode UI, durable Postgres bindings, live target/process/context validation, close/revoke.
 - `src/ui/layout.ts`: `presentation=sidebar`, скрывает навигацию/Meta, сохраняет chat, popup и secure input.
 - `plugins/browser/src/cdp/` и browser wrappers: привязанный agent context, fail-closed guard, reconnect только прежнего target, без автоматического повторения команды.
 - `src/agent/fullSystemPrompt.ts`: актуальный browser context из durable lookup перед запросом, сохраняется смысл после compaction.
 
 ## Реальная установка и browser smoke
 
-Установлено через `Extensions.loadUnpacked` из `/Users/niquola/hyper-code2/browser-extension`, extension ID `gnhpompepbopbbacjgonbkkhjjfdenco`. Обычная ручная установка описана в README.
+Установлено через `Extensions.loadUnpacked` из `/Users/niquola/mauzcode/browser-extension`, extension ID `gnhpompepbopbbacjgonbkkhjjfdenco`. Обычная ручная установка описана в README.
 
 Проверено не только DOM-моком, но в настоящей native панели Chrome:
 
 1. Extension options открывается, localhost:3010 настроен по умолчанию.
 2. `chrome.debugger.getTargets()` сопоставил две вкладки одинакового URL с разными Chrome tabId и точными CDP page targetId, без attach.
 3. Native панель реально открылась, ширина 360px. Для automation `Extensions.triggerAction` требует target типа `tab`, не CDP `page`; перед действием активировали нужный Chrome tab.
-4. Pairing из настоящего extension origin → pending credential → отдельная Hyper approval page → нажата Approve → extension status Approved. Секреты не выводились и не передавались в URL.
+4. Pairing из настоящего extension origin → pending credential → отдельная MauzCode approval page → нажата Approve → extension status Approved. Секреты не выводились и не передавались в URL.
 5. В iframe реально загрузился `/agent/:id?presentation=sidebar` с включённым password gate и существующей сессией пользователя. Composer и popup host присутствуют, Meta скрыт, horizontal overflow отсутствует. Это подтверждение выбранной конфигурации Chrome, не всех cookie policies.
 6. Переключение двух одинаковых URL создало разных агентов (`byqr/byqs`, после restart — `byqt/byqu`). Переключение возвращало соответствующий чат.
 7. Сообщение отправлено через настоящий iframe composer (`#input`, Enter). Агент `byqt` вызвал browser.click без session override на `#change`. Текст A изменился на `Changed in /same`; B остался `Not changed`, хотя во время исполнения активной была B.
@@ -31,7 +31,7 @@
 
 ## Сбой окружения во время теста
 
-Первоначально Chrome 151 перестал отвечать и процесс исчез. До этого сообщение из iframe было принято Hyper, но agent browser calls корректно вернули `Browser binding is unavailable`; другую вкладку агент не выбрал. Причина исчезновения процесса не установлена.
+Первоначально Chrome 151 перестал отвечать и процесс исчез. До этого сообщение из iframe было принято MauzCode, но agent browser calls корректно вернули `Browser binding is unavailable`; другую вкладку агент не выбрал. Причина исчезновения процесса не установлена.
 
 Chrome затем запущен с прежним CDP/profile, без удаления профиля/данных. `/json/version` уже показал Chrome 152. Старые page target не использованы повторно; новые тестовые вкладки получили новые агенты. Успешный action/reconnect smoke выполнен на Chrome 152. Не утверждаем, что остановка была вызвана расширением или что проверен restart с восстановлением всех вкладок.
 

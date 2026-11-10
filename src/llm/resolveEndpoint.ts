@@ -19,7 +19,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     account: string;
     kind: "subscription" | "api" | "local";
     api: "openai" | "anthropic" | "responses" | "gemini" | "mock";
-    /** For hyper/<node> models: the provider the node uses upstream (e.g. claude-code). */
+    /** For mauzcode/<node> models: the provider the node uses upstream (e.g. claude-code). */
     upstream?: string;
     /** Node-scoped upstream quota identity; transport account remains the node name. */
     quotaAccount?: string;
@@ -47,19 +47,19 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const provider = m ? m[1]! : "lmstudio";
     const account = (m?.[2] ?? "default");
     const modelId = m ? m[3]! : model;
-    // hyper/<node>:<model> — another Hyper relays the call through its own
-    // provider (docs/hyper-node.md). The wire api and billing kind come from the
+    // mauzcode/<node>:<model> — another MauzCode relays the call through its own
+    // provider (docs/mauzcode-node.md). The wire api and billing kind come from the
     // node's cached catalogue; the bearer is our client token for that node.
-    if (provider === "hyper") {
+    if (provider === "mauzcode") {
         const node = await ctx.fns.node.get({ name: account });
-        if (!node || !node.enabled) throw new Error(`hyper node not configured: ${account}`);
+        if (!node || !node.enabled) throw new Error(`mauzcode node not configured: ${account}`);
         const matches = node.catalog?.filter((e) => e.id === modelId) ?? [];
         // Bare IDs from older saved agents are safe only when unambiguous.
         if (!matches.length && !modelId.includes(":")) matches.push(...(node.catalog ?? []).filter((e) => e.id.slice(e.id.indexOf(":") + 1) === modelId));
-        if (matches.length > 1) throw new Error(`hyper/${account} model ${modelId} is ambiguous; select provider/account:model`);
+        if (matches.length > 1) throw new Error(`mauzcode/${account} model ${modelId} is ambiguous; select provider/account:model`);
         const entry = matches[0];
-        if (!entry) throw new Error(`hyper/${account} does not offer model ${modelId}`);
-        if (!["openai", "anthropic", "responses", "mock"].includes(String(entry.api))) throw Object.assign(new Error(`hyper/${account}: provider unavailable`), { retryable: false, replaySafe: false });
+        if (!entry) throw new Error(`mauzcode/${account} does not offer model ${modelId}`);
+        if (!["openai", "anthropic", "responses", "mock"].includes(String(entry.api))) throw Object.assign(new Error(`mauzcode/${account}: provider unavailable`), { retryable: false, replaySafe: false });
         const path = entry.api === "openai" ? "chat" : entry.api;
         return { url: `${node.url}/${path}`, apiKey: await ctx.fns.node.token({ name: account }), modelId: entry.id, provider, account, kind: entry.kind, api: entry.api, upstream: entry.provider, quotaAccount: `${account}/${entry.provider}/${entry.account ?? "default"}` };
     }

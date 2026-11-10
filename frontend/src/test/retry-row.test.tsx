@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { RetryRow } from '../components/hyper/RetryRow';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import type { ChatEvent } from '../lib/hyper';
+import { RetryRow } from '../components/mauzcode/RetryRow';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import type { ChatEvent } from '../lib/mauzcode';
 
 const base: ChatEvent = { idx: 7, ts: Date.now(), type: 'llm_retry', text: null, retryId: 'r1', retry: 2, maxRetries: 5, retryMode: 'normal', delayMs: 8000, failureCode: 'SSH_TRANSPORT', failureMessage: 'connection reset', provider: 'ssh/aeza', retryState: 'scheduled' };
 
@@ -35,10 +35,10 @@ describe('model retry row', () => {
 });
 
 describe('retry state across incremental pages', async () => {
-  const { mergeTail, settleRetries } = await import('../lib/hyper');
+  const { mergeTail, settleRetries } = await import('../lib/mauzcode');
   const row = { ...base, idx: 3, retryState: 'scheduled' as const };
   it('marks an off-page scheduled retry started when model output follows', () => {
-    const page = { olderBefore: 4, events: [{ idx: 4, ts: 2, type: 'thinking', text: null }] } as unknown as import('../lib/hyper').EventPage;
+    const page = { olderBefore: 4, events: [{ idx: 4, ts: 2, type: 'thinking', text: null }] } as unknown as import('../lib/mauzcode').EventPage;
     expect(mergeTail([row], page)[0]!.retryState).toBe('started');
   });
   it('marks it started by the next attempt and cancelled by stop', () => {

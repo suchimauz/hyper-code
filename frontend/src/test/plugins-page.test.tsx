@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PluginsPage } from '../components/hyper/PluginsPage';
-vi.mock('../components/hyper/PluginUiReview', () => ({ PluginUiReview: () => null }));
+import { PluginsPage } from '../components/mauzcode/PluginsPage';
+vi.mock('../components/mauzcode/PluginUiReview', () => ({ PluginUiReview: () => null }));
 import { groupPlugins, phosphorClass, type InstalledPlugin } from '../lib/plugins';
 
 const plugin = (over: Partial<InstalledPlugin>): InstalledPlugin => ({ name: 'p', label: 'P', description: 'd', icon: 'ph-browser', version: null, source: 'official', namespaces: ['p'], functions: 2, routes: 0, hasSkill: true, configurable: false, ...over });
@@ -28,7 +28,7 @@ describe('Plugins page', () => {
     expect(new Headers(init?.headers).get('X-CSRF-Token')).toBe('tok');
   });
 
-  it('opens an in-app plugin card instead of linking to Hyper', async () => {
+  it('opens an in-app plugin card instead of linking to MauzCode', async () => {
     const detail = { name: 'browser', label: 'Browser', description: 'd', source: 'official', namespaces: ['browser'], routes: 0, domains: [], overview: '---\nname: browser\n---\n# Browser guide', overviewTruncated: false, functions: [{ name: 'browser.open', summary: 'Open a tab', signature: '() => void', returnType: 'void' }], settings: [], secrets: [] };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ plugins: [plugin({ name: 'browser', label: 'Browser' })], csrfToken: 'tok' })).mockResolvedValue(json({ plugin: detail }));
     const { container } = render(<PluginsPage />);

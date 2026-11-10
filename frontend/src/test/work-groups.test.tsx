@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ChatEvent } from '../lib/hyper';
-import { processEntries, workTurns } from '../components/hyper/transcriptGroups';
-import { Transcript } from '../components/hyper/Transcript';
+import type { ChatEvent } from '../lib/mauzcode';
+import { processEntries, workTurns } from '../components/mauzcode/transcriptGroups';
+import { Transcript } from '../components/mauzcode/Transcript';
 const ev = (idx: number, type: string, text = '', extra: Partial<ChatEvent> = {}): ChatEvent => ({ idx, ts: idx * 1000, type, text, ...extra });
 const history = [ev(0, 'user', 'Question', { messageIdx: 0 }), ev(1, 'assistant', 'Checking'), ev(2, 'tool_call', '', { name: 'read' }), ev(3, 'tool_call', '', { name: 'unfamiliar_tool' }), ev(4, 'assistant', 'Final answer')];
 const props = { agentId: 'a', events: history, page: null, hasOlder: false, loadingOlder: false, loadOlder: async () => {} };

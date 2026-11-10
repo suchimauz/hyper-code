@@ -3,5 +3,5 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     const auth = await ctx.fns.external.authorize({ req: opts.req });
     if (!auth.ok) return auth.response;
     const plugins = (ctx.fns.procs.modules.list({}) as any[]).filter((module: any) => module.plugin);
-    return Response.json({ ok: true, service: "hyper", plugins: plugins.length, tools: ctx.fns.tools.list({}).length });
+    return Response.json({ ok: true, service: "mauzcode", plugins: plugins.length, tools: ctx.fns.tools.list({}).length });
 }

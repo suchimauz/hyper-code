@@ -33,7 +33,7 @@ function context(catalog: any[] = [entry(), entry("second")]) {
 describe("node reasoning identity and policy", () => {
     for (const account of ["su4imauz", "second"]) test(`canonical ${account}: capabilities and policy`, async () => {
         const { ctx } = context();
-        const model = `hyper/mini6:codex/${account}:gpt-6-astra`;
+        const model = `mauzcode/mini6:codex/${account}:gpt-6-astra`;
         ctx.state.agent.test = { id: "test", model, reasoningEffort: "high" };
         expect(await capabilities(ctx, null, { model })).toEqual({ supported: ["auto", "low", "medium", "high", "xhigh"], defaultEffort: "medium", mode: "openai-effort" });
         expect(await resolve(ctx, null, { model, effort: "auto" })).toMatchObject({ applied: "medium", downgraded: false });
@@ -42,30 +42,30 @@ describe("node reasoning identity and policy", () => {
     test("unique legacy routes and old bare catalog entries resolve", async () => {
         for (const catalog of [[entry()], [{ ...entry(), id: "gpt-6-astra" }]]) {
             const { ctx } = context(catalog);
-            expect((await capabilities(ctx, null, { model: "hyper/mini6:gpt-6-astra" })).mode).toBe("openai-effort");
+            expect((await capabilities(ctx, null, { model: "mauzcode/mini6:gpt-6-astra" })).mode).toBe("openai-effort");
         }
     });
     test("missing, disabled, ambiguous, invalid or unreadable node fails closed", async () => {
         const { ctx, node } = context();
-        const model = "hyper/mini6:gpt-6-astra";
+        const model = "mauzcode/mini6:gpt-6-astra";
         expect((await capabilities(ctx, null, { model })).mode).toBe("none");
         for (const value of [null, { ...node, enabled: false }, { ...node, catalog: [] }, { ...node, catalog: [{ ...entry(), provider: "anthropic" }] }]) {
             ctx.fns.node.get = async () => value;
-            expect((await capabilities(ctx, null, { model: `hyper/mini6:${entry().id}` })).mode).toBe("none");
+            expect((await capabilities(ctx, null, { model: `mauzcode/mini6:${entry().id}` })).mode).toBe("none");
         }
         ctx.fns.node.get = async () => { throw new Error("DB unavailable"); };
         expect((await capabilities(ctx, null, { model })).mode).toBe("none");
     });
     test("upstream provider determines Anthropic capabilities too", async () => {
         const { ctx } = context([{ ...entry(), id: "anthropic/work:claude-opus-4-6", provider: "anthropic", account: "work", api: "anthropic" }]);
-        expect((await capabilities(ctx, null, { model: "hyper/mini6:anthropic/work:claude-opus-4-6" })).mode).toBe("anthropic-adaptive");
+        expect((await capabilities(ctx, null, { model: "mauzcode/mini6:anthropic/work:claude-opus-4-6" })).mode).toBe("anthropic-adaptive");
     });
 });
 
 describe("node reasoning wire (no generation or network)", () => {
     for (const account of ["su4imauz", "second"]) test(`streamCodex keeps canonical model and sends effort: ${account}`, async () => {
         const { ctx } = context();
-        const model = `hyper/mini6:codex/${account}:gpt-6-astra`;
+        const model = `mauzcode/mini6:codex/${account}:gpt-6-astra`;
         for (const [requested, applied] of [["high", "high"], ["xhigh", "xhigh"], ["auto", "medium"], ["off", "low"]]) {
             let body: any;
             ctx.fns.llm.connectFetch = async (o: any) => { body = JSON.parse(o.init.body); return new Response("data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } }); };

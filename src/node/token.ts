@@ -1,5 +1,5 @@
 /**
- * Read the bearer token of a configured Hyper node from encrypted local storage
+ * Read the bearer token of a configured MauzCode node from encrypted local storage
  * @param opts.name Node name.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { /** Node name. */ name: string }): Promise<string> {

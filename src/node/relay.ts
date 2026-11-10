@@ -61,7 +61,7 @@ export default async function (
     const localPrefix = `${entry.provider}/${entry.account}:`;
     const localModel = entry.id.startsWith(localPrefix) ? entry.id.slice(localPrefix.length) : entry.id;
     const policyModel = entry.via
-        ? `${entry.via.startsWith("hyper/") ? entry.via : "hyper/" + entry.via}:${entry.id}`
+        ? `${entry.via.startsWith("mauzcode/") ? entry.via : "mauzcode/" + entry.via}:${entry.id}`
         : `${entry.provider}${entry.account && entry.account !== "default" ? "/" + entry.account : ""}:${localModel}`;
     try {
         if (ctx.fns.llm?.modelPolicy) await ctx.fns.llm.modelPolicy({ action: "assert", model: policyModel });
@@ -86,14 +86,14 @@ export default async function (
     const started = performance.now();
     let upstream: Response;
     if (entry.via) {
-        const nodeName = entry.via.replace(/^hyper\//, "");
+        const nodeName = entry.via.replace(/^mauzcode\//, "");
         const node = await ctx.fns.node.get({ name: nodeName });
         if (!node) return Response.json({ error: `node ${nodeName} is not configured` }, { status: 502 });
         const token = await ctx.fns.node.token({ name: nodeName });
         const wireBody = JSON.stringify({ ...JSON.parse(body), model: entry.id });
         const path = opts.api === "openai" ? "chat" : opts.api;
         upstream = await fetch(`${node.url}/${path}`, { method: "POST", signal: opts.req.signal, body: wireBody,
-            headers: { ...metadata, "content-type": "application/json", authorization: `Bearer ${token}`, "x-hyper-hops": String(auth.hops + 1), accept: opts.req.headers.get("accept") ?? "*/*" } });
+            headers: { ...metadata, "content-type": "application/json", authorization: `Bearer ${token}`, "x-mauzcode-hops": String(auth.hops + 1), accept: opts.req.headers.get("accept") ?? "*/*" } });
     } else {
         const up = await ctx.fns.node.upstream({ provider: entry.provider, account: entry.account, api: opts.api, sessionId: opts.req.headers.get("session_id") ?? undefined });
         if (!up) return Response.json({ error: `${entry.provider}: no credentials on the host` }, { status: 503 });

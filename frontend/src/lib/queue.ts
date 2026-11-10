@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 export type QueueItem = { id: string; sequence: number; text: string; version: number; status: 'pending' | 'promoted' | 'removed'; createdAt: number | string; files: { name: string; type: string; size: number }[]; messageIdx?: number };
 const path = (agentId: string) => `/agent/${encodeURIComponent(agentId)}/queue`;

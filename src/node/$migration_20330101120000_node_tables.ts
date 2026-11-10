@@ -1,4 +1,4 @@
-// Hyper-to-Hyper model sharing (docs/hyper-node.md).
+// MauzCode-to-MauzCode model sharing (docs/mauzcode-node.md).
 //   llm_node_clients — who may relay through THIS instance (host side)
 //   llm_nodes        — other instances THIS instance relays through (client side)
 export default {

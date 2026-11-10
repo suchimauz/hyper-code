@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "hyper-code2-desktop",
+      "name": "mauzcode-desktop",
       "devDependencies": {
         "electron": "44.9.0",
         "electron-builder": "26.15.3",

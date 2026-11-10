@@ -22,9 +22,9 @@ describe('new session preferences', () => {
     expect(resolveNewSessionProject([], 'last')).toBe('');
   });
   it('ignores malformed stored values', () => {
-    localStorage.setItem('hyper-ui-last-session-selection', '{broken'); expect(readSessionSelection()).toEqual({});
-    localStorage.setItem('hyper-ui-last-session-selection', JSON.stringify({ model: {}, projectId: 5 })); expect(readSessionSelection()).toEqual({});
-    sessionStorage.setItem('hyper-ui-new-session', '{broken'); expect(readNewSessionDraft().text).toBe('');
+    localStorage.setItem('mauzcode-ui-last-session-selection', '{broken'); expect(readSessionSelection()).toEqual({});
+    localStorage.setItem('mauzcode-ui-last-session-selection', JSON.stringify({ model: {}, projectId: 5 })); expect(readSessionSelection()).toEqual({});
+    sessionStorage.setItem('mauzcode-ui-new-session', '{broken'); expect(readNewSessionDraft().text).toBe('');
   });
 });
 it('explicit creation links preserve advanced domain fields and repeated presets', () => {

@@ -1,7 +1,7 @@
 import { rmSync } from "node:fs";
 
 // Removing an account means removing its credential at the place that owns it,
-// then deleting only secret-free Hyper metadata. Default CLI accounts belong to
+// then deleting only secret-free MauzCode metadata. Default CLI accounts belong to
 // the user's normal CLI installation and are intentionally not removable here.
 /** Removes one isolated subscription account and its secret-free metadata. */
 /**

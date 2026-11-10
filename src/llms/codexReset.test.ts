@@ -6,12 +6,12 @@ function fixture() {
     const events: object[] = [];
     const ctx: any = { fns: {
         auth: { currentUser: async () => ({ required: true, user: { role: 'owner' } }), verifyCsrf: async () => true },
-        http: { publicOrigin: async () => 'https://hyper.test' },
+        http: { publicOrigin: async () => 'https://mauzcode.test' },
         llm: { consumeResetCredit: async (opts: object) => { calls.push(opts); return { outcome: 'reset', windowsReset: 2 }; } },
         procs: { events: { refresh: (opts: object) => events.push(opts) } },
     } };
     const data = { account: 'default', creditId: 'credit', confirmed: true, idempotencyKey: 'stable-retry-key-123' };
-    const run = (body: unknown = data, headers: Record<string, string> = {}) => route(ctx, null, { req: new Request('https://hyper.test/llms/codex/reset', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://hyper.test', 'x-csrf-token': 'token', ...headers }, body: JSON.stringify(body) }) });
+    const run = (body: unknown = data, headers: Record<string, string> = {}) => route(ctx, null, { req: new Request('https://mauzcode.test/llms/codex/reset', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://mauzcode.test', 'x-csrf-token': 'token', ...headers }, body: JSON.stringify(body) }) });
     return { ctx, calls, events, data, run };
 }
 test('confirmed reset returns JSON and preserves the caller retry key', async () => {

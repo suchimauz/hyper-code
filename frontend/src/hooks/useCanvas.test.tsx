@@ -84,7 +84,7 @@ describe('useCanvas', () => {
   it('follows canvas.changed on the shared live stream without holding a /watch request', async () => {
     let handler: ((event: object) => void) | undefined;
     const unsubscribe = vi.fn();
-    window.hyperLive = { subscribe: vi.fn(options => { handler = options.onEvent as (event: object) => void; return unsubscribe; }) };
+    window.mauzcodeLive = { subscribe: vi.fn(options => { handler = options.onEvent as (event: object) => void; return unsubscribe; }) };
     try {
       const fetch = vi.fn().mockResolvedValue(json(state())); vi.stubGlobal('fetch', fetch);
       const { result, unmount } = renderHook(() => useCanvas('a'));
@@ -95,6 +95,6 @@ describe('useCanvas', () => {
       act(() => { handler!({ type: 'canvas.changed', agentId: 'a', open: true, activeItemId: 7, rev: '2' }); });
       expect(result.current.open).toBe(true); expect(result.current.rev).toBe('2');
       unmount(); expect(unsubscribe).toHaveBeenCalled();
-    } finally { delete window.hyperLive; }
+    } finally { delete window.mauzcodeLive; }
   });
 });

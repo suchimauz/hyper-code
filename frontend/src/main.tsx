@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { App } from './App';
 import { LiveApp } from './LiveApp';
-import { FilesPage } from './components/hyper/FilesPage';
+import { FilesPage } from './components/mauzcode/FilesPage';
 import './styles/live.css';
 import './styles/tokens.css';
 import './styles/ui.css';

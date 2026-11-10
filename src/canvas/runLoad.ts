@@ -2,7 +2,7 @@
  * Runs an html canvas tab's `load` code on the server and returns its JSON result for the page.
  *
  * The source is the body of an async function with `ctx` in scope; whatever it returns (JSON-serialisable,
- * up to 2 MB) reaches the page as `hyper.data`. Requires the canvas.allowEval setting. Not a sandbox: the
+ * up to 2 MB) reaches the page as `mauzcode.data`. Requires the canvas.allowEval setting. Not a sandbox: the
  * code can call any runtime function, so only trusted, read-only code belongs here.
  * @param opts.source TypeScript statements ending in `return <value>`.
  */

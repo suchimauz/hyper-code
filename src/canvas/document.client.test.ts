@@ -7,14 +7,14 @@ function fixture() {
     w.document.head.innerHTML = '<meta name="csrf-token" content="document-token">';
     const requests: { url: string; body?: string; headers?: Record<string,string> }[] = [];
     let subscription: any;
-    (w as any).hyperLive = { subscribe: (s: any) => { subscription = s; } };
+    (w as any).mauzcodeLive = { subscribe: (s: any) => { subscription = s; } };
     (w as any).fetch = async (url: string, opts?: any) => { requests.push({url, body: opts?.body, headers: opts?.headers}); return {ok: true, json: async () => ({state:{n:1}}), text: async () => '<section data-canvas-panel data-canvas-rev="p"></section>'}; };
     w.eval(source);
     return {w,requests,subscription};
 }
 test('document bridge ignores messages from unrelated windows', async () => {
     const {w,requests} = fixture();
-    w.dispatchEvent(new w.MessageEvent('message', {data:{hyperCanvas:1,type:'state',state:{n:1}},source:w}));
+    w.dispatchEvent(new w.MessageEvent('message', {data:{mauzCodeCanvas:1,type:'state',state:{n:1}},source:w}));
     await Promise.resolve();
     expect(requests).toHaveLength(0);
     await w.happyDOM.close();
@@ -22,7 +22,7 @@ test('document bridge ignores messages from unrelated windows', async () => {
 test('sandbox state from the pinned frame uses only its item endpoint', async () => {
     const {w,requests} = fixture();
     const frame = w.document.querySelector('iframe')!;
-    w.dispatchEvent(new w.MessageEvent('message', {data:{hyperCanvas:1,type:'state',state:{n:1}},source:frame.contentWindow}));
+    w.dispatchEvent(new w.MessageEvent('message', {data:{mauzCodeCanvas:1,type:'state',state:{n:1}},source:frame.contentWindow}));
     await new Promise(resolve=>setTimeout(resolve,0));
     expect(requests[0]).toEqual({url:'/canvas/a/item/7',body:JSON.stringify({state:{n:1}}),headers:{'content-type':'application/json','x-csrf-token':'document-token'}});
     await w.happyDOM.close();

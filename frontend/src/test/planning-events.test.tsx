@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import type { ChatEvent } from '../lib/hyper';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import type { ChatEvent } from '../lib/mauzcode';
 
 const advisory = 'Planning mode enabled (advisory, not a sandbox)';
 it.each([

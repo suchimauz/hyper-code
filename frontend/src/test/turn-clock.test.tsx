@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CurrentAction, turnClock } from '../components/hyper/CurrentAction';
-import type { EventPage } from '../lib/hyper';
+import { CurrentAction, turnClock } from '../components/mauzcode/CurrentAction';
+import type { EventPage } from '../lib/mauzcode';
 
 const page: EventPage = { agentId: 'fixture', events: [], olderBefore: null, hasOlder: false, isRunning: true, runState: 'running', lastError: null, partial: null };
 

@@ -2,7 +2,7 @@
 
 **Status:** conceptual design; not implemented. Motivated by
 [funes](https://huggingface.co/blog/funes) (Hugging Face, 2026-09-03) and by the fact that
-Hyper already stores everything such a memory would need.
+MauzCode already stores everything such a memory would need.
 
 ## 1. Problem
 
@@ -13,7 +13,7 @@ tried, it broke on BOM and stray quotes in the legacy export, files never exceed
 load into memory instead. Eight months later someone asks for a streaming parser again and the
 agent cheerfully agrees, because the only thing it can see is the current transcript.
 
-Hyper has the record. `messages` holds every turn of every agent, `searchBm25` can already grep
+MauzCode has the record. `messages` holds every turn of every agent, `searchBm25` can already grep
 it lexically. What is missing is a memory an agent reaches for *by itself*, ranked, with exact
 provenance, and spanning sessions other than the current one.
 
@@ -36,11 +36,11 @@ Worth stating because the shape is good and the trade-offs are explicit.
   other (its summary flattened the finding that mattered); recall was cheapest on both — 8x
   cheaper than a written handoff on one task, 4x on the other.
 
-## 3. Why this fits Hyper unusually well
+## 3. Why this fits MauzCode unusually well
 
 We do not need the ingest half at all. It is already there.
 
-| funes needs | Hyper already has |
+| funes needs | MauzCode already has |
 | --- | --- |
 | collect traces from agent CLIs | `messages` table, every agent, durable |
 | a turn/block shape | `messages(agent_id, idx, role, content, tool_calls, tool_call_id, message_type, ts)` |
@@ -132,7 +132,7 @@ Scope defaults matter more here than in function RAG:
 - `scope: "workspace"` — all agents whose `workspace_dir` matches (the useful default);
 - `scope: "all"` — everything.
 
-Because a Hyper user's transcripts include health records, invoices and private mail, `scope`
+Because a MauzCode user's transcripts include health records, invoices and private mail, `scope`
 should default to `workspace`, and cross-workspace recall should be an explicit setting.
 
 ### 4.4 How the agent uses it

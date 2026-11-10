@@ -164,7 +164,7 @@ async function start(ctx: Context, st: types.tsgo.State): Promise<types.tsgo.Cli
     st.pendingChanges = new Map();
     st.docVersion = 0;
     const toUri = (abs: string) => pathToFileURL(abs).href;
-    const push = (abs: string) => { if (!abs.includes("__hyper_virtual_eval__")) st.pendingChanges!.set(abs, 2); };
+    const push = (abs: string) => { if (!abs.includes("__mauzcode_virtual_eval__")) st.pendingChanges!.set(abs, 2); };
     for (const dir of ["src", "script"]) {
         try {
             watchers.push(watch(join(root, dir), { recursive: true }, (_event, file) => {

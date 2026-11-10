@@ -1,11 +1,11 @@
-# Multiuser Hyper
+# Multiuser MauzCode
 
-Documents for turning Hyper into a multi-user, multi-agent platform for a team.
+Documents for turning MauzCode into a multi-user, multi-agent platform for a team.
 
 | File | What it is |
 |---|---|
 | [plan.md](plan.md) | **Start here.** Phased refactoring and migration plan (phases 0–8), order, rollback per phase |
-| [switch.md](switch.md) | Step-by-step switch of the live Hyper to users (phase 1), with rollback point |
+| [switch.md](switch.md) | Step-by-step switch of the live MauzCode to users (phase 1), with rollback point |
 | [design.md](design.md) | Full design discussion: foundations (§0), access model, roles, compute, authority, identity, deployment, decisions §30–§35 |
 | [research/](research/) | Background research: agent platforms, authorization models, agent security and isolation |
 

@@ -24,14 +24,14 @@ export default function (
     // Browser code that listens to the live-update stream directly. Such a
     // listener hears events but is never told when it MISSED some (tab hidden on
     // HTTP/1.1, network drop, frozen tab), so it silently shows stale state — the
-    // canvas did exactly that. Subscribe through window.hyperLive.subscribe with a
-    // resync, or hyperLive.command for one-shot instructions (docs/live-updates.md).
+    // canvas did exactly that. Subscribe through window.mauzcodeLive.subscribe with a
+    // resync, or mauzCodeLive.command for one-shot instructions (docs/live-updates.md).
     // Text-level on purpose: browser scripts are .js, and a .ts file may carry a
     // script as a string (ui.controlScript). Only the stream itself may dispatch.
     if (!/(^|\/)procs\/events\/client\.js$/.test(opts.rel)) {
         opts.text.split("\n").forEach((text, i) => {
-            if (/addEventListener\(\s*\\?['"`]hyper-(events|ui-event)\\?['"`]/.test(text)) {
-                out.push({ line: i + 1, rule: "live-subscribe", severity: "error", detail: "listens to 'hyper-events' directly and never catches up after a gap — use window.hyperLive.subscribe({ types, onEvent, resync }) or hyperLive.command (docs/live-updates.md)" });
+            if (/addEventListener\(\s*\\?['"`]mauzcode-(events|ui-event)\\?['"`]/.test(text)) {
+                out.push({ line: i + 1, rule: "live-subscribe", severity: "error", detail: "listens to 'mauzcode-events' directly and never catches up after a gap — use window.mauzcodeLive.subscribe({ types, onEvent, resync }) or mauzCodeLive.command (docs/live-updates.md)" });
             }
         });
     }

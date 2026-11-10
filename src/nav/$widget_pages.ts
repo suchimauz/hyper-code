@@ -1,5 +1,5 @@
 // Core widget: the pages the core declares (`$app_`). Which pages and in what order comes from the setting
-// nav.pages (ids of $app_ files, usually fixed for the instance in ~/.hyper/settings/$settings_nav.json); without
+// nav.pages (ids of $app_ files, usually fixed for the instance in ~/.mauzcode/settings/$settings_nav.json); without
 // it every core page shows by its declared order, System pages other than Search in an "Administration" section.
 // Pages declared by plugins are on the Plugins tab (plugin-pages widget).
 export default {

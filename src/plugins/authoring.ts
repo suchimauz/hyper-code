@@ -1,5 +1,5 @@
 /**
- * Reads the canonical guide for creating and configuring Hyper plugins.
+ * Reads the canonical guide for creating and configuring MauzCode plugins.
  *
  * Use before authoring a plugin to learn metadata, source layout, runtime functions, declared settings, security boundaries and validation. Resolves the guide beside this loaded core function, independently of the agent workspace and process working directory.
  */

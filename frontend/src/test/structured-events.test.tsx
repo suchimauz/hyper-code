@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { expect, it } from 'vitest';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
 
 it('displays a structured user event without persisted HTML and never injects a historical shell', () => {
   const event = {idx: 4, ts: 1700000000000, type: 'user', text: 'The structured message'};

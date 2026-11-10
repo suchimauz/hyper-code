@@ -1,15 +1,15 @@
-// Another Hyper relays LLM calls through this one (docs/hyper-node.md). The
+// Another MauzCode relays LLM calls through this one (docs/mauzcode-node.md). The
 // caller proves itself with a client token issued by node.issueClient; the
 // request must arrive from loopback, the tailnet or an explicitly allowed IP, and
 // never through a forwarding proxy.
 /**
- * Authorize an incoming Hyper-node request and resolve the client record
+ * Authorize an incoming MauzCode-node request and resolve the client record
  *
  * Verifies the bearer token against llm_node_clients (sha256), checks the
  * source address is loopback, Tailscale (100.64.0.0/10), or an exact IP in
  * node.allowedClientIps (empty by default), without forwarding
- * headers, or a hypermesh overlay client (10.77.0.0/16) forwarded by the local
- * hyperlet ingress after the hub's policy check, enforces the hop limit and bumps usage counters. Returns the client
+ * headers, or a mauzcodemesh overlay client (10.77.0.0/16) forwarded by the local
+ * mauzcodelet ingress after the hub's policy check, enforces the hop limit and bumps usage counters. Returns the client
  * with its provider allow-list, or a ready 401/403 response.
  * @param opts.req Incoming request.
  */
@@ -26,22 +26,22 @@ export default async function (
     const ip = String((ctx.state as any).procs?.http?.server?.server?.requestIP?.(opts.req)?.address ?? "").replace(/^::ffff:/, "");
     const loopback = ip === "127.0.0.1" || ip === "::1" || ip === "localhost";
     const tailscale = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip);
-    // hypermesh: the local hyperlet ingress (loopback peer) forwards only requests the hub has already
+    // mauzcodemesh: the local mauzcodelet ingress (loopback peer) forwards only requests the hub has already
     // authorized by policy grant; it stamps x-hn-id and appends the overlay (10.77.0.0/16) client address.
     const xff = String(opts.req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const hnMesh = loopback && Boolean(opts.req.headers.get("x-hn-id")) && xff.length > 0 && /^10\.77\.\d+\.\d+$/.test(xff.at(-1)!);
     const allowedIps = await ctx.fns.settings.get({ module: "node", scopeType: "global", key: "allowedClientIps" });
     const explicitlyAllowed = ip !== "" && Array.isArray(allowedIps) && allowedIps.some(value => typeof value === "string" && value === ip);
-    if (!hnMesh && (forwarded || !(loopback || tailscale || explicitlyAllowed))) return deny(403, "hyper node source address is not allowed");
-    const hops = Number(opts.req.headers.get("x-hyper-hops") ?? 0);
-    if (!Number.isFinite(hops) || hops >= 3) return deny(508, "hyper node hop limit reached");
+    if (!hnMesh && (forwarded || !(loopback || tailscale || explicitlyAllowed))) return deny(403, "mauzcode node source address is not allowed");
+    const hops = Number(opts.req.headers.get("x-mauzcode-hops") ?? 0);
+    if (!Number.isFinite(hops) || hops >= 3) return deny(508, "mauzcode node hop limit reached");
     const header = opts.req.headers.get("authorization") ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-    if (!token) return deny(401, "hyper node token required");
+    if (!token) return deny(401, "mauzcode node token required");
     const hash = new Bun.CryptoHasher("sha256").update(token).digest("hex");
     const rows = await ctx.fns.procs.db.select({ sql: "SELECT id, name, providers FROM llm_node_clients WHERE token_hash = ? AND revoked_at IS NULL", params: [hash] }) as any[];
     const row = rows[0];
-    if (!row) return deny(401, "invalid or revoked hyper node token");
+    if (!row) return deny(401, "invalid or revoked mauzcode node token");
     await ctx.fns.procs.db.run({ sql: "UPDATE llm_node_clients SET last_used_at = ?, requests = requests + 1 WHERE id = ?", params: [Date.now(), String(row.id)] });
     const providers = String(row.providers ?? "").split(",").map((s: string) => s.trim()).filter(Boolean);
     return { ok: true, client: { id: String(row.id), name: String(row.name), providers }, hops };

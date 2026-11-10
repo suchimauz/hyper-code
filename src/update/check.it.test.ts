@@ -11,7 +11,7 @@ const git = (cwd: string, ...args: string[]) => {
 };
 
 test("update.check distinguishes current, behind and dirty checkouts", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "hyper-update-"));
+  const dir = await mkdtemp(join(tmpdir(), "mauzcode-update-"));
   const bare = join(dir, "remote.git"), seed = join(dir, "seed"), app = join(dir, "app");
   git(dir, "init", "--bare", bare); git(dir, "init", "-b", "main", seed);
   git(seed, "config", "user.email", "test@example.test"); git(seed, "config", "user.name", "Test");

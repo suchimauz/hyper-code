@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ConnectedPlanningPanel } from '../components/hyper/ConnectedPlanningPanel';
-import { ComposerFooter } from '../components/hyper/ComposerFooter';
+import { ConnectedPlanningPanel } from '../components/mauzcode/ConnectedPlanningPanel';
+import { ComposerFooter } from '../components/mauzcode/ComposerFooter';
 const json = (body: object) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
 const state = { version: 1, agentId: 'a', mode: 'plan', revision: 1, scope: 'session', advisory: true, runningPolicy: 'reject', csrfToken: 'token', proposal: null };
 afterEach(() => vi.unstubAllGlobals());

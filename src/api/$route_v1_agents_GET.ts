@@ -1,4 +1,4 @@
-/** Lists active Hyper agents for the native mobile client. */
+/** Lists active MauzCode agents for the native mobile client. */
 export default async function (ctx: Context, _session: Session | null, _opts: { req: Request; params: Record<string, string> }) {
     const agents = await ctx.fns.session.list({});
     const pins = await ctx.fns.auth.pinnedIds({});

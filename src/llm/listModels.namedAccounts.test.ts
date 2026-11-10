@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import listModels from "./listModels";
 
-test("named-only local Codex and Hyper routes remain in the native picker catalog", async () => {
+test("named-only local Codex and MauzCode routes remain in the native picker catalog", async () => {
     const originalFetch = globalThis.fetch;
     const requested: string[] = [];
     globalThis.fetch = (async (url: string | URL | Request) => {
@@ -34,6 +34,6 @@ test("named-only local Codex and Hyper routes remain in the native picker catalo
         const groups = await listModels(ctx, null);
         expect(requested).toEqual(["pro500"]);
         expect(groups.codex).toEqual(["codex/pro500:gpt-6-astra"]);
-        expect(groups["hyper/mini6"]).toEqual(remoteModels.map(id => `hyper/mini6:${id}`));
+        expect(groups["mauzcode/mini6"]).toEqual(remoteModels.map(id => `mauzcode/mini6:${id}`));
     } finally { globalThis.fetch = originalFetch; }
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { markChatRead, type EventPage } from '../lib/hyper';
+import { markChatRead, type EventPage } from '../lib/mauzcode';
 
 /** Acknowledge only a committed snapshot of the selected, visible chat.
  * Bound the receipt by its event timestamp so a newer response arriving during
@@ -28,7 +28,7 @@ export function useReadReceipt(id: string, page: EventPage | null) {
         if (controller.signal.aborted) return;
         if (!result.ok) throw new Error('Read receipt was not acknowledged');
         done = true;
-        window.dispatchEvent(new CustomEvent('hyper-ui:read', { detail: { id, seenAt: result.seenAt } }));
+        window.dispatchEvent(new CustomEvent('mauzcode-ui:read', { detail: { id, seenAt: result.seenAt } }));
       } catch {
         // Non-critical: keep the unread badge and retry, never claim success offline.
         if (!controller.signal.aborted) timer = setTimeout(() => { void mark(); }, 5000);

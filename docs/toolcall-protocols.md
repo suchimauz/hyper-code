@@ -1,6 +1,6 @@
 # Tool-call протоколы: OpenAI, Anthropic, Kimi
 
-Исследование нативных tool-call протоколов провайдеров: wire-форматы, streaming, strict-режимы, параллельные вызовы, кэширование и грабли. Источники: официальные документы, локальные reference implementations (`~/codex`, `~/claude-code`, `~/pi-mono`) и текущие Hyper adapters (`src/llm/stream*.ts`).
+Исследование нативных tool-call протоколов провайдеров: wire-форматы, streaming, strict-режимы, параллельные вызовы, кэширование и грабли. Источники: официальные документы, локальные reference implementations (`~/codex`, `~/claude-code`, `~/pi-mono`) и текущие MauzCode adapters (`src/llm/stream*.ts`).
 
 Результаты ранних A/B-исследований markers vs native JSON не являются runtime dependency; актуальный wire contract определяется source adapters и их tests.
 
@@ -64,7 +64,7 @@
 
 **Кэш:** явные `cache_control` breakpoints. Tools сериализуются **в начало префикса** (до system) — любое изменение списка инструментов инвалидирует весь кэш. Это главный налог протокола: 50+ инструментов = десятки килотокенов в каждом запросе (ответ Anthropic — Tool Search / dynamic discovery).
 
-**Наши грабли (боевые, из hyper-code2):**
+**Наши грабли (боевые, из mauzcode):**
 - 400 на пустой text-блок → `toAnthropicMessages` дропает пустые и склеивает соседние;
 - 400 `final assistant content cannot end with trailing whitespace` → трим хвоста последнего assistant;
 - thinking-блоки надо реплеить с их `signature`, иначе 400;
@@ -112,7 +112,7 @@ Id — `functions.{name}:{index}`; имя достаётся парсингом 
 | Streaming аргументов | deltas по index | semantic events | `input_json_delta` (+eager beta) | сырые токены |
 | Кэш | неявный префикс + `prompt_cache_key` | + реплей reasoning items | явный `cache_control`; tools = голова префикса | явный caching API (Moonshot) |
 
-## 5. Выводы для hyper-code2
+## 5. Выводы для mauzcode
 
 1. **Batch есть у всех, конвейера нет ни у кого.** Все три протокола умеют несколько *независимых* вызовов за ответ, но ни один — зависимую цепочку «выполни, возьми результат, выполни следующее» внутри одного ответа. Наш fail-fast chain (`§eval → §edit → §bash` в одном сообщении) — реальное отличие, оно экономит round-trips именно на цепочках (бенч: dependent-chain у markers 2 tool-turn'а против 4-5 у JSON).
 2. **JSON — универсальный консенсус, различается только обёртка.** Аргументы у всех троих (включая Kimi: внутри `<|tool_call_argument_begin|>` лежит обычный JSON-объект) — это JSON; отличаются лишь контейнеры: поле сообщения / item / content-блок / спецтокены в потоке. Спецтокены K2 решают «где границы вызова», а не «в каком формате параметры». Единственное реальное исключение — OpenAI custom tools (свободный текст + опциональная CFG-грамматика), и это нишевая фича.
@@ -128,4 +128,4 @@ Id — `functions.{name}:{index}`; имя достаётся парсингом 
 - [Anthropic: Tool use overview](https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview) · [Fine-grained tool streaming](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/fine-grained-tool-streaming) · [Streaming messages](https://docs.anthropic.com/en/api/messages-streaming) · [Claude tool use: input_schema, stop_reason, parallel](https://renezander.com/guides/claude-api-tool-use/)
 - [MoonshotAI/Kimi-K2: tool_call_guidance.md](https://github.com/MoonshotAI/Kimi-K2/blob/main/docs/tool_call_guidance.md) · [Kimi-K2-Instruct model card](https://huggingface.co/moonshotai/Kimi-K2-Instruct) · [Kimi API Platform](https://platform.kimi.ai/docs/api/overview)
 - pi-agent: `packages/ai/src/api/{openai-completions,openai-responses-shared,anthropic-messages}.ts`, `providers/{moonshotai,kimi-coding}.ts`
-- hyper-code2: `src/llm/{streamCodex,toAnthropicMessages,parseSSE}.ts`, бенчи `scratchpad/ab/`
+- mauzcode: `src/llm/{streamCodex,toAnthropicMessages,parseSSE}.ts`, бенчи `scratchpad/ab/`

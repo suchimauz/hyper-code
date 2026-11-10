@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { WorkspaceSidebar } from '../components/hyper/WorkspaceSidebar';
-import { defaultWorkspaceView } from '../components/hyper/WorkspaceViewMenu';
+import { WorkspaceSidebar } from '../components/mauzcode/WorkspaceSidebar';
+import { defaultWorkspaceView } from '../components/mauzcode/WorkspaceViewMenu';
 import { chatActivityAt, compareChatsByActivity, workspaceViewProjects } from '../lib/workspaceView';
 import type { NavigationChat, NavigationProject } from '../lib/navigation';
 
@@ -29,7 +29,7 @@ it('preserves pin order and manual order', () => {
   expect(manual[1].chats.map(c => c.id)).toEqual(['older-empty', 'new-empty']);
 });
 it('renders newest empty chat first across workspaces in the flat list, without inventing a reply date', () => {
-  localStorage.setItem('hyper.workspace-view', JSON.stringify({ ...defaultWorkspaceView, group: 'flat' }));
+  localStorage.setItem('mauzcode.workspace-view', JSON.stringify({ ...defaultWorkspaceView, group: 'flat' }));
   render(<WorkspaceSidebar projects={projects} user={null} selected="new-empty" theme="light" onTheme={vi.fn()} onToggle={vi.fn()} onSelect={vi.fn()} onRetry={vi.fn()} />);
   const rows = screen.getAllByRole('button').filter(button => ['new-empty', 'reply', 'older-empty', 'undated'].some(id => button.textContent?.includes(id)) && button.classList.contains('workspace-chat'));
   expect(rows.map(row => row.textContent?.match(/new-empty|older-empty|undated|reply/)?.[0])).toEqual(['new-empty', 'reply', 'older-empty', 'undated']);

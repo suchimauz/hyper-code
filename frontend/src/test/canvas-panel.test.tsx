@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { CanvasPanel } from '../components/hyper/CanvasPanel';
-import { parseCanvasTabs } from '../components/hyper/canvasTabs';
-import { readTabs } from '../components/hyper/canvasTabs';
+import { CanvasPanel } from '../components/mauzcode/CanvasPanel';
+import { parseCanvasTabs } from '../components/mauzcode/canvasTabs';
+import { readTabs } from '../components/mauzcode/canvasTabs';
 import { createExtensionRegistry } from '../extensions/registry';
 import type { ExtensionLauncherProps, UiExtension } from '../extensions/types';
 const launcherExtension: UiExtension = { id: 'terminal', apiVersion: 1, canvasLaunchers: [{ id: 'terminal', title: 'Terminal', description: 'Shell', component: ({ active, tabId }: ExtensionLauncherProps) => <div hidden={!active}>Terminal content {tabId}</div> }] };
@@ -60,11 +60,11 @@ it('launcher icon falls back to the default without a plugin icon, and own icon 
  expect(createExtensionRegistry([launcherExtension],{terminal:{}}).canvasLaunchers).toHaveLength(0);
 });
 it('migrates stored Terminal tabs to the terminal plugin launcher',()=>{
- localStorage.setItem('hyper.canvas.tabs.m',JSON.stringify({starts:[],terms:[3],next:4,selected:'terminal-3'}));
+ localStorage.setItem('mauzcode.canvas.tabs.m',JSON.stringify({starts:[],terms:[3],next:4,selected:'terminal-3'}));
  expect(readTabs('m')).toEqual({starts:[],pages:[{n:3,launcher:'terminal/terminal'}],next:4,selected:'page-3'});
 });
 it('a tab of an unavailable plugin shows a notice',async()=>{
- setLaunchers(true,null,[]);localStorage.setItem('hyper.canvas.tabs.a',JSON.stringify({starts:[],pages:[{n:2,launcher:'terminal/terminal'}],next:3,selected:'page-2'}));
+ setLaunchers(true,null,[]);localStorage.setItem('mauzcode.canvas.tabs.a',JSON.stringify({starts:[],pages:[{n:2,launcher:'terminal/terminal'}],next:3,selected:'page-2'}));
  api([]);render(<CanvasPanel {...props}/>);expect(await screen.findByText(/Плагин недоступен/)).toBeInTheDocument();
 });
 it('validates tab metadata instead of parsing HTML',()=>{

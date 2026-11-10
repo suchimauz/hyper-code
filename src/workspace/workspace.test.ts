@@ -8,7 +8,7 @@ import gitRun from "../git/run";
 
 describe("agent workspace", () => {
     test("files and bash use session.agent.workspaceDir without changing process cwd", async () => {
-        const dir = await mkdtemp(join(tmpdir(), "hyper-workspace-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-workspace-"));
         const originalCwd = process.cwd();
         try {
             await writeFile(join(dir, "marker.txt"), "workspace");
@@ -25,7 +25,7 @@ describe("agent workspace", () => {
     });
 
     test("git defaults to session.agent.workspaceDir", async () => {
-        const dir = await mkdtemp(join(tmpdir(), "hyper-workspace-git-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-workspace-git-"));
         try {
             await Bun.$`git init -q ${dir}`;
             const result = await gitRun({} as any, { agent: { id: "aa", workspaceDir: dir } } as any, {

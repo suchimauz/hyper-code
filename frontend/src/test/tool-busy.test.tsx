@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ToolBusyRow } from '../components/hyper/ToolBusyRow';
-import type { ChatEvent } from '../lib/hyper';
+import { ToolBusyRow } from '../components/mauzcode/ToolBusyRow';
+import type { ChatEvent } from '../lib/mauzcode';
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); document.querySelector('meta[name="csrf-token"]')?.remove(); });
 const event: ChatEvent = { idx: 1, ts: 1, type: 'tool_busy', text: null, runId: 'exact', name: 'bash', subject: '<unsafe>', elapsedSec: 10, timeoutMs: 60000 };
 test('does not abort on render; explicit action sends exact run with cookie CSRF and disables repeats', async () => {

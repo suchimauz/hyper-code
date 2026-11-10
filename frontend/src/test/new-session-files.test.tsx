@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, useState } from 'react';
-import { NewSessionComposer } from '../components/hyper/NewSessionComposer';
+import { NewSessionComposer } from '../components/mauzcode/NewSessionComposer';
 import { type NewSessionDraft, submitNewSession } from '../lib/newSession';
-vi.mock('../components/hyper/ModelPicker', () => ({ ModelPicker: ({ onReadyChange }: { onReadyChange: (ready:boolean)=>void }) => { useEffect(() => onReadyChange(true), [onReadyChange]); return null; } }));
-vi.mock('../components/hyper/CrabMascot', () => ({ CrabMascot: () => null }));
+vi.mock('../components/mauzcode/ModelPicker', () => ({ ModelPicker: ({ onReadyChange }: { onReadyChange: (ready:boolean)=>void }) => { useEffect(() => onReadyChange(true), [onReadyChange]); return null; } }));
+vi.mock('../components/mauzcode/CrabMascot', () => ({ CrabMascot: () => null }));
 vi.mock('../lib/newSession', async original => ({ ...await original<typeof import('../lib/newSession')>(), getNewSessionDefaults: vi.fn(async () => ({ csrfToken:'token' })), submitNewSession: vi.fn() }));
 const created = vi.fn();
 function Draft() { const [draft,onChange]=useState<NewSessionDraft>({projectId:'p',model:'test:model',effort:'',text:'',requestKey:crypto.randomUUID()}); return <NewSessionComposer draft={draft} onChange={onChange} projects={[{id:'p',title:'Project',dir:'/',host:null,chats:[]}]} onCreated={created} onPending={()=>{}} />; }
@@ -22,7 +22,7 @@ it('sends files without text and keeps the same immutable files for uncertain re
  expect(vi.mocked(submitNewSession).mock.calls[1]).toEqual(vi.mocked(submitNewSession).mock.calls[0]);
 });
 it('a reloaded file submission cannot be retried as text-only',()=>{
- sessionStorage.setItem('hyper-ui-new-session-pending',JSON.stringify({projectId:'p',model:'test:model',effort:'',text:'keep',requestKey:'missing-after-reload',fileCount:1}));
+ sessionStorage.setItem('mauzcode-ui-new-session-pending',JSON.stringify({projectId:'p',model:'test:model',effort:'',text:'keep',requestKey:'missing-after-reload',fileCount:1}));
  render(<Draft/>);
  expect(screen.getByRole('alert')).toHaveTextContent('Повтор заблокирован');
  expect(screen.queryByText('Повторить отправку')).not.toBeInTheDocument();

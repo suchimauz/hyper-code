@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it } from 'vitest';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import { ProcessGroup } from '../components/hyper/WorkGroups';
-import { processEntries, workTurns } from '../components/hyper/transcriptGroups';
-import type { ChatEvent } from '../lib/hyper';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import { ProcessGroup } from '../components/mauzcode/WorkGroups';
+import { processEntries, workTurns } from '../components/mauzcode/transcriptGroups';
+import type { ChatEvent } from '../lib/mauzcode';
 const peer: ChatEvent = { idx: 3, ts: 1700000000000, type: 'user', text: '<agent-message>envelope</agent-message>', messageIdx: 9, navigationEligible: false, author: {id:'agent:ab',agentId:'ab',kind:'agent',hue:120,name:'Research',initials:'AB'}, agentMessage: {from:'ab',title:'Research',body:'Exact original\nsecond line'} };
 it('uses a collapsed tool-style row, revealing only the message body on click', () => {
   const {container} = render(<TranscriptMessage event={peer} agentId="owner" />);

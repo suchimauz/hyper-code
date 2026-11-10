@@ -1,8 +1,8 @@
 /**
- * Tells the Hyper Control Plane this instance is alive and shares a small, non-sensitive status.
+ * Tells the MauzCode Control Plane this instance is alive and shares a small, non-sensitive status.
  *
  * Sends counts (users, agents, running agents) and the code version; never names, messages or secrets.
- * Returns the service id the control plane knows this Hyper as, or null when not connected or unreachable.
+ * Returns the service id the control plane knows this MauzCode as, or null when not connected or unreachable.
  * Called periodically from the module's $start; safe to call by hand.
  */
 export default async function (ctx: Context, _session: Session | null, _opts: {}): Promise<{ service: string } | null> {

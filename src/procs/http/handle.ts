@@ -5,7 +5,7 @@
 import { makeRequestCtx } from "../boot/requestCtx";
 
 /**
- * Handles one incoming HTTP request for the running Hyper server: middleware, WebSocket upgrade or route, logging.
+ * Handles one incoming HTTP request for the running MauzCode server: middleware, WebSocket upgrade or route, logging.
  *
  * Use as the Bun.serve fetch handler. A request carrying `Upgrade: websocket` whose path matches a
  * `$ws_<path>.ts` endpoint is upgraded only after every middleware for that path let it through, so

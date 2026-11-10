@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import { Button } from '../ui/Button';
-import { requestJson } from '../../lib/hyper';
+import { requestJson } from '../../lib/mauzcode';
 
 type ResetResult = { outcome: 'reset' | 'nothingToReset' | 'noCredit' | 'alreadyRedeemed'; windowsReset: number | null };
 const messages: Record<ResetResult['outcome'], string> = {
@@ -20,7 +20,7 @@ export function CodexAccountReset({ account, csrfToken, disabled = false }: { ac
   const [message, setMessage] = useState('');
   const inFlight = useRef(false);
   const attempt = useRef<string | null>(null);
-  const storageKey = `hyper.codex-reset.pending:${account}`;
+  const storageKey = `mauzcode.codex-reset.pending:${account}`;
   const submit = async () => {
     if (!confirmed || disabled || !csrfToken || inFlight.current) return;
     inFlight.current = true;

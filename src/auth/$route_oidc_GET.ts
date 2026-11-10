@@ -1,5 +1,5 @@
 /**
- * Starts sign-in through the OIDC provider (Hyper Control Plane): authorization code + PKCE S256 + state + nonce.
+ * Starts sign-in through the OIDC provider (MauzCode Control Plane): authorization code + PKCE S256 + state + nonce.
  * The PKCE verifier, nonce and return path travel in a short-lived signed single-purpose cookie. 404 when off.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
@@ -14,7 +14,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     // One signed, single-purpose token (kind) carries what the callback needs; never a session.
     const carry = await ctx.fns.procs.auth.sign({ sub: state, name: nonce, email: next, jti: verifier, kind: "oidc-state", seconds: 600 });
     const forwardedProto = opts.req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-    const cookie = ctx.fns.procs.auth.cookie({ name: "hyper_oidc_state", token: carry, url: forwardedProto === "https" ? "https://hyper.invalid/" : opts.req.url, days: 1 / 144 });
+    const cookie = ctx.fns.procs.auth.cookie({ name: "mauzcode_oidc_state", token: carry, url: forwardedProto === "https" ? "https://mauzcode.invalid/" : opts.req.url, days: 1 / 144 });
     const u = new URL(cfg.authorizationEndpoint);
     for (const [k, v] of Object.entries({
         client_id: cfg.clientId, redirect_uri: ctx.fns.auth.oidcRedirectUri({ req: opts.req }), response_type: "code",

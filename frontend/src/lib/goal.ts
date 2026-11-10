@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 
 export type Goal = {
   goalId: string; revision: number; objective: string;

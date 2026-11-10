@@ -14,7 +14,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     if (users.length > 1 || (lone && lone.configuredAt != null)) return new Response(null, { status: 303, headers: { location: "/" } });
     // A legacy shared-password install is switched over with `bun script/multiuser.ts up`, not from the web.
     if (!lone && (await ctx.fns.auth.password({}))) return new Response(null, { status: 303, headers: { location: "/auth/login" } });
-    const guess = lone?.name && lone.name !== "Owner" ? lone.name : String(ctx.env.HYPER_USER ?? ctx.env.USER ?? "");
+    const guess = lone?.name && lone.name !== "Owner" ? lone.name : String(ctx.env.MAUZCODE_USER ?? ctx.env.USER ?? "");
     const needsCurrent = !!lone?.hasPassword;
     const error = new URL(opts.req.url).searchParams.get("error");
     if ((opts.req.headers.get("accept") ?? "").includes("application/json")) return Response.json({ kind: "setup", name: guess, email: lone?.email ?? "", needsCurrent, error }, { headers: { "cache-control": "no-store", vary: "Accept" } });

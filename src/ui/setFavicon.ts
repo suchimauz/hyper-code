@@ -1,13 +1,13 @@
 /**
- * Sets or resets the browser tab icon of this Hyper instance
+ * Sets or resets the browser tab icon of this MauzCode instance
  *
- * Overrides the favicon shown in browser tabs for this Hyper instance only. The icon is stored in this instance's settings database (setting ui.favicon), never in source control, so every deployment can carry its own icon. Pass exactly one source: an image file path (svg, png, ico, gif, webp, jpg), raw SVG markup, an emoji (optionally on a coloured rounded square), or a ready data:image URL. reset: true returns to the built-in Hyper icon. Open pages show the new icon after a reload.
+ * Overrides the favicon shown in browser tabs for this MauzCode instance only. The icon is stored in this instance's settings database (setting ui.favicon), never in source control, so every deployment can carry its own icon. Pass exactly one source: an image file path (svg, png, ico, gif, webp, jpg), raw SVG markup, an emoji (optionally on a coloured rounded square), or a ready data:image URL. reset: true returns to the built-in MauzCode icon. Open pages show the new icon after a reload.
  * @param opts.path Image file to use, resolved against the workspace: .svg, .png, .ico, .gif, .webp or .jpg, at most 256 KB once encoded.
  * @param opts.svg Raw SVG markup for the icon; a square viewBox such as 0 0 32 32 looks best at 16×16.
  * @param opts.emoji Emoji or short text drawn as the icon, e.g. 🧪 for a staging instance.
  * @param opts.background CSS colour of a rounded square behind the emoji, e.g. #dc2626; omitted draws the emoji alone. Only used with emoji.
  * @param opts.dataUrl Ready data:image/... URL to store as is.
- * @param opts.reset Remove the override and return to the built-in Hyper icon. @default false
+ * @param opts.reset Remove the override and return to the built-in MauzCode icon. @default false
  */
 export default async function (
     ctx: Context,
@@ -23,7 +23,7 @@ export default async function (
         background?: string;
         /** Ready data:image/... URL to store as is. */
         dataUrl?: string;
-        /** Remove the override and return to the built-in Hyper icon. @default false */
+        /** Remove the override and return to the built-in MauzCode icon. @default false */
         reset?: boolean;
     },
 ): Promise<{ favicon: 'custom' | 'default'; bytes: number }> {

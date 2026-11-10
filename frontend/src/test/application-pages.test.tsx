@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ApplicationPages, applicationLinks, nativeApplicationHref } from '../components/hyper/ApplicationPages';
+import { ApplicationPages, applicationLinks, nativeApplicationHref } from '../components/mauzcode/ApplicationPages';
 const live = vi.hoisted(() => ({ options: null as any, stop: vi.fn() }));
 vi.mock('../sdk/live', () => ({ subscribeLive: (options: unknown) => { live.options = options; return live.stop; } }));
 afterEach(() => { vi.restoreAllMocks(); live.stop.mockClear(); });

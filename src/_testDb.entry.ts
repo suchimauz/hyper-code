@@ -1,9 +1,9 @@
 // The test database, made once. A suite used to migrate ~40 tables into a fresh pg_temp schema for EVERY test
 // ctx (half a second each, most of a full run). Now:
 //
-//   template  hyper_test_t_<hash>   migrated once per migration set, on the test server (54399) — the hash is
+//   template  mauzcode_test_t_<hash>   migrated once per migration set, on the test server (54399) — the hash is
 //                                   taken over the core migration files, so editing one builds a new template
-//   worker    hyper_test_w_<hash>_<pid>   CREATE DATABASE … TEMPLATE, once per test process; every ctx of the
+//   worker    mauzcode_test_w_<hash>_<pid>   CREATE DATABASE … TEMPLATE, once per test process; every ctx of the
 //                                   process connects to it with an ordinary public search_path
 //   reset     between tests (preload afterEach/afterAll): TRUNCATE what has rows, restart sequences, drop what a
 //                                   test created on top of the template — back to the freshly migrated state
@@ -17,7 +17,7 @@ type Snapshot = { tables: string[]; relations: Set<string>; schemas: Set<string>
 type Worker = { url: string; name: string; admin: SQL; snapshot: Snapshot; dirty: boolean };
 
 const G = globalThis as any;
-const workers: Map<string, Promise<Worker>> = (G.__hyperTestDbWorkers ??= new Map());
+const workers: Map<string, Promise<Worker>> = (G.__mauzcodeTestDbWorkers ??= new Map());
 
 const EXTENSIONS = resolve(import.meta.dir, "../script/db-test/extensions.sql");
 
@@ -52,11 +52,11 @@ export async function workerDatabaseUrl(baseUrl: string, hash: string, migrate: 
 }
 
 async function openWorker(baseUrl: string, hash: string, migrate: (url: string) => Promise<void>): Promise<Worker> {
-    const template = `hyper_test_t_${hash}`;
-    const name = `hyper_test_w_${hash}_${process.pid}`;
+    const template = `mauzcode_test_t_${hash}`;
+    const name = `mauzcode_test_w_${hash}_${process.pid}`;
     const maint = new SQL(withDb(baseUrl, "postgres"), { max: 1, prepare: false });
     try {
-        await maint.unsafe(`SELECT pg_advisory_lock(hashtext('hyper_test_template'))`);
+        await maint.unsafe(`SELECT pg_advisory_lock(hashtext('mauzcode_test_template'))`);
         try {
             await dropStale(maint, template);
             const [has] = await maint.unsafe(`SELECT 1 FROM pg_database WHERE datname = $1`, [template]);
@@ -66,14 +66,14 @@ async function openWorker(baseUrl: string, hash: string, migrate: (url: string) 
             // global) or a dead run whose pid came back. Either way the reset below makes it the template again.
             if (!mine) await maint.unsafe(`CREATE DATABASE ${ident(name)} TEMPLATE ${ident(template)}`);
         } finally {
-            await maint.unsafe(`SELECT pg_advisory_unlock(hashtext('hyper_test_template'))`);
+            await maint.unsafe(`SELECT pg_advisory_unlock(hashtext('mauzcode_test_template'))`);
         }
     } finally {
         await maint.close();
     }
     const url = withDb(baseUrl, name);
     const admin = new SQL(url, { max: 1, prepare: false });
-    (G.__hyperTestAdminPools ??= new Set()).add(admin);
+    (G.__mauzcodeTestAdminPools ??= new Set()).add(admin);
     const snapshot = await snapshotOf(admin);
     const w: Worker = { url, name, admin, snapshot, dirty: true };
     await resetWorker(w);
@@ -98,17 +98,17 @@ async function buildTemplate(maint: SQL, baseUrl: string, template: string, migr
 
 // Worker copies of processes that are gone, and templates of migration sets nobody runs any more.
 async function dropStale(maint: SQL, template: string): Promise<void> {
-    const rows = await maint.unsafe(`SELECT datname FROM pg_database WHERE datname LIKE 'hyper\\_test\\_%'`);
+    const rows = await maint.unsafe(`SELECT datname FROM pg_database WHERE datname LIKE 'mauzcode\\_test\\_%'`);
     for (const { datname } of rows as { datname: string }[]) {
-        const w = /^hyper_test_w_[0-9a-z]+_(\d+)$/.exec(datname);
+        const w = /^mauzcode_test_w_[0-9a-z]+_(\d+)$/.exec(datname);
         if (w) {
             if (!alive(Number(w[1]))) await maint.unsafe(`DROP DATABASE IF EXISTS ${ident(datname)} WITH (FORCE)`).catch(() => {});
             continue;
         }
-        if (/^hyper_test_t_[0-9a-z]+$/.test(datname) && datname !== template) {
+        if (/^mauzcode_test_t_[0-9a-z]+$/.test(datname) && datname !== template) {
             // Still the template of a live run (its workers' copies exist)? Leave it.
-            const hash = datname.slice("hyper_test_t_".length);
-            const users = (rows as { datname: string }[]).filter(r => r.datname.startsWith(`hyper_test_w_${hash}_`)
+            const hash = datname.slice("mauzcode_test_t_".length);
+            const users = (rows as { datname: string }[]).filter(r => r.datname.startsWith(`mauzcode_test_w_${hash}_`)
                 && alive(Number(r.datname.split("_").pop())));
             if (!users.length) await maint.unsafe(`DROP DATABASE IF EXISTS ${ident(datname)} WITH (FORCE)`).catch(() => {});
         }
@@ -188,7 +188,7 @@ function sqlString(s: string): string {
 
 /** Close the reset connections (end of a test process). */
 export async function closeTestDatabases(): Promise<void> {
-    const pools: Set<SQL> | undefined = G.__hyperTestAdminPools;
+    const pools: Set<SQL> | undefined = G.__mauzcodeTestAdminPools;
     if (!pools) return;
     for (const sql of [...pools]) {
         pools.delete(sql);

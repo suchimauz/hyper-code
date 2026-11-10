@@ -1,9 +1,9 @@
 {
-  "name": "hyper-code2-desktop",
+  "name": "mauzcode-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Minimal secure desktop client for an existing Hyper-code2 server",
-  "author": "Hyper-code2 contributors",
+  "description": "Minimal secure desktop client for an existing MauzCode server",
+  "author": "MauzCode contributors",
   "main": "main.cjs",
   "scripts": {
     "dev": "electron .",
@@ -20,8 +20,8 @@
   },
   "trustedDependencies": ["electron"],
   "build": {
-    "appId": "dev.hypercode.desktop",
-    "productName": "Hyper-code2",
+    "appId": "dev.mauzcodecode.desktop",
+    "productName": "MauzCode",
     "directories": { "output": "dist" },
     "files": ["main.cjs", "navigation.cjs", "lifecycle.cjs", "assets/**/*", "security.cjs", "preload.cjs", "renderer.js", "index.html", "styles.css", "package.json"],
     "asar": true,

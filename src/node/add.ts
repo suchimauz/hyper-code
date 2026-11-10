@@ -1,11 +1,11 @@
 /**
- * Add or update a Hyper node to relay through: stores url and token, then fetches its catalogue
- * @param opts.name Local node name; becomes the model prefix hyper/<name>:.
+ * Add or update a MauzCode node to relay through: stores url and token, then fetches its catalogue
+ * @param opts.name Local node name; becomes the model prefix mauzcode/<name>:.
  * @param opts.url Node base URL ending in /node/v1, e.g. http://127.0.0.1:3010/node/v1.
  * @param opts.token Client token issued by the host (node.issueClient there); empty keeps the stored one.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
-    /** Local node name (model prefix hyper/<name>:). */ name: string;
+    /** Local node name (model prefix mauzcode/<name>:). */ name: string;
     /** Node base URL ending in /node/v1. */ url: string;
     /** Client token issued by the host; empty keeps the stored one. */ token?: string;
 }): Promise<types.node.NodeEntry> {

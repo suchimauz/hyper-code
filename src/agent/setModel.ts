@@ -142,7 +142,7 @@ async function splitModel(ctx: Context, model: string): Promise<{ provider: stri
         const inner = /^(codex|claude-code)\/([\w-]+):/.exec(m?.[3] ?? "");
         if (inner) return { provider: inner[1]!, account: `ssh.${account}.${inner[2]}` };
     }
-    if (provider !== "hyper") return { provider, account };
+    if (provider !== "mauzcode") return { provider, account };
     const id = m![3]!;
     const canonical = /^([a-z][\w\-]*)\/([\w\-.]+):/.exec(id);
     if (canonical) return { provider, account: `${account}/${canonical[1]}/${canonical[2]}` };

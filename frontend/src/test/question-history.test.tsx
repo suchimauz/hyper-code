@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
-import { QuestionHistoryContext, QuestionHistoryList, historyGroups, choiceResultId, coalesceQuestionHistory } from '../components/hyper/QuestionHistory';
-import { Transcript } from '../components/hyper/Transcript';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import type { ChatEvent } from '../lib/hyper';
+import { QuestionHistoryContext, QuestionHistoryList, historyGroups, choiceResultId, coalesceQuestionHistory } from '../components/mauzcode/QuestionHistory';
+import { Transcript } from '../components/mauzcode/Transcript';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import type { ChatEvent } from '../lib/mauzcode';
 import type { ChoiceInput } from '../lib/questions';
 afterEach(cleanup);
 const event = (id: string, kind = 'choice'): ChatEvent => ({ idx: 1, ts: 0, type: 'user', text: `<input-result id="${id}" kind="${kind}" state="submitted">\nUntrusted summary\n{}\n</input-result>` });

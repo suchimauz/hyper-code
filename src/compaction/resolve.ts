@@ -1,7 +1,7 @@
 /**
  * Selects the context compactor for a model
  *
- * Returns the `$compaction_<provider>` compactor registered for the model's provider, falling back to `$compaction_default`. Hyper routes allow native Codex and the exact Anthropic providers only when their cached catalogue API matches the native wire format. Use before compacting an agent context so provider-native strategies (such as Codex server checkpoints) win over the generic text summary.
+ * Returns the `$compaction_<provider>` compactor registered for the model's provider, falling back to `$compaction_default`. MauzCode routes allow native Codex and the exact Anthropic providers only when their cached catalogue API matches the native wire format. Use before compacting an agent context so provider-native strategies (such as Codex server checkpoints) win over the generic text summary.
  * @param opts.model Provider-qualified model such as `codex:gpt-5`, `codex/work:gpt-5` or `anthropic:claude-sonnet-4-5`.
  */
 export default async function (

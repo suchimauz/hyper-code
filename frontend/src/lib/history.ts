@@ -2,7 +2,7 @@ import type { ChoiceInput } from './questions';
 import type { ConfirmInput } from './confirms';
 import type { GridInput } from './grids';
 import type { SecretHistoryInput } from './secrets';
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 /** Terminal plugin input with a server-computed, display-safe history summary (Kind.history hook). */
 export type PluginHistoryInput = { id: string; agentId: string; kind: string; plugin: true; title: string; message?: string; state: 'submitted' | 'cancelled' | 'expired'; history?: { summary: string; details?: { label: string; value: string }[] } };
 /** Input kinds whose answered cards stay visible as transcript history rows. */

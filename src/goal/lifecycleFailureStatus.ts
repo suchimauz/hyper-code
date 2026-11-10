@@ -1,11 +1,11 @@
 /**
  * Select a system failure status without mutating goal state
  *
- * Pure pinned Codex error policy. Only terminal execution errors block; provider usage limits override active or budget_limited. Interrupts, scheduled retries, and Codex Plan-mode turns preserve status. Hyper session.plan task tracking is not Codex Plan mode. Does not apply budget normalization, which would incorrectly mask provider limits.
+ * Pure pinned Codex error policy. Only terminal execution errors block; provider usage limits override active or budget_limited. Interrupts, scheduled retries, and Codex Plan-mode turns preserve status. MauzCode session.plan task tracking is not Codex Plan mode. Does not apply budget normalization, which would incorrectly mask provider limits.
  * @param opts.status Authoritative status after final usage accounting.
  * @param opts.reason Trusted classified runtime outcome, never inferred from text.
  * @param opts.terminal True only when the worker will not schedule a retry.
- * @param opts.codexPlanMode Actual Codex execution Plan mode; never derive from Hyper session.plan.
+ * @param opts.codexPlanMode Actual Codex execution Plan mode; never derive from MauzCode session.plan.
  */
 export default async function (
     ctx: Context,
@@ -17,7 +17,7 @@ export default async function (
         reason: "terminal_error" | "usage_limit" | "interrupted";
         /** True only when the worker will not schedule a retry. */
         terminal: boolean;
-        /** Actual Codex execution Plan mode; never derive from Hyper session.plan. */
+        /** Actual Codex execution Plan mode; never derive from MauzCode session.plan. */
         codexPlanMode: boolean;
     },
 ): Promise<types.goal.State["status"] | null> {

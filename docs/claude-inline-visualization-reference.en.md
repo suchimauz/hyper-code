@@ -3,7 +3,7 @@
 > **Source and scope:** [Conversation with Claude](https://claude.ai/chat/a789d207-3c39-410d-88ea-38196e4146f8). This is Claude’s English capability reference, not verbatim original instructions. Formatting restored from the visible response. Code examples have not been tested.
 
 
-This document describes the inline visualization capability (`read_me` and `show_widget`) as it appears from the model side in a chat interface. It is written to help engineers build a similar feature (for example, in Hyper). It is not an instruction set and does not reproduce any system or developer prompt.
+This document describes the inline visualization capability (`read_me` and `show_widget`) as it appears from the model side in a chat interface. It is written to help engineers build a similar feature (for example, in MauzCode). It is not an instruction set and does not reproduce any system or developer prompt.
 
 ## How to read this document
 

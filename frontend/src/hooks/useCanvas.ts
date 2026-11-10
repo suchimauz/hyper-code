@@ -13,7 +13,7 @@ async function canvasRequest<T>(path: string, signal: AbortSignal, body?: object
     ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
   });
   if (!response.ok) throw new Error(`Canvas: HTTP ${response.status}`);
-  if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Сессия Canvas недоступна. Войдите в Hyper снова.');
+  if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Сессия Canvas недоступна. Войдите в MauzCode снова.');
   return response.json() as Promise<T>;
 }
 
@@ -73,8 +73,8 @@ export function useCanvas(agentId: string | null | undefined) {
     };
     const resync = () => { void read().catch(error => fail(error, resync)); };
     const attach = async () => {
-      let live: typeof window.hyperLive;
-      try { await loadLiveClient(); live = window.hyperLive; } catch { live = undefined; }
+      let live: typeof window.mauzcodeLive;
+      try { await loadLiveClient(); live = window.mauzcodeLive; } catch { live = undefined; }
       if (!valid() || !live) return;
       poll.abort();
       unsubscribe = live.subscribe({
@@ -89,7 +89,7 @@ export function useCanvas(agentId: string | null | undefined) {
       resync();
     };
     // State is read at once; the live client usually is already loaded by the chat, then no /watch is held.
-    if (window.hyperLive) void attach(); else { void pollLoop(); void attach(); }
+    if (window.mauzcodeLive) void attach(); else { void pollLoop(); void attach(); }
     return () => { run.abort(); poll.abort(); unsubscribe?.(); if (timer) clearTimeout(timer); };
   }, [agentId, revision]);
 

@@ -10,7 +10,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     const users = await ctx.fns.auth.listUsers({});
     const multiuser = users.length > 1;
     const canManage = user ? user.role === 'owner' : !required || legacy === true;
-    if (legacy) return Response.json({ authenticated: true, required, multiuser, canManage, user: { name: "Hyper user", role: "owner" } });
+    if (legacy) return Response.json({ authenticated: true, required, multiuser, canManage, user: { name: "MauzCode user", role: "owner" } });
     if (!user && required) return Response.json({ authenticated: false, multiuser, canManage: false }, { status: 401 });
     return Response.json({ authenticated: !!user, required, multiuser, canManage, user });
 }

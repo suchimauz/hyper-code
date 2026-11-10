@@ -16,11 +16,11 @@ window.htmx = htmx;
 // something when it lands (wire a menu, draw a chart, mount a panel) never
 // hears it. But `htmx:after:process` fires on the root of everything htmx
 // processes — the body at boot, every swapped node, every oob island — so this
-// hands each landed `hx-on:hyper-load` element exactly one `hyper-load` event.
+// hands each landed `hx-on:mauzcode-load` element exactly one `mauzcode-load` event.
 // The listener itself was attached by htmx in the same processing pass, before
 // this event fires.
-const MARK = "[hx-on\\:hyper-load]";
-const boot = (el) => el.dispatchEvent(new CustomEvent("hyper-load"));
+const MARK = "[hx-on\\:mauzcode-load]";
+const boot = (el) => el.dispatchEvent(new CustomEvent("mauzcode-load"));
 
 function bootAll(root) {
   if (!root || root.nodeType !== 1) return;
@@ -45,7 +45,7 @@ document.addEventListener("htmx:after:process", (e) => bootAll(e.target));
 // It has to wait for DOMContentLoaded, not just for a parsed DOM. Every client
 // script is `defer`, so they run in document order — this one first, `chat`,
 // `charts` and the rest after — and by then `readyState` is already
-// "interactive". Booting there would fire `hyper-load` into handlers that say
+// "interactive". Booting there would fire `mauzcode-load` into handlers that say
 // `window.chat.compose(this)` before `window.chat` exists; htmx swallows the
 // TypeError and the element is silently never wired. DOMContentLoaded fires
 // after the last deferred script, which is the first moment every handler this

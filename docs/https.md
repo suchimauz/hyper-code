@@ -1,10 +1,10 @@
 # HTTPS / HTTP/2
 
-Hyper listens on two ports:
+MauzCode listens on two ports:
 
 | Port | Protocol | Who uses it |
 |------|----------|-------------|
-| `PORT` (3010) | plain HTTP/1.1 | `hyper` CLI, `bun script/repl.ts`, browser extension, FRP tunnel |
+| `PORT` (3010) | plain HTTP/1.1 | `mauzcode` CLI, `bun script/repl.ts`, browser extension, FRP tunnel |
 | `H2_PORT` (3443) | HTTPS + HTTP/2 | browsers on this Mac and devices on the tailnet |
 
 Why: over HTTP/1.1 Chrome allows 6 connections per origin and every visible tab
@@ -26,7 +26,7 @@ everything over one connection.
 ## Switches (env, e.g. in the launchd plist)
 
 ```
-HYPER_HTTPS=off           # old behaviour: plain HTTP on PORT only, no redirect
-HYPER_HTTPS_REDIRECT=off  # keep HTTPS on 3443, but no http:// → https:// redirect
+MAUZCODE_HTTPS=off           # old behaviour: plain HTTP on PORT only, no redirect
+MAUZCODE_HTTPS_REDIRECT=off  # keep HTTPS on 3443, but no http:// → https:// redirect
 H2_PORT=3443              # HTTPS port
 ```

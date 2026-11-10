@@ -1,5 +1,5 @@
 /**
- * Render explicit local Hyper approval for a pending browser extension credential.
+ * Render explicit local MauzCode approval for a pending browser extension credential.
  *
  * Use for /sidebar/approve/:pairId. Existing password/session gate plus loopback, same-origin form POST, CSRF nonce and frame denial prevent silent website approval. In password-free deployments explicit local approval is the trust boundary.
  * @param opts.req Incoming approval page GET or explicit form POST request.
@@ -25,9 +25,9 @@ export default async function (
     if(opts.req.method==='POST'){
      const data=await opts.req.formData();if(String(data.get('nonce')??'')!==pair.nonce||String(data.get('approve')??'')!=='yes')return new Response('Approval rejected',{status:403,headers});
      await ctx.fns.procs.db.run({sql:'UPDATE sidebar_pairs SET approved=true,expires_at=? WHERE id=? AND revoked=false',params:[Date.now()+30*86400000,id]});
-     return new Response('<h1>Extension approved</h1><p>Return to the Hyper side panel. This tab can be closed.</p>',{headers});
+     return new Response('<h1>Extension approved</h1><p>Return to the MauzCode side panel. This tab can be closed.</p>',{headers});
     }
     if(opts.req.method!=='GET')return new Response('Method not allowed',{status:405,headers});
-    return new Response('<!doctype html><title>Approve Hyper extension</title><h1>Connect browser extension?</h1><p>Extension: <code>'+Bun.escapeHTML(pair.origin)+'</code></p><p>Only approve if you just requested this connection from your Hyper extension. It may create chats, update tab context and close its bindings for 30 days. This is a trusted-local-user prototype, not a sandbox. Chat still uses your existing Hyper login.</p><form method="post"><input type="hidden" name="nonce" value="'+Bun.escapeHTML(pair.nonce)+'"><button name="approve" value="yes">Approve extension</button></form>',{headers});
+    return new Response('<!doctype html><title>Approve MauzCode extension</title><h1>Connect browser extension?</h1><p>Extension: <code>'+Bun.escapeHTML(pair.origin)+'</code></p><p>Only approve if you just requested this connection from your MauzCode extension. It may create chats, update tab context and close its bindings for 30 days. This is a trusted-local-user prototype, not a sandbox. Chat still uses your existing MauzCode login.</p><form method="post"><input type="hidden" name="nonce" value="'+Bun.escapeHTML(pair.nonce)+'"><button name="approve" value="yes">Approve extension</button></form>',{headers});
     }catch{return new Response('Approval rejected',{status:403,headers});}
 }

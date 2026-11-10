@@ -5,7 +5,7 @@
  * navigation of a whole page, and nothing otherwise. Never touches htmx/fetch calls,
  * SSE, iframes (the browser-extension sidebar), the CLI, or tunnel traffic
  * (x-forwarded-*), so every non-browser client keeps working on plain HTTP.
- * Off with HYPER_HTTPS=off or HYPER_HTTPS_REDIRECT=off, and when no trusted
+ * Off with MAUZCODE_HTTPS=off or MAUZCODE_HTTPS_REDIRECT=off, and when no trusted
  * (Tailscale) certificate is available.
  * @param opts.req Incoming request as seen by the plain HTTP server.
  */

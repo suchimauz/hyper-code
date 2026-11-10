@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { RotateCw } from 'lucide-react';
-import { requestJson } from '../../lib/hyper';
+import { requestJson } from '../../lib/mauzcode';
 import { Button } from '../ui/Button';
 
 type UpdateData = { csrfToken: string; status: { state: string; message: string; current?: string; target?: string; upstream?: string; clean: boolean } };
 
-/** Owner-only self-update of this Hyper checkout, rendered as the last Settings tab.
+/** Owner-only self-update of this MauzCode checkout, rendered as the last Settings tab.
  * The POST is never sent until a separate explicit confirmation of the displayed target. */
 export function UpdatesPanel() {
   const [data, setData] = useState<UpdateData | null>(null);
@@ -46,7 +46,7 @@ export function UpdatesPanel() {
   return <section className="settings-panel" aria-label="Updates">
     <header className="settings-panel-header">
       <h2>Updates</h2>
-      <p className="settings-note">Owner-only administration. Updating requires a clean checkout and fast-forward history. Hyper will restart; active work may be interrupted.</p>
+      <p className="settings-note">Owner-only administration. Updating requires a clean checkout and fast-forward history. MauzCode will restart; active work may be interrupted.</p>
     </header>
     {error && <p role="alert" className="settings-feedback is-error">{error}</p>}
     {!data && !error && <p role="status" className="settings-loading">Loading update status…</p>}

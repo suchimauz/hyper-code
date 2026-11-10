@@ -1,4 +1,4 @@
-/** GET /architecture-map — live interactive view over Hyper's indexed call graph. */
+/** GET /architecture-map — live interactive view over MauzCode's indexed call graph. */
 export default async function (ctx: Context, _session: Session | null, opts: { req: Request; params: Record<string, string> }) {
     const url = new URL(opts.req.url);
     if (url.searchParams.has('itemId') || url.searchParams.has('agentId')) {

@@ -9,10 +9,10 @@ export class ExtensionBoundary extends Component<{ children: ReactNode }, { fail
   render() { return this.state.failed ? <p role="alert">Расширение недоступно. Откройте его заново.</p> : this.props.children; }
 }
 
-/** Placement, error isolation and identity belong to Hyper, not to the extension. */
+/** Placement, error isolation and identity belong to MauzCode, not to the extension. */
 export function ExtensionSurface({ view, context, onClose }: { view: RegisteredView; context: ExtensionContext; onClose: () => void }) {
   const View = view.component;
-  return <section className="hyper-extension-surface" aria-label={view.title}>
+  return <section className="mauzcode-extension-surface" aria-label={view.title}>
     <header><h2>{view.title}</h2><Button onClick={onClose} aria-label={`Закрыть ${view.title}`}>Закрыть</Button></header>
     <ExtensionBoundary key={`${view.key}:${context.agentId}`}><View context={context} /></ExtensionBoundary>
   </section>;

@@ -104,7 +104,7 @@ async function callModel(ctx: Context, opts: any): Promise<{ text: string; finis
     const endpoint = await ctx.fns.llm.resolveEndpoint({ model });
 
     if (endpoint.api === "mock") return normalizeStructured({ text: user, finishReason: "stop", usage: null, raw: { mock: true } }, opts.response_format);
-    const result = (endpoint.provider === "hyper" ? endpoint.upstream : endpoint.provider) === "xai" ? await xaiResponses(ctx, endpoint, { ...opts, user, system })
+    const result = (endpoint.provider === "mauzcode" ? endpoint.upstream : endpoint.provider) === "xai" ? await xaiResponses(ctx, endpoint, { ...opts, user, system })
         : endpoint.api === 'gemini' ? { ...await ctx.fns.llm.callGemini({...opts,model,user,system}), raw: null }
         : endpoint.api === "responses" ? await responses(ctx, endpoint, { ...opts, user, system })
             : endpoint.api === "anthropic" ? await anthropic(ctx, endpoint, { ...opts, user, system })
@@ -141,7 +141,7 @@ function shouldFallback(error: unknown): boolean {
 }
 
 async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
-    const token = endpoint.provider === "hyper" ? endpoint.apiKey : await ctx.fns.llm.getXaiOAuthToken({ account: endpoint.account });
+    const token = endpoint.provider === "mauzcode" ? endpoint.apiKey : await ctx.fns.llm.getXaiOAuthToken({ account: endpoint.account });
     if (!token) throw new Error(`${endpoint.provider}: no credentials`);
     const body: any = {
         model: endpoint.modelId,
@@ -174,7 +174,7 @@ async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
 
 
 async function responses(ctx: Context, endpoint: any, opts: any) {
-    const token = endpoint.provider === "hyper" || endpoint.provider === "opencode" || endpoint.ssh ? endpoint.apiKey : await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
+    const token = endpoint.provider === "mauzcode" || endpoint.provider === "opencode" || endpoint.ssh ? endpoint.apiKey : await ctx.fns.llm.refreshCodex({ account: endpoint.account }) ?? endpoint.apiKey;
     if (!token && endpoint.provider !== "opencode") throw new Error("codex: no access_token");
     const body: any = {
         model: endpoint.modelId,
@@ -203,7 +203,7 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
         method: "POST",
         headers: {
             authorization: `Bearer ${token}`,
-            ...(endpoint.provider === "hyper" || endpoint.provider === "opencode" ? {} : {
+            ...(endpoint.provider === "mauzcode" || endpoint.provider === "opencode" ? {} : {
                 ...(endpoint.ssh ? {} : { "chatgpt-account-id": accountId(token) }),
                 originator: "codex_cli_rs",
                 "OpenAI-Beta": "responses=experimental",
@@ -301,10 +301,10 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
     } else if (endpoint.provider === "anthropic-oauth") {
         apiKey = await ctx.fns.llm.getAnthropicOAuthToken({ account: endpoint.account });
     }
-    const upstream = endpoint.provider === "hyper" ? (endpoint.upstream ?? "") : endpoint.provider;
+    const upstream = endpoint.provider === "mauzcode" ? (endpoint.upstream ?? "") : endpoint.provider;
     const subscription = upstream === "claude-code" || upstream === "anthropic-oauth";
     if (apiKey) {
-        if (subscription || upstream === "kimi-coding" || endpoint.provider === "hyper") headers.authorization = `Bearer ${apiKey}`;
+        if (subscription || upstream === "kimi-coding" || endpoint.provider === "mauzcode") headers.authorization = `Bearer ${apiKey}`;
         else headers["x-api-key"] = apiKey;
     }
     if (subscription) {

@@ -1,7 +1,7 @@
 /**
  * Returns how to show the author of a chat message: name, initials, a stable color and profile photo.
  *
- * Returns null when no author should be shown: no user id, or a single-user local Hyper (fewer than
+ * Returns null when no author should be shown: no user id, or a single-user local MauzCode (fewer than
  * two active users and no control-plane sign-in), so such an instance looks exactly as before.
  * The photo comes from the sign-in ID token's `picture` claim (https only). Use when rendering
  * user messages; `auth.badge` is the compact label form.

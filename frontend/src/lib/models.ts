@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 import type { NavigationIcon } from './navigation';
 import { readSessionSelection } from './newSession';
 export type ModelOption = { provider: string; model: string; label: string; disabled: boolean; icon: NavigationIcon | null };
@@ -27,7 +27,7 @@ export async function setAgentEffort(id: string, effort: string) {
   const body = new FormData(); body.set('effort', effort);
   const response = await fetch(`/agent/${encodeURIComponent(id)}/effort`, { method: 'POST', body, credentials: 'same-origin', redirect: 'error' });
   if (!response.ok) throw new Error((await response.text()).slice(0,300) || `Ошибка HTTP ${response.status}`);
-  if (response.status !== 204) throw new Error('Hyper не подтвердил сохранение настройки. Обновите список моделей.');
+  if (response.status !== 204) throw new Error('MauzCode не подтвердил сохранение настройки. Обновите список моделей.');
 }
 export const normalizeEffort = (effort: string, supported: string[]) => supported.includes(effort) ? effort : 'auto';
 export const effortLabel = (value: string) => ({ auto: 'Default', off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Max' }[value] ?? value);

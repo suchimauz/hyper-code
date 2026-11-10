@@ -7,11 +7,11 @@ import { resolve } from 'node:path';
 const ctx: any = { fns: { auth: { currentUser: async () => ({ user: null, required: true }) }, h2: { redirect: () => null }, frontendRuntime: { page: async () => undefined } }, state: {} };
 test('only fixed read-only auth assets bypass sign-in, not Vite or arbitrary auth files', async () => {
   for (const path of ['/auth/ui.js', '/auth/ui.css']) {
-    expect(await middleware(ctx, null, {req:new Request('https://hyper.example'+path)})).toBeUndefined();
-    expect((await middleware(ctx, null, {req:new Request('https://hyper.example'+path,{method:'POST'})}))?.status).toBe(401);
+    expect(await middleware(ctx, null, {req:new Request('https://mauzcode.example'+path)})).toBeUndefined();
+    expect((await middleware(ctx, null, {req:new Request('https://mauzcode.example'+path,{method:'POST'})}))?.status).toBe(401);
   }
   for (const path of ['/auth/ui.js.map','/auth/other.js','/ui-lab/src/main.tsx','/ui-lab/@fs/etc/passwd']) {
-    expect((await middleware(ctx, null, {req:new Request('https://hyper.example'+path)}))?.status).toBe(401);
+    expect((await middleware(ctx, null, {req:new Request('https://mauzcode.example'+path)}))?.status).toBe(401);
   }
 });
 test('auth document mounts no application shell or inline script', async () => {

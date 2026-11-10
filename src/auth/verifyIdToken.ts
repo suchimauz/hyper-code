@@ -2,10 +2,10 @@
  * Verifies an OpenID Connect ID token or signed assertion (RS256 or ES256) against the issuer's JWKS and returns its claims.
  *
  * Checks signature, issuer, audience, expiry and — when given — nonce. Generic over the provider: used for the
- * Hyper Control Plane and for Google. Keys are cached per JWKS URL and refetched on an unknown key id.
+ * MauzCode Control Plane and for Google. Keys are cached per JWKS URL and refetched on an unknown key id.
  * @param opts.idToken Compact JWT from the token endpoint.
  * @param opts.issuer Expected `iss`; accepts a list for providers with several spellings.
- * @param opts.clientId Expected `aud` (this Hyper's client ID).
+ * @param opts.clientId Expected `aud` (this MauzCode's client ID).
  * @param opts.jwksUri Where the issuer publishes its signing keys.
  * @param opts.nonce Nonce sent in the authorization request; required on the code flow, omitted on refresh.
  * @param opts.leewaySec Clock skew tolerated when checking `exp`, in seconds. @default 60 @minimum 0
@@ -19,7 +19,7 @@ export default async function (
         idToken: string;
         /** Expected `iss`; accepts a list for providers with several spellings. */
         issuer: string | string[];
-        /** Expected `aud` (this Hyper's client ID). */
+        /** Expected `aud` (this MauzCode's client ID). */
         clientId: string;
         /** Where the issuer publishes its signing keys. */
         jwksUri: string;

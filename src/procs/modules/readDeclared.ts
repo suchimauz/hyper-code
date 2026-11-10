@@ -11,7 +11,7 @@ import projectRootFn from "../project/projectRoot";
 //                                     $HOME and per-machine config.
 //
 // The split is the point: the second file is where a path like
-// /Users/me/.hyper/user/linkedin belongs, and such a path in the first one is a
+// /Users/me/.mauzcode/user/linkedin belongs, and such a path in the first one is a
 // mount nobody else can satisfy. The key is the namespace the module is mounted
 // under — never the package's own preference — and the value says where it
 // comes from and how it is configured:

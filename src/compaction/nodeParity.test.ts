@@ -7,7 +7,7 @@ import compactCodex from "../llm/compactCodex";
 import autoCompact from "../agent/autoCompactIfNeeded";
 import generic from "./$compaction_default";
 
-const route = "hyper/mini6:codex/named:gpt-6-astra";
+const route = "mauzcode/mini6:codex/named:gpt-6-astra";
 function fixture() {
     const ctx: any = { state: { compaction: { compactors: { default: { provider: "default" }, codex: { provider: "codex" } } } }, fns: { node: { get: async () => ({ enabled: true, catalog: [{ id: "codex/named:gpt-6-astra", provider: "codex", account: "named", api: "responses" }] }) }, compaction: {}, llm: {} } };
     ctx.fns.compaction.modelIdentity = (o: any) => identity(ctx, null, o);
@@ -18,7 +18,7 @@ function fixture() {
 describe("node native compaction parity without credentials or generation", () => {
     test("direct, canonical and unambiguous legacy routes resolve upstream window and compactor", async () => {
         const ctx = fixture();
-        for (const model of ["codex/named:gpt-6-astra", route, "hyper/mini6:gpt-6-astra"]) {
+        for (const model of ["codex/named:gpt-6-astra", route, "mauzcode/mini6:gpt-6-astra"]) {
             expect(await windowSize(ctx, null, { model })).toBe(272000);
             expect(await resolve(ctx, null, { model })).toMatchObject({ provider: "codex", fallback: false });
         }
@@ -47,7 +47,7 @@ describe("node native compaction parity without credentials or generation", () =
     });
     test("native relay uses node bearer, canonical wire model and compaction trigger, never refreshes local credentials", async () => {
         const ctx = fixture(); let request: any;
-        ctx.fns.llm.resolveEndpoint = async () => ({ provider: "hyper", upstream: "codex", api: "responses", apiKey: "node-bearer", modelId: "codex/named:gpt-6-astra", url: "http://node/responses" });
+        ctx.fns.llm.resolveEndpoint = async () => ({ provider: "mauzcode", upstream: "codex", api: "responses", apiKey: "node-bearer", modelId: "codex/named:gpt-6-astra", url: "http://node/responses" });
         ctx.fns.llm.refreshCodex = () => { throw new Error("local credential access forbidden"); };
         ctx.fns.llm.toCodexInput = () => ({ input: [{ role: "user", content: "hello" }], instructions: "system" });
         ctx.fns.llm.codexCliVersion = async () => "test";
@@ -65,7 +65,7 @@ describe("node native compaction parity without credentials or generation", () =
     test("same upstream checkpoints replay across account names and transports", () => {
         const messages = [{ role: "user", content: JSON.stringify({ type: "compaction", encrypted_content: "opaque" }), message_type: "codex_compaction" }];
         expect(portable(fixture(), null, { model: route, producedBy: route, messages })).toEqual(messages);
-        for (const model of ["codex/named:gpt-6-astra", "hyper/mini6:codex/other:gpt-6-astra"]) expect(portable(fixture(), null, { model, producedBy: route, messages })).toEqual(messages);
+        for (const model of ["codex/named:gpt-6-astra", "mauzcode/mini6:codex/other:gpt-6-astra"]) expect(portable(fixture(), null, { model, producedBy: route, messages })).toEqual(messages);
     });
     test("generic overflow retries with oldest removed, single oversized item fails explicitly", async () => {
         const ctx = fixture(); const sizes: number[] = [];

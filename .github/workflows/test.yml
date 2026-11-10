@@ -24,13 +24,13 @@ jobs:
       postgres:
         image: paradedb/paradedb:latest-pg18
         env:
-          POSTGRES_USER: hyper
-          POSTGRES_PASSWORD: hyper
-          POSTGRES_DB: hyper
+          POSTGRES_USER: mauzcode
+          POSTGRES_PASSWORD: mauzcode
+          POSTGRES_DB: mauzcode
         ports:
           - 54393:5432
         options: >-
-          --health-cmd "pg_isready -U hyper"
+          --health-cmd "pg_isready -U mauzcode"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -42,9 +42,9 @@ jobs:
       - name: Raise Postgres connection limit
         run: |
           container="$(docker ps --filter ancestor=paradedb/paradedb:latest-pg18 --format '{{.ID}}' | head -1)"
-          docker exec "$container" psql -U hyper -d hyper -c "ALTER SYSTEM SET max_connections = 500"
+          docker exec "$container" psql -U mauzcode -d mauzcode -c "ALTER SYSTEM SET max_connections = 500"
           docker restart "$container"
-          until docker exec "$container" pg_isready -U hyper -d hyper; do sleep 1; done
+          until docker exec "$container" pg_isready -U mauzcode -d mauzcode; do sleep 1; done
       - uses: actions/checkout@v4
 
       - name: Setup Bun

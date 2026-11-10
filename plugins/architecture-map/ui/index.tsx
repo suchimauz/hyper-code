@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Panel, TextField, requestJson, type ExtensionCanvasProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, TextField, requestJson, type ExtensionCanvasProps, type UiExtension } from '@mauzcode/ui';
 
 type Node = {id:string;functions:number;incoming:number;outgoing:number;entryPoints:number;roots:string[]};
 type Edge = {source:string;target:string;weight:number;samples:{rel:string;line:number}[]};
@@ -29,7 +29,7 @@ function ArchitecturePage({canvas}:CanvasBinding = {}) {
   const [weight,setWeight]=useViewState(canvas,'minWeight',Math.max(1,Math.min(50,Number(initial.get('minWeight'))||2)));
   const [search,setSearch]=useViewState(canvas,'search',''),[selected,setSelected]=useViewState(canvas,'selected','');
   const {data,error,refresh}=useData<MapData>(`/architectureMap?minWeight=${weight}${canvasQuery(canvas)}`);
-  const nodes=(data?.graph.nodes ?? []).filter(node=>{const core=node.roots.some(root=>root==='core'||root==='hyper');return (scope==='all'||(scope==='core'?core:!core)) && node.id.toLowerCase().includes(search.toLowerCase());});
+  const nodes=(data?.graph.nodes ?? []).filter(node=>{const core=node.roots.some(root=>root==='core'||root==='mauzcode');return (scope==='all'||(scope==='core'?core:!core)) && node.id.toLowerCase().includes(search.toLowerCase());});
   const ids=new Set(nodes.map(node=>node.id));const edges=(data?.graph.edges ?? []).filter(edge=>ids.has(edge.source)&&ids.has(edge.target));
   const cycles=new Set(data?.graph.cycles.flat() ?? []);const violations=new Set(data?.boundary.violations.map(item=>`${item.caller.split('.')[0]}→${item.callee.split('.')[0]}`) ?? []);
   const chosen=data?.graph.nodes.find(node=>node.id===selected);

@@ -12,8 +12,8 @@ test("live usage hides logged-out Codex, preserves history and remote accounts",
     const rows = [
         { provider: "codex", account: "default" },
         { provider: "codex", account: "work" },
-        { provider: "hyper", account: "mini6/codex/one" },
-        { provider: "hyper", account: "mini6/codex/two" },
+        { provider: "mauzcode", account: "mini6/codex/one" },
+        { provider: "mauzcode", account: "mini6/codex/two" },
     ].map(snapshot => ({ value: JSON.stringify({ ...snapshot, windows: { primary: { usedPercent: 80 } } }) }));
     const ctx = { fns: {
         settings: { getNumber: async ({ fallback }: any) => fallback },
@@ -28,17 +28,17 @@ test("live usage hides logged-out Codex, preserves history and remote accounts",
 });
 
 test("cached catalogue prunes only removed local Codex credential, preserving mini6 slots", async () => {
-    const remote = ["hyper/mini6:codex/one:gpt-test", "hyper/mini6:codex/two:gpt-test"];
+    const remote = ["mauzcode/mini6:codex/one:gpt-test", "mauzcode/mini6:codex/two:gpt-test"];
     const ctx = { state: { llmModelCatalog: { all: { at: Date.now(), value: {
-        codex: ["codex:gpt-test", "codex/work:gpt-test"], "hyper/mini6": remote,
+        codex: ["codex:gpt-test", "codex/work:gpt-test"], "mauzcode/mini6": remote,
     } } } }, fns: { llm: { accountCredentialExists: ({ account }: any) => account === "work" } } } as unknown as Context;
     const result = await listModels(ctx, null, {});
     expect(result.codex).toEqual(["codex/work:gpt-test"]);
-    expect(result["hyper/mini6"]).toEqual(remote);
+    expect(result["mauzcode/mini6"]).toEqual(remote);
 });
 
 test("absent CLI file is not a connected account; existing auth and node survive", async () => {
-    const home = mkdtempSync(join(tmpdir(), "hyper-logout-test-"));
+    const home = mkdtempSync(join(tmpdir(), "mauzcode-logout-test-"));
     const path = join(home, ".codex/auth.json");
     const ctx = { env: { HOME: home }, fns: {
         llm: {

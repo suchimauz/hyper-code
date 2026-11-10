@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 test("runtime scanner excludes result payloads and symlink aliases", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "hyper-scan-results-"));
+    const dir = await mkdtemp(join(tmpdir(), "mauzcode-scan-results-"));
     try {
-        const root = join(dir, ".hyper");
+        const root = join(dir, ".mauzcode");
         await mkdir(join(root, "results"), { recursive: true });
         await mkdir(join(root, "safe"));
         await writeFile(join(root, "results/payload.ts"), "export default () => 1;");

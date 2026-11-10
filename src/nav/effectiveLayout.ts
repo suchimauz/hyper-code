@@ -2,7 +2,7 @@
  * Reads the global menu (⌘/) layout that applies to the current viewer.
  *
  * The person's own layout (setting nav.layout, scope user) replaces the instance layout (scope global,
- * env HYPER_NAV) as a whole; with neither, the layout is empty and only the built-in home tab shows.
+ * env MAUZCODE_NAV) as a whole; with neither, the layout is empty and only the built-in home tab shows.
  * Malformed JSON is treated as empty so a bad value can never break the menu.
  */
 export default async function (

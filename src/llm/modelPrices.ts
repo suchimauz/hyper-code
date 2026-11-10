@@ -7,13 +7,13 @@
  * hour and retain the last successful snapshot with its original timestamp on failure.
  * Ignore every non-OpenCode route and never change provider settings or call inference.
  * @param opts.models Exact model routes; non-OpenCode providers are ignored.
- * @param opts.nodes Saved Hyper node catalogue for billing classification only.
+ * @param opts.nodes Saved MauzCode node catalogue for billing classification only.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
     /** Exact routes to compare; non-OpenCode providers cause no requests. */ models: string[];
     /** Saved node billing information; no remote credentials or settings are read. */ nodes?: types.node.NodeEntry[];
 }): Promise<Record<string, types.llm.ModelPrice>> {
-    const models = opts.models.filter(model => /^(?:(?:ssh|hyper)\/[^:]+:)*opencode(?:\/[\w.-]+)?:/.test(model));
+    const models = opts.models.filter(model => /^(?:(?:ssh|mauzcode)\/[^:]+:)*opencode(?:\/[\w.-]+)?:/.test(model));
     if (!models.length) return {};
     const localPlan = models.some(m=>/^opencode(?:\/[^:]+)?:/.test(m)) ? await ctx.fns.settings.getString({module:'llm',scopeType:'global',key:'opencodePlan'}) : undefined;
     type Snapshot = Awaited<ReturnType<typeof ctx.fns.llm.opencodeGoComparison>>;
@@ -38,10 +38,10 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     }
     const out:Record<string,types.llm.ModelPrice>={};
     for(const route of models){
-        const match=/^(?:(?:ssh|hyper)\/[^:]+:)*opencode(?:\/[\w.-]+)?:(.+)$/.exec(route);
-        const node=/^hyper\/([^:]+):(.+)$/.exec(route);
+        const match=/^(?:(?:ssh|mauzcode)\/[^:]+:)*opencode(?:\/[\w.-]+)?:(.+)$/.exec(route);
+        const node=/^mauzcode\/([^:]+):(.+)$/.exec(route);
         const kind=node?opts.nodes?.find(n=>n.name===node[1])?.catalog?.find(e=>e.id===node[2])?.kind:undefined;
-        const remote=/^(?:ssh|hyper)\//.test(route);
+        const remote=/^(?:ssh|mauzcode)\//.test(route);
         const billing:types.llm.ModelPrice['billing']=kind??(!remote?(localPlan==='go'?'subscription':'api'):'unknown');
         out[route]={billing,...cache.data?.[match?.[1]??''],source:'https://opencode.ai/go',updatedAt:cache.updatedAt,note:'Official Go / Go Plus estimates, not remaining quota or PAYG prices. Actual request sizes vary; limits are shared, not additive per model.'};
     }

@@ -96,8 +96,8 @@ async function pollLoop(ctx: Context): Promise<void> {
 
 function commonHeaders(_ctx: Context): Record<string, string> {
     return {
-        "X-Msh-Platform": "hyper-code2",
+        "X-Msh-Platform": "mauzcode",
         "X-Msh-Version": "0.1",
-        "X-Msh-Device-Id": "hyper-code2",
+        "X-Msh-Device-Id": "mauzcode",
     };
 }

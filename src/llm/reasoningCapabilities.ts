@@ -2,8 +2,8 @@
  * Reports supported reasoning effort levels for a model route
  *
  * Return the safe reasoning effort choices, default and provider wire mode for a concrete provider/account/model route. Use when rendering controls and before constructing an LLM request.
- * Hyper routes use the enabled node's cached catalogue identity, without fetching credentials or contacting the node. Missing, ambiguous or inconsistent entries return no reasoning capability.
- * @param opts.model Concrete model route in provider[/account]:modelId form, including hyper/node:provider/account:modelId.
+ * MauzCode routes use the enabled node's cached catalogue identity, without fetching credentials or contacting the node. Missing, ambiguous or inconsistent entries return no reasoning capability.
+ * @param opts.model Concrete model route in provider[/account]:modelId form, including mauzcode/node:provider/account:modelId.
  */
 export default async function (
     ctx: Context,
@@ -22,7 +22,7 @@ export default async function (
         if (!route) return {supported:['auto','off'],defaultEffort:'off',mode:'none'};
         provider = route[1]!; rawModelId = route[2]!;
     }
-    if (provider === "hyper") {
+    if (provider === "mauzcode") {
         const unavailable: types.llm.ReasoningProfile = { supported: ["auto", "off"], defaultEffort: "off", mode: "none" };
         // Only cached metadata is needed: capability controls must not read tokens
         // or trigger network/auth refreshes. Never infer trust from the route text.
@@ -38,7 +38,7 @@ export default async function (
         const entry = matches[0]!;
         const identity = /^([a-z][\w-]*)\/([\w.-]+):(.+)$/.exec(entry.id);
         if (entry.id.includes(":") && (!identity || identity[1] !== entry.provider || identity[2] !== entry.account)) return unavailable;
-        if (entry.provider === "hyper") return unavailable;
+        if (entry.provider === "mauzcode") return unavailable;
         provider = entry.provider;
         rawModelId = identity?.[3] ?? entry.id;
     }
@@ -51,7 +51,7 @@ export default async function (
     // MiniMax M Plan (Anthropic-compatible endpoint). The wire mode is
     // "anthropic-adaptive" (thinking + output_config.effort), but the level
     // set is MiniMax's own: low, medium, high, xhigh and max — "off" and
-    // "minimal" are rejected by the gateway, and "xhigh" is Hyper's
+    // "minimal" are rejected by the gateway, and "xhigh" is MauzCode's
     // user-facing Max choice mapped to the wire value "max".
     //   M3.1-Flash  always thinks; thinking.type "disabled" is a 400.
     //   M3          thinks only when thinking.type "adaptive" is sent;
@@ -71,7 +71,7 @@ export default async function (
     // supports_thinking_type "only", but the live endpoint accepts
     // thinking.type "disabled" on every model and then answers without a
     // thinking block, so reasoning is genuinely optional here.
-    // Effort is low/high/max; Hyper's xhigh is the user's Max choice and maps
+    // Effort is low/high/max; MauzCode's xhigh is the user's Max choice and maps
     // to max on the wire. Only the models whose catalogue carries
     // think_efforts support choosing a level at all.
     if (provider === "kimi-coding") {
@@ -80,7 +80,7 @@ export default async function (
     }
 
     // GLM-5.3 and Flash share low/high/max; reasoning cannot be disabled.
-    // xhigh is Hyper's existing user-facing Max choice, mapped on the wire.
+    // xhigh is MauzCode's existing user-facing Max choice, mapped on the wire.
     if (provider === "zai-coding" && /^glm-5\.3(?:-flashx?)?$/.test(modelId)) {
         return { supported: ["auto", "low", "high", "xhigh"], defaultEffort: "xhigh", mode: "openai-effort" };
     }

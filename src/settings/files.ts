@@ -1,5 +1,5 @@
-// Instance settings files: `$settings_<module>.json` in one directory per instance (env HYPER_SETTINGS,
-// default ~/.hyper/settings). Each file holds values for keys the module declares with `$setting_<key>.ts`.
+// Instance settings files: `$settings_<module>.json` in one directory per instance (env MAUZCODE_SETTINGS,
+// default ~/.mauzcode/settings). Each file holds values for keys the module declares with `$setting_<key>.ts`.
 // The snapshot is cached and re-read when a file's mtime changes (checked at most once a second), so an
 // edit applies without a restart. A file that does not parse keeps its last good values and reports an error.
 import { readdir, stat } from "node:fs/promises";
@@ -42,7 +42,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { f
 }> {
     const st = ((ctx.state as any).settings ??= {});
     const cache = (st.files ??= { checkedAt: 0, mtimes: {} as Record<string, number>, perFile: {} as Record<string, { values: Record<string, any>; error?: string }>, snapshot: null as Snapshot | null });
-    const dir = String(ctx.env.HYPER_SETTINGS ?? (ctx.env.HOME ? join(String(ctx.env.HOME), ".hyper", "settings") : "")).trim() || null;
+    const dir = String(ctx.env.MAUZCODE_SETTINGS ?? (ctx.env.HOME ? join(String(ctx.env.HOME), ".mauzcode", "settings") : "")).trim() || null;
     const now = Date.now();
     if (!opts.force && cache.snapshot && cache.snapshot.dir === dir && now - cache.checkedAt < 1000) return shape(cache.snapshot);
     cache.checkedAt = now;

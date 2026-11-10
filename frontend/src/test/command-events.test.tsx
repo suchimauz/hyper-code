@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { coalesceCommands } from '../components/hyper/commandEvents';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import { Transcript } from '../components/hyper/Transcript';
-import type { ChatEvent } from '../lib/hyper';
+import { coalesceCommands } from '../components/mauzcode/commandEvents';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import { Transcript } from '../components/mauzcode/Transcript';
+import type { ChatEvent } from '../lib/mauzcode';
 
 const start: ChatEvent = { idx: 1, ts: 10, type: 'command_invocation', commandName: 'plan', commandText: '/plan', operationId: 'op1', requestId: 'r1', status: 'running', text: '/plan' };
 const end: ChatEvent = { ...start, idx: 3, ts: 30, type: 'command_result', status: 'completed', text: 'Planning mode enabled' };

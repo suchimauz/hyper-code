@@ -5,7 +5,7 @@ import iconsExtension from '../../../plugins/icons/ui';
 import { BrowserLive } from '../../../plugins/browser/ui';
 const IconsCanvas = iconsExtension.canvasKinds![0]!.component as unknown as import('react').FC;
 const request = vi.hoisted(() => vi.fn());
-vi.mock('@hyper/ui', () => ({requestJson:request,Panel:({title,children}:any)=><section><h1>{title}</h1>{children}</section>,Button:({children,...props}:any)=><button {...props}>{children}</button>,TextField:({label,...props}:any)=><label>{label}<input {...props}/></label>}));
+vi.mock('@mauzcode/ui', () => ({requestJson:request,Panel:({title,children}:any)=><section><h1>{title}</h1>{children}</section>,Button:({children,...props}:any)=><button {...props}>{children}</button>,TextField:({label,...props}:any)=><label>{label}<input {...props}/></label>}));
 afterEach(()=>{cleanup();request.mockReset();vi.unstubAllGlobals();});
 const props={context:{agentId:'test',theme:'dark' as const,readOnly:true},item:{id:1,kind:'code.tests',args:{},state:{}}};
 it('reads reports without launching tests and keeps report source sandboxed',async()=>{request.mockImplementation(async(url:string)=>url.includes('/files')?[]:url.includes('/status')?{running:false}:{tests:1,failures:1,skipped:0,wall:1,at:null,top:[],slowTests:[],fails:[{name:'bad',file:'x',s:1,code:{line:1,html:'<script>bad()</script>'}}]});render(<TestsCanvas {...props}/>);await screen.findByText('bad · 1s');expect(screen.getByRole('button',{name:'Run fast'})).toBeDisabled();expect(document.querySelector('iframe')).toHaveAttribute('sandbox','');expect(request.mock.calls.every(c=>!c[1]?.method)).toBe(true);});

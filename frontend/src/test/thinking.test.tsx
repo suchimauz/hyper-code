@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { Transcript } from '../components/hyper/Transcript';
-import type { EventPage } from '../lib/hyper';
+import { Transcript } from '../components/mauzcode/Transcript';
+import type { EventPage } from '../lib/mauzcode';
 it('shows Thinking only with an explicit signal and removes it on transition', () => {
   const page: EventPage = { agentId: 'test', events: [], olderBefore: null, hasOlder: false, isRunning: true, runState: 'running', lastError: null, partial: null };
   const props = { agentId: 'test', events: [], hasOlder: false, loadingOlder: false, loadOlder: async () => {} };

@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PlanningPanel, type PlanningPanelProps, type PlanningState } from '../components/hyper/PlanningPanel';
+import { PlanningPanel, type PlanningPanelProps, type PlanningState } from '../components/mauzcode/PlanningPanel';
 
 const proposal: NonNullable<PlanningState['proposal']> = {
   id: 'proposal-1', inputId: 'input-1', createdAt: 123,

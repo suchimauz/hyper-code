@@ -1,5 +1,5 @@
 /**
- * Fetch a Hyper node's catalogue and usage and cache them locally
+ * Fetch a MauzCode node's catalogue and usage and cache them locally
  *
  * Calls GET <url>/models and GET <url>/usage with the node token, stores both
  * snapshots with timestamps, records the last error on failure. Use after

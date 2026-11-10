@@ -1,14 +1,14 @@
 /**
  * Look up public pay-as-you-go USD prices per million tokens for model routes
  *
- * Resolve Hyper model routes such as anthropic:claude-haiku-4-5 or claude-code:claude-sonnet-4-5 to models.dev public API list prices (input, output, cache read, cache write, USD per 1M tokens). Use to estimate session spend; for subscription providers this is an API-equivalent estimate, not a bill. Cached for six hours; unknown models map to null.
- * @param opts.models Exact Hyper model routes <provider>:<modelId> to price.
+ * Resolve MauzCode model routes such as anthropic:claude-haiku-4-5 or claude-code:claude-sonnet-4-5 to models.dev public API list prices (input, output, cache read, cache write, USD per 1M tokens). Use to estimate session spend; for subscription providers this is an API-equivalent estimate, not a bill. Cached for six hours; unknown models map to null.
+ * @param opts.models Exact MauzCode model routes <provider>:<modelId> to price.
  */
 export default async function (
     ctx: Context,
     session: Session | null,
     opts: {
-        /** Exact Hyper model routes <provider>:<modelId> to price. */
+        /** Exact MauzCode model routes <provider>:<modelId> to price. */
         models: string[];
     },
 ): Promise<Record<string, { input: number; output: number; cacheRead: number | null; cacheWrite: number | null } | null>> {

@@ -1,10 +1,10 @@
-# Remote browser для Hyper: обзор реализаций на GitHub
+# Remote browser для MauzCode: обзор реализаций на GitHub
 
 ## Главный вывод
 
 Это уже решённая задача, но есть два разных сценария: управлять отдельным Chrome на сервере через удалённый CDP и управлять повседневным Chrome пользователя через расширение. Для второго сценария самый близкий найденный пример — **Playwriter**: Chrome extension → локальный relay → удалённый клиент. Для первого полезны **OpenClaw** и **Browserless**. **Anomaly Browser Control** полезен как образец управления сессиями и восстановления связи.
 
-Для Hyper рекомендую сохранить текущий API browser, добавить идентичность браузера и сменные подключения. Hypermesh использовать для защищённого доступа вместо собственного публичного туннельного сервиса. MCP для этого не обязателен: у нас уже есть процедурный API.
+Для MauzCode рекомендую сохранить текущий API browser, добавить идентичность браузера и сменные подключения. MauzCodemesh использовать для защищённого доступа вместо собственного публичного туннельного сервиса. MCP для этого не обязателен: у нас уже есть процедурный API.
 
 ## Что проверено
 
@@ -12,10 +12,10 @@
 
 ## Сравнение
 
-| Проект | Что уже реализовано | Что полезно Hyper | Ограничение |
+| Проект | Что уже реализовано | Что полезно MauzCode | Ограничение |
 |---|---|---|---|
 | [Playwriter](https://github.com/remorses/playwriter) | Chrome extension, CDP relay, Playwright, CLI/MCP; документирован remote access через relay и туннель | Наиболее близкий пример удалённого доступа к Chrome с существующими входами | Нужно проверить покрытие CDP и совместимость Live View; MIT |
-| [Anomaly Browser Control](https://github.com/anomalyco/browser-control) | Существующий Chromium → расширение → локальный relay → агент; Playwright snippets | Сессии, reconnect, жизненный цикл relay, проверки origin, тесты | Основной описанный режим локальный; не готовая Hypermesh-интеграция; MIT |
+| [Anomaly Browser Control](https://github.com/anomalyco/browser-control) | Существующий Chromium → расширение → локальный relay → агент; Playwright snippets | Сессии, reconnect, жизненный цикл relay, проверки origin, тесты | Основной описанный режим локальный; не готовая MauzCodemesh-интеграция; MIT |
 | [Microsoft Playwright MCP](https://github.com/microsoft/playwright-mcp) | Подключение по CDP endpoint, заголовки авторизации, режим extension для работающего Chrome/Edge | Пример поддержки нескольких способов подключения поверх одного набора действий | MCP-сервер не заменяет сетевую авторизацию и привязку нашего sidebar; Apache-2.0 |
 | [OpenClaw](https://github.com/openclaw/openclaw) | Именованные browser profiles, remote CDP и node host на машине с браузером | Хороший образец маршрутизации: Gateway → удалённый узел → браузер | Большой продукт, не маленькая библиотека; текущие docs existing-session описывают Chrome DevTools MCP, а не extension relay; MIT |
 | [Chrome MCP Server](https://github.com/hangwin/mcp-chrome) | Автоматизация повседневного Chrome через расширение с сохранением входов | UX и набор браузерных инструментов | Удалённый транспорт между машинами в просмотренных материалах не подтверждён; MIT |
@@ -36,7 +36,7 @@ Relay работает на машине пользователя. Удалён�
 
 В исходниках `cdp-relay.ts` видна пересылка `forwardCDPCommand` и работа с CDP sessionId; default host — loopback. Есть отдельный `extension/src/remote-tunnel.ts` с WebSocket и keepalive. Наличие этого файла само по себе не доказывает, что все варианты удалённого доступа используют одну и ту же схему.
 
-**Что взять:** интерфейс relay и стратегию совместимости с Playwright. Вместо публичного Traforo использовать Hypermesh. Не предполагать полную эквивалентность extension CDP обычному browser-level CDP: создание targets, дочерние sessions, события и screencast требуют проверки.
+**Что взять:** интерфейс relay и стратегию совместимости с Playwright. Вместо публичного Traforo использовать MauzCodemesh. Не предполагать полную эквивалентность extension CDP обычному browser-level CDP: создание targets, дочерние sessions, события и screencast требуют проверки.
 
 Источники: [remote access](https://github.com/remorses/playwriter/blob/main/docs/remote-access.md), [CDP relay](https://github.com/remorses/playwriter/blob/main/playwriter/src/cdp-relay.ts), [extension remote tunnel](https://github.com/remorses/playwriter/blob/main/extension/src/remote-tunnel.ts).
 
@@ -52,7 +52,7 @@ Relay работает на машине пользователя. Удалён�
 
 В текущей документации различаются локальный браузер, remote CDP и node host на машине с Chrome. Gateway проксирует браузерные действия на узел. Именованные профили выбирают конкретное подключение. Важная деталь: действие с конкретным targetId не должно запускать новый браузер, потому что нужной вкладки в нём быть не может.
 
-Для Hyper это аргумент в пользу явного browserId и режима attach-only: потеря соединения не должна незаметно переключать агента на локальный Chrome или создавать другой профиль.
+Для MauzCode это аргумент в пользу явного browserId и режима attach-only: потеря соединения не должна незаметно переключать агента на локальный Chrome или создавать другой профиль.
 
 Источники: [remote browsers](https://github.com/openclaw/openclaw/blob/main/docs/tools/browser/remote.md), [profiles и existing session](https://github.com/openclaw/openclaw/blob/main/docs/tools/browser/existing-session.md).
 
@@ -60,17 +60,17 @@ Relay работает на машине пользователя. Удалён�
 
 README документирует `--cdp-endpoint`, `--cdp-header`, `--cdp-timeout` и `--extension`. Это подтверждает, что удалённый CDP и работа с уже открытым пользовательским браузером могут сосуществовать за одним высокоуровневым API.
 
-Для Hyper стоит перенять именно разделение инструментов и транспорта, а не обязательно внедрять MCP. Авторизация пользователя в sidebar, доступ Hyper к браузеру и авторизация внутри сайтов — три разные вещи.
+Для MauzCode стоит перенять именно разделение инструментов и транспорта, а не обязательно внедрять MCP. Авторизация пользователя в sidebar, доступ MauzCode к браузеру и авторизация внутри сайтов — три разные вещи.
 
 Источник: [README и параметры](https://github.com/microsoft/playwright-mcp#readme).
 
-## Предлагаемая архитектура Hyper
+## Предлагаемая архитектура MauzCode
 
 ```text
-Hyper browser API
+MauzCode browser API
    ↓ выбирает browserId
-   ├─ direct-cdp → Hypermesh → CDP выделенного Chrome
-   └─ extension-relay → Hypermesh → локальный relay → extension → обычный Chrome
+   ├─ direct-cdp → MauzCodemesh → CDP выделенного Chrome
+   └─ extension-relay → MauzCodemesh → локальный relay → extension → обычный Chrome
 
 Sidebar binding = пользователь + browserId + browserEpoch + tabId + targetId
 ```
@@ -78,20 +78,20 @@ Sidebar binding = пользователь + browserId + browserEpoch + tabId + 
 Это предложение для нашего проекта, не уже реализованная возможность.
 
 1. **Реестр браузеров.** Стабильный browserId, владелец/допуски, transport, адрес или secret reference, статус. Сессии, кеши, refs и очереди действий разделять по браузерам.
-2. **Первый этап — direct CDP.** Проверить существующий plugin через Hypermesh с отдельным Chrome. Сохранить API navigate/snapshot/act. Не запускать локальный браузер при недоступности удалённого.
+2. **Первый этап — direct CDP.** Проверить существующий plugin через MauzCodemesh с отдельным Chrome. Сохранить API navigate/snapshot/act. Не запускать локальный браузер при недоступности удалённого.
 3. **Второй этап — extension relay.** Расширение явно подключает разрешённые вкладки через chrome.debugger; локальный relay предоставляет совместимый интерфейс. За основу исследования взять Playwriter, а не писать протокол с нуля.
 4. **Sidebar.** Текущая привязка targetId недостаточна при нескольких Chrome. Сервер должен проверять target в указанном браузере; browserId от расширения не является доказательством права доступа.
 5. **Live View.** Отдельно проверить Page.startScreencast, Input, отсоединение DevTools и поведение фоновых вкладок через extension transport. Пока не обещать полную совместимость.
 
 ## Безопасность и минимальная проверка прототипа
 
-- CDP даёт широкие полномочия над профилем. VPN защищает канал, но не заменяет авторизацию конкретного Hyper и выбор разрешённых вкладок.
+- CDP даёт широкие полномочия над профилем. VPN защищает канал, но не заменяет авторизацию конкретного MauzCode и выбор разрешённых вкладок.
 - Не публиковать незащищённый CDP в интернет. Для машинного соединения нужны права/учётные данные: интерактивная portal-сессия человека не автоматически подходит агенту.
 - Существующий sidebar pairing token нельзя автоматически считать разрешением на управление Chrome.
 - При потере связи не повторять автоматически отправку формы, платёж или удаление: результат последней команды может быть неизвестен.
 - Проверить два браузера с одинаковыми URL, смену target, рестарт расширения, истечение/отзыв доступа, задержки, reconnect, отсутствие перетекания refs между сессиями.
-- Для CDP через прокси проверить `/json/version` и возвращаемый WebSocket URL: loopback-адрес удалённой машины не должен восприниматься как localhost сервера Hyper.
+- Для CDP через прокси проверить `/json/version` и возвращаемый WebSocket URL: loopback-адрес удалённой машины не должен восприниматься как localhost сервера MauzCode.
 
 ## Итоговая рекомендация
 
-**Быстрый прототип:** наш browser plugin + remote CDP через Hypermesh. **Удобный пользовательский вариант:** наш Chrome extension + локальный CDP relay по модели Playwriter, доступный через Hypermesh. Сначала сделать общую модель browserId и проверить совместимость на одной удалённой машине. Решение о заимствовании кода принимать после чтения лицензий, тестов и проверки полного пути snapshot → act → Live View.
+**Быстрый прототип:** наш browser plugin + remote CDP через MauzCodemesh. **Удобный пользовательский вариант:** наш Chrome extension + локальный CDP relay по модели Playwriter, доступный через MauzCodemesh. Сначала сделать общую модель browserId и проверить совместимость на одной удалённой машине. Решение о заимствовании кода принимать после чтения лицензий, тестов и проверки полного пути snapshot → act → Live View.

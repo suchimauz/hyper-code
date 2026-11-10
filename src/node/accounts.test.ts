@@ -47,7 +47,7 @@ describe("node credential identity", () => {
         let sent: { url: string; body: string } | undefined;
         const ctx = { fns: { node: {
             authorize: async () => ({ ok: true, client: { providers: ["openai"], name: "client" }, hops: 0 }),
-            catalog: async () => [{ ...entry("second", "openai"), api: "openai", via: "hyper/next" }],
+            catalog: async () => [{ ...entry("second", "openai"), api: "openai", via: "mauzcode/next" }],
             get: async () => ({ url: "http://next/v1" }), token: async () => "test-token",
         }, procs: { log: { info: () => {} } } } } as unknown as Context;
         globalThis.fetch = (async (url, opts) => { sent = { url: String(url), body: String(opts?.body) }; return new Response("ok"); }) as typeof fetch;

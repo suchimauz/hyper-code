@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { WaitLoader } from '../components/hyper/WaitLoader';
+import { WaitLoader } from '../components/mauzcode/WaitLoader';
 
 it('renders all three original lanes with 3, 3 and 4 decorative dots', () => {
   const view = render(<WaitLoader />);

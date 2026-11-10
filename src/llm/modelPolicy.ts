@@ -1,7 +1,7 @@
 /**
  * List, set, or enforce user-disabled exact model routes
  *
- * Persist per-route model opt-outs in kv and reject disabled inference before resolving credentials or transport. Canonicalizes bare local models and explicit provider/default aliases, while preserving named accounts, SSH routes and Hyper node identities.
+ * Persist per-route model opt-outs in kv and reject disabled inference before resolving credentials or transport. Canonicalizes bare local models and explicit provider/default aliases, while preserving named accounts, SSH routes and MauzCode node identities.
  * @param opts.action List disabled routes, set one route policy, or reject a disabled route.
  * @param opts.model Exact model route; required for set and assert. Bare model IDs use lmstudio. Named accounts, SSH and node routes remain distinct.
  * @param opts.disabled Whether set disables the route; required and strictly boolean for set.
@@ -30,7 +30,7 @@ export default async function (
         } else if (model.includes(":")) {
             const match = /^([a-z][\w-]*)(?:\/([\w.-]+))?:(\S+)$/.exec(model);
             if (!match || (match[2] && [".", ".."].includes(match[2]))) throw new Error("Invalid model route");
-            route = match[1] + (match[2] && (match[2] !== "default" || match[1] === "hyper") ? "/" + match[2] : "") + ":" + match[3];
+            route = match[1] + (match[2] && (match[2] !== "default" || match[1] === "mauzcode") ? "/" + match[2] : "") + ":" + match[3];
         } else {
             route = "lmstudio:" + model;
         }

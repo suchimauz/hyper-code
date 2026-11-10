@@ -5,7 +5,7 @@ Status: draft for review. Scope decided in discussion (design §32–§34 plus t
 ## Decisions
 
 1. Every chat (agent session) has an **owner**: the user who created it.
-2. **Subscription/credentials: always the Hyper owner's** (today's behavior). Personal subscriptions
+2. **Subscription/credentials: always the MauzCode owner's** (today's behavior). Personal subscriptions
    are deferred. The chat owner is recorded anyway, for "mine" and a later switch.
 3. **Visibility: everyone sees every chat and can write in any.** Trusted team, no isolation.
 4. Every human message carries its **author**. The UI draws the name with an avatar dot.
@@ -58,7 +58,7 @@ Status: draft for review. Scope decided in discussion (design §32–§34 plus t
 - Table `user_agent_state(user_id, agent_id, seen_at, seen_idx, pinned, PRIMARY KEY (user_id, agent_id))`.
 - Code reads/writes it instead of `kv` keys `seen-at:<agent>`, `seen:<agent>`, `mobile-pin-agent:<agent>`
   (`session/list.ts`, `nav/next_unread`, `api/*_read_POST`, `api/*_pin_POST`, `nav/*_pin_POST`).
-- Data: one-time copy of those `kv` keys into rows for the Hyper owner. Small (≈ number of agents).
+- Data: one-time copy of those `kv` keys into rows for the MauzCode owner. Small (≈ number of agents).
   `kv` keys are **not deleted** in this step.
 - Rollback: code reads `kv` again (still intact); drop the table.
 
@@ -103,7 +103,7 @@ the fixes below are required first. Each finding was checked against the code be
 
 1. **Rollback order is wrong.** `switch.md` says to run `down` (drop `users` + columns) while the
    new code is running. The new code reads `users` on every request (`auth/currentUser`) and writes
-   `created_by` in `session/save` → the running Hyper breaks, and a restart re-applies the migration.
+   `created_by` in `session/save` → the running MauzCode breaks, and a restart re-applies the migration.
    **Fix:** rollback = stop service → restore previous code → start. **Leave the additive schema in
    place** (old code ignores extra nullable columns and an unused table). `down` only as an optional
    cleanup, run with the old code already live.
@@ -138,7 +138,7 @@ the fixes below are required first. Each finding was checked against the code be
   creator, so a fork gets the requester, not the parent owner. Decide explicitly per path
   (fork/delegate → parent owner; new chat → requester) and pass the owner in, don't infer.
 - **`createdBy ??=` on an old chat** assigns a creator in memory while `ON CONFLICT` keeps DB NULL →
-  old chats stay ownerless and fall out of "mine". Treat NULL owner as "Hyper owner" in "mine", or
+  old chats stay ownerless and fall out of "mine". Treat NULL owner as "MauzCode owner" in "mine", or
   backfill `agents.created_by` separately and optionally (agents only — 53k rows, batched).
 - **Read state is also written in `ui/chatColumn.ts:22`** (web), not only mobile routes — include in
   step 4.
@@ -187,8 +187,8 @@ Steps 2–7 keep the review notes above.
 
 ## Implemented and browser-verified (branch `multiuser-users`, 076f04b)
 
-Test instance: full copy of the live DB (`hyper_multitest`, 53 657 agents), port 3020, agent worker
-and cron off, queued runs/triggers neutralized, a fake Google on :3021. Live Hyper untouched.
+Test instance: full copy of the live DB (`mauzcode_multitest`, 53 657 agents), port 3020, agent worker
+and cron off, queued runs/triggers neutralized, a fake Google on :3021. Live MauzCode untouched.
 
 | Checked in the browser | Result |
 |---|---|
@@ -210,4 +210,4 @@ and cron off, queued runs/triggers neutralized, a fake Google on :3021. Live Hyp
 Tests: 101/101 (`src/auth`, `src/session`, affected `src/api`).
 
 Not done yet: iPhone email field (step 6), sidebar pairing per user, real Google OAuth client in
-`<gcp-project>` (console-only; see below), the switch of the live Hyper.
+`<gcp-project>` (console-only; see below), the switch of the live MauzCode.

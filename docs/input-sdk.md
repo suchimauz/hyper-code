@@ -77,7 +77,7 @@ Merge this grant into the plugin's existing `package.json` (do not replace its o
 ```tsx
 import { useState } from 'react';
 import { Button, TextField, requestJson,
-  type ExtensionInputProps, type UiExtension } from '@hyper/ui';
+  type ExtensionInputProps, type UiExtension } from '@mauzcode/ui';
 
 function NoteCard({ context, input, onDone }: ExtensionInputProps) {
   const [note, setNote] = useState('');
@@ -123,9 +123,9 @@ await ctx.fns.input.request({
 
 ## React contract
 
-Import only `react`, public `@hyper/ui` and the plugin's declared package dependencies. Do not deep-import host modules or bundle another React runtime. `UiExtension.inputKinds` entries are `{ kind, component }`, require matching `procs.ui.inputKinds` grants, and must use the plugin's owner prefix. These are trusted same-origin extensions, **not sandboxes**.
+Import only `react`, public `@mauzcode/ui` and the plugin's declared package dependencies. Do not deep-import host modules or bundle another React runtime. `UiExtension.inputKinds` entries are `{ kind, component }`, require matching `procs.ui.inputKinds` grants, and must use the plugin's owner prefix. These are trusted same-origin extensions, **not sandboxes**.
 
-The public props exported by `@hyper/ui` are:
+The public props exported by `@mauzcode/ui` are:
 
 ```ts
 type ExtensionInputProps = {
@@ -160,4 +160,4 @@ A private Redmine integration may adopt this lifecycle and a granted native card
 
 Absent/unapproved plugin views continue through the secure-input compatibility host; a failed native card offers a compatibility link. Keep `input.compatView`, server `open`/`done` rendering, protected transports and necessary SSR documents. This SDK is not a declaration that all HTML/HTMX is removed. See [UI architecture](ui-architecture.md).
 
-Authoritative contracts: `src/input/{request,Kind,cards,submit,complete,expireDue}.ts`, `src/input/$loader_input.ts`, `src/input/$route_$id_POST.ts`, `src/agent/workerLoop.ts`, `frontend/src/extensions/{types,registry,pluginRuntime}.ts`, `frontend/src/components/hyper/PluginInputHost.tsx` and `frontend/src/sdk/index.ts`.
+Authoritative contracts: `src/input/{request,Kind,cards,submit,complete,expireDue}.ts`, `src/input/$loader_input.ts`, `src/input/$route_$id_POST.ts`, `src/agent/workerLoop.ts`, `frontend/src/extensions/{types,registry,pluginRuntime}.ts`, `frontend/src/components/mauzcode/PluginInputHost.tsx` and `frontend/src/sdk/index.ts`.

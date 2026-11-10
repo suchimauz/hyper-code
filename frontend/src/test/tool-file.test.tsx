@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ToolRow } from '../components/hyper/ToolRow';
-import { toolFileTarget } from '../components/hyper/toolFileTarget';
+import { ToolRow } from '../components/mauzcode/ToolRow';
+import { toolFileTarget } from '../components/mauzcode/toolFileTarget';
 const event = { idx: 3, ts: 1, type: 'tool_call', name: 'read', text: null, preview: 'wrong guessed path' };
 const detail = { ...event, args: '{"path":"src/real.ts","host":"home-dev"}', argsTruncated: false, result: '', resultTruncated: false, isError: false };
 afterEach(() => vi.unstubAllGlobals());

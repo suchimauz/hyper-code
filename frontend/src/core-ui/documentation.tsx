@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button, Panel, TextField, requestJson, type UiExtension } from '@hyper/ui';
+import { Button, Panel, TextField, requestJson, type UiExtension } from '@mauzcode/ui';
 
 type Hit = {agentId:string;idx:number;role:string;score:number;snippet:string};
 type Schema = {type?:string;description?:string;enum?:unknown[];anyOf?:Schema[];items?:Schema;'x-typescript-type'?:string};

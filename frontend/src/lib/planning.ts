@@ -1,4 +1,4 @@
-import { ApiError, requestJson } from './hyper';
+import { ApiError, requestJson } from './mauzcode';
 export type PlanningState = {
   version: 1; agentId: string; mode: 'plan' | 'execute'; revision: number; scope: 'session'; advisory: true; runningPolicy: 'reject'; csrfToken: string;
   proposal: null | { id: string; inputId: string; plan: string; status: 'pending' | 'approved' | 'kept'; createdAt: number };

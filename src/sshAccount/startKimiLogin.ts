@@ -2,9 +2,9 @@ import { lstatSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 // Kimi Coding authorization: the same OAuth device flow, with the granted
 // credential written either to the local isolated slot
-// (~/.hyper/accounts/kimi-coding/<account>/kimi-code.json) or, when an SSH
+// (~/.mauzcode/accounts/kimi-coding/<account>/kimi-code.json) or, when an SSH
 // instance is chosen, straight to that host's slot
-// (~/.hyper/ssh-accounts/kimi-coding/<account>/kimi-code.json) over the pinned
+// (~/.mauzcode/ssh-accounts/kimi-coding/<account>/kimi-code.json) over the pinned
 // connection — the content travels on stdin, never in argv. No CLI is ever
 // executed and no token is returned to the caller.
 const KIMI_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -44,9 +44,9 @@ export default async function (
     const host = ctx.env.KIMI_CODE_OAUTH_HOST ?? "https://auth.kimi.com";
     const headers = {
         "content-type": "application/x-www-form-urlencoded",
-        "X-Msh-Platform": "hyper-code2",
+        "X-Msh-Platform": "mauzcode",
         "X-Msh-Version": "0.1",
-        "X-Msh-Device-Id": "hyper-code2",
+        "X-Msh-Device-Id": "mauzcode",
     };
     let data: any;
     try {
@@ -129,11 +129,11 @@ export default async function (
 // then read the JSON from stdin and write it 0600 atomically. The credential
 // bytes travel only over the SSH stdin pipe.
 async function writeRemoteCredential(connection: { bin: string; args: string[]; host: string }, account: string, payload: string): Promise<void> {
-    const root = `.hyper/ssh-accounts/kimi-coding/${account}`;
+    const root = `.mauzcode/ssh-accounts/kimi-coding/${account}`;
     const script = [
         "set -eu", "umask 077",
         `root="$HOME/${root}"`,
-        `for p in "$HOME/.hyper" "$HOME/.hyper/ssh-accounts" "$HOME/.hyper/ssh-accounts/kimi-coding" "$root"; do test ! -L "$p" || exit 1; done`,
+        `for p in "$HOME/.mauzcode" "$HOME/.mauzcode/ssh-accounts" "$HOME/.mauzcode/ssh-accounts/kimi-coding" "$root"; do test ! -L "$p" || exit 1; done`,
         'mkdir -p "$root" && chmod 700 "$root"',
         'test ! -L "$root/kimi-code.json" || exit 1',
         'tmp="$root/.kimi-code.json.tmp"',

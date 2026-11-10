@@ -1,7 +1,7 @@
 /**
  * Runs a bash command on a remote SSH server over a persistent multiplexed connection.
  *
- * Executes the command with `bash -lc` (PATH extended with ~/.bun/bin, ~/.local/bin, ~/.cargo/bin, Homebrew and /usr/local/bin) on the named host from ~/.ssh/config or HYPER_SSH_CONFIG (list them with remote.servers; connection options come from remote.sshOptions). The first call opens an OpenSSH ControlMaster socket kept alive for 30 minutes, so later calls reuse it and start in tens of milliseconds. Non-interactive (BatchMode): key-based auth only. The script is sent over stdin (not argv), so commands and exported secrets stay out of the remote process list; optional stdin is piped to the command after it, which makes it suitable for writing files. On timeout the remote process tree is terminated as well. Use it for remote shell work and as the transport under host-aware tools.
+ * Executes the command with `bash -lc` (PATH extended with ~/.bun/bin, ~/.local/bin, ~/.cargo/bin, Homebrew and /usr/local/bin) on the named host from ~/.ssh/config or MAUZCODE_SSH_CONFIG (list them with remote.servers; connection options come from remote.sshOptions). The first call opens an OpenSSH ControlMaster socket kept alive for 30 minutes, so later calls reuse it and start in tens of milliseconds. Non-interactive (BatchMode): key-based auth only. The script is sent over stdin (not argv), so commands and exported secrets stay out of the remote process list; optional stdin is piped to the command after it, which makes it suitable for writing files. On timeout the remote process tree is terminated as well. Use it for remote shell work and as the transport under host-aware tools.
  * @param opts.host SSH host alias from ~/.ssh/config, as returned by remote.servers.
  * @param opts.command Bash source executed remotely via bash -lc.
  * @param opts.cwd Remote working directory; ~ and ~/ prefixes resolve to the remote home.
@@ -40,7 +40,7 @@ export default async function (
     // The wrapper shell is the session/process-group leader on the remote side
     // (sshd starts it with setsid), so a timeout can kill the whole group —
     // including children that were orphaned or backgrounded.
-    const wrapper = 'IFS= read -r n; echo "__HYPER_PID=$$ __HYPER_PGID=$(ps -o pgid= -p $$ | tr -d " ")" >&2; s=$(dd bs=1 count="$n" 2>/dev/null); eval "$s"';
+    const wrapper = 'IFS= read -r n; echo "__MAUZCODE_PID=$$ __MAUZCODE_PGID=$(ps -o pgid= -p $$ | tr -d " ")" >&2; s=$(dd bs=1 count="$n" 2>/dev/null); eval "$s"';
     const cmd = [ssh.bin, "-T", ...ssh.args, opts.host, "exec bash -lc " + shq(wrapper)];
     function shq(s: string) { return ctx.fns.remote.quote({ value: s }); }
     const started = Date.now();
@@ -65,7 +65,7 @@ export default async function (
                 // The marker is a whole line anywhere in stderr: ssh banners or
                 // host-key warnings may come first.
                 pidBuf += text;
-                const m = /(^|\n)__HYPER_PID=(\d+) __HYPER_PGID=(\d*)\n/.exec(pidBuf);
+                const m = /(^|\n)__MAUZCODE_PID=(\d+) __MAUZCODE_PGID=(\d*)\n/.exec(pidBuf);
                 if (m) {
                     remotePid = Number(m[2]);
                     remotePgid = Number(m[3] || 0);

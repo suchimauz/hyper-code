@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { liveRefresh } from '../lib/liveRefresh';
 import type { LiveEvent, LiveStatus } from '../lib/live';
-let subscriptions: Array<Parameters<NonNullable<Window['hyperLive']>['subscribe']>[0]>;
+let subscriptions: Array<Parameters<NonNullable<Window['mauzCodeLive']>['subscribe']>[0]>;
 let statuses: Array<(status: LiveStatus) => void>;
 let status: LiveStatus;
 let hidden = false;
@@ -9,12 +9,12 @@ const disposers: Array<() => void> = [];
 beforeEach(() => {
   vi.useFakeTimers(); subscriptions = []; statuses = []; status = 'connected'; hidden = false;
   vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
-  window.hyperLive = { getStatus: () => status,
+  window.mauzcodeLive = { getStatus: () => status,
     subscribe: opts => { subscriptions.push(opts); return () => { subscriptions = subscriptions.filter(s => s !== opts); }; },
     onStatus: listener => { statuses.push(listener); return () => { statuses = statuses.filter(s => s !== listener); }; },
   };
 });
-afterEach(() => { disposers.splice(0).forEach(dispose => dispose()); delete window.hyperLive; vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { disposers.splice(0).forEach(dispose => dispose()); delete window.mauzcodeLive; vi.useRealTimers(); vi.restoreAllMocks(); });
 const emit = (event: LiveEvent = { topic: 'agent:a', type: 'refresh' }) => subscriptions.forEach(s => s.onEvent(event));
 const change = (next: LiveStatus) => { status = next; statuses.forEach(s => s(next)); };
 const tick = (ms = 0) => vi.advanceTimersByTimeAsync(ms);

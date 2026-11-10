@@ -55,7 +55,7 @@ test('capture distinguishes confirmed inactivity from failed reads and missing a
 });
 
  test('all stream providers use reported counts and soft overshoot stops next continuation',async()=>{
- for(const provider of ['codex','anthropic','openai','xai','cursor','hyper','mock','gemini']) {
+ for(const provider of ['codex','anthropic','openai','xai','cursor','mauzcode','mock','gemini']) {
  const {ctx,calls}=fixture();const state=await bound(ctx);
  ctx.fns.goal.accountingCheckpoint=async(o:any)=>{calls.push(o);const exhausted=BigInt(o.current.input)+BigInt(o.current.output)>=10n;return {revision:2,status:exhausted?'budget_limited':'active',budgetTransition:exhausted};};
  await record(ctx,null,{state,provider,requestId:'q',format:'common-stream',usage:{prompt_tokens:100,completion_tokens:50}});

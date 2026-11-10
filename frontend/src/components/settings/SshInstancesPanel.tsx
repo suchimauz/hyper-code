@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
 import { Check, Copy, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { ApiError } from '../../lib/hyper';
+import { ApiError } from '../../lib/mauzcode';
 import { getSshInstances, runSshAction, sshTarget, type SshAction, type SshActionResult, type SshInstance, type SshProbe } from '../../lib/sshInstances';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
@@ -50,7 +50,7 @@ function TrustForm({ item, run, busy }: { item: SshInstance; run: Run; busy: boo
 function EditForm({ item, run, busy }: { item: SshInstance; run: Run; busy: boolean }) {
   const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); await run({ action: 'save', ...readEndpoint(event.currentTarget, item.name) }); };
   return <form className="ssh-form" onSubmit={submit}>
-    <p className="settings-note">The name stays the same. Changing host, user or port clears host verification and requires reconnecting provider accounts. Hyper’s public key stays the same.</p>
+    <p className="settings-note">The name stays the same. Changing host, user or port clears host verification and requires reconnecting provider accounts. MauzCode’s public key stays the same.</p>
     <div className="ssh-grid">
       <Field label="Host" name="host" required defaultValue={item.host} autoComplete="off" spellCheck={false} />
       <Field label="User" name="user" required maxLength={64} defaultValue={item.user} autoComplete="off" spellCheck={false} />
@@ -64,8 +64,8 @@ function RemoveForm({ item, run, busy }: { item: SshInstance; run: Run; busy: bo
   const [confirmed, setConfirmed] = useState(false);
   const submit = async (event: FormEvent) => { event.preventDefault(); await run({ action: 'remove', name: item.name, confirmed: true }); };
   return <form className="ssh-form" onSubmit={submit}>
-    <p className="settings-note">Removes this connection and its provider-account records from Hyper. Remote credentials and authorized_keys are not changed; this does not revoke server access.</p>
-    <label className="settings-check"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />Remove {item.name} and its account records from Hyper.</label>
+    <p className="settings-note">Removes this connection and its provider-account records from MauzCode. Remote credentials and authorized_keys are not changed; this does not revoke server access.</p>
+    <label className="settings-check"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />Remove {item.name} and its account records from MauzCode.</label>
     <div className="ssh-form-actions"><Button className="button--danger" type="submit" disabled={busy || !confirmed}>Remove instance</Button></div>
   </form>;
 }
@@ -94,7 +94,7 @@ function InstanceCard({ item, run, busy, probe }: { item: SshInstance; run: Run;
     <div className="ssh-card-tabs" role="group" aria-label={`Действия ${item.name}`}>
       {tabs.map(([id, label]) => <button key={id} type="button" className={`ssh-card-tab ${id === 'remove' ? 'is-danger' : ''}`} aria-expanded={open === id} onClick={() => toggle(id)}>{label}</button>)}
     </div>
-    {open === 'key' && <div className="ssh-card-section"><p className="settings-note">Add this public key to <code>~/.ssh/authorized_keys</code> for <b>{item.user}</b>. The private key stays in Hyper.</p><CopyKey value={item.publicKey} />{trusted && <p className="settings-note">Pinned host key: <code className="ssh-pinned">{item.pinnedHostKey}</code></p>}</div>}
+    {open === 'key' && <div className="ssh-card-section"><p className="settings-note">Add this public key to <code>~/.ssh/authorized_keys</code> for <b>{item.user}</b>. The private key stays in MauzCode.</p><CopyKey value={item.publicKey} />{trusted && <p className="settings-note">Pinned host key: <code className="ssh-pinned">{item.pinnedHostKey}</code></p>}</div>}
     {open === 'trust' && <div className="ssh-card-section"><TrustForm item={item} run={run} busy={busy} /></div>}
     {open === 'edit' && <div className="ssh-card-section"><EditForm key={item.updatedAt} item={item} run={run} busy={busy} /></div>}
     {open === 'remove' && <div className="ssh-card-section"><RemoveForm item={item} run={run} busy={busy} /></div>}

@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { QueueDock } from '../components/hyper/QueueDock';
-import { LiveComposer } from '../components/hyper/LiveComposer';
-import { MessageInput } from '../components/hyper/MessageInput';
+import { QueueDock } from '../components/mauzcode/QueueDock';
+import { LiveComposer } from '../components/mauzcode/LiveComposer';
+import { MessageInput } from '../components/mauzcode/MessageInput';
 import { enqueueMessage, changeQueue, type QueueItem } from '../lib/queue';
-vi.mock('../components/hyper/ComposerFooter', () => ({ ComposerFooter: () => null }));
+vi.mock('../components/mauzcode/ComposerFooter', () => ({ ComposerFooter: () => null }));
 const row: QueueItem = { id: 'q/1', sequence: 1, text: 'First message', version: 2, status: 'pending', createdAt: 1, files: [] };
 const json = (body: object) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); sessionStorage.clear(); });

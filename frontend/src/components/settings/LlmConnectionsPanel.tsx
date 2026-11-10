@@ -4,9 +4,9 @@ import { RemoteLoginDiagnostics } from './RemoteLoginDiagnostics';
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { ExternalLink, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { NavigationChatIcon } from '../hyper/NavigationChatIcon';
+import { NavigationChatIcon } from '../mauzcode/NavigationChatIcon';
 import type { NavigationIcon } from '../../lib/navigation';
-import { ApiError } from '../../lib/hyper';
+import { ApiError } from '../../lib/mauzcode';
 import { accountSlot, getLlmConnections, LOGIN_PROVIDERS, REMOVABLE, runLlmAction, type LlmAccount, type LlmAction, type LlmActionResult, type LlmLogin, type LoginProvider, type QuotaWindow } from '../../lib/llmConnections';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
@@ -17,9 +17,9 @@ const GROUPS: { id: string; title: string; providers: string[]; login?: LoginPro
   { id: 'claude', title: 'Claude', providers: ['claude-code', 'anthropic-oauth'], login: 'claude-code' },
   { id: 'kimi', title: 'Kimi Coding', providers: ['kimi-coding'], login: 'kimi-coding' },
   { id: 'grok', title: 'Grok', providers: ['xai'], login: 'xai' },
-  { id: 'opencode', title: 'OpenCode', providers: ['opencode'], hint: 'API key is configured in Hyper settings.' },
-  { id: 'zai', title: 'Z.ai', providers: ['zai-coding'], hint: 'API key is configured in Hyper settings.' },
-  { id: 'minimax', title: 'MiniMax', providers: ['minimax-coding'], hint: 'API key is configured in Hyper settings.' },
+  { id: 'opencode', title: 'OpenCode', providers: ['opencode'], hint: 'API key is configured in MauzCode settings.' },
+  { id: 'zai', title: 'Z.ai', providers: ['zai-coding'], hint: 'API key is configured in MauzCode settings.' },
+  { id: 'minimax', title: 'MiniMax', providers: ['minimax-coding'], hint: 'API key is configured in MauzCode settings.' },
 ];
 const PROVIDER_NAME: Record<string, string> = { codex: 'Codex', 'claude-code': 'Claude Code', 'anthropic-oauth': 'Claude', 'kimi-coding': 'Kimi Coding', xai: 'Grok' };
 
@@ -93,7 +93,7 @@ function RemoveAccount({ item, run, busy, onDone }: { item: LlmAccount; run: Run
   useEffect(() => { void run({ action: 'users', provider: item.provider, account: item.account }, true).then(result => setUsers(result?.users ?? [])); }, [item.provider, item.account]); // eslint-disable-line react-hooks/exhaustive-deps
   const submit = async (event: FormEvent) => { event.preventDefault(); const ok = await run({ action: 'remove', provider: item.provider, account: item.account, confirmed: true, archiveUsers: !!users?.length }); if (ok) onDone(); };
   return <form className="ssh-form llm-remove" onSubmit={submit}>
-    <p className="settings-note">Removes the credential <code>{item.provider}/{item.account}</code> from Hyper.{item.sshInstance ? ' Files on the SSH server are not changed.' : ''}</p>
+    <p className="settings-note">Removes the credential <code>{item.provider}/{item.account}</code> from MauzCode.{item.sshInstance ? ' Files on the SSH server are not changed.' : ''}</p>
     {users === null ? <p className="settings-loading" role="status">Checking agents…</p> : users.length > 0 && <p className="settings-note">Used by {users.length} agent{users.length === 1 ? '' : 's'}: {users.slice(0, 5).map(u => <code key={u.id}>{u.title || u.id}</code>).reduce<React.ReactNode[]>((acc, el, i) => i ? [...acc, ', ', el] : [el], [])}. They will be archived.</p>}
     <label className="settings-check"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />{users?.length ? `Archive ${users.length} agent${users.length === 1 ? '' : 's'} and remove the account.` : 'Remove this account.'}</label>
     <div className="ssh-form-actions"><Button variant="ghost" type="button" onClick={onDone}>Cancel</Button><Button className="button--danger" type="submit" disabled={busy || !confirmed || users === null}>Remove account</Button></div>

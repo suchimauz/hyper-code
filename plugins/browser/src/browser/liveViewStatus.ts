@@ -1,5 +1,5 @@
 /**
- * Lists the live-view viewers currently connected to this Hyper and what each one shows.
+ * Lists the live-view viewers currently connected to this MauzCode and what each one shows.
  *
  * Use to check whether a human has the live view open (for example before resuming automation on that
  * tab). Each entry gives the Chrome endpoint, the shown target id, frame/input counters and the current picture

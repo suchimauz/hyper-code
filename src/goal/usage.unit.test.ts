@@ -29,7 +29,7 @@ describe('goal usage evidence normalization',()=>{
   expect((await normalize(ctx,null,{binding,format:'anthropic-raw',usage:{input_tokens:10,cache_read_input_tokens:0,output_tokens:20}})).quality).not.toBe('exact');
  });
  test('transformed provider streams never masquerade as exact',async()=>{
-  for(const format of ['unsupported','hyper-stream-anthropic'] as const)
+  for(const format of ['unsupported','mauzcode-stream-anthropic'] as const)
    expect(await normalize(ctx,null,{binding,format,usage:{prompt_tokens:0,cache_read_tokens:0,completion_tokens:0}})).toMatchObject({quality:'unsupported',inputTokens:null});
  });
  test('binding copied and frozen, no implicit goal identity',async()=>{

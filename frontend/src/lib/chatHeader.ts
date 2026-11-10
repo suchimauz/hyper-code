@@ -1,4 +1,4 @@
-import { requestJson } from './hyper';
+import { requestJson } from './mauzcode';
 import type { NavigationIcon } from './navigation';
 export type HeaderChild = { tokens?: number | null; durationMs?: number | null; modelLabel?: string; lastReplyAt?: number | null; id: string; title: string; icon?: NavigationIcon | null; colorHue?: number | null; runState: string };
 export type ChatHeaderData = { parent?: { id: string; title: string } | null; siblings?: HeaderChild[]; agentId: string; title: string; children: HeaderChild[]; csrfToken: string };

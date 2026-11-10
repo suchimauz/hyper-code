@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { TranscriptMessage } from '../components/hyper/TranscriptMessage';
-import type { ChatEvent } from '../lib/hyper';
+import { TranscriptMessage } from '../components/mauzcode/TranscriptMessage';
+import type { ChatEvent } from '../lib/mauzcode';
 afterEach(cleanup);
 const event: ChatEvent = { idx: 1, ts: 1, type: 'parked', text: null };
 test.each([

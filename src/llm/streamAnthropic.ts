@@ -28,7 +28,7 @@ export default async function (
 
     const reasoning = await ctx.fns.llm.resolveReasoningEffort({ model: agent.model, effort: agent.reasoningEffort ?? "auto" });
     // buildLlmRequest keeps the required Claude Code identity in the top-level
-    // system field for both externally managed and hyper-code2-managed OAuth.
+    // system field for both externally managed and mauzcode-managed OAuth.
     const { system, messages: convo, cacheableMessageCount } = await ctx.fns.agent.buildLlmRequest({ agent });
     // Prompt caching. Two breakpoints: the bootstrap turn (tools + system +
     // core prompt — identical for every turn and for every transcript-sharing
@@ -66,7 +66,7 @@ export default async function (
     // MiniMax M Plan speaks the same Anthropic dialect but has its own rules:
     // M3.1-Flash always thinks and rejects thinking.type "disabled" (400),
     // M3 thinks only when asked and honours effort, M2.x cannot think less.
-    const upstreamProvider = ep.provider === "hyper" ? (ep.upstream ?? "") : ep.provider;
+    const upstreamProvider = ep.provider === "mauzcode" ? (ep.upstream ?? "") : ep.provider;
     if (upstreamProvider === "minimax-coding") {
         const modelId = String(ep.modelId).toLowerCase();
         const isM31 = /^minimax-m3\.1-flash/.test(modelId);
@@ -121,12 +121,12 @@ export default async function (
         apiKey = await ctx.fns.llm.getAnthropicOAuthToken({ account: ep.account });
     }
 
-    const upstream = ep.provider === "hyper" ? (ep.upstream ?? "") : ep.provider;
+    const upstream = ep.provider === "mauzcode" ? (ep.upstream ?? "") : ep.provider;
     const claudeSubscription = upstream === "claude-code" || upstream === "anthropic-oauth";
     if (apiKey) {
         // Authentication semantics come from the selected provider, not from a
         // token-prefix heuristic. This prevents accidental billing/auth changes.
-        if (claudeSubscription || upstream === "kimi-coding" || ep.provider === "hyper") {
+        if (claudeSubscription || upstream === "kimi-coding" || ep.provider === "mauzcode") {
             headers["authorization"] = `Bearer ${apiKey}`;
         } else {
             headers["x-api-key"] = apiKey;

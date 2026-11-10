@@ -1,7 +1,7 @@
 /**
  * Builds one mounted plugin's browser UI bundle from its package.json procs.ui entry
  *
- * Use when a plugin's UI files or manifest changed; plugins.uiBuildAll calls it on load, add and reload. Bundles the declared entry with Bun.build as minified ESM. The modules react, react/jsx-runtime, react-dom and the Hyper UI SDK become imports of host shims under /ui-lab/runtime; packages listed in the plugin's own package.json dependencies are bundled from its node_modules (and so covered by the bundle hash and approval); relative imports must stay inside the entry folder and every other import fails the build. Validates requested grants: page/panel/action/Canvas launcher ids and Canvas kinds limited to the plugin's own namespaces. Records package.json procs.icon as the default Canvas launcher icon. Caches by a source fingerprint in ctx.state.plugins.ui. It never approves or executes the bundle.
+ * Use when a plugin's UI files or manifest changed; plugins.uiBuildAll calls it on load, add and reload. Bundles the declared entry with Bun.build as minified ESM. The modules react, react/jsx-runtime, react-dom and the MauzCode UI SDK become imports of host shims under /ui-lab/runtime; packages listed in the plugin's own package.json dependencies are bundled from its node_modules (and so covered by the bundle hash and approval); relative imports must stay inside the entry folder and every other import fails the build. Validates requested grants: page/panel/action/Canvas launcher ids and Canvas kinds limited to the plugin's own namespaces. Records package.json procs.icon as the default Canvas launcher icon. Caches by a source fingerprint in ctx.state.plugins.ui. It never approves or executes the bundle.
  * @param opts.name Mounted plugin name whose UI should be built.
  * @param opts.force Rebuild even when the source fingerprint is unchanged.
  */
@@ -73,12 +73,12 @@ export default async function (
         if (!(await fs.realpath(entryPath)).startsWith(uiRoot + path.sep)) throw new Error('UI entry escapes the plugin directory');
         const shims: Record<string, string> = {
             'react': '/plugins/ui/runtime/react.js', 'react/jsx-runtime': '/plugins/ui/runtime/react-jsx-runtime.js',
-            'react-dom': '/plugins/ui/runtime/react-dom.js', '@hyper/ui': '/plugins/ui/runtime/hyper-ui.js',
+            'react-dom': '/plugins/ui/runtime/react-dom.js', '@mauzcode/ui': '/plugins/ui/runtime/mauzcode-ui.js',
         };
         const result = await Bun.build({
             entrypoints: [entryPath], target: 'browser', format: 'esm', minify: true, splitting: false,
             define: { 'process.env.NODE_ENV': '"production"' }, throw: false,
-            plugins: [{ name: 'hyper-plugin-ui-boundary', setup(build) {
+            plugins: [{ name: 'mauzcode-plugin-ui-boundary', setup(build) {
                 build.onResolve({ filter: /.*/ }, args => {
                     if (!args.importer) return undefined;
                     if (Object.hasOwn(shims, args.path)) return { path: shims[args.path]!, external: true };
@@ -95,7 +95,7 @@ export default async function (
                         const resolved = Bun.resolveSync(args.path, root);
                         if (resolved.startsWith(path.join(root, 'node_modules') + path.sep)) return { path: resolved };
                     }
-                    throw new Error(`Plugin UI may import only react, react-dom, the Hyper UI SDK, its own package.json dependencies and files inside ${path.dirname(entry)}/: ${args.path}`);
+                    throw new Error(`Plugin UI may import only react, react-dom, the MauzCode UI SDK, its own package.json dependencies and files inside ${path.dirname(entry)}/: ${args.path}`);
                 });
             } }],
         } as Parameters<typeof Bun.build>[0] & { throw: false });

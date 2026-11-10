@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 describe("GET /files — media preview", () => {
     test("renders png through the raw media endpoint without decoding it as text", async () => {
         const ctx = await mkTestCtx();
-        const dir = await mkdtemp(join(tmpdir(), "hyper-media-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-media-"));
         const path = join(dir, "sample.png");
         const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
         await writeFile(path, bytes);
@@ -27,7 +27,7 @@ describe("GET /files — media preview", () => {
 
     test("uses native preview elements for video, audio and pdf", async () => {
         const ctx = await mkTestCtx();
-        const dir = await mkdtemp(join(tmpdir(), "hyper-media-"));
+        const dir = await mkdtemp(join(tmpdir(), "mauzcode-media-"));
         try {
             for (const [file, previewKind] of [["clip.mp4", "video"], ["sound.mp3", "audio"], ["paper.pdf", "pdf"]] as const) {
                 const path = join(dir, file);
