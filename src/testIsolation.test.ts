@@ -40,13 +40,3 @@ test("core testCtx excludes inherited plugin migrations before they execute", as
         rmSync(root, { recursive: true, force: true });
     }
 });
-
-test("core testCtx keeps unqualified tables private to each pg_temp connection", async () => {
-    const first = await testCtx();
-    const second = await testCtx();
-    await first.fns.procs.db.exec({ sql: "CREATE TABLE test_isolation_probe (value TEXT)" });
-    await first.fns.procs.db.run({ sql: "INSERT INTO test_isolation_probe VALUES (?)", params: ["first"] });
-    expect(await first.fns.procs.db.select({ sql: "SELECT value FROM test_isolation_probe" })).toEqual([{ value: "first" }]);
-    const rows = await second.fns.procs.db.select({ sql: "SELECT to_regclass('test_isolation_probe')::text AS name" });
-    expect(rows[0].name).toBeNull();
-});

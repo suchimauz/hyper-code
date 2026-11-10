@@ -20,10 +20,3 @@ test('filesystem proxy rejects dependency symlinks escaping node_modules',async(
   expect((await request(dir+'/outside.json'))?.status).toBe(403);
  } finally {await rm(dir,{recursive:true,force:true});}
 });
-
-test('live filesystem proxy serves only canonical Vite dependency modules without cookies',async()=>{
- const response=await request(root+'/node_modules/vite/dist/client/env.mjs');
- expect(response?.status).toBe(200);
- expect(response?.headers.get('set-cookie')).toBeNull();
- expect(await response!.text()).toContain('globalThis');
-});

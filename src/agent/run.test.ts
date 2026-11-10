@@ -1,6 +1,14 @@
 import { describe, test, expect } from 'bun:test';
 import { mkTestCtx } from '../_testCtx.entry';
 
+// The planning-mode context row is covered by its own tests; keep transcript
+// indices here about the tool-call protocol only.
+async function mkCtx() {
+    const ctx: any = await mkTestCtx();
+    ctx.fns.agent.syncPlanningContext = async () => {};
+    return ctx;
+}
+
 async function mkAgent(ctx: any, turns: any[]) {
     const agent = await ctx.fns.agent.start({ model: 'mock:test' });
     agent.scratchpad.mockLLM = { turns, defaultText: 'done' };
@@ -10,7 +18,7 @@ async function mkAgent(ctx: any, turns: any[]) {
 
 describe('agent.run', () => {
     test('a tool call round-trips: assistant row carries the call, a tool row answers it by id', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         ctx.fns.files.read = async (_c: any, _s: any, o: any) => `CONTENT OF ${o.path}`;
 
         const agent = await mkAgent(ctx, [
@@ -35,7 +43,7 @@ describe('agent.run', () => {
     });
 
     test('parallel calls in one reply each get their own answer', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         ctx.fns.files.read = async (_c: any, _s: any, o: any) => `READ:${o.path}`;
         ctx.fns.files.grep = async () => [{ path: 'a.ts', line: 1, column: 2, text: 'hit' }];
 
@@ -58,7 +66,7 @@ describe('agent.run', () => {
     });
 
     test('a bad argument comes back as the tool answer, and the loop keeps going', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await mkAgent(ctx, [
             { toolCalls: [{ name: 'read', args: { path: 'a.ts', maxLine: 3 } }] },
             { text: 'понял, опция называется maxLines' },
@@ -76,11 +84,12 @@ describe('agent.run', () => {
 
 
     test('tool schemas go on the wire in the endpoint dialect', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await ctx.fns.agent.start({ model: 'mock:test' });
 
         const wire = ctx.fns.agent.wireTools({ agent, api: 'anthropic' });
-        expect(wire.map((t: any) => t.name).sort()).toEqual(['bash', 'edit', 'eval', 'find', 'grep', 'read', 'respondHtml', 'write']);
+        // Native goal tools (create_goal/get_goal/update_goal) join when the goal feature is on.
+        expect(wire.map((t: any) => t.name).filter((n: string) => !n.endsWith('_goal')).sort()).toEqual(['bash', 'edit', 'eval', 'find', 'grep', 'read', 'respondHtml', 'write']);
 
         const narrowed = ctx.fns.agent.wireTools({ agent: { ...agent, tools: ['read'] }, api: 'openai' });
         expect(narrowed).toHaveLength(1);
@@ -101,7 +110,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     }
 
     test('deleting half a JSON pair is refused, like half a marker pair', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await withPair(ctx);
         const msgs = await ctx.fns.session.getMessages({ id: agent.id });
         const callIdx = 1, resultIdx = 2;
@@ -114,7 +123,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('truncating into a pair walks back to the call', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await withPair(ctx);
 
         // idx 2 is the tool result — cutting there must take its call with it
@@ -124,7 +133,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('rewriting the transcript preserves tool_calls and tool_call_id', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await withPair(ctx);
 
         const before = await ctx.fns.session.getMessages({ id: agent.id });
@@ -143,7 +152,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('a reply truncated mid-arguments executes nothing and says so', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await ctx.fns.agent.start({ model: 'mock:test' });
             let ran = 0;
         ctx.fns.tools.read = async () => { ran++; return 'x'; };
@@ -165,7 +174,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('non-length malformed arguments reject the whole mixed batch without claiming truncation', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await mkAgent(ctx, []);
         let ran = 0;
         let sampled = 0;
@@ -189,7 +198,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('three consecutive malformed responses end only this turn with actionable feedback', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await mkAgent(ctx, []);
         const other = await mkAgent(ctx, []);
         let sampled = 0;
@@ -215,7 +224,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('a valid response resets the consecutive malformed response budget', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await mkAgent(ctx, []);
         let sampled = 0;
         let ran = 0;
@@ -237,7 +246,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('respondHtml stores the tool result, sanitizes HTML, publishes one final answer, and skips another LLM turn', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await mkAgent(ctx, [
             { toolCalls: [{ name: 'respondHtml', args: {
                 html: '<!DOCTYPE html><html><head><script>bad()</script></head><body><section><h2>Sessions</h2></section></body></html>',
@@ -262,7 +271,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
 
 
     test('plan continuation is bounded and excluded from the user cursor', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await mkAgent(ctx, Array.from({ length: 4 }, () => ({ text: 'not finished' })));
         await ctx.fns.session.plan({ agent, tasks: [{ id: 'work', title: 'Work', instructions: 'Keep going' }] });
         const result = await ctx.fns.agent.run({ agent, userText: 'start' });
@@ -276,7 +285,7 @@ describe('transcript surgery keeps JSON pairs intact', () => {
     });
 
     test('goal continuation runs before plan continuation without conflict', async () => {
-        const ctx: any = await mkTestCtx();
+        const ctx: any = await mkCtx();
         const agent = await mkAgent(ctx, [{ text: 'first' }, { text: 'second' }, { text: 'third' }, { text: 'fourth' }]);
         await ctx.fns.session.plan({ agent, tasks: [{ id: 'work', title: 'Work' }] });
         agent.goal = { enabled: true, statement: 'Goal', maxIterations: 1 };

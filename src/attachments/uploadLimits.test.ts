@@ -36,7 +36,7 @@ for (const [sizes, expected] of [
     test(`mobile ingress rejects ${expected} before storage`, async () => {
         const req = new Request('http://localhost/api/v1/agents/test/messages', { method: 'POST', headers: { 'content-type': 'multipart/form-data' } });
         req.formData = async () => ({ get: () => null, getAll: () => sizes.map(file) }) as any;
-        const ctx: any = { state: { agent: { test: { id: 'test' } } } };
+        const ctx: any = { state: { agent: { test: { id: 'test' } } }, fns: { procs: { db: { select: async () => [{ archived_at: null }] } } } };
         const response = await mobileMessage(ctx, null, { req, params: { id: 'test' } });
         expect(response.status).toBe(413);
         expect((await response.json() as { error: string }).error).toBe(expected);

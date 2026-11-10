@@ -670,7 +670,14 @@ async function workerPass(ctx: Context, inflight: Set<Promise<unknown>>): Promis
         // else: drained > 0 — loop back immediately to look for more.
     }
 
-export default async function (ctx: Context, _session: Session | null, _opts?: {}): Promise<void> {
+/**
+ * Run the in-process agent worker until `ctx.state.workerLoopRunning` is cleared: claim due agents,
+ * run housekeeping and retry failed passes with bounded exponential backoff.
+ * @param opts.retryBaseMs Base delay of the failed-pass backoff (doubled per consecutive failure, capped at 30 s); tests pass a small value.
+ * @default 500
+ * @minimum 0
+ */
+export default async function (ctx: Context, _session: Session | null, opts?: { retryBaseMs?: number }): Promise<void> {
     if ((ctx.state as any).workerLoopRunning) return;
     (ctx.state as any).workerLoopRunning = true;
 
@@ -686,7 +693,7 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
             failures = 0;
         } catch (error: any) {
             failures++;
-            const delay = Math.min(30_000, 500 * 2 ** Math.min(failures, 6));
+            const delay = Math.min(30_000, Math.max(0, opts?.retryBaseMs ?? 500) * 2 ** Math.min(failures, 6));
             console.error(`[workerLoop] pass failed (${failures}), retrying in ${delay}ms:`, error?.message ?? error);
             ctx.fns.procs.log.warn({ event: 'agent.worker.passFailed', msg: String(error?.message ?? error) });
             await waitForWork(ctx, delay);

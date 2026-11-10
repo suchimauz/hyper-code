@@ -23,12 +23,6 @@ describe("shared chat icon renderer", () => {
         expect(ctx.fns.chat.icon({ model: "anthropic:claude-opus-4-5", live: true, size: "md" })).toContain("chat-icon-ring--live");
         expect(ctx.fns.chat.icon({ model: "anthropic:claude-opus-4-5" })).not.toContain("chat-icon-ring");
     });
-
-    test("GET /chat/:id/panel is retired", async () => {
-        const { ctx } = await ctxWithAgent();
-        const res = await ctx.fns.procs.http.dispatch({ method: "GET", url: "/chat/a1/panel" });
-        expect(res.status).toBe(404);
-    });
 });
 
 describe("chat icon", () => {

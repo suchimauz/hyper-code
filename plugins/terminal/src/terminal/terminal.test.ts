@@ -79,7 +79,7 @@ test('live PTY runs in the workspace, resizes, and its shell dies when the socke
   const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
   for (let i = 0; i < 100 && alive(); i++) await Bun.sleep(50);
   expect(alive()).toBe(false);
- } finally { server.stop(true); }
+ } finally { await server.stop(true); }
 }, 20000);
 
 test('shell exit closes the socket with an exit frame; invalid frames close the session', async () => {
@@ -100,7 +100,7 @@ test('shell exit closes the socket with an exit frame; invalid frames close the 
   await new Promise(resolve => { bad.onopen = resolve; });
   bad.send('not json');
   expect(await badClosed).toBe(1003);
- } finally { server.stop(true); }
+ } finally { await server.stop(true); }
 }, 20000);
 
 test('at most four terminals run at once', async () => {
@@ -116,7 +116,7 @@ test('at most four terminals run at once', async () => {
  } finally {
   for (const ws of sockets) ws.close();
   await Bun.sleep(300);
-  server.stop(true);
+  await server.stop(true);
  }
  expect(((globalThis as any).__mauzcodeUiTerminals as Set<unknown>).size).toBe(0);
 }, 20000);

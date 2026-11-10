@@ -37,7 +37,7 @@ test('worker response has root scope, no-store, JavaScript MIME and only exact G
   expect(response.headers.get('service-worker-allowed')).toBe('/');
   expect(response.headers.get('cache-control')).toBe('no-store');
   expect(response.headers.get('content-type')).toContain('application/javascript');
-  const ctx: any = { fns: { h2: { redirect: () => undefined }, auth: { currentUser: async () => ({ required: true, user: null }) } } };
+  const ctx: any = { fns: { h2: { redirect: () => undefined }, frontendRuntime: { page: async () => undefined }, auth: { currentUser: async () => ({ required: true, user: null }) } } };
   for (const method of ['GET', 'HEAD']) expect(await middleware(ctx, null, { req: new Request('https://mauzcode.test/webPush/web-push-sw.js', { method }) })).toBeUndefined();
   for (const [path, method] of [['/webPush/web-push-sw.js', 'POST'], ['/webPush/config', 'GET'], ['/webPush/web-push-sw.js/extra', 'GET']]) expect((await middleware(ctx, null, { req: new Request('https://mauzcode.test' + path, { method }) }))?.status).toBe(401);
 });

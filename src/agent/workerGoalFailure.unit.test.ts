@@ -28,6 +28,7 @@ async function scenario(kind: string, retries = 0) {
         },
         events: { emitAgentsChanged: noop }, settings: { getNumber: async () => 0 },
         session: { syncAgentState: noop, appendErrorEvent: noop },
+        input: { expireDue: async () => 0 },
         procs: { env: { mode: () => 'test' }, log: { warn: noop }, db: {
             select: async ({ sql, params }: any) => {
                 if (sql.startsWith('WITH stale')) return [];
@@ -72,7 +73,7 @@ async function scenario(kind: string, retries = 0) {
                 throw Object.freeze(error);
             },
         },
-        webPush: { recordFailure: async () => ({ recorded: false }), notifyError: noop },
+        webPush: { recallStaleError: noop, recordFailure: async () => ({ recorded: false }), notifyError: noop },
     };
     await worker(ctx, null, {});
     return { transitions, order, token, consumeAttempts, modelRuns, parks, finalizes };
@@ -82,10 +83,11 @@ for (const kind of ['fatal', 'replacement', 'quota']) test(`terminal Goal finali
     expect(r.transitions).toEqual([{ agentId: 'goal-failure-test', expectedGoalId: 'captured-goal', expectedRunToken: r.token, reason: kind === 'quota' ? 'usage_limit' : 'terminal_error', terminal: true, codexPlanMode: false }]);
     expect(r.order).toEqual(['accounting', 'failure', 'revoke', 'commit']);
 });
-for (const kind of ['absent', 'setup', 'disabled', 'wrong-token', 'abort', 'transient', 'success']) test(`no Goal failure transition: ${kind}`, async () => {
+for (const kind of ['absent', 'setup', 'disabled', 'wrong-token', 'abort', 'success']) test(`no Goal failure transition: ${kind}`, async () => {
     const r = await scenario(kind); expect(r.transitions).toEqual([]); expect(r.order).toEqual(['accounting', 'revoke']);
 });
-test('exhausted transient retry transitions only after final accounting', async () => { const r = await scenario('transient', 1); expect(r.transitions).toHaveLength(1); expect(r.order).toEqual(['accounting', 'failure', 'revoke', 'commit']); });
+// Model retries live in run(); a transient error reaching the worker is terminal.
+test('transient failure escaping run transitions only after final accounting', async () => { const r = await scenario('transient'); expect(r.transitions).toHaveLength(1); expect(r.order).toEqual(['accounting', 'failure', 'revoke', 'commit']); });
 test('lost finalization token rolls back the Goal transaction', async () => { const r = await scenario('stale'); expect(r.order).toEqual(['accounting', 'failure', 'revoke', 'rollback']); });
 
 for(const kind of ['blocked','lock-always','lock-text'])test(`consume ${kind} parks without model or fallback`,async()=>{
@@ -97,5 +99,5 @@ test('structured lock contention retries same claim once',async()=>{const r=awai
 test('descendant provider failure never transitions root',async()=>{const r=await scenario('descendant');expect(r.modelRuns).toBe(1);expect(r.transitions).toEqual([]);});
 test('descendant nonbound capture cannot trigger root terminal callback',async()=>{const r=await scenario('capture-blocked');expect(r.transitions).toEqual([]);expect(r.order).toEqual(['cursor-schedule','revoke','commit']);expect(r.modelRuns).toBe(1);expect(r.finalizes[0].params[0]).toBeNull();expect(r.finalizes[0].sql).not.toContain('last_processed_msg_idx');});
 test('task finalization locks root first, settles exact receipt before revoke and restores human schedule',async()=>{const r=await scenario('grant-human');expect(r.order).toEqual(['root-source-lock','cursor-schedule','settle-terminal','revoke','commit']);expect(r.finalizes[0].params[0]).toBe(12345);});
-test('known drained transient receipt grants retry while unknown usage never renews',async()=>{const r=await scenario('grant-retry');expect(r.order).toEqual(['root-source-lock','cursor-schedule','settle-retry','revoke','commit']);expect(r.finalizes[0].params[0]).toBeNumber();const u=await scenario('grant-unknown');expect(u.order).toEqual(['root-source-lock','cursor-schedule','revoke','commit']);expect(u.finalizes[0].params[0]).toBeNull();});
+test('transient task failure never settles a retry grant; unknown usage never renews',async()=>{const r=await scenario('grant-retry');expect(r.order).toEqual(['root-source-lock','cursor-schedule','revoke','commit']);expect(r.finalizes[0].params[0]).toBeNull();const u=await scenario('grant-unknown');expect(u.order).toEqual(['root-source-lock','cursor-schedule','revoke','commit']);expect(u.finalizes[0].params[0]).toBeNull();});
 for(const kind of ['grant-rollback','grant-stale'])test(`task finalization ${kind} rolls back whole settlement`,async()=>{const r=await scenario(kind);expect(r.order.at(-1)).toBe('rollback');expect(r.order).not.toContain('commit');});

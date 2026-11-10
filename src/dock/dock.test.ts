@@ -57,13 +57,6 @@ test("malformed layout JSON is ignored and the save route validates its body", a
     expect((await ctx.fns.dock.items({})).hidden.map((x: any) => x.id)).toEqual(["z.a"]);
 });
 
-test("the shipped entries load from $dock_ files", async () => {
-    const ctx: any = await mkTestCtx();
-    const ids = Object.keys(ctx.state.dock?.items ?? {});
-    expect(ids).toContain("theme");
-    for (const id of ["mentions.mentions", "update.update", "auth.online", "llms.quota"]) expect(ids).not.toContain(id);
-});
-
 test("pinned chats come from the person's pins and pinned pages from layout.pins; unpin removes them", async () => {
     const ctx: any = await mkTestCtx();
     register(ctx, { "q.one": { label: "One", href: "/one" } });

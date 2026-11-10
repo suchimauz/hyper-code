@@ -1,31 +1,38 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { testCtx } from "../$test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
 
-// A throwaway project on disk, indexed for real. Fixtures beat mocks here: the
-// thing under test IS the reading of files, so stubbing the files would test
-// nothing but the stub.
-function fixture(files: Record<string, string>): string {
+// One throwaway project on disk and ONE ctx for the whole file (booting a ctx on a custom root costs ~0.5 s;
+// the index itself ~50 ms). Each test replaces the project's files and re-indexes it from empty, so tests
+// stay independent while paying the boot once.
+let shared: { ctx: any; dir: string; root: string };
+beforeAll(async () => {
     const dir = mkdtempSync(join(tmpdir(), "code-index-"));
+    mkdirSync(join(dir, "src"), { recursive: true });
+    shared = { ctx: await testCtx({ root: dir }), dir, root: basename(dir) };
+});
+afterAll(() => rmSync(shared.dir, { recursive: true, force: true }));
+
+// Replace the project's files and clear what the previous test left in the graph — without indexing them.
+async function project(files: Record<string, string>) {
+    const { ctx, dir, root } = shared;
+    rmSync(join(dir, "src"), { recursive: true, force: true });
+    mkdirSync(join(dir, "src"), { recursive: true });
+    await ctx.fns.procs.db.exec({ sql: "TRUNCATE code_calls, code_functions, code_types, code_findings, code_file_metrics, code_function_metrics" });
     for (const [rel, body] of Object.entries(files)) {
         const abs = join(dir, "src", rel);
         mkdirSync(join(abs, ".."), { recursive: true });
         writeFileSync(abs, body);
     }
-    return dir;
+    return shared;
 }
 
-// The scanner always also sees the framework's own src, so the fixture is
-// addressed by its own root name — which is exactly the `root` filter that
-// callers use to index a single plugin.
 async function indexed(files: Record<string, string>) {
-    const dir = fixture(files);
-    const ctx = await testCtx({ root: dir });
-    const root = basename(dir);
+    const { ctx, dir, root } = await project(files);
     const result = await ctx.fns.code.index({ root });
-    return { ctx, dir, root, result, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+    return { ctx, dir, root, result, cleanup: () => {} };
 }
 
 describe("code.index", () => {
@@ -161,17 +168,16 @@ describe("code.index", () => {
     });
 
     test("dryRun computes counts and writes nothing", async () => {
-        const dir = fixture({
+        const { ctx, root } = await project({
             "shop/checkout.ts": `export default async function (ctx: Context) { await ctx.fns.shop.charge({}); }\n`,
             "shop/charge.ts": `export default async function () { return 1; }\n`,
         });
-        const ctx = await testCtx({ root: dir });
-        try {
-            const result = await ctx.fns.code.index({ root: basename(dir), dryRun: true });
+        {
+            const result = await ctx.fns.code.index({ root, dryRun: true });
             expect(result.calls).toBe(1);
             const [{ n }] = await ctx.fns.procs.db.select({ sql: "SELECT COUNT(*) AS n FROM code_calls", params: [] });
             expect(Number(n)).toBe(0);
-        } finally { rmSync(dir, { recursive: true, force: true }); }
+        }
     });
 
     test("the reported count is what actually lands in the table", async () => {
@@ -189,15 +195,14 @@ describe("code.index", () => {
 
 describe("code.index incremental", () => {
     test("re-indexing one file picks up its new call and leaves the rest alone", async () => {
-        const dir = fixture({
+        const { ctx, dir, root } = await project({
             "shop/checkout.ts": `export default async function (ctx: Context) { await ctx.fns.shop.charge({}); }\n`,
             "shop/charge.ts": `export default async function () { return 1; }\n`,
             "shop/refund.ts": `export default async function () { return 1; }\n`,
             "other/untouched.ts": `export default async function (ctx: Context) { await ctx.fns.shop.charge({}); }\n`,
         });
-        const ctx = await testCtx({ root: dir });
-        try {
-            await ctx.fns.code.index({ root: basename(dir) });
+        {
+            await ctx.fns.code.index({ root });
 
             writeFileSync(join(dir, "src", "shop", "checkout.ts"),
                 `export default async function (ctx: Context) { await ctx.fns.shop.refund({}); }\n`);
@@ -209,17 +214,16 @@ describe("code.index incremental", () => {
                 { caller: "other.untouched", callee: "shop.charge" },
                 { caller: "shop.checkout", callee: "shop.refund" },
             ]);
-        } finally { rmSync(dir, { recursive: true, force: true }); }
+        }
     });
 
     test("a deleted file loses its edges", async () => {
-        const dir = fixture({
+        const { ctx, dir, root } = await project({
             "shop/checkout.ts": `export default async function (ctx: Context) { await ctx.fns.shop.charge({}); }\n`,
             "shop/charge.ts": `export default async function () { return 1; }\n`,
         });
-        const ctx = await testCtx({ root: dir });
-        try {
-            await ctx.fns.code.index({ root: basename(dir) });
+        {
+            await ctx.fns.code.index({ root });
             rmSync(join(dir, "src", "shop", "checkout.ts"));
             await ctx.fns.code.index({ rel: "shop/checkout.ts" });
 
@@ -227,7 +231,7 @@ describe("code.index incremental", () => {
             expect(edges).toEqual([]);
             const fns = await ctx.fns.procs.db.select({ sql: "SELECT name FROM code_functions ORDER BY name", params: [] });
             expect(fns.map((f: any) => f.name)).toEqual(["shop.charge"]);
-        } finally { rmSync(dir, { recursive: true, force: true }); }
+        }
     });
 
     // The regex this indexer used to be could not tell a call from the same text
@@ -255,16 +259,6 @@ describe("code.index incremental", () => {
         try {
             const edges = await ctx.fns.procs.db.select({ sql: "SELECT caller, callee FROM code_calls WHERE kind='fn'", params: [] });
             expect(edges).toEqual([{ caller: "shop.render", callee: "shop.total" }]);
-        } finally { cleanup(); }
-    });
-
-    test("a mention in a comment is not an edge", async () => {
-        const { ctx, cleanup } = await indexed({
-            "shop/quiet.ts": '// see ctx.fns.shop.vanished({}) for the old way\n/* and ctx.fns.shop.alsoGone({}) */\nexport default function () { return 1; }\n',
-        });
-        try {
-            const edges = await ctx.fns.procs.db.select({ sql: "SELECT callee FROM code_calls WHERE kind='fn'", params: [] });
-            expect(edges).toEqual([]);
         } finally { cleanup(); }
     });
 

@@ -16,7 +16,7 @@ describe('tools registry', () => {
         const ctx = await setup();
         const byName = Object.fromEntries(ctx.fns.tools.list({}).map((t: any) => [t.wireName, t]));
 
-        expect(Object.keys(byName).sort()).toEqual(['bash', 'edit', 'eval', 'find', 'grep', 'read', 'respondHtml', 'write']);
+        expect(Object.keys(byName).sort()).toEqual(['bash', 'create_goal', 'edit', 'eval', 'find', 'get_goal', 'grep', 'read', 'respondHtml', 'update_goal', 'write']);
         expect(byName.read.fn).toBe('tools.read');
         expect(byName.read.marker).toBe('read');
         expect(byName.read.parameters.required).toEqual(['path']);
@@ -27,12 +27,12 @@ describe('tools registry', () => {
     test('call runs the declared fn and reports failures as text, not exceptions', async () => {
         const ctx = await setup();
         expect(await ctx.fns.tools.call({ name: 'read', args: { path: 'x.ts', maxLines: 2 } }))
-            .toEqual({ output: 'a\nb', isError: false });
+            .toEqual({ output: 'a\nb', isError: false, handlerExecuted: true });
 
         const ok = await ctx.fns.tools.call({ name: 'edit', args: {
             path: 'a.ts', edits: [{ oldText: 'x', newText: 'y' }],
         } });
-        expect(ok).toEqual({ output: 'edited a.ts (12 bytes, 1 edit)', isError: false });
+        expect(ok).toEqual({ output: 'edited a.ts (12 bytes, 1 edit)', isError: false, handlerExecuted: true });
 
         // the text DSL is gone from the tool's surface: it is a marker detail
         const boom = await ctx.fns.tools.call({ name: 'edit', args: { script: '@a.ts' } });
@@ -47,13 +47,13 @@ describe('tools registry', () => {
         for (const value of values) {
             ctx.fns.tools.read = async () => value;
             expect(await ctx.fns.tools.call({ name: 'read', args: { path: 'unused' } }))
-                .toEqual({ output: JSON.stringify(value), isError: false });
+                .toEqual({ output: JSON.stringify(value), isError: false, handlerExecuted: true });
         }
         for (const value of [{ output: '', isError: false }, { output: 'failure', isError: true },
             { output: 'answer', terminal: { type: 'html', html: '<p>answer</p>', text: 'answer' } }]) {
             ctx.fns.tools.read = async () => value;
             expect(await ctx.fns.tools.call({ name: 'read', args: { path: 'unused' } }))
-                .toEqual({ isError: false, ...value });
+                .toEqual({ isError: false, handlerExecuted: true, ...value });
         }
     });
 
@@ -226,7 +226,7 @@ describe('bash options', () => {
             env: { TOKEN: 'ordinary' },
             secrets: { TOKEN: 'env://MAUZCODE_SECRET_TEST' },
         } });
-        expect(secret).toEqual({ output: '[REDACTED]', isError: false });
+        expect(secret).toEqual({ output: '[REDACTED]', isError: false, handlerExecuted: true });
         expect(secret.output).not.toContain('very-secret-value');
 
         const slow = await ctx.fns.tools.call({ name: 'bash', args: { command: 'echo starting; sleep 5', timeout: 1 } });

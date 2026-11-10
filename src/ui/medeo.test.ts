@@ -27,7 +27,7 @@ for (const name of names) test(`${name} is served from the installed package as 
 });
 
 test("only exact read-only font assets bypass sign-in", async () => {
-    const ctx: any = { fns: { h2: { redirect: () => null }, auth: { currentUser: async () => ({ required: true }) } } };
+    const ctx: any = { fns: { h2: { redirect: () => null }, frontendRuntime: { page: async () => undefined }, auth: { currentUser: async () => ({ required: true }) } } };
     for (const name of ["medeo.css", ...names]) {
         expect(await gate(ctx, null, { req: new Request(`http://localhost/ui/vendor/${name}`) })).toBeUndefined();
         const denied = await gate(ctx, null, { req: new Request(`http://localhost/ui/vendor/${name}`, { method: "POST" }) });
@@ -38,13 +38,11 @@ test("only exact read-only font assets bypass sign-in", async () => {
     }
 });
 
-test("app shell loads font faces explicitly and code editor uses the shared mono token", async () => {
+test("app shell loads font faces explicitly and code uses the shared mono token", async () => {
     const layout = await Bun.file(new URL("./layout.ts", import.meta.url)).text();
     expect(layout).toContain('<link rel="stylesheet" href="/ui/vendor/medeo.css">');
     const styles = await Bun.file(new URL("../procs/styles/$style_app.css", import.meta.url)).text();
     expect(styles).toContain('--font-sans: "Medeo Sans"');
     expect(styles).toContain('--font-mono: "Medeo Mono"');
     expect(styles).toContain("pre, code, kbd, samp { font-family: var(--font-mono); }");
-    const editor = await Bun.file(new URL("../files/$script_editor.js", import.meta.url)).text();
-    expect(editor).toContain('fontFamily: "var(--font-mono)"');
 });

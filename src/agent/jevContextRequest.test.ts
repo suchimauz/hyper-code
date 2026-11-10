@@ -1,14 +1,16 @@
 import {test,expect} from 'bun:test';
-import build from './buildLlmRequest';
+import buildRaw from './buildLlmRequest';
 import select from './selectJevContext';
 import repair from '../session/repairToolPairs';
+// Drop the request-only planning guidance tail (no planning_context row in these fixtures).
+const build=async(...a:Parameters<typeof buildRaw>)=>{const r=await buildRaw(...a);return {...r,messages:r.messages.filter((m:any)=>m.content!=='planning')};};
 function fixture(){
  const messages:any[]=[{role:'user',id:'u0',content:'Old request'}];
  for(let i=0;i<9;i++)messages.push({role:'assistant',tool_calls:[{id:'t'+i,name:'read'}]},{role:'tool',tool_call_id:'t'+i,content:'old public output '.repeat(100)});
  messages.push({role:'user',id:'u1',content:'Previous request'},{role:'user',id:'u2',content:'Explain a completely unrelated question in detail'});
  const agent:any={id:'test',model:'mock:test',scratchpad:{},messages,jevContextEnabled:true};
  const calls:any[]=[];
- const ctx:any={fns:{agent:{fullSystemPrompt:async()=>'',normalizeSleepContext:()=>null,selectJevContext:(o:any)=>select(ctx,null,o)},session:{repairToolPairs:(o:any)=>repair(ctx,null,o)},llm:{resolveEndpoint:async()=>({provider:'mock'})},auth:{attributeMessages:async(o:any)=>({...o,applied:false})},attachments:{resolveContent:async(o:any)=>o.messages},procs:{log:{warn:()=>{}}},jev:{decide:async(o:any)=>{calls.push(o);return {answers:Object.fromEntries(Object.keys(o.questions).map(k=>[k,{type:'noul',noul:0.01}])),usage:{inputTokens:1,outputTokens:1,cost:null}};}}}};
+ const ctx:any={fns:{agent:{fullSystemPrompt:async()=>'',normalizeSleepContext:()=>null,selectJevContext:(o:any)=>select(ctx,null,o)},session:{repairToolPairs:(o:any)=>repair(ctx,null,o)},llm:{resolveEndpoint:async()=>({provider:'mock'})},auth:{attributeMessages:async(o:any)=>({...o,applied:false})},attachments:{resolveContent:async(o:any)=>o.messages},procs:{log:{warn:()=>{}}},planning:{prompt:async()=>'planning'},compaction:{project:async(o:any)=>({messages:o.messages,mode:'full',fallback:null,revision:null})},jev:{decide:async(o:any)=>{calls.push(o);return {answers:Object.fromEntries(Object.keys(o.questions).map(k=>[k,{type:'noul',noul:0.01}])),usage:{inputTokens:1,outputTokens:1,cost:null}};}}}};
  return {ctx,agent,calls};
 }
 test('outgoing builder applies selection without touching transcript or tool pairs',async()=>{

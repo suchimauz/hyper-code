@@ -51,7 +51,7 @@ window.mauzcode=Object.freeze({get state(){return state},data:${json(data)},
 setState(patch){if(!patch||typeof patch!=='object')throw new Error('mauzcode.setState: pass an object');state=Object.fromEntries(Object.entries({...state,...patch}).filter(([,v])=>v!==null));send({type:'state',state:patch});},
 ping(text,data){send({type:'ping',text:String(text??''),data});},
 onState(fn){listeners.push(fn);}});
-addEventListener('message',e=>{if(e.source!==parent||!e.data||e.data.mauzcodeCanvas!==1||e.data.type!=='state')return;state=e.data.state||{};for(const fn of listeners){try{fn(state)}catch(err){console.error(err)}}});
+addEventListener('message',e=>{if(e.source!==parent||!e.data||e.data.mauzCodeCanvas!==1||e.data.type!=='state')return;state=e.data.state||{};for(const fn of listeners){try{fn(state)}catch(err){console.error(err)}}});
 addEventListener('error',e=>send({type:'error',message:String(e.message||e.error||'error')}));})();</script></head><body>`;
     return new Response(bridge + String(item.args.html ?? "") + "</body></html>", { headers });
 }

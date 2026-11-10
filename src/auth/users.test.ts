@@ -154,6 +154,8 @@ test("legacy session counts as signed in on /auth/session before the switch", as
 test("migration converges an older, stricter users table and is idempotent", async () => {
     const ctx = await mkTestCtx();
     const m = (ctx.state.procs.migrate.list as any[]).find((x) => x.id === "20320401000000_users");
+    // Later modules reference users (web push); drop those FKs in this throwaway schema so down() can run.
+    await ctx.fns.procs.db.exec({ sql: "ALTER TABLE IF EXISTS web_push_subscriptions DROP CONSTRAINT IF EXISTS web_push_subscriptions_owner_id_fkey; ALTER TABLE IF EXISTS web_push_preferences DROP CONSTRAINT IF EXISTS web_push_preferences_owner_id_fkey" });
     await m.down(ctx);
     // The shape an early draft left in a live database.
     await ctx.fns.procs.db.exec({ sql: `CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT NOT NULL,
@@ -161,6 +163,8 @@ test("migration converges an older, stricter users table and is idempotent", asy
         disabled_at BIGINT); CREATE UNIQUE INDEX users_email_lower_idx ON users (lower(email)); ALTER TABLE agents ADD COLUMN created_by TEXT;` });
     await m.up(ctx);
     await m.up(ctx);
+    // down() also removes auth_sessions (a later migration referencing users); restore the later auth migrations.
+    for (const x of (ctx.state.procs.migrate.list as any[]).filter((x) => /^2032040[23]\d+_/.test(x.id))) await x.up(ctx);
     const cols = await ctx.fns.procs.db.select({ sql: "SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name='users' AND table_schema = current_schema()" });
     const nullable = Object.fromEntries(cols.map((c: any) => [c.column_name, c.is_nullable]));
     expect(nullable.email).toBe("YES");

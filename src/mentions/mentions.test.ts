@@ -41,11 +41,6 @@ test("a person's @id in a message becomes an unread mention for them; opening th
     await ctx.fns.session.appendMessage({ id: agent.id, message: { role: "user", content: "## People\n@anna", message_type: "world_state", excluded_from_cursor: true } });
     expect(await ctx.fns.mentions.unreadCount({ userId: "anna" })).toBe(2);
 
-    // The global menu retains unread mentions and links after retiring the rail badge.
-    const menu = await (await get(anna, "/nav/items")).text();
-    expect(menu).toContain("Mentions · 2");
-    expect(menu).toContain(`/agent/${agent.id}#m-${reply.idx}`);
-
     // Opening the chat (markSeen) reads Anna's mentions there — and only hers.
     await ra.fns.auth.markSeen({ agentId: agent.id });
     expect(await ctx.fns.mentions.unreadCount({ userId: "anna" })).toBe(0);

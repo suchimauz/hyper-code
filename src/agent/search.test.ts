@@ -11,6 +11,6 @@ test("agent.search ranks title prefixes, supports ordered terms and hides compac
   expect(prefixHits.some((row: any) => row.id === hidden.id)).toBe(false);
   const ordered = await ctx.fns.agent.search({ query: "old network", limit: 10 });
   expect(ordered.some((row: any) => row.id === middle.id)).toBe(true);
-  const fuzzy = await ctx.fns.agent.search({ query: "hyprmesh", limit: 10 });
+  const fuzzy = await ctx.fns.agent.search({ query: "mauzcodmesh", limit: 10 });
   expect(fuzzy.some((row: any) => row.id === prefix.id)).toBe(true);
 });

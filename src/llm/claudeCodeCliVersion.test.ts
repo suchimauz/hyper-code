@@ -69,7 +69,11 @@ test('local deadline kills and reaps a stalled SSH probe', async () => {
         exited,
         kill: () => { if (!killed) { killed = true; controller.close(); finish(137); } },
     })) as any);
-    expect(await version(ctx, null, {instance:'a'})).toBe('2.1.260');
+    // Fire the 12 s local deadline immediately instead of waiting for it.
+    const realSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = ((fn: any, ms?: number, ...rest: any[]) => realSetTimeout(fn, ms === 12_000 ? 1 : ms, ...rest)) as any;
+    try { expect(await version(ctx, null, {instance:'a'})).toBe('2.1.260'); }
+    finally { globalThis.setTimeout = realSetTimeout; }
     expect(killed).toBe(true);
     expect(await exited).toBe(137);
 }, 15000);

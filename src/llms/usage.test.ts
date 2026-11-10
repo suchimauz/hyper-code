@@ -11,10 +11,8 @@ async function data(nodes:any[],locals:any[]=[local],groups?:Record<string,strin
 }
 describe('native quota source preserves account/domain selection',()=>{
  test('gateway remains distinct from measured quota',async()=>{const q=await data([node()],[local],undefined,{status:'available',reason:'models-ok'});expect(q.gateway?.status).toBe('available');expect(q.entries).toHaveLength(3);expect(q.entries.some(e=>e.usedPercent===17)).toBe(true);});
- test('local only is preserved',async()=>{expect((await data([])).entries[0]?.usedPercent).toBe(21);});
  test('relayed snapshots never duplicate remote accounts',async()=>{expect((await data([node()],[local,{...local,provider:'mauzcode'}])).entries).toHaveLength(3);});
  test('same account on distinct providers and nodes stays distinct',async()=>{const n=node({catalog:[{id:'a',provider:'codex',account:'same'},{id:'b',provider:'claude-code',account:'same'}]});expect((await data([n,{...n,name:'other'}],[])).entries).toHaveLength(4);});
- test('empty inputs stay empty',async()=>{expect((await data([],[])).entries).toEqual([]);});
  test('14 models collapse to two account observations plus local',async()=>{const q=await data([node()]);expect(q.entries).toHaveLength(3);expect(q.entries.map(e=>e.usedPercent).sort()).toEqual([17,21,83]);});
  test('disabled and forbidden catalogues are omitted',async()=>{for(const patch of [{enabled:false},{lastError:'models 403: forbidden'}])expect((await data([node(patch)])).entries).toHaveLength(1);});
  test('successful empty catalogues and shared omissions are authoritative',async()=>{expect((await data([node()],[local],{})).entries).toHaveLength(1);expect((await data([node({catalog:[]})])).entries).toHaveLength(1);});

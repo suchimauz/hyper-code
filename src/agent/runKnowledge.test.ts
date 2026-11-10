@@ -9,13 +9,14 @@ function harness(turns: any[], scratchpad: any = { knowledgeTrackingEnabled: tru
     const appendMessage = async ({ message }: any) => { const row = { ...message, idx: rows.length }; rows.push(row); return row; };
     const noop = async () => {};
     const ctx: any = { fns: {
+        input: { isWaiting: async () => false }, planning: { read: async () => ({ mode: 'execute' }) },
         goal: { delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) },
         session: { forAgent: () => ({}), appendUserMessage: ({ text }: any) => appendMessage({ message: { role: 'user', content: text } }), appendMessage,
             syncAgentState: async () => { agent.messages = rows.map(r => ({ ...r })); }, appendAssistantEvent: async () => ({idx: 0}), appendErrorEvent: noop, appendToolCallEvent: noop,
             updateMessageContent: async ({ idx, content }: any) => { rows[idx].content = content; }, recordContextUsage: noop },
-        agent: { recordRunLifecycle: async () => {}, autoCompactIfNeeded: async () => ({ status: 'not_needed' }), statusLineForTurn: async () => '', stashResult: async ({ output }: any) => ({ content: output }), sanitizeHtmlBody: ({ html }: any) => html },
-        procs: { events: { emit: () => {} }, db: { select: async () => [{ i: Math.max(-1, ...rows.filter(r => r.role === 'user').map(r => r.idx)) }] } },
-        llm: { stream: async () => { const turn = turns.shift(); if (turn instanceof Error) throw turn; return turn ?? { text: 'done' }; } },
+        agent: { recordRunLifecycle: async () => {}, retryWait: async () => {}, retrySchedule: async () => false, autoCompactIfNeeded: async () => ({ status: 'not_needed' }), statusLineForTurn: async () => '', stashResult: async ({ output }: any) => ({ content: output }), sanitizeHtmlBody: ({ html }: any) => html },
+        procs: { events: { emit: () => {} }, db: { select: async () => [{ i: Math.max(-1, ...rows.filter(r => r.role === 'user').map(r => r.idx)) }], run: async () => ({ changes: 1, rows: [] }) } },
+        llm: { resolveEndpoint: async () => ({ provider: 'fixture' }), classifyError: () => ({ kind: 'fatal', retryable: false }), stream: async () => { const turn = turns.shift(); if (turn instanceof Error) throw turn; return turn ?? { text: 'done' }; } },
         markdown: { render: async ({ source }: any) => source },
         tools: { call: async ({ name }: any) => ({ output: 'tool persisted', ...(name === 'respondHtml' ? { terminal: { type: 'html', html: '<p>final</p>', text: 'final' } } : {}) }) },
         knowledge: { updateSidecar: async (o: any) => { launches.push({ messageIdx: o.messageIdx, rows: rows.map(r => ({ ...r })) }); } },

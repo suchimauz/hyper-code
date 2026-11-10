@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 import refreshUsage from "./refreshUsage";
 import recordUsage from "./recordUsage";
-import quotaCards from "../llms/quotaCards";
 
 const NOW = 1_786_900_000_000;
 
@@ -34,8 +33,8 @@ describe("llm.refreshUsage", () => {
         expect(usage[0]).toMatchObject({ provider: "codex", account: "work", usedPercent: 42, planType: "pro", resetCredits: { availableCount: 3, credits: [{ id: "credit-1", resetType: "codex_rate_limits" }] } });
     });
 
-    test("Codex weekly-only primary stays weekly through refresh and quota rendering", async () => {
-        // Exercise the real parser, normalizer and renderer without booting the
+    test("Codex weekly-only primary stays weekly through refresh and persistence", async () => {
+        // Exercise the real parser and normalizer without booting the
         // full browser/Postgres test registry or making a provider request.
         const values = new Map<string, string>();
         const ctx: any = { fns: {
@@ -59,10 +58,6 @@ describe("llm.refreshUsage", () => {
         expect(result[0]?.status).toBe("refreshed");
         const snapshot = JSON.parse(values.get('llm:usage:codex:weekly')!);
         expect(snapshot.windows).toEqual({ primary: { usedPercent: 41, windowMinutes: 10080, resetsAt: NOW + 551897000 } });
-        const html = quotaCards(ctx, null, { account: { available: true, usedPercent: 41, resetsAt: null, windows: snapshot.windows } });
-        expect(html).toContain("Неделя");
-        expect(html).not.toContain("5 часов");
-        expect(html).not.toContain("Месяц");
     });
 
     test("fetches Claude OAuth usage and converts percentages for recordUsage", async () => {
@@ -113,7 +108,7 @@ describe("llm.refreshUsage", () => {
         const failed = await ctx.fns.llm.refreshUsage({ accounts: [{ provider: "codex", account: "bad" }, { provider: "kimi-coding", account: "default" }], now: NOW });
         expect(failed).toEqual([
             { provider: "codex", account: "bad", status: "failed", error: "Bearer [redacted] provider down" },
-            { provider: "kimi-coding", account: "default", status: "unsupported", error: null },
+            { provider: "kimi-coding", account: "default", status: "failed", error: "Kimi Coding credential is unavailable; reconnect the selected account" },
         ]);
         expect(calls).toBe(1);
     });

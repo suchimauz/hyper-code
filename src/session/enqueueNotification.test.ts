@@ -29,13 +29,12 @@ describe('session.enqueueNotification',()=>{
   expect((await ctx.fns.session.enqueueNotification(input)).duplicate).toBe(true);
   expect(await counts(ctx)).toEqual({messages:0,events:0,receipts:1,wake:null});
  });
- test('rollback on event insert and scheduling failure leaves no partial delivery',async()=>{
-  for(const fail of ['INSERT INTO events','UPDATE agents SET next_run_at']) {
+ // One test per injected failure: the test database is reset between tests, not between fixtures.
+ for(const fail of ['INSERT INTO events','UPDATE agents SET next_run_at']) test(`rollback on ${fail} failure leaves no partial delivery`,async()=>{
    const ctx=await fixture(), original=ctx.state.registry.procs.db.run;
    ctx.state.registry.procs.db.run=async(c:any,s:any,o:any)=>{if(o.sql.startsWith(fail))throw new Error('injected failure');return original(c,s,o);};
    await expect(ctx.fns.session.enqueueNotification(input)).rejects.toThrow('injected failure');
    expect(await counts(ctx)).toEqual({messages:0,events:0,receipts:0,wake:null});
-  }
  });
  test('concurrent duplicate keys return one delivery',async()=>{
   const ctx=await fixture();

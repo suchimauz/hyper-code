@@ -4,6 +4,7 @@ import transport from './opencodeFetch';
 import refresh from './refreshUsage';
 import record from './recordUsage';
 import overview from './usageOverview';
+import normalizeQuotaWindows from './normalizeQuotaWindows';
 const reset='2026-11-22T15:32:29.000Z';
 const body=()=>({usage:{rolling:{status:'ok',percent:12,resetsAt:reset},weekly:{status:'ok',percent:35,resetsAt:reset},monthly:{status:'ok',percent:67,resetsAt:reset}}});
 test('Go normalizes three used windows and never infers remaining as used',async()=>{
@@ -37,6 +38,7 @@ test('refreshUsage persists Go through the standard recorder and skips PAYG',asy
 test('three-window recorder and overview persist monthly worst and hide expired resets without database fixtures',async()=>{
  const now=Date.parse('2026-10-22T16:44:00Z');const kv=new Map<string,string>();
  const ctx:any={fns:{settings:{getNumber:async({fallback}:any)=>fallback},procs:{db:{select:async({sql,params}:any)=>sql.includes('LIKE')?[...kv].map(([key,value])=>({key,value})):kv.has(params[0])?[{value:kv.get(params[0])}]:[],run:async({params}:any)=>{kv.set(params[0],params[1]);}},events:{refresh:()=>{}}},ui:{notify:async()=>{}}}};
+ ctx.fns.llm={...ctx.fns.llm,normalizeQuotaWindows:(o:any)=>normalizeQuotaWindows(ctx,null,o)};
  const result=await record(ctx,null,{provider:'opencode',planType:'Go subscription',now,rateLimits:{primary:{used_percent:1,window_minutes:300,resets_at:(now+10000)/1000},secondary:{used_percent:5,window_minutes:10080,resets_at:(now+20000)/1000},tertiary:{used_percent:90,window_minutes:43200,resets_at:(now+30000)/1000}}});
  expect(result!.windows.tertiary!.usedPercent).toBe(90);
  expect((await overview(ctx,null,{now}))[0]).toMatchObject({usedPercent:90,resetsAt:now+30000,tone:'error'});

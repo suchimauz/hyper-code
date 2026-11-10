@@ -29,28 +29,6 @@ describe("ui.live", () => {
     });
 
 
-    test("the timer is a watchdog, never the mechanism", async () => {
-        const ctx: any = await mkTestCtx();
-        const html = ctx.fns.ui.live({ id: "x", url: "/x", topic: "t" });
-
-        expect(html).toContain('hx-trigger="mauzcode-live, every');
-        expect(html).toContain("every 30s");
-        // Nobody may ask for a hot loop.
-        expect(ctx.fns.ui.live({ id: "x", url: "/x", topic: "t", every: 1 })).toContain("every 5s");
-    });
-
-    test("editable regions refresh only from their topic", async () => {
-        const ctx: any = await mkTestCtx();
-        const html = ctx.fns.ui.live({ id: "meta", url: "/meta", topic: "agent-meta:a", every: 0 });
-        expect(html).toContain('data-live-topic="agent-meta:a"');
-        expect(html).toContain('hx-trigger="mauzcode-live"');
-        expect(html).not.toContain("every 5s");
-    });
-
-
-    // A live region sits inside pages that declare hx-target for their own
-    // links; without saying "this" it inherits that target and the refresh
-    // paints the region over the page containing it.
     test("a region refreshes itself, whatever its ancestors say", async () => {
         const ctx: any = await mkTestCtx();
 

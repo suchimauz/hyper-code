@@ -66,10 +66,15 @@ function runFixture(over=false) {
  const append=async({message}:any)=>{messages.push(message);return {idx:messages.length-1};};
  const ctx:any={fns:{
  procs:{db:{select:async()=>[{i:0}]},log:{warn:()=>{}},events:{emit:()=>{}}},
- session:{recordContextUsage:async({usage}:any)=>{usageSnapshots.push(usage);},forAgent:()=>null,appendUserMessage:async({text}:any)=>append({message:{role:'user',content:text}}),appendMessage:append,syncAgentState:async()=>{},appendAssistantEvent:async()=>{visibleReplies++;},appendErrorEvent:async()=>{},appendToolCallEvent:async()=>{},updateMessageContent:async({idx,content}:any)=>{messages[idx].content=content;}},
+ session:{recordContextUsage:async({usage}:any)=>{usageSnapshots.push(usage);},forAgent:()=>null,appendUserMessage:async({text}:any)=>append({message:{role:'user',content:text}}),appendMessage:append,syncAgentState:async()=>{},appendAssistantEvent:async()=>{visibleReplies++;return {idx:visibleReplies};},appendErrorEvent:async()=>{},appendToolCallEvent:async()=>{},updateMessageContent:async({idx,content}:any)=>{messages[idx].content=content;}},
  agent:{statusLineForTurn:async()=>'',stashResult:async({output}:any)=>({content:output}),autoCompactIfNeeded:async({checkOnly}:any)=>{if(!checkOnly)attempts++;expect(messages.filter(m=>m.role==='tool').every(m=>m.content==='done')).toBe(true);return {status:checkOnly?'over_threshold':'failed',estimatedTokens:over?195000:10000,contextWindow:200000};},stop:async()=>{stops++;agent.abortController.abort();}},
  markdown:{render:async({source}:any)=>source},tools:{call:async()=>{effects++;return {output:'done'};}},llm:{stream:async()=>{streams++;const usage={prompt_tokens:streams*1000,completion_tokens:100};return streams<=3?{text:'',usage,toolCalls:[{id:'c'+streams,name:'effect',args:{}}]}:{text:'finished',usage,toolCalls:[]};}}
  }};
+ // Current run lifecycle/goal/planning hooks: inert stubs (goal feature disabled, nothing waiting).
+ Object.assign(ctx.fns.agent,{recordRunLifecycle:async()=>{},contextBudget:async()=>null,wireTools:()=>[],syncWorldState:async()=>{},syncGoalContext:async()=>{},syncPlanningContext:async()=>{}});
+ ctx.fns.goal={runBindingCapture:async()=>({kind:'disabled'}),read:async()=>({enabled:false}),delegationScope:({fn}:any)=>fn()};
+ ctx.fns.input={isWaiting:async()=>false};ctx.fns.llm.resolveEndpoint=async()=>({provider:'test',api:'chat'});ctx.fns.llm.classifyError=({body}:any)=>{throw new Error('unexpected run error: '+body);};Object.assign(ctx.fns.agent,{retryWait:async()=>{},buildLlmRequest:async()=>({messages:[],system:''})});ctx.fns.procs.db.run=async()=>({});ctx.fns.planning={read:async()=>({mode:'execute'})};
+ ctx.fns.compaction={tokenizer:async()=>null,estimateTokens:async()=>0};ctx.fns.events={refreshAgentMeta:()=>{}};
  return {ctx,agent,usageSnapshots,visibleReplies:()=>visibleReplies,counts:()=>({attempts,effects,streams,stops})};
 }
 test('real run records every tool-only response without emitting empty assistant replies',async()=>{

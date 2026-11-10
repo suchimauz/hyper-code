@@ -62,16 +62,16 @@ test("Google sign-in is off by default; login page has no Google button", async 
     const ctx = await mkTestCtx({ env: { MAUZCODE_PASSWORD: "legacy-password" } });
     expect(await ctx.fns.auth.googleConfig({})).toBeNull();
     expect((await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/google" })).status).toBe(404);
-    const page = await (await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/login" })).text();
-    expect(page).not.toContain("Sign in with Google");
+    const page = await (await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/login", headers: { accept: "application/json" } })).json();
+    expect(page.google).toBeNull();
 });
 
 test("verified health-samurai.io account signs in, is created once, found by subject later", async () => {
     const ctx = await ctxWithGoogle();
     await ctx.fns.auth.createUser({ name: "Nikolai", email: "niquola@health-samurai.io", password: "password-123" });
-    const page = await (await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/login" })).text();
-    expect(page).toContain("Sign in with Google");
-    expect(page).toContain('name="password"'); // password stays available
+    const page = await (await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/login", headers: { accept: "application/json" } })).json();
+    expect(page.google).toEqual({ domain: "health-samurai.io" });
+    expect(page.showPassword).toBe(true); // password stays available
 
     const res = await googleLogin(ctx, (n) => good(n));
     expect(res.status).toBe(303);

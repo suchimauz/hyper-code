@@ -16,7 +16,7 @@ function harness() {
             recordContextUsage: async () => {},
             appendMessage: async ({ message }: any) => { const row = { ...message, idx: rows.length }; rows.push(row); return row; },
             appendUserMessage: async ({ text }: any) => { const row = { role: "user", content: text, idx: rows.length }; rows.push(row); return row; },
-            appendEvent: async ({ event }: any) => events.push(event), appendAssistantEvent: async () => {}, appendErrorEvent: async () => {},
+            appendEvent: async ({ event }: any) => events.push(event), appendAssistantEvent: async () => ({ idx: events.length }), appendErrorEvent: async () => {},
             syncAgentState: async ({ agent }: any) => { agent.messages = rows.map(row => ({ ...row })); return agent; },
             getFullMessages: async () => rows, getMessages: async () => rows,
         },
@@ -29,7 +29,9 @@ function harness() {
             return { changes: 1, rows: [] };
         } }, events: { emit: () => {}, refresh: () => {} }, ui: { escape: ({ text }: any) => text }, log: { warn: () => {} } },
         settings: { getNumber: async () => 0 }, attachments: { saveUploads: async () => [], commitUploads: async () => {}, resolveContent: async ({ messages }: any) => messages },
-        agent: { autoCompactIfNeeded: async () => ({ status: 'disabled', overBudget: false }), wakeWaiters: async () => {}, renderEventHtml: async () => "", wakeWorker: () => {}, statusLineForTurn: async () => "", buildLlmRequest: async () => ({ system: "", messages: agent.messages }), functionRag: async () => null, fullSystemPrompt: async () => "", cacheRoot: async () => "a", wireTools: () => [], stashResult: async ({ output }: any) => ({ content: output }) },
+        input: { isWaiting: async () => false },
+        goal: { delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) }, planning: { read: async () => ({ mode: 'execute' }) },
+        agent: { recordRunLifecycle: async () => {}, retryWait: async () => {}, retrySchedule: async () => false, sanitizeHtmlBody: ({ html }: any) => html, promoteQueuedTurn: async () => null, autoCompactIfNeeded: async () => ({ status: 'disabled', overBudget: false }), wakeWaiters: async () => {}, renderEventHtml: async () => "", wakeWorker: () => {}, statusLineForTurn: async () => "", buildLlmRequest: async () => ({ system: "", messages: agent.messages }), functionRag: async () => null, fullSystemPrompt: async () => "", cacheRoot: async () => "a", wireTools: () => [], stashResult: async ({ output }: any) => ({ content: output }) },
         llm: { stream: async ({ signal }: any) => { streamCalls++; if (streamCalls === 1) return await new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true })); return { text: "steered answer", usage: {}, finishReason: "stop", toolCalls: [] }; } },
         markdown: { render: async ({ source }: any) => source }, tools: { runs: () => [], call: async () => ({ output: "" }) }, events: { refreshAgentMeta: () => {} },
     } };

@@ -17,6 +17,8 @@ async function harness(){
  ctx.fns.sshInstance.get=async()=>({...item});ctx.fns.sshInstance.validate=(o:any)=>validate(ctx,null,o);
  ctx.fns.sshInstance.paths=async({id}:any)=>{const dir=root+'/'+id;await mkdir(dir,{recursive:true,mode:0o700});return {dir,key:dir+'/identity',knownHosts:dir+'/known_hosts',socket:dir+'/cm'};};
  ctx.fns.sshInstance.replaceDescriptor=(o:any)=>replaceDescriptor(ctx,null,o);
+ // Credential guard is covered by sshProvider/removalGuard.test.ts; here it only runs the work.
+ ctx.fns.codexTunnel={mutationRun:async(o:any)=>o.work()};
  const old={...item};const p=await ctx.fns.sshInstance.paths({id:item.id});await writeFile(p.key,'fake private identity',{mode:0o600});await writeFile(p.knownHosts,'old pin');
  return {ctx,root,old,p,pin,queries,get item(){return item;},get accounts(){return accounts;},stale:()=>stale=true,deny:()=>denied=true,clean:()=>rm(root,{recursive:true,force:true})};
 }

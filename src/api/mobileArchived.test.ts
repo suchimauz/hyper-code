@@ -1,13 +1,12 @@
 import { expect, test } from 'bun:test';
 import message from './$route_v1_agents_$id_messages_POST';
 import model from './$route_v1_agents_$id_model_POST';
-import compact from './$route_v1_agents_$id_compact_POST';
 import inject from './$route_v1_agents_$id_inject_POST';
 import effort from '../agent/$route_$id_effort_POST';
 import detail from './$route_v1_agents_$id_GET';
 import events from './$route_v1_agents_$id_events_GET';
 
-for (const [name, route] of Object.entries({message,model,compact,inject,effort})) {
+for (const [name, route] of Object.entries({message,model,inject,effort})) {
  test(`${name} rejects archived chat before reading body or mutating`,async()=>{
   const ctx:any={state:{agent:{ab:{id:'ab'}}},fns:{procs:{db:{select:async()=>[{archived_at:123}]}}}};
   const req=new Request('http://localhost/',{method:'POST',body:'invalid body'});

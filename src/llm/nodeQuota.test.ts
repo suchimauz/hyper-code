@@ -16,7 +16,7 @@ function fixture(entries = catalog) {
     ];
     const ctx: any = { state: { agent: {} }, fns: {
         node: { get: async () => ({ enabled: true, url: "https://node.test", catalog: entries }), token: async () => "fake" },
-        procs: { db: { select: async () => rows, run: async () => {} } },
+        procs: { db: { select: async () => rows, run: async () => ({ changes: 1 }) } },
         session: { mutateScratchpad: async ({mutate}: any) => { const scratchpad = {}; mutate(scratchpad); return {scratchpad}; }, appendEvent: async () => {} },
         events: { refreshAgentMeta: () => {} }, ui: { notify: async () => {} },
         llm: { recordUsage: async () => {} },

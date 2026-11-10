@@ -3,8 +3,6 @@ import remove from './remove';
 import lease from './lease';
 import registry from '../sshAccount/registry';
 import removeAccount from '../llm/removeAccount';
-import confirm from '../llms/confirmRemoveAccount';
-import popup from '../llms/removeAccount';
 import activate from './activate';
 import dispatch from './dispatch';
 
@@ -20,10 +18,9 @@ function fixture(){
  ctx.fns.settings={remove:async()=>{if(fail)throw Error('db failure');metadata=false},set:async()=>{throw Error('list wrote')}};
  ctx.fns.procs={db:{transaction:async({fn}:any)=>{const before=structuredClone(records),meta=metadata;try{return await fn()}catch(e){records=before;metadata=meta;throw e}},run:async()=>({}),select:async()=>metadata?[{value:{...d,status:'pending',updatedAt:0}}]:[]},events:{refresh:()=>{}},ui:{escape:({text}:any)=>Bun.escapeHTML(text)}};
  ctx.fns.llm={accountUsers:async()=>[],removeAccount:(o:any)=>removeAccount(ctx,null,o)};
- ctx.fns.ui={popupContent:async(o:any)=>o.html};ctx.fns.llms={popupButton:()=>'<button>Confirm</button>'};
  return {ctx,d,records:()=>records,metadata:()=>metadata,fail:()=>fail=true,deny:()=>denied=true,reads:()=>reads};
 }
-test('UI confirmation is read-only; confirmed removal uses registry and tombstones only selected local slots',async()=>{const f=fixture(),o={provider:'codex' as const,account:'ssh.any-host.any-slot'};const html=await popup(f.ctx,null,o);expect(html).toContain('llms.confirmRemoveAccount');expect(html).toContain('Remote CLI credentials stay');expect(f.reads()).toBe(0);await confirm(f.ctx,null,o);expect(f.metadata()).toBe(false);for(const key of ['current','old']){expect(f.records().get(key).value.mode).toBe('removed');expect(f.records().get(key).value.tokens).toBeUndefined()}expect(f.records().get('unrelated').value.mode).toBe('socks');});
+test('account removal uses registry and tombstones only selected local slots',async()=>{const f=fixture(),o={provider:'codex' as const,account:'ssh.any-host.any-slot'};await removeAccount(f.ctx,null,o);expect(f.metadata()).toBe(false);for(const key of ['current','old']){expect(f.records().get(key).value.mode).toBe('removed');expect(f.records().get(key).value.tokens).toBeUndefined()}expect(f.records().get('unrelated').value.mode).toBe('socks');});
 test('cross-owner removal fails before credentials are read',async()=>{const f=fixture();f.deny();await expect(registry(f.ctx,null,{action:'remove',...f.d} as any)).rejects.toThrow('Owner');expect(f.reads()).toBe(0);expect(f.metadata()).toBe(true)});
 test('binding mismatch rolls back tombstones and metadata',async()=>{const f=fixture();f.records().get('old').value.owner='another';await expect(remove(f.ctx,null,f.d)).rejects.toThrow('binding');expect(f.records().get('current').value.mode).toBe('socks');expect(f.metadata()).toBe(true)});
 test('metadata deletion failure rolls back both credential writes',async()=>{const f=fixture();f.fail();await expect(remove(f.ctx,null,f.d)).rejects.toThrow('db failure');expect(f.records().get('old').value.tokens.refresh).toBe('synthetic-old');expect(f.records().get('current').value.mode).toBe('socks');expect(f.metadata()).toBe(true)});

@@ -22,15 +22,4 @@ describe("session.searchBm25", () => {
         expect(onlyB[0]!.agentId).toBe(b.id);
         expect(await ctx.fns.session.searchBm25({ q: "giraffe", agentId: a.id })).toEqual([]);
     });
-
-    test("GET /search renders hits", async () => {
-        const ctx = await mkTestCtx();
-        const a = await ctx.fns.agent.start({ model: "mock:echo" });
-        await ctx.fns.session.appendMessage({ id: a.id, message: { role: "user", content: "pelican in the harbor" } });
-        const res = await ctx.fns.procs.http.dispatch({ url: "/search?q=pelican" });
-        expect(res.status).toBe(200);
-        const html = await res.text();
-        expect(html).toContain("pelican");
-        expect(html).toContain(`/agent/${a.id}`);
-    });
 });

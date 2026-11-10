@@ -1,14 +1,32 @@
 import { describe, expect, test } from "bun:test";
 import { mkTestCtx } from "../_testCtx.entry";
 
+// Production polls launch background work; await each claim before inspecting
+// state or resetting the shared test database for the next case.
+async function poll(ctx: any, now: number) {
+  const pending: Promise<any>[] = [];
+  const original = ctx.fns.agent.processTrigger;
+  ctx.fns.agent.processTrigger = (_c: any, _s: any, opts: any) => {
+    const work = original(opts);
+    pending.push(work);
+    return work;
+  };
+  try {
+    await ctx.fns.agent.pollTriggers({ now });
+    await Promise.all(pending);
+  } finally {
+    ctx.fns.agent.processTrigger = (_c: any, _s: any, opts: any) => original(opts);
+  }
+}
+
 describe("agent durable triggers", () => {
   test("wake fires once into the same conversation", async () => {
     const ctx: any = await mkTestCtx();
     const agent = await ctx.fns.agent.start({ model: "mock:test" });
     const made = await ctx.fns.agent.wake({ id: agent.id, inMs: 1000, prompt: "Continue later" });
     expect(made.id).toStartWith("tr_");
-    await ctx.fns.agent.pollTriggers({ now: made.nextAt + 1 });
-    await Bun.sleep(30);
+    await poll(ctx, made.nextAt + 1);
+   
     const rows = await ctx.fns.agent.triggers({ id: agent.id, status: "all" });
     expect(rows[0].status).toBe("completed");
     const messages = await ctx.fns.session.getMessages({ id: agent.id });
@@ -19,8 +37,8 @@ describe("agent durable triggers", () => {
     const ctx: any = await mkTestCtx();
     const agent = await ctx.fns.agent.start({ model: "mock:test" });
     const made = await ctx.fns.agent.cron({ id: agent.id, expression: "* * * * *", timezone: "UTC", prompt: "Tick" });
-    await ctx.fns.agent.pollTriggers({ now: made.nextAt + 1 });
-    await Bun.sleep(30);
+    await poll(ctx, made.nextAt + 1);
+   
     const active = await ctx.fns.agent.triggers({ id: agent.id });
     expect(Number(active[0].nextAt)).toBeGreaterThan(made.nextAt);
     expect((await ctx.fns.agent.cancelAllTriggers({ id: agent.id })).cancelled).toBe(1);
@@ -31,14 +49,14 @@ describe("agent durable triggers", () => {
     const agent = await ctx.fns.agent.start({ model: "mock:test" });
     const marker = `.mauzcode/tmp/trigger-test-${crypto.randomUUID()}`;
     const made = await ctx.fns.agent.watch({ id: agent.id, predicate: "file.exists", opts: { path: marker }, prompt: "File ready", everyMs: 5000, mode: "edge" });
-    await ctx.fns.agent.pollTriggers({ now: made.nextAt }); await Bun.sleep(30);
+    await poll(ctx, made.nextAt);
     await ctx.fns.files.write({ path: marker, content: "ok" });
     let row = (await ctx.fns.agent.triggers({ id: agent.id }))[0];
-    await ctx.fns.agent.pollTriggers({ now: Number(row.nextAt) + 1 }); await Bun.sleep(30);
+    await poll(ctx, Number(row.nextAt) + 1);
     let messages = await ctx.fns.session.getMessages({ id: agent.id });
     expect(messages.filter((m: any) => m.content === "File ready")).toHaveLength(1);
     row = (await ctx.fns.agent.triggers({ id: agent.id }))[0];
-    await ctx.fns.agent.pollTriggers({ now: Number(row.nextAt) + 1 }); await Bun.sleep(30);
+    await poll(ctx, Number(row.nextAt) + 1);
     messages = await ctx.fns.session.getMessages({ id: agent.id });
     expect(messages.filter((m: any) => m.content === "File ready")).toHaveLength(1);
     await ctx.fns.files.remove({ path: marker });
@@ -49,7 +67,7 @@ describe("agent durable triggers", () => {
     const agent = await ctx.fns.agent.start({ model: "mock:test" });
     const made = await ctx.fns.agent.wake({ id: agent.id, inMs: 1000, prompt: "Never" });
     expect((await ctx.fns.agent.cancelTrigger({ id: agent.id, triggerId: made.id })).cancelled).toBe(true);
-    await ctx.fns.agent.pollTriggers({ now: made.nextAt + 1 }); await Bun.sleep(20);
+    await poll(ctx, made.nextAt + 1);
     expect((await ctx.fns.session.getMessages({ id: agent.id })).some((m: any) => m.content === "Never")).toBe(false);
   });
 });

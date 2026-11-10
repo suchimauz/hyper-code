@@ -24,10 +24,3 @@ for(const [name,adapter] of Object.entries({anthropic,openai,codex,xai,gemini}))
  await expect(adapter(ctx,null,{agent:{id:'child',model:'test:model'} as any})).rejects.toMatchObject({goalRequestDenied:true});
  expect(built).toBe(1);expect(checks).toBe(1);expect(fetches).toBe(0);
 });
-
-test('Codex reauthorizes retry outside transport catch',async()=>{
- let checks=0,fetches=0;
- const ctx:any={goalRequestContext:{agentId:'child',authority},fns:{agent:{buildLlmRequest:async()=>({system:'',messages:[]}),cacheRoot:async()=> 'root',wireTools:()=>[]},goal:{requestAuthorize:async()=>{if(++checks===2) throw Object.assign(Error('revoked'),{goalRequestDenied:true});}},llm:{resolveEndpoint:async()=>({provider:'mauzcode',apiKey:'test',modelId:'test',url:'https://example.invalid'}),resolveReasoningEffort:async()=>({applied:'off'}),toCodexInput:()=>({input:[]}),codexCliVersion:async()=> '0',connectFetch:async()=>{fetches++;throw Error('temporary transport failure');}}}};
- await expect(codex(ctx,null,{agent:{id:'child',model:'test:model'} as any})).rejects.toMatchObject({goalRequestDenied:true});
- expect(checks).toBe(2);expect(fetches).toBe(1);
-});

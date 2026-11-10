@@ -14,7 +14,7 @@ test('weighted decode TPS, cache ratio and partial history coverage', async () =
  const ctx:any={fns:{procs:{db:{select:async()=>rows}}}};
  const r=await details(ctx,null,{agentId:'x'});
  expect(r.session).toEqual({llmTimeMs:7000,toolTimeMs:250,avgTtftMs:1000,tokensPerSecond:20});
- expect(r.usage).toEqual({requests:3,inputTokens:310,outputTokens:105,cachedInputTokens:180,uncachedInputTokens:120,cacheHitRatio:0.6,cacheWriteTokens:0});
+ expect(r.usage).toEqual({requests:3,inputTokens:310,outputTokens:105,cachedInputTokens:180,uncachedInputTokens:120,cacheHitRatio:0.6,cacheWriteTokens:0,costUsd:null,price:null});
  expect(r.coverage).toEqual({requests:3,tokenRequests:3,timedRequests:2,ttftRequests:2,cacheRequests:2,tools:2,timedTools:1});
 });
 test('persists real zero cache and timing, absent cache remains unknown',async()=>{
