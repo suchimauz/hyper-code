@@ -52,7 +52,7 @@ export function PlanningPanel({ state, busy = false, running, readOnly = false, 
         </div>
         <div className="planning-panel__actions" aria-describedby={reason ? `${id}-reason` : undefined}>
           <Button variant="primary" disabled={disabled} onClick={() => onDecision('approve')}>Начать реализацию</Button>
-          <Button disabled={disabled} onClick={() => onDecision('keep')}>Продолжить обсуждение</Button>
+          <Button disabled={disabled} onClick={() => onDecision('keep')}>Уточнить план</Button>
         </div>
       </> : state.proposal && <p className="planning-panel__previous">{state.proposal.status === 'approved' ? 'Предыдущий план одобрен.' : 'Продолжаем обсуждение плана.'}</p>}
     </section>

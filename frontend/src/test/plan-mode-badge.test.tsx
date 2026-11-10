@@ -39,6 +39,6 @@ it('retains both real proposal review actions while the footer shows Plan', asyn
   vi.stubGlobal('fetch', vi.fn(async (url: string) => json(url.endsWith('/planning') ? { ...state, proposal: { id: 'p', inputId: 'i', plan: 'Real plan', status: 'pending', createdAt: 1 } } : { budget: null })));
   render(ui());
   expect(await screen.findByRole('button', { name: 'Начать реализацию' })).toBeEnabled();
-  expect(screen.getByRole('button', { name: 'Продолжить обсуждение' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Уточнить план' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Plan — выйти из режима планирования' })).toBeEnabled();
 });

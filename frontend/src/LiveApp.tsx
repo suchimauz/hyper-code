@@ -24,7 +24,7 @@ import { readWorkspaceView, workspaceViewProjects } from './lib/workspaceView';
 import { persistNewSessionDraft, readNewSessionDraft, readSessionSelection, rememberSessionSelection, resolveNewSessionProject, type NewSessionDraft } from './lib/newSession';
 import { CanvasPanel } from './components/hyper/CanvasPanel';
 import { QuestionHistoryContext } from './components/hyper/QuestionHistory';
-import type { ChoiceInput } from './lib/questions';
+import type { HistoryInput } from './lib/history';
 import { SettingsDialog, type SettingsTab } from './components/settings/SettingsDialog';
 import { SecureInputDialog } from './components/SecureInputDialog';
 import { AutomationTasks } from './components/hyper/AutomationTasks';
@@ -44,7 +44,7 @@ export function LiveApp() {
   const installedExtensions = pluginUi.registry;
   useEffect(() => { pluginRuntime.start(); }, []);
   const hyper = useHyper();
-  const [historyInputs, setHistoryInputs] = useState<ChoiceInput[]>([]);
+  const [historyInputs, setHistoryInputs] = useState<HistoryInput[]>([]);
   const { theme, themeMode, setTheme } = useTheme();
   const navigation = useNavigation();
   const quotas = useQuotas();
@@ -193,7 +193,7 @@ export function LiveApp() {
     <fieldset disabled={archived} inert={archived} className={`chat-readonly-boundary ${archived ? 'is-archived' : ''}`} aria-label={archived ? 'Архивный разговор — только чтение' : undefined} onClickCapture={event => { if (archived && (event.target as Element).closest('button,a,input,select,textarea')) { event.preventDefault(); event.stopPropagation(); } }}>
     {isNewSession ? <NewSessionWelcome userName={navigation.user?.name || ''} /> : hyper.loading ? <div className="chat-scroll" role="status">Загружаем разговор…</div> : hyper.selected && <QuestionHistoryContext.Provider value={historyInputs.filter(input => input.agentId === hyper.selected)}><Transcript key={hyper.selected} agentId={hyper.selected} events={hyper.events} page={hyper.page} hasOlder={hyper.hasOlder} loadingOlder={hyper.loadingOlder} loadOlder={hyper.loadOlder} outline={hyper.outline} loadThrough={hyper.loadThrough} /></QuestionHistoryContext.Provider>}
     </fieldset>
-    <div className="chat-bottom">{isNewSession ? <NewSessionComposer draft={draft} onChange={updateDraft} projects={navigation.projects} onCreated={created} onPending={setDraftPending} /> : hyper.selected && !hyper.loading && hyper.page && <ConnectedQuestionCard key={`questions:${hyper.selected}`} agentId={hyper.selected} readOnly={readOnly} onAccepted={hyper.refresh} onInputs={setHistoryInputs} mascot={<CrabMascot page={hyper.page} />}><ConnectedPlanningPanel key={`planning:${hyper.selected}`} agentId={hyper.selected} running={!!hyper.page.isRunning} readOnly={readOnly} onAccepted={hyper.refresh}>{planningBadge => <LiveComposer key={hyper.selected!} readOnly={readOnly} agentId={hyper.selected!} running={!!hyper.page?.isRunning} onAccepted={hyper.refresh} planningBadge={planningBadge} />}</ConnectedPlanningPanel></ConnectedQuestionCard>}</div>
+    <div className="chat-bottom">{isNewSession ? <NewSessionComposer draft={draft} onChange={updateDraft} projects={navigation.projects} onCreated={created} onPending={setDraftPending} /> : hyper.selected && !hyper.loading && hyper.page && <ConnectedQuestionCard key={`questions:${hyper.selected}`} agentId={hyper.selected} readOnly={readOnly} onAccepted={hyper.refresh} onInputs={setHistoryInputs} mascot={<CrabMascot page={hyper.page} />}><ConnectedPlanningPanel key={`planning:${hyper.selected}`} agentId={hyper.selected} running={!!hyper.page.isRunning} readOnly={readOnly} onAccepted={hyper.refresh}>{(planningBadge, reviewPending, focusRequest) => <><LiveComposer focusRequest={focusRequest} key={hyper.selected!} readOnly={readOnly || reviewPending} agentId={hyper.selected!} running={!!hyper.page?.isRunning} onAccepted={hyper.refresh} planningBadge={planningBadge} />{reviewPending && <p className="transcript-notice" role="status">Сначала примите решение в карточке плана — после этого ввод станет доступен.</p>}</>}</ConnectedPlanningPanel></ConnectedQuestionCard>}</div>
     </ChatViewport>
   </section>;
   return <><div className={embedded ? 'embedded-chat-marker' : ''} hidden /><div hidden data-live-topic="agents" /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}` : 'agents'} /><div hidden data-live-topic={hyper.selected ? `agent:${hyper.selected}:stream` : 'agents'} />

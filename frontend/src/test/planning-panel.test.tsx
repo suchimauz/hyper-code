@@ -26,7 +26,7 @@ it('renders the complete safe Markdown proposal and a persistent advisory indica
 it('emits decisions and exit without mutating the controlled proposal', async () => {
   const p = props(); render(<PlanningPanel {...p} />); const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: 'Начать реализацию' }));
-  await user.click(screen.getByRole('button', { name: 'Продолжить обсуждение' }));
+  await user.click(screen.getByRole('button', { name: 'Уточнить план' }));
   await user.click(screen.getByRole('button', { name: 'Выйти из Plan mode' }));
   expect(p.onDecision).toHaveBeenNthCalledWith(1, 'approve');
   expect(p.onDecision).toHaveBeenNthCalledWith(2, 'keep');

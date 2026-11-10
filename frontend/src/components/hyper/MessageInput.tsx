@@ -8,15 +8,23 @@ import { InputCaret } from './InputCaret';
 
 export type MessageInputProps = {
   value: string; onChange: (value: string) => void; onSend: () => void;
+  focusRequest?: number;
   disabled?: boolean; sendDisabled?: boolean; running?: boolean; onStop?: () => void; onSteerAll?: () => void;
   commandMenuOpen?: boolean; onCommandMenuClose?: () => void; onFile?: () => void; onCompact?: () => void;
   placeholder?: string; hasAttachments?: boolean; attachments?: ReactNode; onFiles?: (files: File[]) => void; commandsEnabled?: boolean;
 };
 /** One-line controlled input; grows for wrapped lines, then scrolls at 180px. */
-export function MessageInput({ commandMenuOpen, onCommandMenuClose, onFile, onCompact, value, onChange, onSend, disabled, sendDisabled = false, running, onStop, onSteerAll, hasAttachments = false, attachments, onFiles, commandsEnabled = false, placeholder = 'Напишите сообщение…' }: MessageInputProps) {
+export function MessageInput({ focusRequest = 0, commandMenuOpen, onCommandMenuClose, onFile, onCompact, value, onChange, onSend, disabled, sendDisabled = false, running, onStop, onSteerAll, hasAttachments = false, attachments, onFiles, commandsEnabled = false, placeholder = 'Напишите сообщение…' }: MessageInputProps) {
   const input = useRef<HTMLTextAreaElement>(null);
   const menuId = useId();
   const editor = useRef<CommandEditorHandle>(null);
+  const appliedFocus = useRef(0);
+  useLayoutEffect(() => {
+    if (!disabled && focusRequest > appliedFocus.current) {
+      if (commandsEnabled) editor.current?.focus(); else input.current?.focus({ preventScroll: true });
+      appliedFocus.current = focusRequest;
+    }
+  }, [focusRequest, disabled, commandsEnabled]);
   const [claimed, setClaimed] = useState<{ name: string } | null>(null);
   useLayoutEffect(() => { if (!value) setClaimed(null); }, [value]);
   // Touch: opening the + menu must not raise the on-screen keyboard.

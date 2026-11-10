@@ -5,11 +5,12 @@ import { executeCommand, notifyPlanningChanged } from '../../lib/commands';
 import { PlanModeBadge } from './PlanModeBadge';
 
 /** Server-owned state: refresh after commands, run changes, focus and bounded visible-tab polling. */
-export function ConnectedPlanningPanel({ agentId, running, readOnly, onAccepted, children }: { agentId: string; running: boolean; readOnly: boolean; onAccepted: () => void; children?: (badge: ReactNode) => ReactNode }) {
+export function ConnectedPlanningPanel({ agentId, running, readOnly, onAccepted, children }: { agentId: string; running: boolean; readOnly: boolean; onAccepted: () => void; children?: (badge: ReactNode, reviewPending: boolean, focusRequest: number) => ReactNode }) {
   const [state, setState] = useState<PlanningState | null>(null);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [focusRequest, setFocusRequest] = useState(0);
   const [revision, setRevision] = useState(0);
   const lock = useRef(false);
   const generation = useRef(0);
@@ -39,6 +40,7 @@ export function ConnectedPlanningPanel({ agentId, running, readOnly, onAccepted,
         const result = await reviewPlan(agentId, state, decision);
         if (result.planning?.mode) setState({ ...state, ...result.planning, csrfToken: state.csrfToken });
       }
+      if (decision === 'keep') setFocusRequest(value => value + 1);
       onAccepted();
       try { setState(await getPlanning(agentId)); }
       catch (reason) { setError(`Решение принято, но состояние не обновилось: ${reason instanceof Error ? reason.message : String(reason)}`); }
@@ -47,5 +49,5 @@ export function ConnectedPlanningPanel({ agentId, running, readOnly, onAccepted,
   };
   const badge = state?.mode === 'plan' ? <PlanModeBadge disabled={busy || running || readOnly} busy={busy} onExit={() => { void decide('exit'); }} /> : null;
   return <>{state && <PlanningPanel state={state} running={running} busy={busy} readOnly={readOnly} onDecision={decision => { void decide(decision); }} onExit={() => { void decide('exit'); }} />}
-    {(error || actionError) && <p className="connection-error" role="alert">Режим планирования: {actionError || error} <button type="button" className="button button--ghost" disabled={busy} onClick={() => setRevision(n => n + 1)}>Обновить</button></p>}{children ? children(badge) : badge}</>;
+    {(error || actionError) && <p className="connection-error" role="alert">Режим планирования: {actionError || error} <button type="button" className="button button--ghost" disabled={busy} onClick={() => setRevision(n => n + 1)}>Обновить</button></p>}{children ? children(badge, state?.proposal?.status === 'pending', focusRequest) : badge}</>;
 }

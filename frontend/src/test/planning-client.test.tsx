@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConnectedPlanningPanel } from '../components/hyper/ConnectedPlanningPanel';
+import { MessageInput } from '../components/hyper/MessageInput';
 import { getPlanning, reviewPlan, type PlanningState } from '../lib/planning';
 const state: PlanningState = { version: 1, agentId: 'a', mode: 'plan', revision: 7, scope: 'session', advisory: true, runningPolicy: 'reject', csrfToken: 'token', proposal: { id: 'p1', inputId: 'i1', plan: '# Проверить проект\n\nИзучить файлы.', status: 'pending', createdAt: 1 } };
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -63,4 +64,21 @@ it('uses a successful decision response when the follow-up GET fails', async () 
   await waitFor(() => expect(accepted).toHaveBeenCalledOnce());
   expect(screen.queryByRole('button', { name: 'Начать реализацию' })).toBeNull();
   expect(await screen.findByRole('alert')).toHaveTextContent('network offline');
+});
+
+it.each(['approve', 'keep'] as const)('locks composer during review and unlocks after %s without losing draft', async decision => {
+  let resolved = false;
+  const current = () => resolved ? { ...state, mode: decision === 'approve' ? 'execute' : 'plan', proposal: { ...state.proposal!, status: decision === 'approve' ? 'approved' : 'kept' } } : state;
+  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') { resolved = true; return json({ ok: true, planning: current() }); }
+    return json(current());
+  }));
+  render(<ConnectedPlanningPanel agentId="a" running={false} readOnly={false} onAccepted={vi.fn()}>{(_badge, pending, focusRequest) => <MessageInput commandsEnabled focusRequest={focusRequest} disabled={pending} value="Сохранённый черновик" onChange={vi.fn()} onSend={vi.fn()} />}</ConnectedPlanningPanel>);
+  const draft = screen.getByRole('textbox', { name: 'Сообщение агенту' });
+  await waitFor(() => expect(draft).toHaveAttribute('contenteditable', 'false'));
+  await userEvent.click(screen.getByRole('button', { name: decision === 'approve' ? 'Начать реализацию' : 'Уточнить план' }));
+  await waitFor(() => expect(draft).toHaveAttribute('contenteditable', 'true'));
+  expect(draft).toHaveTextContent('Сохранённый черновик');
+  if (decision === 'keep') await waitFor(() => expect(draft).toHaveFocus());
+  else expect(draft).not.toHaveFocus();
 });
