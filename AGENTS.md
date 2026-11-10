@@ -18,9 +18,10 @@ This rule is scoped to the **product being edited**, not the agent's host: other
 - **Bun, not Node.js.** Use `bun`, `bun test`, `bun install`, `bunx`, `bun build`. `.env` loads automatically.
 - Prefer Bun built-ins over npm packages: `Bun.serve()`, `Bun.file()`, `Bun.write()`, `Bun.$` shell, `Bun.Glob`, `Bun.spawn`, `bun:sqlite`, `Bun.markdown.html`, etc.
 - Tests: `bun:test`. Filename must match `*.test.ts` for auto-discovery.
-- **Requires `ripgrep`** (`brew install ripgrep`): `ctx.fns.files.grep` spawns `rg --json` for
-  .gitignore-aware search. Without it grep falls back to an in-process scan and says so, loudly,
-  in every result — so a missing `rg` is visible to the agent and the user rather than silent.
+- Prefer `rg` for text search and `rg --files -g '<glob>'` for file discovery through bash. Scope searches to the relevant directory, preserve ignore rules by default, and bound output; avoid broad shell `find` walks. Use the structured grep/find tools when their options or hashline edit anchors are useful.
+- Prefer `jq` to select, filter and summarize JSON in shell pipelines before returning it to the model. Do not dump large JSON blobs or parse JSON with grep/sed.
+- If `rg` or `jq` is unavailable on the execution host, use the grep/find tools or Bun/Node/Python JSON parsing instead. Check `command -v` when needed; do not repeatedly retry a missing command or install software without permission. `rg` exit 1 means no matches, not a missing command.
+- The structured `ctx.fns.files.grep` tool uses `rg --json` for .gitignore-aware search when available; without it, it reports that it is using an in-process fallback. This is separate from shell commands: bash does not automatically substitute missing `rg` or `jq`.
 
 ## The procs contract (calling convention)
 

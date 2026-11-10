@@ -114,6 +114,18 @@ describe('prompt assembly', () => {
     });
 
 
+    test('shell guidance prefers rg/jq and includes missing-command alternatives', async () => {
+        const ctx = await setup();
+        const section = ctx.fns.tools.promptSection({ protocol: 'json' });
+        expect(section).toContain('Prefer rg for text search');
+        expect(section).toContain('Prefer jq to select, filter and summarize JSON');
+        expect(section).toContain('If rg or jq is unavailable on the execution host');
+        expect(section).toContain('rg exit 1 means no matches');
+        expect(section).not.toContain('To locate files use the find tool and to search contents use grep');
+        const narrow = ctx.fns.tools.promptSection({ protocol: 'json', only: ['read'] });
+        expect(narrow).not.toContain('Prefer jq');
+    });
+
     test('the system prompt carries it, and narrowing an agent shrinks the prefix', async () => {
         const ctx = await setup();
         const agent = await ctx.fns.agent.start({ model: 'mock:test' });

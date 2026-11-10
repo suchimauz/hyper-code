@@ -4,7 +4,7 @@ description: >-
   shelling out to `find` — a walk over a home directory takes minutes and usually times out.
 promptSnippet: "find files by glob (respects .gitignore)"
 promptGuidelines:
-  - "Look for files with find, not with bash `find` — it is faster and skips node_modules and build output."
+  - "For file discovery use rg --files -g '<glob>' through bash or the find tool, not broad shell find walks; both respect ignore rules by default."
 parameters:
   type: object
   properties:

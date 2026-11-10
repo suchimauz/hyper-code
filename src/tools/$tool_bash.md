@@ -4,11 +4,13 @@ description: >-
   Returns stdout; a non-zero exit returns [exit N] with stderr, and a command that outruns
   timeout is killed and reported with whatever it printed.
 marker: bash
-promptSnippet: "run shell commands (ls, git, tests)"
+promptSnippet: "run shell commands (rg, jq, git, tests)"
 promptGuidelines:
   - "To work on another machine pass host (an alias from ~/.ssh/config, list with ctx.fns.remote.servers({})) to bash, read, write or edit — no ssh quoting needed; the connection is kept open between calls."
   - "Give bash a timeout when a command could hang (a server, a watcher, a prompt) — and make it generous: a slow search needs minutes, and a timeout that is too tight kills work that was about to succeed."
-  - "To locate files use the find tool and to search contents use grep; `bash find ~` walks every node_modules on the machine and dies on the clock."
+  - "Prefer rg for text search and rg --files -g '<glob>' for file discovery through bash; scope searches to the relevant directory and bound output. Keep .gitignore filtering unless ignored files are explicitly needed; avoid broad shell find walks. Use the grep/find tools when their structured options or hashline edit anchors are useful."
+  - "Prefer jq to select, filter and summarize JSON in shell pipelines before returning it to the model; do not dump large JSON blobs or parse JSON with grep/sed."
+  - "If rg or jq is unavailable on the execution host, use an alternative: grep/find tools for search, or Bun/Node/Python JSON parsing for jq. Check command -v when needed; do not repeatedly retry a missing command or install software without permission. rg exit 1 means no matches, not a missing command."
 parameters:
   type: object
   properties:
