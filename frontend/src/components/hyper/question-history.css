@@ -8,3 +8,8 @@
 .question-history-copy { font: 12px/1.65 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .question-history-copy p { margin: 0; }
 .question-history-copy ul { margin: 0; padding-left: 16px; }
+/* Grid answers: the picked rows as a compact read-only table. */
+.question-history-grid { overflow-x: auto; }
+.question-history-grid table { border-collapse: collapse; white-space: nowrap; }
+.question-history-grid th { padding: 0 16px 2px 0; color: var(--text-tertiary); font-weight: 500; text-align: left; }
+.question-history-grid td { padding: 2px 16px 0 0; border-top: 1px solid var(--line); }

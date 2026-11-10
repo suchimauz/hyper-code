@@ -6,6 +6,7 @@ export default async function(ctx: Context, session: Session | null, opts: {
     if (!(session as Session & {user?: {id:string}})?.user) return Response.json({error:'Unauthorized'}, {status:401,headers});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/choices') return ctx.fns.frontendBridge.choices({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/confirms') return ctx.fns.frontendBridge.confirms({req:opts.req});
+    if (new URL(opts.req.url).pathname === '/ui-lab-api/grids') return ctx.fns.frontendBridge.grids({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/project-action') return ctx.fns.frontendBridge.projectAction({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/chat-header') return ctx.fns.frontendBridge.chatHeader({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/new-session') return ctx.fns.frontendBridge.newSession({req:opts.req});

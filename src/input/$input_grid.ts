@@ -79,6 +79,11 @@ export default {
             + `<tbody id="${rowsId}">${await body(ctx, input, "", new Set())}</tbody></table></div>`
             + `<p class="text-3xs text-faint">showing the first ${PAGE} matches</p>`;
     },
+    async search(ctx: Context, opts: { input: types.input.Row; q: string }) {
+        const s = opts.input.spec;
+        const found = await matches(ctx, s, opts.q);
+        return { page: PAGE, rows: found.map(r => ({ value: cell(r[s.valueKey]), cells: s.columns.map((c: Column) => cell(r[c.key])) })) };
+    },
     async part(ctx: Context, opts: { input: types.input.Row; query: URLSearchParams }) {
         return body(ctx, opts.input, opts.query.get("q") ?? "", new Set(opts.query.getAll("pick")));
     },

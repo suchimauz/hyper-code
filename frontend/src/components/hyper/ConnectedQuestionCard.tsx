@@ -5,13 +5,19 @@ import { QuestionCard } from './QuestionCard';
 import { SecureInputHost } from './SecureInputHost';
 import { ConfirmCard } from './ConfirmCard';
 import { clearConfirmComment, getConfirmInputs, pendingConfirm, submitConfirmInput, type ConfirmAnswer, type ConfirmInputsState } from '../../lib/confirms';
+import { GridCard } from './GridCard';
+import type { HistoryInput } from '../../lib/history';
+import { clearGridPicks, getGridInputs, pendingGrid, submitGridInput, type GridInputsState } from '../../lib/grids';
 
 /** Owns polling and the submit lock for an agent; key this boundary by agent id. */
-export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs, children, mascot }: { agentId: string; readOnly: boolean; onAccepted: () => void; onInputs?: (inputs: ChoiceInput[]) => void; children: ReactNode; mascot?: ReactNode }) {
+export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs, children, mascot }: { agentId: string; readOnly: boolean; onAccepted: () => void; onInputs?: (inputs: HistoryInput[]) => void; children: ReactNode; mascot?: ReactNode }) {
   const [state, setState] = useState<ChoiceInputsState | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmInputsState | null>(null);
   const [confirmClosed, setConfirmClosed] = useState<string[]>([]);
-  useEffect(() => { if (state) onInputs?.(state.inputs); }, [state, onInputs]);
+  const [gridState, setGridState] = useState<GridInputsState | null>(null);
+  const [gridClosed, setGridClosed] = useState<string[]>([]);
+  // History rows need every native kind; each source keeps its last good snapshot.
+  useEffect(() => { if (state || confirmState || gridState) onInputs?.([...(state?.inputs || []), ...(confirmState?.inputs || []), ...(gridState?.inputs || [])]); }, [state, confirmState, gridState, onInputs]);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,6 +45,9 @@ export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs,
       // Confirm inputs are a separate native kind; their failure must not hide choice questions.
       try { const next = await getConfirmInputs(agentId, signal); if (!disposed && !signal.aborted && attempt === generation.current) setConfirmState(next); }
       catch { /* Keep the last authoritative confirm snapshot; the next poll retries. */ }
+      // Grid inputs are their own native kind; same isolation as confirms.
+      try { const next = await getGridInputs(agentId, signal); if (!disposed && !signal.aborted && attempt === generation.current) setGridState(next); }
+      catch { /* Keep the last authoritative grid snapshot; the next poll retries. */ }
       finally { inFlight = false; }
     };
     void refresh(); const timer = window.setInterval(() => void refresh(), 4000);
@@ -112,6 +121,21 @@ setActionError(reason instanceof Error ? reason.message : String(reason));
       }
     } finally { lock.current = false; if (alive.current) { setBusy(false); setRevision(value => value + 1); } }
   };
+  const grid = !input && !confirm && gridState ? pendingGrid(gridState.inputs.filter(item => !gridClosed.includes(item.id))) : undefined;
+  const submitGrid = async (answer: { values: string[] } | { cancel: true }) => {
+    if (!gridState || !grid || lock.current || readOnly || grid.state !== 'open') return;
+    lock.current = true; ++generation.current; setBusy(true); setActionError('');
+    try {
+      await submitGridInput(agentId, grid.id, answer, gridState.csrfToken);
+      clearGridPicks(agentId, grid.id);
+      if (alive.current) { setGridClosed(previous => [...previous, grid.id]); onAccepted(); }
+    } catch (reason) {
+      if (alive.current) {
+        if (reason instanceof ApiError && reason.status === 409) { setGridClosed(previous => [...previous, grid.id]); clearGridPicks(agentId, grid.id); }
+        setActionError(reason instanceof Error ? reason.message : String(reason));
+      }
+    } finally { lock.current = false; if (alive.current) { setBusy(false); setRevision(value => value + 1); } }
+  };
   if (readOnly) return <>{children}</>;
-  return <div className={`question-composer-stack${input || confirm ? ' has-question' : ''}`}><div className="composer-input-anchor question-pet-perch">{mascot}</div>{input ? <><QuestionCard key={`${agentId}:${input.id}`} input={input} stepHint={state?.batch ? viewedIndex < episode.length - 1 ? 'Далее · ответы пока не отправлены' : 'Отправить все ответы агенту' : undefined} navigation={navigation} busy={busy || input.state === 'processing'} error={actionError || error} minimized={minimizedId === input.id} onMinimize={() => setMinimizedId(previous => previous === input.id ? null : input.id)} onCancel={input.id === current?.id ? () => void submit({ cancel: true }) : undefined} onSubmit={answer => void submit(answer)} /></> : confirm ? <ConfirmCard key={`${agentId}:${confirm.id}`} input={confirm} busy={busy || confirm.state === 'processing'} error={actionError} minimized={minimizedId === confirm.id} onMinimize={() => setMinimizedId(previous => previous === confirm.id ? null : confirm.id)} onSubmit={answer => void submitConfirm(answer)} /> : <>{error && <div className="question-load-error" role="alert">{error} <button onClick={() => setRevision(value => value + 1)}>Повторить загрузку вопросов</button></div>}</>}<SecureInputHost agentId={agentId} />{children}</div>;
+  return <div className={`question-composer-stack${input || confirm || grid ? ' has-question' : ''}`}><div className="composer-input-anchor question-pet-perch">{mascot}</div>{input ? <><QuestionCard key={`${agentId}:${input.id}`} input={input} stepHint={state?.batch ? viewedIndex < episode.length - 1 ? 'Далее · ответы пока не отправлены' : 'Отправить все ответы агенту' : undefined} navigation={navigation} busy={busy || input.state === 'processing'} error={actionError || error} minimized={minimizedId === input.id} onMinimize={() => setMinimizedId(previous => previous === input.id ? null : input.id)} onCancel={input.id === current?.id ? () => void submit({ cancel: true }) : undefined} onSubmit={answer => void submit(answer)} /></> : confirm ? <ConfirmCard key={`${agentId}:${confirm.id}`} input={confirm} busy={busy || confirm.state === 'processing'} error={actionError} minimized={minimizedId === confirm.id} onMinimize={() => setMinimizedId(previous => previous === confirm.id ? null : confirm.id)} onSubmit={answer => void submitConfirm(answer)} /> : grid ? <GridCard key={`${agentId}:${grid.id}`} input={grid} busy={busy || grid.state === 'processing'} error={actionError} minimized={minimizedId === grid.id} onMinimize={() => setMinimizedId(previous => previous === grid.id ? null : grid.id)} onSubmit={values => void submitGrid({ values })} onCancel={() => void submitGrid({ cancel: true })} /> : <>{error && <div className="question-load-error" role="alert">{error} <button onClick={() => setRevision(value => value + 1)}>Повторить загрузку вопросов</button></div>}</>}<SecureInputHost agentId={agentId} />{children}</div>;
 }
