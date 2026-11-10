@@ -2,6 +2,7 @@ import {test,expect} from 'bun:test';
 import read from './read';
 import assertIdle from './assertIdle';
 import prompt from './prompt';
+import enter from './enter';
 import inherit from './inherit';
 import propose from './propose';
 import review from './review';
@@ -23,6 +24,7 @@ function fixture() {
    if(sql.includes('FROM agent_planning')) return state.mode?[{mode:state.mode,revision:state.revision,proposal:structuredClone(state.proposal)}]:[];
    if(sql.includes('FROM agent_command_requests')) return state.requests[params[1]]?[state.requests[params[1]]]:[];
    if(sql.includes('FROM messages')) return [];
+   if(sql.includes('AS blocking FROM inputs')) return state.inputs[params[0]]?[{agent_id:'a',blocking:false}]:[];
    throw Error('Unexpected select: '+sql);
   },
   run:async({sql,params:p}:any)=>{
@@ -115,4 +117,32 @@ test('review rejects non-request caller and invalid CSRF; fresh prompt and fork 
  expect(await prompt(f.ctx,null,{agentId:'a'})).toContain('PLAN (advisory');
  await inherit(f.ctx,null,{sourceId:'a',targetId:'child'});expect(f.state().forks).toEqual([{id:'child',mode:'plan',proposal:null}]);
  await f.command('/plan off');expect(await prompt(f.ctx,null,{agentId:'a'})).toContain('mode: execute');
+});
+
+test('agent can enter planning during a run without scheduling or enabling execution',async()=>{
+ const f=fixture();f.state().runState='running';f.state().queued=123;
+ f.ctx.state.agent.a.activeRunCount=1;
+ expect(await enter(f.ctx,null,{})).toMatchObject({mode:'plan',revision:1});
+ expect(f.state().queued).toBe(123);expect(f.state().messages).toEqual([]);
+ expect(f.notifications()).toBe(1);
+ await f.proposal('Preserve this exact plan');
+ const before=structuredClone(f.state().proposal);const revision=f.state().revision;
+ expect(await enter(f.ctx,null,{})).toMatchObject({mode:'plan',revision,proposal:before});
+ expect(f.state().proposal).toEqual(before);
+ await expect(f.command('/plan off')).rejects.toThrow();
+ expect(f.state().mode).toBe('plan');
+});
+test('agent planning entry rejects missing or archived sessions',async()=>{
+ for(const rows of [[],[{id:'a',archived_at:1}]]) {
+  const f=fixture();f.ctx.fns.procs.db.select=async()=>rows;
+  await expect(enter(f.ctx,null,{})).rejects.toThrow('Active session required');
+  expect(f.notifications()).toBe(0);expect(f.state().mode).toBeNull();
+ }
+});
+test('fresh prompt explains semantic entry and research-first planning',async()=>{
+ const f=fixture();const executing=await prompt(f.ctx,null,{agentId:'a'});
+ expect(executing).toContain('planning.enter');expect(executing).toContain('not by keyword');
+ await enter(f.ctx,null,{});
+ const planning=await prompt(f.ctx,null,{agentId:'a'});
+ for(const text of ['Phase 1','Phase 2','Phase 3','planning.propose','Approve','not a sandbox']) expect(planning).toContain(text);
 });
