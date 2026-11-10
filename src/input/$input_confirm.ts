@@ -4,7 +4,25 @@
 
 export const hint = 'yes/no before an outward or irreversible action (send, push, delete, pay, publish) — spec `{ details?: markdown preview of exactly what will happen, confirmLabel?, declineLabel?, danger?: boolean }`; result `{ confirmed: boolean, comment? }`. Act only on confirmed: true';
 
+const batch: types.input.BatchCodec = {
+    version: 1,
+    normalizeSpec({ spec: s }) {
+        if (Object.keys(s).some(k => !["details", "confirmLabel", "declineLabel", "danger"].includes(k))) throw new Error("confirm: unknown spec field");
+        if ([s.details, s.confirmLabel, s.declineLabel].some(v => v !== undefined && typeof v !== "string") || (s.danger !== undefined && typeof s.danger !== "boolean")) throw new Error("confirm: invalid spec");
+        return { details: s.details ?? "", confirmLabel: s.confirmLabel ?? "Confirm", declineLabel: s.declineLabel ?? "Decline", danger: s.danger === true };
+    },
+    validate({ values }) {
+        if (Object.keys(values).some(k => !["decision", "comment"].includes(k)) || !["yes", "no"].includes(values.decision as string) || (values.comment !== undefined && typeof values.comment !== "string") || (typeof values.comment === "string" && values.comment.length > 2000)) return { ok: false, error: { code: "invalid_confirmation", message: "Choose yes or no and an optional short comment" } };
+        const comment = typeof values.comment === "string" ? values.comment.trim() : "";
+        const confirmed = values.decision === "yes";
+        return { ok: true, values: { decision: confirmed ? "yes" : "no", ...(comment ? { comment } : {}) }, result: { confirmed, ...(comment ? { comment } : {}) }, summary: `${confirmed ? "Confirmed" : "Declined"}${comment ? `: ${comment}` : ""}` };
+    },
+    projectSpec({ spec }) { return structuredClone(spec); },
+    projectDraft({ values }) { return { ...(values.decision !== undefined ? { decision: values.decision } : {}), ...(values.comment !== undefined ? { comment: values.comment } : {}) }; },
+};
+
 export default {
+    batch,
     icon: "seal-question",
     cancel: false,
     prepare(_ctx: Context, opts: { spec: Record<string, any> }) {

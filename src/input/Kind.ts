@@ -6,6 +6,8 @@
 // like, how a submission becomes a result, and how the answer looks afterwards.
 
 export type Kind = {
+    /** Opt-in pure synchronous codec for atomic collection; protected completion kinds cannot opt in. */
+    batch?: types.input.BatchCodec;
     /** Server-only dispatch capability for dedicated authenticated completion; generic submit/cancel is denied. Resolve current registered identity after hot reload. Not an authorization sandbox. */
     completionAuthority?: object;
     /** Explicit public spec projection for owner-only React cards. Return only display-safe fields; never credentials, completion authority, transport tokens or raw results. Missing hook means metadata-only for plugin kinds. */

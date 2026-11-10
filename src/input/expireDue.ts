@@ -13,8 +13,10 @@ export default async function (
     },
 ): Promise<{ expired: number }> {
     const limit=Math.min(500,Math.max(1,Math.trunc(opts.limit ?? 100)));
-    const rows=await ctx.fns.procs.db.select({sql:"SELECT id FROM inputs WHERE state='open' AND (CASE WHEN spec->>'_expiresAt' ~ '^[0-9]{1,16}$' THEN (spec->>'_expiresAt')::bigint END) <= ? ORDER BY (CASE WHEN spec->>'_expiresAt' ~ '^[0-9]{1,16}$' THEN (spec->>'_expiresAt')::bigint END) LIMIT ?",params:[Date.now(),limit]});
+    const rows=await ctx.fns.procs.db.select({sql:"SELECT id,kind FROM inputs WHERE state='open' AND (CASE WHEN spec->>'_expiresAt' ~ '^[0-9]{1,16}$' THEN (spec->>'_expiresAt')::bigint END) <= ? ORDER BY (CASE WHEN spec->>'_expiresAt' ~ '^[0-9]{1,16}$' THEN (spec->>'_expiresAt')::bigint END) LIMIT ?",params:[Date.now(),limit]});
     let expired=0;
-    for(const row of rows){ const out=await ctx.fns.input.complete({id:row.id,state:'expired',summary:'Input expired before an answer was received',actor:'system:expiry'}); if(out.completed) expired++; }
+    for(const row of rows){ if(row.kind==='batch'){const out=await ctx.fns.input.batchAction({id:row.id,action:'expire'});if(out.state==='expired')expired++;}else{const out=await ctx.fns.input.complete({id:row.id,state:'expired',summary:'Input expired before an answer was received',actor:'system:expiry'}); if(out.completed) expired++;} }
+    const pending=await ctx.fns.procs.db.select({sql:"SELECT id FROM inputs WHERE kind='batch' AND state='processing' ORDER BY updated_at LIMIT ?",params:[limit]});
+    for(const row of pending)await ctx.fns.input.batchAction({id:row.id,action:'recover'});
     return {expired};
 }

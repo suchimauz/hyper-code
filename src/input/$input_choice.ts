@@ -5,7 +5,38 @@ export const hint = 'one or several of a few options — spec `{ options: (strin
 
 type Option = { value: string; label: string; description?: string };
 
+const batch: types.input.BatchCodec = {
+    version: 1,
+    normalizeSpec({ spec: s }) {
+        if (Object.keys(s).some(k => !["options", "multiple", "allowOther"].includes(k))) throw new Error("choice: unknown spec field");
+        if ([s.multiple, s.allowOther].some(v => v !== undefined && typeof v !== "boolean")) throw new Error("choice: invalid flags");
+        if (!Array.isArray(s.options) || s.options.length < 1 || s.options.length > 30) throw new Error("choice: options must have 1–30 entries");
+        const options = s.options.map(o => {
+            if (typeof o === "string" && o) return { value: o, label: o };
+            if (!o || typeof o !== "object" || Array.isArray(o) || Object.keys(o).some(k => !["value", "label", "description"].includes(k)) || typeof o.value !== "string" || !o.value || (o.label !== undefined && typeof o.label !== "string") || (o.description !== undefined && typeof o.description !== "string")) throw new Error("choice: invalid option");
+            return { value: o.value, label: o.label ?? o.value, ...(o.description !== undefined ? { description: o.description } : {}) };
+        });
+        if (new Set(options.map(o => o.value)).size !== options.length) throw new Error("choice: duplicate values");
+        return { options, multiple: s.multiple === true, allowOther: s.allowOther === true };
+    },
+    validate({ spec: s, values }) {
+        const fail = (): types.input.BatchValidation => ({ ok: false, error: { code: "invalid_choice", message: "Select valid options or enter an allowed answer" } });
+        if (Object.keys(values).some(k => !["pick", "other"].includes(k))) return fail();
+        const pick = values.pick === undefined ? [] : typeof values.pick === "string" ? [values.pick] : values.pick;
+        if (!Array.isArray(pick) || pick.some(v => typeof v !== "string") || new Set(pick).size !== pick.length || (!s.multiple && pick.length > 1)) return fail();
+        const options = s.options as Option[];
+        if (pick.some(v => !options.some(o => o.value === v))) return fail();
+        if (values.other !== undefined && typeof values.other !== "string") return fail();
+        const other = typeof values.other === "string" ? values.other.trim() : "";
+        if ((other && !s.allowOther) || other.length > 2000 || (!pick.length && !other)) return fail();
+        return { ok: true, values: { pick, ...(other ? { other } : {}) }, result: { ...(s.multiple ? { values: pick } : pick.length ? { value: pick[0] } : {}), ...(other ? { other } : {}) }, summary: [...pick.map(v => options.find(o => o.value === v)!.label), other].filter(Boolean).join(", ") };
+    },
+    projectSpec({ spec }) { return structuredClone(spec); },
+    projectDraft({ values }) { return { ...(values.pick !== undefined ? { pick: structuredClone(values.pick) } : {}), ...(values.other !== undefined ? { other: values.other } : {}) }; },
+};
+
 export default {
+    batch,
     icon: "list-checks",
     prepare(_ctx: Context, opts: { spec: Record<string, any> }) {
         const raw = Array.isArray(opts.spec.options) ? opts.spec.options : [];

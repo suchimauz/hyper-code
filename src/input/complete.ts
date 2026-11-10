@@ -30,6 +30,11 @@ export default async function (
     const existing = await ctx.fns.input.get({id:opts.id});
     if (!existing) throw new Error('Unknown input');
     const kind = (ctx.state as any).input?.kinds?.[existing.kind] as types.input.Registered | undefined;
+    if(existing.kind==='batch'&&opts.authority!==kind?.completionAuthority){
+        if(opts.state!=='expired')throw new Error('Use dedicated batch controls');
+        const out=await ctx.fns.input.batchAction({id:opts.id,action:'expire'});
+        return {state:String(out.state),completed:existing.state==='open'&&out.state==='expired',scheduled:false};
+    }
     if (opts.state !== 'expired' && kind?.completionAuthority && opts.authority !== kind.completionAuthority) throw new Error('Protected input requires its authoritative handler');
     if (opts.state !== 'expired' && !kind?.completionAuthority) throw new Error('Use input.submit for ordinary input results');
     const persist = async () => {
@@ -50,6 +55,7 @@ export default async function (
     // The owner handled this request here: withdraw the notification from their other devices.
     // An ambient transaction is still open at this point, so the withdrawal waits for it to commit.
     if(!ambient?.active) await ctx.fns.webPush?.recall?.({inputId:opts.id}).catch(()=>undefined);
+    if(ambient?.active) return out as {state:string;completed:boolean;scheduled:boolean};
     const live=(ctx.state as any).agent?.[existing.agentId];
     if(live) await ctx.fns.session.syncAgentState({agent:live});
     ctx.fns.procs.events.refresh({topic:'agent:'+existing.agentId,reason:'input'});

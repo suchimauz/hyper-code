@@ -26,7 +26,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { e
         return source.root;
     };
     const protectedOwners: Record<string, string> = {
-        secret: "core", choice: "core", confirm: "core", grid: "core", "planning-review": "core",
+        secret: "core", choice: "core", confirm: "core", grid: "core", batch: "core", "planning-review": "core",
     };
     for (const entry of opts.entries) {
         const name = String(entry.name ?? "").toLowerCase();
@@ -48,6 +48,13 @@ export default async function (ctx: Context, _session: Session | null, opts: { e
         const def = imported?.default;
         if (!def || typeof def.open !== "function" || typeof def.submit !== "function" || typeof def.done !== "function") {
             throw new Error(`${entry.rel}: $input_ file must default-export { open, submit, done }`);
+        }
+        if (def.batch !== undefined) {
+            const codec = def.batch;
+            if (def.completionAuthority || name === "batch" || name === "planning-review") throw new Error(`${entry.rel}: protected or nested input cannot provide a batch codec`);
+            const required = ["normalizeSpec", "validate", "projectSpec", "projectDraft"];
+            if (!codec || typeof codec !== "object" || codec.version !== 1 || Object.keys(codec).some(k => !["version", ...required, "history"].includes(k)) || required.some(k => typeof codec[k] !== "function") || (codec.history !== undefined && typeof codec.history !== "function")) throw new Error(`${entry.rel}: invalid batch codec version or hooks`);
+            if ([...required, ...(codec.history ? ["history"] : [])].some(k => ["AsyncFunction", "GeneratorFunction", "AsyncGeneratorFunction"].includes(codec[k].constructor?.name))) throw new Error(`${entry.rel}: batch codec hooks must be synchronous`);
         }
         const hint = typeof imported.hint === "string" ? imported.hint : undefined;
         kinds[name] = { ...def, name, owner, module: entry.moduleDir === "." ? "app" : String(entry.moduleDir), rel: entry.rel, hint };

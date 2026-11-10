@@ -6,7 +6,35 @@ export const hint = 'a password, API key or one-time code, saved straight into e
 
 const MODES = ["password", "otp", "text"] as const;
 
+const batch: types.input.BatchCodec = {
+    version: 1,
+    normalizeSpec({ spec: s }) {
+        if (Object.keys(s).some(k => !["saveAs", "mode", "maxlength"].includes(k))) throw new Error("secret: unknown spec field");
+        if (typeof s.saveAs !== "string" || !/^secret:\/\/([A-Za-z0-9][\w.-]*)\/([A-Za-z0-9][\w.:@-]*)$/.test(s.saveAs)) throw new Error("secret: invalid reference");
+        if (s.mode !== undefined && !MODES.includes(s.mode as typeof MODES[number])) throw new Error("secret: invalid mode");
+        const mode = s.mode ?? "password";
+        const maxlength = s.maxlength ?? (mode === "otp" ? 16 : 256);
+        if (typeof maxlength !== "number" || !Number.isInteger(maxlength) || maxlength < 1 || maxlength > 4096) throw new Error("secret: maxlength must be 1–4096");
+        return { saveAs: s.saveAs, mode, maxlength };
+    },
+    validate({ spec: s, values }) {
+        const fail = (): types.input.BatchValidation => ({ ok: false, error: { code: "invalid_secret", message: "Enter a valid value within the field length limit" } });
+        if (Object.keys(values).some(k => k !== "value") || typeof values.value !== "string") return fail();
+        let value = s.mode === "password" ? values.value : values.value.trim();
+        if (!value || value.length > Number(s.maxlength)) return fail();
+        if (s.mode === "otp") {
+            if (!/^[0-9 -]{3,16}$/.test(value)) return fail();
+            value = value.replace(/[ -]/g, "");
+            if (value.length < 3) return fail();
+        }
+        return { ok: true, values: { value }, result: { ref: s.saveAs }, summary: `Saved as ${s.saveAs}` };
+    },
+    projectSpec({ spec: s }) { return { saveAs: s.saveAs, mode: s.mode, maxlength: s.maxlength }; },
+    projectDraft() { return {}; },
+};
+
 export default {
+    batch,
     icon: "key",
     prepare(ctx: Context, opts: { spec: Record<string, any> }) {
         const { namespace, name } = ctx.fns.secrets.parseRef({ ref: String(opts.spec.saveAs ?? "") });

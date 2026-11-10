@@ -13,22 +13,22 @@
  * kind returns only its secret:// reference, never the value). End the turn after
  * calling; do not poll. Available kinds and their spec are listed in the system prompt
  * under "Chat inputs" (input.kinds returns them too).
- * @param opts.kind Input kind, e.g. secret, confirm, choice or grid.
+ * @param opts.kind Input kind, e.g. batch, secret, confirm, choice or grid.
  * @param opts.title Short question shown as the card heading.
  * @param opts.message Optional Markdown explanation under the heading.
- * @param opts.spec Kind-specific settings, e.g. { options } for choice or { saveAs } for secret.
+ * @param opts.spec Kind-specific settings, e.g. batch {items:[{key,kind,title,spec}]} for atomic collection, { options } for choice or { saveAs } for secret.
  * @param opts.agentId Agent to wake with the answer. @default the current agent
  * @param opts.waitForAnswer Persist a durable gate only when explicitly true. @default false
  * @param opts.expiresAt Optional future safe epoch-millisecond deadline; cannot extend a trusted kind deadline.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
-    /** Input kind, e.g. secret, confirm, choice or grid. */
+    /** Input kind, e.g. batch, secret, confirm, choice or grid. */
     kind: string;
     /** Short question shown as the card heading. */
     title: string;
     /** Optional Markdown explanation under the heading. */
     message?: string;
-    /** Kind-specific settings, e.g. { options } for choice or { saveAs } for secret. */
+    /** Kind-specific settings, e.g. batch {items:[{key,kind,title,spec}]} for atomic collection, { options } for choice or { saveAs } for secret. */
     spec?: Record<string, any>;
     /** Agent to wake with the answer. @default the current agent */
     agentId?: string;
@@ -46,6 +46,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     const title = String(opts.title ?? "").trim();
     if (!title) throw new Error("input.request: title is required");
     const agentId = String(opts.agentId ?? (await ctx.fns.agent.current({})).id);
+    if (kindName === 'batch' && Object.keys(opts.spec ?? {}).some(k => k !== 'items')) throw new Error('Invalid batch definition fields');
     const suppliedSpec = { ...(opts.spec ?? {}) };
     delete suppliedSpec._expiresAt;
     delete suppliedSpec._agentWait;
@@ -79,6 +80,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
               VALUES (?, ?, ?, 'open', ?, ?, ?::jsonb, ?, ?)`,
         params: [id, agentId, kindName, title, String(opts.message ?? ""), JSON.stringify(spec), now, now],
     });
+    if (kindName === 'batch') await ctx.fns.procs.db.run({sql:'INSERT INTO input_batch_state(input_id) VALUES (?)',params:[id]});
     } });
     // messageIdx anchors the card in the transcript order: views that page or
     // fold by message (the compact "fresh tail") keep events that carry one.

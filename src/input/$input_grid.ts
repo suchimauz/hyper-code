@@ -50,7 +50,38 @@ async function body(ctx: Context, input: types.input.Row, q: string, picked: Set
     return rowsHtml(ctx, input, [...pinned, ...found], picked);
 }
 
+const batch: types.input.BatchCodec = {
+    version: 1,
+    normalizeSpec({ spec: s }) {
+        if (Object.keys(s).some(k => !["rows", "columns", "valueKey", "labelKey", "multiple"].includes(k))) throw new Error("grid: batch supports inline rows only and no unknown fields");
+        if (!Array.isArray(s.rows) || s.rows.length > 5000 || s.rows.some(r => !r || typeof r !== "object" || Array.isArray(r))) throw new Error("grid: invalid inline rows");
+        if ([s.valueKey, s.labelKey].some(v => v !== undefined && (typeof v !== "string" || !v)) || (s.multiple !== undefined && typeof s.multiple !== "boolean")) throw new Error("grid: invalid spec");
+        const valueKey = (s.valueKey ?? "id") as string;
+        const rows = structuredClone(s.rows) as Record<string, unknown>[];
+        if (rows.some(r => !Object.hasOwn(r, valueKey) || !["string", "number"].includes(typeof r[valueKey]) || !cell(r[valueKey])) || new Set(rows.map(r => cell(r[valueKey]))).size !== rows.length) throw new Error("grid: rows require unique scalar keys");
+        if (s.columns !== undefined && !Array.isArray(s.columns)) throw new Error("grid: invalid columns");
+        const columns: Column[] = Array.isArray(s.columns) && s.columns.length ? s.columns.map(c => {
+            if (typeof c === "string" && c) return { key: c, label: c };
+            if (!c || typeof c !== "object" || Object.keys(c).some(k => !["key", "label"].includes(k)) || typeof c.key !== "string" || !c.key || (c.label !== undefined && typeof c.label !== "string")) throw new Error("grid: invalid column");
+            return { key: c.key, label: c.label ?? c.key };
+        }) : Object.keys(rows[0] ?? { [valueKey]: "" }).slice(0, 8).map(key => ({ key, label: key }));
+        return { rows, columns, valueKey, labelKey: s.labelKey ?? columns.find(c => c.key !== valueKey)?.key ?? valueKey, multiple: s.multiple === true };
+    },
+    validate({ spec: s, values }) {
+        const fail = (): types.input.BatchValidation => ({ ok: false, error: { code: "invalid_grid", message: "Select available rows" } });
+        if (Object.keys(values).some(k => k !== "pick")) return fail();
+        const pick = typeof values.pick === "string" ? [values.pick] : values.pick;
+        if (!Array.isArray(pick) || !pick.length || pick.some(v => typeof v !== "string") || new Set(pick).size !== pick.length || (!s.multiple && pick.length !== 1)) return fail();
+        const rows = pick.map(v => (s.rows as Record<string, unknown>[]).find(r => cell(r[s.valueKey as string]) === v));
+        if (rows.some(r => !r)) return fail();
+        return { ok: true, values: { pick: [...pick] }, result: s.multiple ? { values: [...pick], rows: structuredClone(rows) } : { value: pick[0], row: structuredClone(rows[0]) }, summary: `Picked: ${rows.map(r => cell(r![s.labelKey as string])).join(", ")}` };
+    },
+    projectSpec({ spec }) { return structuredClone(spec); },
+    projectDraft({ values }): types.input.FormValues { return values.pick === undefined ? {} : { pick: structuredClone(values.pick) }; },
+};
+
 export default {
+    batch,
     icon: "table",
     async prepare(ctx: Context, opts: { spec: Record<string, any> }) {
         const s = opts.spec;

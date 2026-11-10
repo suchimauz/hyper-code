@@ -37,7 +37,7 @@ describe("input declaration ownership", () => {
         await expect(register(fixture(), entry("beta", "alpha-form", { moduleDir: "alpha" }))).rejects.toThrow("owner prefix beta-");
     });
     test("core secret and planning are protected before or after core loads", async () => {
-        for (const name of ["secret", "planning-review", "choice", "confirm", "grid"]) {
+        for (const name of ["secret", "planning-review", "choice", "confirm", "grid", "batch"]) {
             const ctx = fixture(); const bad = entry("alpha", name, { moduleDir: "input" });
             await expect(register(ctx, bad)).rejects.toThrow("belongs to core");
             await register(ctx, entry("core", name));
@@ -54,6 +54,15 @@ describe("input declaration ownership", () => {
         await register(ctx, { ...original, root: undefined, rootDir: undefined } as any);
         expect(ctx.state.input.kinds["alpha-form"].owner).toBe("alpha");
         await expect(register(fixture(), { ...original, root: undefined, rootDir: undefined } as any)).rejects.toThrow("mounted source owner");
+    });
+    test("batch codec registration validates sync hooks and protected exclusions", async () => {
+        const codec = { version: 1, normalizeSpec: () => ({}), validate: () => ({}), projectSpec: () => ({}), projectDraft: () => ({}) };
+        const registerCodec = (batch: unknown, extra = {}, name = "alpha-form", owner = "alpha") => register(fixture(), entry(owner, name, { mod: { default: { ...definition(), batch, ...extra } } }));
+        await registerCodec(codec);
+        for (const batch of [null, {}, { ...codec, version: 2 }, { ...codec, validate: undefined }, { ...codec, arbitrary: true }, { ...codec, validate: async () => ({}) }, { ...codec, validate: function* () {} }]) await expect(registerCodec(batch)).rejects.toThrow("batch codec");
+        await expect(registerCodec(codec, { completionAuthority: {} })).rejects.toThrow("protected");
+        await expect(registerCodec(codec, {}, "batch", "core")).rejects.toThrow("nested");
+        await expect(registerCodec(codec, {}, "planning-review", "core")).rejects.toThrow("protected");
     });
     test("legacy registration migrates only with unambiguous source owner", async () => {
         const original = entry("alpha", "alpha-form"); const ctx = fixture([original]);

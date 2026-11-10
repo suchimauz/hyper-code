@@ -1,0 +1,2 @@
+/** Durable encrypted drafts and accepted attempts for atomic batch inputs. */
+export default {async up(ctx:Context){await ctx.fns.procs.db.exec({sql:`CREATE TABLE IF NOT EXISTS input_batch_state (input_id TEXT PRIMARY KEY REFERENCES inputs(id) ON DELETE CASCADE, revision INTEGER NOT NULL DEFAULT 0, current_step INTEGER NOT NULL DEFAULT 0, draft_enc TEXT, attempt_id TEXT, accepted_at BIGINT, history JSONB, error JSONB); CREATE INDEX IF NOT EXISTS input_batch_attempt ON input_batch_state(accepted_at) WHERE attempt_id IS NOT NULL;`});}};
