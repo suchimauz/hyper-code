@@ -196,14 +196,14 @@ Use `settings.get`/`settings.set` for values. An instance may fix a plugin's val
 
 A plugin's browser UI lives only in its own folder — never in `frontend/src`, never in a host allowlist.
 
-1. Write `ui/index.tsx` with `export default` a `UiExtension` whose `id` equals the plugin name. Import only `react`, `react/jsx-runtime`, `react-dom`, `@hyper/ui` and relative files inside `ui/`.
+1. Write `ui/index.tsx` with `export default` a `UiExtension` whose `id` equals the plugin name. Import only `react`, `react/jsx-runtime`, `react-dom`, `@hyper/ui`, relative files inside `ui/` and packages listed in the plugin's own `package.json` `dependencies` (run `bun install` in the plugin folder; they are bundled into the approved hash).
 2. Declare the requested grants in `package.json`:
 
 ```json
 "procs": { "src": "src", "ui": { "entry": "ui/index.tsx", "pages": ["overview"], "canvasKinds": ["example.board"], "applications": { "/example": "overview" } } }
 ```
 
-   Canvas kinds must start with one of the plugin's namespaces; `applications` maps a legacy document path to a requested page.
+   Canvas kinds must start with one of the plugin's namespaces; `applications` maps a legacy document path to a requested page. `canvasLaunchers: ["<id>"]` grants buttons on the Canvas Start page: the extension declares `canvasLaunchers: [{ id, title, description?, icon?, component }]`, each click opens a local tab ("Title", "Title 2", …) rendering `component` with `{ context, tabId, active }`, unmounted when the tab closes. The icon defaults to the plugin's `procs.icon`, then a puzzle. Reference: `plugins/terminal`.
 3. Run `plugins.reload({ name })`. Hyper rebuilds the bundle (`plugins.uiCompile`), emits `plugins.changed`, and open tabs pick it up without a page reload or frontend rebuild. Check `ctx.state.plugins.ui[name].error` or `plugins.uiManifest({})` for build errors.
 4. Official plugins are pre-approved. A user or other plugin's UI runs only after a person approves the exact bundle hash and grants in the Plugins page; any change to the code or grants sends it back for review. Never approve on a person's behalf.
 
