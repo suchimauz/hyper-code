@@ -1,6 +1,5 @@
 import { createElement, useMemo, type ReactNode } from 'react';
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
-import { ChatMarkdown } from './ChatMarkdown';
 
 // Parse without a browser DOM: even discarded images/frames cannot initiate requests.
 // Rebuild semantic elements only. No HTML injection, styles, classes, IDs, event
@@ -16,16 +15,15 @@ function renderNode(node: HtmlNode, key: number, depth = 0): ReactNode {
   const children = node.childNodes.map((child, index) => renderNode(child, index, depth + 1));
   if (!allowed.has(node.tagName)) return children;
   // Links intentionally become text: authored HTML cannot navigate to internal
-  // mutation endpoints or external tracking URLs. Markdown fallback remains available.
+  // mutation endpoints or external tracking URLs. The plain-text fallback is kept for history/LLM context only.
   const tag = node.tagName === 'a' ? 'span' : node.tagName;
   return createElement(tag, { key }, ...children);
 }
 
 /** Only TranscriptMessage's explicit assistant-answer branch may use this renderer. */
-export function AssistantHtml({ html, text }: { html: string; text: string | null }) {
+export function AssistantHtml({ html }: { html: string }) {
   const content = useMemo(() => parseFragment(html.slice(0, 200000)).childNodes.map((child, index) => renderNode(child, index)), [html]);
   return <div className="assistant-html-answer">
     <div className="markdown" role="region" aria-label="Ответ в формате HTML">{content}</div>
-    {text && <details><summary>Текстовая версия ответа</summary><div className="markdown"><ChatMarkdown>{text}</ChatMarkdown></div></details>}
   </div>;
 }

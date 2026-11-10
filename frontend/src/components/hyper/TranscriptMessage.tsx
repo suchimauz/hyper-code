@@ -74,7 +74,7 @@ export function TranscriptMessage({ event, agentId }: { event: ChatEvent; agentI
   }
   return <article className={`message message--assistant ${event.type === 'error' ? 'message--error' : ''}`} data-event-idx={event.idx}>
     {event.type === 'assistant' && event.htmlSource === 'assistant-answer' && event.html
-      ? <AssistantHtml html={event.html} text={event.text} />
+      ? <AssistantHtml html={event.html} />
       : <div className="markdown"><ChatMarkdown>{event.text || (event.html ? 'HTML-ответ недоступен без подтверждённого источника.' : '')}</ChatMarkdown></div>}
     {attachments}
   </article>;
