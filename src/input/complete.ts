@@ -46,10 +46,10 @@ export default async function (
      return {state:opts.state,completed:true,scheduled:scheduled.rows.length > 0};
     };
     const ambient=(ctx.state as any).procs?.db?.transactionStorage?.getStore();
-    if(ambient?.active) return await persist();
-    const out=await ctx.fns.procs.db.transaction({fn:persist});
+    const out=ambient?.active?await persist():await ctx.fns.procs.db.transaction({fn:persist});
     // The owner handled this request here: withdraw the notification from their other devices.
-    await ctx.fns.webPush?.recall?.({inputId:opts.id}).catch(()=>undefined);
+    // An ambient transaction is still open at this point, so the withdrawal waits for it to commit.
+    if(!ambient?.active) await ctx.fns.webPush?.recall?.({inputId:opts.id}).catch(()=>undefined);
     const live=(ctx.state as any).agent?.[existing.agentId];
     if(live) await ctx.fns.session.syncAgentState({agent:live});
     ctx.fns.procs.events.refresh({topic:'agent:'+existing.agentId,reason:'input'});

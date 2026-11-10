@@ -35,3 +35,13 @@ test('delivery failure rolls claim and final state back to open for retry after 
     await expect(submit(h.ctx,null,{id:'in1'})).rejects.toThrow('delivery failure');
     expect(h.state).toBe('open'); expect(h.messages.length).toBe(0);
 });
+test('answering withdraws the notification from the owner\'s other devices after the transaction commits', async()=>{
+    const h=harness(); const recalled:any[]=[]; let committed=false;
+    h.ctx.fns.webPush={recall:async(o:any)=>{recalled.push(o);}};
+    const tx=h.ctx.fns.procs.db.transaction;
+    h.ctx.fns.procs.db.transaction=async({fn}:any)=>{const out=await tx({fn}); committed=true; return out;};
+    await submit(h.ctx,null,{id:'in1'});
+    expect(recalled).toEqual([{inputId:'in1'}]);
+    // The withdrawal must not run before the answer is durable.
+    expect(committed).toBe(true);
+});
