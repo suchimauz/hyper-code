@@ -41,6 +41,9 @@ export default async function (
         const saved = await db.run({ sql: "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = GREATEST(COALESCE(NULLIF(kv.value, '')::numeric, 0), EXCLUDED.value::numeric)::text RETURNING value", params: [`seen-at:${opts.agentId}`, String(seenAt)] });
         if (!userId) seenAt = Number(saved.rows[0].value);
     }
+    // The owner has seen the chat on some device: withdraw its push notifications from every device.
+    // Background, so a slow push provider never delays the read receipt.
+    if (userId) void ctx.fns.webPush?.recallSeen?.({ agentId: opts.agentId, userId, seenAt })?.catch(() => undefined);
     // Opening a chat reads the viewer's @mentions in it.
     if (userId && opts.throughTs === undefined) await ctx.fns.mentions.markRead({ agentId: opts.agentId, userId }).catch(() => undefined);
     return seenAt;

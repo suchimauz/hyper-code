@@ -22,7 +22,10 @@ export default async function (
         sql: `SELECT d.subscription_id, s.endpoint, s.p256dh, s.auth
                 FROM web_push_deliveries d
                 JOIN web_push_subscriptions s ON s.id = d.subscription_id
-                WHERE d.input_id = ? AND d.status = 'sent' AND s.expires_at > ?`,
+                WHERE d.input_id = ? AND d.status = 'sent' AND s.expires_at > ?
+                  -- iOS cannot close a delivered notification from the worker, and Safari revokes subscriptions
+                  -- that receive pushes showing nothing: never send a recall to Apple endpoints.
+                  AND s.endpoint NOT LIKE 'https://web.push.apple.com/%'`,
         params: [inputId, Date.now()],
     });
     if (!deliveries.length) return;
