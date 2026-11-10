@@ -11,7 +11,7 @@ test('update pages and status deny nonowners before git access', async () => {
  expect((await apply({} as any,null,{req:req(),params:{}})).status).toBe(403);
 });
 test('owner redirect is native and status does not fetch by default',async()=>{
- expect((await page({} as any,owner,{req:new Request('http://localhost/update'),params:{}})).headers.get('location')).toBe('/?view=extension:utilities/update');
+ expect((await page({} as any,owner,{req:new Request('http://localhost/update'),params:{}})).headers.get('location')).toBe('/?settings=updates');
  const ctx={fns:{update:{check:async({fetch}:any)=>{expect(fetch).toBe(false);return {state:'current'};}},auth:{csrfToken:async()=> 'token'}}} as any;
  const result=await status(ctx,owner,{req:new Request('http://localhost/update/status'),params:{}});
  expect(await result.json()).toEqual({status:{state:'current'},csrfToken:'token'});

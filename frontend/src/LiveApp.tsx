@@ -144,8 +144,8 @@ export function LiveApp() {
   const readOnly = archived || !hyper.page || (hyper.page.archived == null && !selectedChat);
   const current = hyper.agents.find(item => item.id === hyper.selected) ?? selectedChat;
   const requestedSettings = new URLSearchParams(location.search).get('settings');
-  const [settingsOpen, setSettingsOpen] = useState(requestedSettings === 'ssh-instances' || requestedSettings === 'llm-connections' || requestedSettings === 'push-notifications');
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>(requestedSettings === 'push-notifications' ? 'push-notifications' : requestedSettings === 'llm-connections' ? 'llm-connections' : 'ssh-instances');
+  const [settingsOpen, setSettingsOpen] = useState(requestedSettings === 'ssh-instances' || requestedSettings === 'llm-connections' || requestedSettings === 'push-notifications' || requestedSettings === 'updates');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>(requestedSettings === 'push-notifications' ? 'push-notifications' : requestedSettings === 'llm-connections' ? 'llm-connections' : requestedSettings === 'updates' ? 'updates' : 'ssh-instances');
   const changeSettingsOpen = (open: boolean) => {
     setSettingsOpen(open);
     if (!open) { const url = new URL(location.href); url.searchParams.delete('settings'); history.replaceState(null, '', url); }

@@ -24,7 +24,7 @@ export const coreGrants: Readonly<Record<string, ExtensionGrant>> = {
   settings: { pages: ['overview', 'declared'] },
   'shared-agents': { pages: ['overview'] },
   instances: { pages: ['overview'] },
-  utilities: { pages: ['autotext', 'update'] },
+  utilities: { pages: ['autotext'] },
   'agent-source': { pages: ['overview'] },
   'developer-canvases': { canvasKinds: ['code.tests'] },
   'initial-prompt': { pages: ['overview'] },
@@ -36,5 +36,5 @@ export const coreApplications: Readonly<Record<string, string>> = {
   '/search': 'documentation/search', '/functions': 'documentation/functions',
   '/settings': 'settings/overview', '/settings/declared': 'settings/declared',
   '/shared-agents': 'shared-agents/overview', '/controlPlane': 'instances/overview',
-  '/autotext': 'utilities/autotext', '/update': 'utilities/update',
+  '/autotext': 'utilities/autotext',
 };

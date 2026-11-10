@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog, Panel, Stack, requestJson, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
+import { Button, Panel, Stack, requestJson, type ExtensionViewProps, type UiExtension } from '@hyper/ui';
 
 const models = ['codex:gpt-6-luna', 'claude-code:claude-haiku-4-5', 'codex:gpt-5.6-luna', 'groq:openai/gpt-oss-20b', 'groq:openai/gpt-oss-120b', 'groq:qwen/qwen3.8-27b', 'openrouter:z-ai/glm-5.3-flash'];
 function Autotext({ context }: ExtensionViewProps) {
@@ -33,16 +33,4 @@ function Autotext({ context }: ExtensionViewProps) {
   </Stack></Panel>;
 }
 
-type UpdateData = { csrfToken: string; status: { state: string; message: string; current?: string; target?: string; upstream?: string; clean: boolean } };
-function Update({ context }: ExtensionViewProps) {
-  const [data, setData] = useState<UpdateData | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [confirm, setConfirm] = useState(false), [message, setMessage] = useState('');
-  async function refresh(check = false, signal?: AbortSignal) { setError(''); try { setData(await requestJson<UpdateData>('/update/status' + (check ? '?check=1' : ''), { signal })); } catch (cause) { if (!signal?.aborted) setError(String(cause)); } }
-  useEffect(() => { const controller = new AbortController(); void refresh(false, controller.signal); return () => controller.abort(); }, []);
-  async function apply() { if (!data || context.readOnly) return; setConfirm(false); setBusy(true); setError(''); try { const result = await requestJson<{message:string}>('/update/apply', { method: 'POST', csrfToken: data.csrfToken, body: { confirmed: true, target: data.status.target } }); setMessage(result.message); } catch (cause) { setError(String(cause)); } finally { setBusy(false); } }
-  return <Panel title="Hyper update"><Stack><p>Owner-only administration. Updating requires a clean checkout and fast-forward history. Hyper will restart; active work may be interrupted.</p>{error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
-    {data && <><p role="status">{data.status.message}</p><dl><dt>Current</dt><dd>{data.status.current || '—'}</dd><dt>Target</dt><dd>{data.status.target || '—'}</dd><dt>Upstream</dt><dd>{data.status.upstream || '—'}</dd><dt>Working tree</dt><dd>{data.status.clean ? 'Clean' : 'Dirty'}</dd></dl></>}
-    <Button disabled={busy || context.readOnly} onClick={() => void refresh(true)}>Check upstream</Button><Button disabled={busy || context.readOnly || data?.status.state !== 'available'} onClick={() => setConfirm(true)}>Update and restart…</Button>
-    <Dialog open={confirm} onOpenChange={setConfirm} title="Update and restart Hyper?"><p>Apply target {data?.status.target} and restart the server. Active connections will disconnect. No change occurs until you confirm.</p><Button onClick={() => setConfirm(false)}>Cancel</Button><Button disabled={busy || context.readOnly} onClick={() => void apply()}>Confirm update and restart</Button></Dialog>
-  </Stack></Panel>;
-}
-export const utilityExtension: UiExtension = { id: 'utilities', apiVersion: 1, pages: [{ id: 'autotext', title: 'Autotext', component: Autotext }, { id: 'update', title: 'Hyper update', component: Update }], navigation: [{ page: 'autotext', title: 'Autotext' }, { page: 'update', title: 'Hyper update' }] };
+export const utilityExtension: UiExtension = { id: 'utilities', apiVersion: 1, pages: [{ id: 'autotext', title: 'Autotext', component: Autotext }], navigation: [{ page: 'autotext', title: 'Autotext' }] };

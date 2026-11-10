@@ -17,7 +17,7 @@ describe('public-SDK dev/test fixture', () => {
     expect(installedExtensions.pages.map(page => page.key)).toEqual([
       'documentation/search', 'documentation/functions',
       'settings/overview', 'settings/declared', 'shared-agents/overview', 'instances/overview',
-      'utilities/autotext', 'utilities/update', 'agent-source/overview', 'initial-prompt/overview',
+      'utilities/autotext', 'agent-source/overview', 'initial-prompt/overview',
     ]);
     expect(installedExtensions.panels.map(panel => panel.key)).toEqual(['agent-meta/overview']);
     expect(installedExtensions.actions).toEqual([]);

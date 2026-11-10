@@ -32,6 +32,18 @@
 .settings-field input:focus-visible { outline: none; border-color: var(--line-strong); }
 .settings-check { display: flex; align-items: flex-start; gap: var(--space-2); font-size: var(--font-sm); line-height: 1.5; cursor: pointer; }
 .settings-check input { margin-top: 3px; accent-color: var(--accent); }
+.settings-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.settings-kv { display: flex; flex-direction: column; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); overflow: hidden; }
+.settings-kv-row { display: grid; grid-template-columns: 130px 1fr; align-items: baseline; gap: var(--space-3); padding: 10px 14px; font-size: var(--font-sm); line-height: 1.5; }
+.settings-kv-row + .settings-kv-row { border-top: 1px solid var(--line); }
+.settings-kv dt { color: var(--text-secondary); }
+.settings-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.settings-kv-flag { color: var(--tool-error); font-weight: 500; }
+.settings-confirm { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border: 1px solid color-mix(in srgb, var(--tool-error) 30%, transparent); border-radius: var(--radius-md); background: color-mix(in srgb, var(--tool-error) 6%, var(--surface)); }
+.settings-confirm .settings-actions { justify-content: flex-end; }
+.settings-spinner { display: inline-block; vertical-align: -2px; animation: settings-spin .9s linear infinite; }
+@keyframes settings-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .settings-spinner { animation: none; } }
 
 .ssh-list { display: flex; flex-direction: column; gap: var(--space-4); }
 .ssh-card { padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); display: flex; flex-direction: column; gap: var(--space-4); }
