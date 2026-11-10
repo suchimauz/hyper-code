@@ -102,3 +102,8 @@
 .grid-table .grid-pick input:focus-visible { outline:2px solid var(--focus-ring); }
 .grid-table .grid-empty { padding:12px; text-align:center; color:var(--text-tertiary); cursor:default; }
 .grid-note { margin:6px 8px 0; color:var(--text-tertiary); font-size:11px; }
+
+/* Secret: native card, only the value field is an isolated same-origin document. */
+.secret-field-frame { display:block; width:calc(100% - 16px); height:50px; margin:0 8px 6px; border:0; background:transparent; color-scheme:normal; }
+.secret-hint { margin:0 8px; color:var(--text-tertiary); font-size:11px; line-height:16px; overflow-wrap:anywhere; }
+.secret-hint code { font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); }

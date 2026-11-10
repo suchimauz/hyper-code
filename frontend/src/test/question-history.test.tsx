@@ -24,7 +24,7 @@ describe('question reply history', () => {
  it('does not show pending durable inputs or special forms in reply history', () => {
   show([{ ...input('q1'), state: 'open' }], { idx: 1, ts: 1, type: 'input', kind: 'choice', inputId: 'q1', text: null });
   expect(screen.queryByRole('button')).toBeNull();
-  for (const kind of ['secret', 'tbank-login', 'redmine-approval']) expect(choiceResultId({ idx: 1, ts: 1, type: 'input', kind, inputId: 'q1', text: null })).toBeNull();
+  for (const kind of ['tbank-login', 'redmine-approval']) expect(choiceResultId({ idx: 1, ts: 1, type: 'input', kind, inputId: 'q1', text: null })).toBeNull();
  });
  it('uses native id, not API order, renders labels/Other and original details only after expansion', () => {
   show([input('q2'), input('q1')]);
@@ -53,8 +53,8 @@ describe('question reply history', () => {
   expect(screen.getByText('Данные вопроса недоступны')).toBeTruthy();
   expect(screen.queryByText('Original question?')).toBeNull();
  });
- it('does not project secret, bank or redmine envelopes, or assistant quoted text', () => {
-  for (const kind of ['secret', 'tbank-login', 'redmine-approval']) expect(choiceResultId(event('q1', kind))).toBeNull();
+ it('does not project bank or redmine envelopes, or assistant quoted text', () => {
+  for (const kind of ['tbank-login', 'redmine-approval']) expect(choiceResultId(event('q1', kind))).toBeNull();
   expect(choiceResultId({ ...event('q1'), type: 'assistant' })).toBeNull();
   expect(choiceResultId({ ...event('q1'), text: `Quoted ${event('q1').text}` })).toBeNull();
  });

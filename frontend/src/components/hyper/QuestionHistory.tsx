@@ -1,5 +1,5 @@
 import { createContext, useContext, useId, useState } from 'react';
-import { ChevronDown, ChevronUp, CircleCheck, CircleHelp, Table2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleCheck, CircleHelp, KeyRound, Table2 } from 'lucide-react';
 import type { ChatEvent } from '../../lib/hyper';
 import { choiceOptions, type ChoiceInput } from '../../lib/questions';
 import type { ConfirmInput } from '../../lib/confirms';
@@ -70,7 +70,8 @@ function gridSummary(input: GridInput) {
 }
 function answerSummary(input?: HistoryInput) {
   if (!input) return 'Данные вопроса недоступны';
-  if (input.state === 'cancelled') return input.kind === 'confirm' ? 'Подтверждение отменено' : 'Вопрос отменён';
+  if (input.state === 'cancelled') return input.kind === 'confirm' ? 'Подтверждение отменено' : input.kind === 'secret' ? 'Ввод секрета отменён' : 'Вопрос отменён';
+  if (input.kind === 'secret') return input.result?.ref ? `Сохранено в ${input.result.ref}` : 'Ответ не сохранён';
   if (input.kind === 'confirm') return confirmSummary(input);
   if (input.kind === 'grid') return gridSummary(input);
   const options = choiceOptions(input);
@@ -82,6 +83,7 @@ function answerSummary(input?: HistoryInput) {
 /** The same input/output sections as ToolBody, with human question/answer labels. */
 function QuestionBody({ input }: { input: HistoryInput }) {
   if (input.kind === 'confirm') return input.spec.details ? <p>{input.spec.details}</p> : null;
+  if (input.kind === 'secret') return <p>{input.spec.mode === 'otp' ? 'Одноразовый код' : input.spec.mode === 'text' ? 'Скрытое значение' : 'Пароль или ключ'} → <code>{input.spec.saveAs}</code> · значение скрыто</p>;
   if (input.kind === 'grid') return <p>{input.spec.multiple ? 'Выбор нескольких строк' : 'Выбор одной строки'}: {input.spec.columns.map(column => column.label).join(', ')}</p>;
   return <ul>{choiceOptions(input).map(option => <li key={option.value}><span>{option.label || option.value}</span>{option.description && <span> — {option.description}</span>}</li>)}{input.spec.allowOther && <li>Другое — свой вариант</li>}</ul>;
 }
@@ -103,7 +105,7 @@ function QuestionAnswer({ input, inputId }: { input?: HistoryInput; inputId: str
     </div></section>}
   </>;
 }
-function kindLabel(kind: HistoryInput['kind']) { return kind === 'confirm' ? 'Подтверждение' : kind === 'grid' ? 'Таблица' : 'Вопрос'; }
+function kindLabel(kind: HistoryInput['kind']) { return kind === 'confirm' ? 'Подтверждение' : kind === 'grid' ? 'Таблица' : kind === 'secret' ? 'Секрет' : 'Вопрос'; }
 export function QuestionHistory({ event, events = [event], agentId }: { event: ChatEvent; events?: ChatEvent[]; agentId: string }) {
   const inputs = useContext(QuestionHistoryContext);
   const [expanded, setExpanded] = useState(false);
@@ -113,7 +115,7 @@ export function QuestionHistory({ event, events = [event], agentId }: { event: C
   const count = items.length;
   const summary = count === 1 ? answerSummary(items[0].input) : items.map(item => item.input?.title || 'Вопрос недоступен').join(' · ');
   const kind = items[0].input?.kind ?? 'choice';
-  const Icon = kind === 'confirm' ? CircleCheck : kind === 'grid' ? Table2 : CircleHelp;
+  const Icon = kind === 'confirm' ? CircleCheck : kind === 'grid' ? Table2 : kind === 'secret' ? KeyRound : CircleHelp;
   const title = count === 1 ? kindLabel(kind) : 'Вопросы';
   return <article className="tool-row question-history" data-chat-flow-kind="question-history" data-event-idx={event.idx} data-input-id={choiceResultId(event)}>
     <button className="tool-row-summary question-history-toggle" type="button" aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(value => !value)}>

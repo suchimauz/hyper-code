@@ -7,10 +7,11 @@ afterEach(cleanup);
 const request = (id: string, kind: string): ChatEvent => ({ idx: 1, ts: 1, type: 'input', kind, inputId: id, text: null });
 const show = (input: HistoryInput) => render(<QuestionHistoryContext.Provider value={[input]}><QuestionHistoryList events={[request(input.id, input.kind)]} agentId="a" /></QuestionHistoryContext.Provider>);
 describe('confirm and grid history', () => {
-  it('accepts confirm and grid ids but not secret', () => {
+  it('accepts confirm, grid and secret ids but not private login forms', () => {
     expect(choiceResultId(request('c1', 'confirm'))).toBe('c1');
     expect(choiceResultId(request('g1', 'grid'))).toBe('g1');
-    expect(choiceResultId(request('s1', 'secret'))).toBeNull();
+    expect(choiceResultId(request('s1', 'secret'))).toBe('s1');
+    expect(choiceResultId(request('t1', 'tbank-login'))).toBeNull();
   });
   it('shows confirm decision and comment', () => {
     show({ id: 'c1', agentId: 'a', kind: 'confirm', title: 'Push?', state: 'submitted', spec: { details: 'main', confirmLabel: 'Пушим', declineLabel: 'Нет', danger: false }, result: { confirmed: true, comment: 'ок' } });
@@ -28,5 +29,16 @@ describe('confirm and grid history', () => {
   it('shows cancelled grid status', () => {
     show({ id: 'g2', agentId: 'a', kind: 'grid', title: 'Pick', state: 'cancelled', spec: { columns: [{ label: 'Язык' }], multiple: false }, result: null });
     expect(screen.getAllByText('Вопрос отменён').length).toBeGreaterThan(0);
+  });
+});
+describe('secret history', () => {
+  it('shows only the stored reference, never a value', () => {
+    show({ id: 's1', agentId: 'a', kind: 'secret', title: 'API key', state: 'submitted', spec: { saveAs: 'secret://test/demo', mode: 'password' }, result: { ref: 'secret://test/demo' } });
+    expect(screen.getByText('Секрет · 1')).toBeTruthy();
+    expect(screen.getByText('Сохранено в secret://test/demo')).toBeTruthy();
+  });
+  it('shows a cancelled secret request', () => {
+    show({ id: 's2', agentId: 'a', kind: 'secret', title: 'API key', state: 'cancelled', spec: { saveAs: 'secret://test/demo', mode: 'otp' }, result: null });
+    expect(screen.getByText('Ввод секрета отменён')).toBeTruthy();
   });
 });

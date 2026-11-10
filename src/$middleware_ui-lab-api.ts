@@ -7,6 +7,7 @@ export default async function(ctx: Context, session: Session | null, opts: {
     if (new URL(opts.req.url).pathname === '/ui-lab-api/choices') return ctx.fns.frontendBridge.choices({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/confirms') return ctx.fns.frontendBridge.confirms({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/grids') return ctx.fns.frontendBridge.grids({req:opts.req});
+    if (new URL(opts.req.url).pathname === '/ui-lab-api/secrets') return ctx.fns.frontendBridge.secrets({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/project-action') return ctx.fns.frontendBridge.projectAction({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/chat-header') return ctx.fns.frontendBridge.chatHeader({req:opts.req});
     if (new URL(opts.req.url).pathname === '/ui-lab-api/new-session') return ctx.fns.frontendBridge.newSession({req:opts.req});

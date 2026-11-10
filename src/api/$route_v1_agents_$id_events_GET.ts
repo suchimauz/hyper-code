@@ -1,6 +1,6 @@
 /**
  * Return a bounded transcript page, persistent mascot and live activity for native and web chat.
- * Choice input events expose identity only for history lookup; private forms and input HTML are never projected.
+ * Choice, confirm, grid and secret input events expose identity only for history lookup; private forms and input HTML are never projected.
  * Retry rows expose safe failure metadata and their latest durable lifecycle state, including markers outside this page.
  * turnStartedAt is the durable worker-claim time for the current running turn,
  * including provider/tool waits; queued or stopped turns have no clock.
@@ -117,7 +117,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
     }
 
     const mobileEvents = events
-        .filter((event: any) => (event.type === 'input' && ['choice', 'confirm', 'grid'].includes(event.kind) && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result", "llm_retry", "tool_busy", "tool_aborted", "goal_transition", "parked", "unparked", "model_changed", "team_update", "wake_up", "canvas_ping", "plan_activation", "goal_activation", "goal_check", "attempt", "attachment_event", "user_message"].includes(String(event.type)))
+        .filter((event: any) => (event.type === 'input' && ['choice', 'confirm', 'grid', 'secret'].includes(event.kind) && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result", "llm_retry", "tool_busy", "tool_aborted", "goal_transition", "parked", "unparked", "model_changed", "team_update", "wake_up", "canvas_ping", "plan_activation", "goal_activation", "goal_check", "attempt", "attachment_event", "user_message"].includes(String(event.type)))
         .map((event: any) => ({
             ...(event.type === 'input' ? { inputId: event.inputId, kind: event.kind } : {}),
             ...(event.type === 'llm_retry' ? {

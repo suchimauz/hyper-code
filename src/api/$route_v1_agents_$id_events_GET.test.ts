@@ -8,7 +8,7 @@ describe("GET /api/v1/agents/:id/events", () => {
             { idx: 1097, messageIdx: 1026, ts: 1794102189920, type: 'input', inputId: 'inbc7a809ea1b342b6', kind: 'choice', html: '<form>never expose</form>' },
             { idx: 1098, messageIdx: 1026, ts: 1794102189921, type: 'input', inputId: 'inconfirm', kind: 'confirm', html: '<form>never expose</form>' },
             { idx: 1099, messageIdx: 1026, ts: 1794102189922, type: 'input', inputId: 'ingrid', kind: 'grid', html: '<form>never expose</form>' },
-            ...['secret', 'tbank-login', 'redmine-approval'].map((kind, i) => ({ idx: 1100 + i, ts: 1, type: 'input', inputId: 'private', kind, html: 'private form' })),
+            ...['tbank-login', 'redmine-approval'].map((kind, i) => ({ idx: 1100 + i, ts: 1, type: 'input', inputId: 'private', kind, html: 'private form' })),
         ];
         const ctx: any = { state: {}, fns: { auth: { author: async () => null }, mentions: { parse: async () => [] }, procs: { db: { select: async ({ sql }: any) => sql.includes('SELECT 1') ? [{ exists: 1 }] : [{ run_state: 'idle', next_run_at: null }] } }, session: { getEvents: async () => events, getMaxEventIdx: async () => 1100 } } };
         const response = await route(ctx, null, { req: new Request('http://local/api/v1/agents/ebo/events'), params: { id: 'ebo' } });
@@ -117,7 +117,7 @@ test('lifecycle projection allowlists display fields without leaking arbitrary p
         {idx:1,ts:1,type:'team_update',event:'plan.completed',memberId:'b',summary:'done',private:'secret'},
         {idx:2,ts:1,type:'attachment_event',source:'telegram',payload:{text:'message',senderName:'Person',token:'secret'}},
         {idx:3,ts:1,type:'wake_up',watchId:'w',watchStatus:'ready',resultRef:{id:'stored',private:'secret'},result:{ok:true}},
-        {idx:4,ts:1,type:'input',inputId:'private',kind:'secret',prompt:'secret',html:'secret'},
+        {idx:4,ts:1,type:'input',inputId:'private',kind:'tbank-login',prompt:'secret',html:'secret'},
         {idx:5,ts:1,type:'assistant',html:'<p>saved respondHtml</p>'},
         {idx:6,ts:1,type:'assistant',html:'<p>explicit</p>',htmlSource:'assistant-answer'},
         {idx:7,ts:1,type:'user',html:'<p>untrusted</p>',htmlSource:'assistant-answer'},

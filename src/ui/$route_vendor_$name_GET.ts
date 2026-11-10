@@ -40,6 +40,13 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         css += '\n:root{--font-sans:var(--font-medeo-sans);--font-mono:var(--font-medeo-mono)}html{font-family:var(--font-sans);font-optical-sizing:auto}';
         return new Response(css, { headers });
     }
+    if (name === "tokens.css") {
+        // The React shell's design tokens, shared with server-rendered documents (secure input fields).
+        // Fonts come from medeo.css, so the package @imports are dropped.
+        const root = ctx.fns.procs.project.projectRoot({});
+        const css = (await Bun.file(root + "/frontend/src/styles/tokens.css").text()).replace(/^@import[^\n]*\n/gm, "");
+        return new Response(css, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache" } });
+    }
     const source = SOURCES[name];
     if (!source) return new Response("unknown asset", { status: 404 });
 

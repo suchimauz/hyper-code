@@ -8,6 +8,7 @@ import { clearConfirmComment, getConfirmInputs, pendingConfirm, submitConfirmInp
 import { GridCard } from './GridCard';
 import type { HistoryInput } from '../../lib/history';
 import { clearGridPicks, getGridInputs, pendingGrid, submitGridInput, type GridInputsState } from '../../lib/grids';
+import { getSecretInputs, type SecretInputsState } from '../../lib/secrets';
 
 /** Owns polling and the submit lock for an agent; key this boundary by agent id. */
 export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs, children, mascot }: { agentId: string; readOnly: boolean; onAccepted: () => void; onInputs?: (inputs: HistoryInput[]) => void; children: ReactNode; mascot?: ReactNode }) {
@@ -16,8 +17,9 @@ export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs,
   const [confirmClosed, setConfirmClosed] = useState<string[]>([]);
   const [gridState, setGridState] = useState<GridInputsState | null>(null);
   const [gridClosed, setGridClosed] = useState<string[]>([]);
+  const [secretState, setSecretState] = useState<SecretInputsState | null>(null);
   // History rows need every native kind; each source keeps its last good snapshot.
-  useEffect(() => { if (state || confirmState || gridState) onInputs?.([...(state?.inputs || []), ...(confirmState?.inputs || []), ...(gridState?.inputs || [])]); }, [state, confirmState, gridState, onInputs]);
+  useEffect(() => { if (state || confirmState || gridState || secretState) onInputs?.([...(state?.inputs || []), ...(confirmState?.inputs || []), ...(gridState?.inputs || []), ...(secretState?.inputs || [])]); }, [state, confirmState, gridState, secretState, onInputs]);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,6 +50,9 @@ export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs,
       // Grid inputs are their own native kind; same isolation as confirms.
       try { const next = await getGridInputs(agentId, signal); if (!disposed && !signal.aborted && attempt === generation.current) setGridState(next); }
       catch { /* Keep the last authoritative grid snapshot; the next poll retries. */ }
+      // Secret rows feed history only; the open card itself is rendered by SecureInputHost.
+      try { const next = await getSecretInputs(agentId, signal); if (!disposed && !signal.aborted && attempt === generation.current) setSecretState(next); }
+      catch { /* Keep the last secret history snapshot; the next poll retries. */ }
       finally { inFlight = false; }
     };
     void refresh(); const timer = window.setInterval(() => void refresh(), 4000);

@@ -38,6 +38,8 @@ export default async function (ctx: Context, session: Session | null, opts: {
             } catch (error) { return html(await ctx.fns.input.card({ id, error: String((error as Error).message) })); }
         }
         const out = await ctx.fns.input.submit({ id, values, cancel, actor });
+        // The isolated secret field asks for JSON: it reports only state/error to its React card.
+        if ((opts.req.headers.get("accept") ?? "").includes("application/json")) return Response.json({ state: out.state, error: out.error ?? null }, { headers: { "cache-control": "no-store" } });
         return html(await ctx.fns.input.card({ id, error: out.error ?? null }));
     } catch (error: any) {
         return Response.json({ error: String(error?.message ?? error) }, { status: 404 });

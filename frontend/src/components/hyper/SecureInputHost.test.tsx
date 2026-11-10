@@ -1,16 +1,30 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { SecureInputHost } from './SecureInputHost';
-vi.mock('../../lib/hyper', () => ({ requestJson: vi.fn(async () => ({ inputs: [{id:'s',kind:'secret',title:'Secret'},{id:'r',kind:'redmine-approval',title:'Approve'}] })) }));
+vi.mock('../../lib/hyper', () => ({ requestJson: vi.fn(async () => ({ inputs: [{id:'s',kind:'secret',title:'Secret',message:'Paste key',saveAs:'secret://test/demo',mode:'password'},{id:'t',kind:'redmine-time',title:'Time'},{id:'r',kind:'redmine-approval',title:'Approve'}] })) }));
 afterEach(cleanup);
-test('secret opens isolated document only after click; approval uses top-level protected page', async () => {
+test('secret renders a native card; only the value field is an isolated frame', async () => {
  const {container}=render(<SecureInputHost agentId="a" />);
- const button=await screen.findByRole('button',{name:/Secret/});
- expect(container.querySelector('iframe')).toBeNull();
- fireEvent.click(button);
- const frame=container.querySelector('iframe')!;
- expect(frame.getAttribute('src')).toBe('/input/compat?agentId=a&id=s&theme=light');
+ const card=await screen.findByRole('region',{name:'Secret'});
+ expect(card.className).toContain('question-card');
+ expect(screen.getByText('Paste key')).toBeTruthy();
+ expect(screen.getByText('secret://test/demo')).toBeTruthy();
+ const frame=card.querySelector('iframe')!;
+ expect(frame.getAttribute('src')).toBe('/input/compat?agentId=a&id=s&theme=light&view=field');
  expect(frame.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-same-origin');
  expect(frame.hasAttribute('srcdoc')).toBe(false);
+ const save=screen.getByRole('button',{name:'Сохранить'}) as HTMLButtonElement;
+ expect(save.disabled).toBe(true);
+ window.dispatchEvent(new MessageEvent('message',{origin:'http://evil',data:{source:'hyper-secret',id:'s',state:'ready'}}));
+ expect(save.disabled).toBe(true);
+ expect(container.querySelectorAll('iframe')).toHaveLength(1);
+});
+test('other secure kinds open after click; approval uses top-level protected page', async () => {
+ const {container}=render(<SecureInputHost agentId="a" />);
+ const button=await screen.findByRole('button',{name:/Time/});
+ expect(container.querySelectorAll('iframe')).toHaveLength(1);
+ fireEvent.click(button);
+ const frames=[...container.querySelectorAll('iframe')].map(f=>f.getAttribute('src'));
+ expect(frames).toContain('/input/compat?agentId=a&id=t&theme=light');
  const link=screen.getByRole('link');expect(link.getAttribute('target')).toBe('_blank');expect(link.getAttribute('href')).toContain('id=r');
 });
