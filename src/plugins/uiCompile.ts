@@ -35,14 +35,15 @@ export default async function (
     const applications: Record<string, string> = {};
     try {
         if (typeof ui !== 'object' || Array.isArray(ui)) throw new Error('procs.ui must be an object');
-        const unknown = Object.keys(ui).filter(k => !['entry', 'pages', 'panels', 'actions', 'canvasKinds', 'canvasLaunchers', 'sidebarNavigation', 'applications'].includes(k));
+        const unknown = Object.keys(ui).filter(k => !['entry', 'pages', 'panels', 'actions', 'canvasKinds', 'canvasLaunchers', 'sidebarNavigation', 'inputKinds', 'applications'].includes(k));
         if (unknown.length) throw new Error('Unknown procs.ui keys: ' + unknown.join(', '));
         entry = ui.entry ?? entry;
         if (typeof entry !== 'string' || !/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_.-]+)*\.(?:tsx|ts|jsx|js)$/.test(entry) || entry.split('/').includes('..')) throw new Error('procs.ui.entry must be a safe plugin-relative script path');
-        grants = { pages: list(ui.pages, 'pages'), panels: list(ui.panels, 'panels'), actions: list(ui.actions, 'actions'), canvasKinds: list(ui.canvasKinds, 'canvasKinds'), ...(ui.canvasLaunchers === undefined ? {} : { canvasLaunchers: list(ui.canvasLaunchers, 'canvasLaunchers') }), ...(ui.sidebarNavigation === undefined ? {} : { sidebarNavigation: list(ui.sidebarNavigation, 'sidebarNavigation') }) };
+        grants = { ...(ui.inputKinds === undefined ? {} : { inputKinds: list(ui.inputKinds, 'inputKinds') }), pages: list(ui.pages, 'pages'), panels: list(ui.panels, 'panels'), actions: list(ui.actions, 'actions'), canvasKinds: list(ui.canvasKinds, 'canvasKinds'), ...(ui.canvasLaunchers === undefined ? {} : { canvasLaunchers: list(ui.canvasLaunchers, 'canvasLaunchers') }), ...(ui.sidebarNavigation === undefined ? {} : { sidebarNavigation: list(ui.sidebarNavigation, 'sidebarNavigation') }) };
         for (const id of [...grants.pages, ...grants.panels, ...grants.actions, ...(grants.canvasLaunchers ?? [])]) if (!/^[a-z][a-z0-9-]{0,63}$/.test(id)) throw new Error('Invalid surface id: ' + id);
         for (const id of grants.sidebarNavigation ?? []) if (!grants.pages.includes(id)) throw new Error('procs.ui.sidebarNavigation must reference a requested page: ' + id);
         for (const kind of grants.canvasKinds) if (!namespaces.some(ns => kind.startsWith(ns + '.'))) throw new Error(`Canvas kind ${kind} must start with a namespace of this plugin (${namespaces.join(', ')})`);
+        for (const kind of grants.inputKinds ?? []) if (!/^[a-z][a-zA-Z0-9.-]{0,99}$/.test(kind) || ['secret', 'choice', 'confirm', 'grid'].includes(kind) || !(kind.startsWith(mod.name + '.') || kind.startsWith(mod.name + '-'))) throw new Error(`Input kind ${kind} must belong to plugin ${mod.name}`);
         if (ui.applications !== undefined) {
             if (!ui.applications || typeof ui.applications !== 'object' || Array.isArray(ui.applications)) throw new Error('procs.ui.applications must be an object');
             for (const [href, page] of Object.entries(ui.applications)) {

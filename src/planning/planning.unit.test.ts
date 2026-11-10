@@ -16,11 +16,11 @@ function fixture() {
  let notifications=0;
  const req=new Request('http://local/agent/a/planning/review',{method:'POST',headers:{'x-csrf-token':'ok'}});
  const session:any={req,user:{id:'owner'}};
- const ctx:any={state:{agent:{a:{id:'a',activeRunCount:0}}},fns:{}};
+ const ctx:any={state:{input:{kinds:{'planning-review':{completionAuthority:{}}}},agent:{a:{id:'a',activeRunCount:0}}},fns:{}};
  const db={
   transaction:async({fn}:any)=>{const before=structuredClone(state);try{return await fn();}catch(e){state=before;throw e;}},
   select:async({sql,params}:any)=>{
-   if(sql.includes('FROM agents')) return [{id:'a',run_state:state.runState,archived_at:null,next_run_at:state.queued}];
+   if(sql.includes('FROM agents')) return [{id:'a',run_state:state.runState,archived_at:state.archivedAt??null,next_run_at:state.queued}];
    if(sql.includes('FROM agent_planning')) return state.mode?[{mode:state.mode,revision:state.revision,proposal:structuredClone(state.proposal)}]:[];
    if(sql.includes('FROM agent_command_requests')) return state.requests[params[1]]?[state.requests[params[1]]]:[];
    if(sql.includes('FROM messages')) return [];
@@ -42,7 +42,14 @@ function fixture() {
    return {changes:1,rows:[]};
   },
  };
- ctx.fns={procs:{db},projects:{principal:async()=> 'user:owner'},auth:{verifyCsrf:async({token}:any)=>token==='ok'},agent:{current:async()=>({id:'a'}),renderEventHtml:async()=>'<p>event</p>'},session:{appendMessage:async({message}:any)=>{state.messages.push(message);return {idx:state.messages.length-1};},appendEvent:async({event}:any)=>state.events.push(event)},planning:{read:(o:any)=>read(ctx,session,o),assertIdle:(o:any)=>assertIdle(ctx,session,o),publish:async()=>{notifications++;}},commands:{recordEvent:async(event:any)=>state.events.push(event),list:()=>list(ctx,session,{}),parse:(o:any)=>parse(ctx,session,o)},input:{get:async({id}:any)=>state.inputs[id]}};
+ ctx.fns={procs:{db,events:{refresh:()=>{}}},projects:{principal:async()=> 'user:owner'},auth:{verifyCsrf:async({token}:any)=>token==='ok'},agent:{wakeWorker:()=>{},current:async()=>({id:'a'}),renderEventHtml:async()=>'<p>event</p>'},session:{syncAgentState:async()=>{},appendMessage:async({message}:any)=>{state.messages.push(message);return {idx:state.messages.length-1};},appendEvent:async({event}:any)=>state.events.push(event)},planning:{read:(o:any)=>read(ctx,session,o),assertIdle:(o:any)=>assertIdle(ctx,session,o),publish:async()=>{notifications++;}},commands:{recordEvent:async(event:any)=>state.events.push(event),list:()=>list(ctx,session,{}),parse:(o:any)=>parse(ctx,session,o)},input:{get:async({id}:any)=>state.inputs[id],isWaiting:async()=>Object.values(state.inputs).some((i:any)=>i.state==='open'&&i.spec?._agentWait===true),complete:async(o:any)=>{
+  expect(o.authority).toBe(ctx.state.input.kinds['planning-review'].completionAuthority);
+  const input=state.inputs[o.id]; if(input?.state!=='open') return {completed:false,scheduled:false};
+  input.state=o.state;input.result=o.result;state.messages.push({content:o.summary,result:o.result,message_type:'input'});
+  const scheduled=!state.stopped&&!state.paused&&!await ctx.fns.input.isWaiting({agentId:'a'});
+  if(scheduled) state.queued=Date.now();
+  return {completed:true,scheduled};
+ }}};
  const command=(text:string,key=text)=>dispatch(ctx,session,{agentId:'a',text,requestId:key});
  const proposal=(plan='Exact plan\n1. Read only\n2. Report')=>propose(ctx,session,{plan});
  const decide=(decision:'approve'|'keep',revision=state.revision,id=state.proposal?.id)=>review(ctx,session,{req,agentId:'a',proposalId:id,decision,expectedRevision:revision});
@@ -103,11 +110,11 @@ test('approve binds revision and exact text, atomically queues once, duplicate i
  expect(f.state().messages[0].content).toContain('EXACT <text>\nline two');expect(f.state().messages).toHaveLength(1);
  expect(await f.decide('approve',p.revision)).toMatchObject({duplicate:true});expect(f.state().messages).toHaveLength(1);
 });
-test('keep does not queue; superseded or cancelled input cannot approve; CAS failure rolls back mode',async()=>{
+test('keep delivers a result and resumes planning; superseded or cancelled input cannot approve',async()=>{
  const f=fixture();await f.command('/plan');const first=await f.proposal();await f.decide('keep');
- expect(f.state().mode).toBe('plan');expect(f.state().queued).toBeNull();expect(f.state().messages).toHaveLength(0);
+ expect(f.state().mode).toBe('plan');expect(f.state().queued).not.toBeNull();expect(f.state().messages).toHaveLength(1);
  const second=await f.proposal('revised');await expect(f.decide('approve',first.revision,first.proposal!.id)).rejects.toThrow('no longer current');
- f.state().inputs[second.proposal!.inputId].state='cancelled';await expect(f.decide('approve')).rejects.toThrow('no longer open');expect(f.state().mode).toBe('plan');expect(f.state().proposal.status).toBe('pending');
+ f.state().queued=null;f.state().inputs[second.proposal!.inputId].state='cancelled';await expect(f.decide('approve')).rejects.toThrow('no longer open');expect(f.state().mode).toBe('plan');expect(f.state().proposal.status).toBe('pending');
 });
 test('review rejects non-request caller and invalid CSRF; fresh prompt and fork preserve mode only',async()=>{
  const f=fixture();await f.command('/plan');const p=await f.proposal();
@@ -145,4 +152,29 @@ test('fresh prompt explains semantic entry and research-first planning',async()=
  await enter(f.ctx,null,{});
  const planning=await prompt(f.ctx,null,{agentId:'a'});
  for(const text of ['Phase 1','Phase 2','Phase 3','planning.propose','Approve','not a sandbox']) expect(planning).toContain(text);
+});
+
+test('review waits explicitly and accepts queued work only while a durable gate exists',async()=>{
+ const f=fixture();await f.command('/plan');const p=await f.proposal();
+ expect(f.state().inputs[p.proposal!.inputId].spec._agentWait).toBe(true);
+ f.state().queued=123;
+ for(const runState of ['running','claimed']) {f.state().runState=runState;await expect(f.decide('approve')).rejects.toThrow('Stop');}
+ f.state().runState='idle';f.ctx.state.agent.a.activeRunCount=1;await expect(f.decide('approve')).rejects.toThrow('Stop');
+ f.ctx.state.agent.a.activeRunCount=0;
+ expect(await f.decide('approve')).toMatchObject({scheduled:true});
+});
+test('review delivers once but does not resume past other gates, Stop or task pause',async()=>{
+ for(const decision of ['approve','keep'] as const) for(const gate of ['other','stopped','paused']) {
+  const f=fixture();await f.command('/plan');await f.proposal();
+  if(gate==='other') f.state().inputs.other={state:'open',spec:{_agentWait:true}};else f.state()[gate]=true;
+  expect(await f.decide(decision)).toMatchObject({scheduled:false});
+  expect(f.state().queued).toBeNull();expect(f.state().messages).toHaveLength(1);
+  expect(f.state().mode).toBe(decision==='approve'?'execute':'plan');
+  expect(await f.decide(decision)).toMatchObject({duplicate:true,scheduled:false});
+ }
+});
+test('archived review does not change proposal, deliver or schedule',async()=>{
+ const f=fixture();await f.command('/plan');await f.proposal();f.state().archivedAt=1;
+ await expect(f.decide('approve')).rejects.toThrow('archived');
+ expect(f.state().proposal.status).toBe('pending');expect(f.state().messages).toHaveLength(0);expect(f.state().queued).toBeNull();
 });

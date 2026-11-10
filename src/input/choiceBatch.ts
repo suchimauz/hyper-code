@@ -34,6 +34,11 @@ export default async function (
      if(!agents.length)throw new Error('Stale batch');
      const s=await snapshot(true);
      if(s.revision!==opts.revision || s.choices.some((r:any)=>r.state!=='open') || s.inputIds.length!==opts.answers!.length || new Set(opts.answers!.map(a=>a.id)).size!==s.inputIds.length || opts.answers!.some(a=>!s.inputIds.includes(a.id)))throw new Error('Stale batch');
+     const due=s.choices.filter((r:any)=>{const spec=typeof r.spec==='string'?JSON.parse(r.spec):r.spec;return typeof spec?._expiresAt==='number' && spec._expiresAt<=Date.now();});
+     if(due.length){
+      for(const row of due) await ctx.fns.input.complete({id:row.id,state:'expired',summary:'Input expired before an answer was received',actor:'system:expiry'});
+      return {revision:s.revision,inputIds:s.inputIds,state:'expired'};
+     }
      const outcomes=[];
      for(const row of s.choices){
       const answer=opts.answers!.find(a=>a.id===row.id)!;
@@ -56,7 +61,7 @@ export default async function (
       const content='<input-result id="'+attr(input.id)+'" kind="choice" state="submitted" title="'+attr(input.title)+'">\n'+outcome.summary+'\n'+JSON.stringify(outcome.result)+'\n</input-result>';
       await ctx.fns.session.appendMessage({id:opts.agentId,message:{role:'user',content,message_type:'input',author:opts.actor},ts:now});
      }
-     await ctx.fns.procs.db.run({sql:"UPDATE agents SET next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=? AND archived_at IS NULL AND stopped_at IS NULL AND NOT EXISTS (SELECT 1 FROM inputs WHERE agent_id=? AND state IN ('open','processing') AND spec->>'_agentWait'='true')",params:[now,now,opts.agentId,opts.agentId]});
+     await ctx.fns.procs.db.run({sql:"UPDATE agents SET next_run_at=GREATEST(COALESCE(next_run_at,0),?), updated_at=? WHERE id=? AND archived_at IS NULL AND stopped_at IS NULL AND NOT EXISTS (SELECT 1 FROM inputs WHERE agent_id=? AND state IN ('open','processing') AND spec->>'_agentWait'='true') AND NOT (COALESCE(scratchpad::jsonb,'{}'::jsonb)->'plan'->>'pausedAt' IS NOT NULL)",params:[now,now,opts.agentId,opts.agentId]});
      return {revision:s.revision,inputIds:s.inputIds,state:'submitted'};
     }});
     const live=(ctx.state as any).agent?.[opts.agentId];if(live)await ctx.fns.session.syncAgentState({agent:live});

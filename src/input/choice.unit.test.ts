@@ -39,7 +39,7 @@ async function fixture(multiple = false) {
             } else if (!sql.startsWith('UPDATE agents')) throw new Error(`Unexpected SQL: ${sql}`);
             return { rows: [] };
         },
-        select: async () => [],
+        select: async ({sql}: {sql:string}) => sql.includes('archived_at IS NULL') ? [{id:input.agentId}] : [],
         transaction: async ({ fn }: { fn: () => Promise<void> }) => fn(),
     };
     ctx.fns.procs.events = { refresh() {} };
@@ -54,7 +54,7 @@ async function fixture(multiple = false) {
         const body = new URLSearchParams();
         for (const [key, value] of new window.FormData(form)) body.append(key, String(value));
         if (button.name) body.append(button.name, button.value);
-        return post(ctx, null, { params: { id: input.id }, req: new Request('http://fixture/input/fixture', {
+        return post(ctx, {user:{id:'owner',role:'owner'}} as any, { params: { id: input.id }, req: new Request('http://fixture/input/fixture', {
             method: 'POST', headers: { 'x-csrf-token': 'fixture' }, body,
         }) });
     };

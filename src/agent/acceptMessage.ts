@@ -3,6 +3,8 @@
  *
  * Shared existing chat HTTP submission pipeline; callers must authenticate and resolve the durable agent before calling.
  * A newly accepted human turn resumes a paused plan atomically with enqueueing. Duplicate retries do not resume it.
+ * Ordinary turns submitted during a durable input wait are queued with their exact attachments, without resuming a stopped agent.
+ * Queue promotion returns input_waiting (409) while the gate remains active.
  * Archived chats return 409 before body processing; a row-lock recheck prevents concurrent archive from accepting uploads or a turn.
  * @param opts.req Text or multipart chat request.
  * @param opts.params Route values containing the existing agent id.
@@ -77,6 +79,7 @@ export default async function (
         const declared = await ctx.fns.settings.getNumber({ module: 'agent', scopeType: 'global', key: 'debounceMs' });
         const sendAt = ts + (explicitSeconds != null ? Math.max(0, Number(explicitSeconds) * 1000) : (perAgent ?? declared ?? 5000));
         let uploads: Awaited<ReturnType<typeof ctx.fns.attachments.saveUploads>> = [];
+        let queued: { ok: true; queued: true; queueId: string; version: number; duplicate?: boolean } | undefined;
         // Cheap preflight avoids repeated file work for completed keys. The same
         // check is repeated under the transaction lock to handle racing requests.
         if (requestId) {
@@ -109,6 +112,20 @@ export default async function (
                     const locked = (await ctx.fns.procs.db.select({ sql: 'SELECT id, archived_at, run_token, run_state, stopped_at, last_processed_msg_idx FROM agents WHERE id=? FOR UPDATE', params: [id] }))[0];
                     if (!locked) throw new Error('SUBMISSION_NOT_FOUND');
                     if (locked.archived_at != null) throw new Error('SUBMISSION_ARCHIVED');
+                    const waitingForInput = await ctx.fns.input.isWaiting({ agentId: id });
+                    if (opts.queue && waitingForInput) throw new Error('SUBMISSION_INPUT_WAITING');
+                    if (!opts.queue) {
+                        const prior = requestId ? (await ctx.fns.procs.db.select({ sql: 'SELECT id,version,fingerprint FROM agent_turn_queue WHERE agent_id=? AND request_id=?', params: [id, requestId] }))[0] : undefined;
+                        if (prior || waitingForInput) {
+                            const queueFiles = await Promise.all(files.map(async file => ({ name: file.name, type: file.type, size: file.size, data: Buffer.from(await file.arrayBuffer()).toString('base64') })));
+                            const queueFingerprint = new Bun.CryptoHasher('sha256').update(JSON.stringify({ text, files: queueFiles })).digest('hex');
+                            if (prior && prior.fingerprint !== queueFingerprint) throw new Error('SUBMISSION_CONFLICT');
+                            const queueId = prior?.id ?? crypto.randomUUID();
+                            if (!prior) await ctx.fns.procs.db.run({ sql: 'INSERT INTO agent_turn_queue(id,agent_id,request_id,fingerprint,text,files,created_at) VALUES(?,?,?,?,?,?::jsonb,?)', params: [queueId,id,requestId || crypto.randomUUID(),queueFingerprint,text,JSON.stringify(queueFiles),ts] });
+                            queued = { ok: true, queued: true, queueId, version: prior ? Number(prior.version) : 1, ...(prior ? { duplicate: true } : {}) };
+                            return { idx: -1, duplicate: !!prior };
+                        }
+                    }
                     if (opts.queue) {
                         const q = (await ctx.fns.procs.db.select({sql:"SELECT id,version,status FROM agent_turn_queue WHERE agent_id=? AND id=? FOR UPDATE",params:[id,opts.queue.id]}))[0];
                         if (!q || q.status !== 'pending' || Number(q.version) !== opts.queue.version) throw new Error('SUBMISSION_CONFLICT');
@@ -152,11 +169,17 @@ export default async function (
                 const message = String(error instanceof Error ? error.message : error);
                 if (message === 'SUBMISSION_ARCHIVED') return Response.json({ error: 'archived', message: 'Restore this archived chat before sending messages' }, { status: 409 });
                 if (message === 'SUBMISSION_NOT_FOUND') return Response.json({ error: 'not_found' }, { status: 404 });
+                if (message === 'SUBMISSION_INPUT_WAITING') return Response.json({ error: 'input_waiting' }, { status: 409 });
                 if (message === 'SUBMISSION_UPLOAD_FAILED') return Response.json({ error: String(error instanceof Error ? error.cause : error) }, { status: 400 });
                 if (message === 'SUBMISSION_CONFLICT') return Response.json({ error: 'Этот ключ уже использован или прежняя отправка не завершена. Проверьте историю чата.' }, { status: 409 });
                 if (attempt >= 9 || !/duplicate key|messages_pkey|events_pkey|deadlock detected|serialization failure/i.test(message)) throw error;
                 await Bun.sleep(3 + Math.random() * 20 * (attempt + 1));
             }
+        }
+        if (queued) {
+            try { ctx.fns.events.emitAgentsChanged({ agentId: id, reason: 'turn-queue' }); }
+            catch (error) { console.warn('Turn queued; notification failed', id, error); }
+            return Response.json(queued);
         }
         if (userAppend.duplicate) {
             if (req.headers.get('hx-request') === 'true') return new Response(null, { status: 204, headers: { 'x-chat-message-idx': String(userAppend.idx) } });

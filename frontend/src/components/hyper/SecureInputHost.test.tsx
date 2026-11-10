@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { requestJson } from '../../lib/hyper';
 import { SecureInputHost } from './SecureInputHost';
 vi.mock('../../lib/hyper', () => ({ requestJson: vi.fn(async () => ({ inputs: [{id:'s',kind:'secret',title:'Secret',message:'Paste key',saveAs:'secret://test/demo',mode:'password'},{id:'t',kind:'redmine-time',title:'Time'},{id:'r',kind:'redmine-approval',title:'Approve'}] })) }));
 afterEach(cleanup);
@@ -27,4 +28,14 @@ test('other secure kinds open after click; approval uses top-level protected pag
  const frames=[...container.querySelectorAll('iframe')].map(f=>f.getAttribute('src'));
  expect(frames).toContain('/input/compat?agentId=a&id=t&theme=light');
  const link=screen.getByRole('link');expect(link.getAttribute('target')).toBe('_blank');expect(link.getAttribute('href')).toContain('id=r');
+});
+
+test('unapproved arbitrary plugin has visible safe fallback; core native kinds are not duplicated', async () => {
+ vi.mocked(requestJson).mockResolvedValueOnce({ inputs: [{id:'x',kind:'example-review',title:'Plugin review'}, ...['choice','confirm','grid','planning-review'].map(kind=>({id:kind,kind,title:kind}))] } as never);
+ render(<SecureInputHost agentId="a" />);
+ fireEvent.click(await screen.findByRole('button',{name:/Plugin review/}));
+ expect(screen.getByTitle('Plugin review').getAttribute('src')).toContain('id=x');
+ expect(screen.getByText(/восстановите её плагин/)).toBeTruthy();
+ expect(screen.getByText('Ожидают ответа или обработки: 5')).toBeTruthy();
+ for(const kind of ['choice','confirm','grid','planning-review']) expect(screen.queryByRole('button',{name:new RegExp(kind)})).toBeNull();
 });

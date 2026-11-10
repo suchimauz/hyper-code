@@ -4,6 +4,11 @@ import type { ComponentType } from 'react';
 export type ExtensionContext = Readonly<{ agentId: string | null; theme: 'light' | 'dark'; readOnly: boolean }>;
 export type ExtensionViewProps = { context: ExtensionContext };
 export type ExtensionCanvasProps = ExtensionViewProps & { item: Readonly<{ id: number; kind: string; args: Record<string, unknown>; state: Record<string, unknown> }> };
+/** Safe server-projected input metadata; never contains completion capabilities or secrets. */
+export type ExtensionInput = Readonly<{ id: string; kind: string; title: string; message?: string; spec?: Record<string, unknown>; state?: string }>;
+/** onDone only refreshes authoritative server state; it never approves or completes an input. */
+export type ExtensionInputProps = ExtensionViewProps & { input: ExtensionInput; onDone: () => void };
+export type ExtensionInputKind = { kind: string; component: ComponentType<ExtensionInputProps> };
 export type ExtensionCanvasKind = { kind: string; component: ComponentType<ExtensionCanvasProps> };
 /** Props of a Start-page launcher tab: a local browser tab, unmounted when closed. */
 export type ExtensionLauncherProps = ExtensionViewProps & { tabId: string; active: boolean };
@@ -24,16 +29,19 @@ export type UiExtension = {
   sidebarNavigation?: readonly { page: string; title: string }[];
   panels?: readonly ExtensionPanel[];
   canvasKinds?: readonly ExtensionCanvasKind[];
+  /** Plugin-owned input cards; explicit inputKinds grants are required. */
+  inputKinds?: readonly ExtensionInputKind[];
   /** Start-page buttons opening local Canvas tabs; each also requires a canvasLaunchers grant. */
   canvasLaunchers?: readonly ExtensionCanvasLauncher[];
   actions?: readonly ExtensionAction[];
 };
-export type ExtensionGrant = Readonly<{ pages?: readonly string[]; sidebarNavigation?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[]; canvasLaunchers?: readonly string[] }>;
+export type ExtensionGrant = Readonly<{ inputKinds?: readonly string[]; pages?: readonly string[]; sidebarNavigation?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[]; canvasLaunchers?: readonly string[] }>;
 export type RegisteredView = Readonly<{ key: string; title: string; component: ComponentType<ExtensionViewProps> }>;
 /** A granted launcher; `icon` is resolved (launcher icon, else plugin icon, else null → default). */
 export type RegisteredLauncher = Readonly<Omit<ExtensionCanvasLauncher, 'icon'> & { key: string; icon: string | null }>;
 export type RegisteredAction = Readonly<ExtensionAction & { key: string }>;
 export type ExtensionRegistry = Readonly<{
+  inputKinds: readonly Readonly<ExtensionInputKind & { key: string }>[];
   pages: readonly RegisteredView[];
   navigation: readonly Readonly<{ key: string; title: string }>[];
   sidebarNavigation: readonly Readonly<{ key: string; title: string }>[];

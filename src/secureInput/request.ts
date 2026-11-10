@@ -42,6 +42,7 @@ export default async function (
     if (!["otp", "password", "text"].includes(kind)) throw new Error("secureInput.request: invalid kind");
     const out = await ctx.fns.input.request({
         kind: "secret",
+        waitForAnswer: true,
         title: opts.title,
         message: opts.message,
         spec: { saveAs: opts.saveAs, mode: kind, ...(opts.maxlength ? { maxlength: opts.maxlength } : {}) },

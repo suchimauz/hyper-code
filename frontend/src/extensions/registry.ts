@@ -3,6 +3,7 @@ import type { ExtensionGrant, ExtensionRegistry, UiExtension } from './types';
 /** Build a snapshot from an explicit host allowlist; ungranted entries never reach a slot.
  * `icons` maps extension id → its plugin icon, the default for launchers without their own. */
 export function createExtensionRegistry(extensions: readonly UiExtension[], grants: Readonly<Record<string, ExtensionGrant>>, icons: Readonly<Record<string, string | null | undefined>> = {}): ExtensionRegistry {
+  const inputKinds: ExtensionRegistry['inputKinds'][number][] = [];
   const pages: ExtensionRegistry['pages'][number][] = [];
   const navigation: ExtensionRegistry['navigation'][number][] = [];
   const sidebarNavigation: ExtensionRegistry['sidebarNavigation'][number][] = [];
@@ -27,6 +28,15 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
         if (kind === 'actions') actions.push(Object.freeze({ ...entry, key }) as ExtensionRegistry['actions'][number]);
         else (kind === 'pages' ? pages : panels).push(Object.freeze({ ...entry, key }) as ExtensionRegistry['pages'][number]);
       }
+    }
+    const seenInputs = new Set<string>();
+    for (const entry of extension.inputKinds ?? []) {
+      if (!/^[a-z][a-zA-Z0-9.-]{0,99}$/.test(entry.kind) || seenInputs.has(entry.kind) || typeof entry.component !== 'function') throw new Error(`Invalid input kind: ${entry.kind}`);
+      seenInputs.add(entry.kind);
+      if (!grant?.inputKinds?.includes(entry.kind)) continue;
+      if (['secret', 'choice', 'confirm', 'grid'].includes(entry.kind) || !(entry.kind.startsWith(extension.id + '-') || entry.kind.startsWith(extension.id + '.'))) throw new Error(`Input kind must belong to extension: ${entry.kind}`);
+      if (inputKinds.some(kind => kind.kind === entry.kind)) throw new Error(`Duplicate input kind: ${entry.kind}`);
+      inputKinds.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.kind}` }));
     }
     const seenKinds = new Set<string>();
     for (const entry of extension.canvasKinds ?? []) {
@@ -56,5 +66,5 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
     }
     }
   }
-  return Object.freeze({ sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), canvasLaunchers: Object.freeze(canvasLaunchers), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
+  return Object.freeze({ inputKinds: Object.freeze(inputKinds), sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), canvasLaunchers: Object.freeze(canvasLaunchers), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
 }

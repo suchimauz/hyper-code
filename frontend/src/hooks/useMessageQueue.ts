@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { changeQueue, enqueueMessage, getQueue, type QueueItem } from '../lib/queue';
 
 export function useMessageQueue(agentId: string, onAccepted: () => void) {
+  const [waitingForInput, setWaitingForInput] = useState(false);
   const [items, setItems] = useState<QueueItem[]>([]);
   const [sending, setSending] = useState<QueueItem | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -18,6 +19,7 @@ export function useMessageQueue(agentId: string, onAccepted: () => void) {
       try {
         const result = await getQueue(agentId, signal);
         if (mounted.current && current === generation.current) {
+          setWaitingForInput(result.waitingForInput === true);
           setItems((result.items || []).filter(item => item.status === 'pending').sort((a, b) => a.sequence - b.sequence)); setError('');
           if (clearSending) setSending(null);
         }
@@ -28,6 +30,7 @@ export function useMessageQueue(agentId: string, onAccepted: () => void) {
   }, [agentId]);
   useEffect(() => {
     mounted.current = true; const controller = new AbortController();
+    setWaitingForInput(false); setItems([]); setSending(null); setProcessing(null); setError('');
     void refresh(controller.signal);
     const poll = () => { if (!document.hidden && !locked.current && !reading.current) void refresh(controller.signal); };
     const timer = setInterval(poll, 2000);
@@ -50,5 +53,5 @@ export function useMessageQueue(agentId: string, onAccepted: () => void) {
     finally { if (mounted.current) { await refresh(); setProcessing(null); if (failure) setError(failure); } locked.current = false; }
     return success;
   };
-  return { items, sending, processing, error, refresh, enqueue, perform };
+  return { waitingForInput, items, sending, processing, error, refresh, enqueue, perform };
 }

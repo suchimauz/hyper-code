@@ -1,26 +1,56 @@
-// `$input_<kind>.ts` — a kind of form an agent can put into the chat and wait
-// for (secret, confirm, choice, grid, …). Any module or plugin may declare one:
-// default-export a types.input.Kind and a named `hint` that tells agents what
-// the kind is for and what its spec looks like. Later roots override earlier
-// ones by name, so a plugin can replace a core kind.
+// `$input_<kind>.ts` declares a chat form. Later roots may replace a kind only
+// when they belong to the same mounted owner; module paths are not identities.
 
 /**
- * Registers `$input_<kind>.ts` definitions in ctx.state.input.kinds.
- * @param opts.entries The classified input-kind files to register.
+ * Registers input kinds with mounted-source ownership checks before importing them.
+ * Built-in kinds stay core-owned; other owners register only their own name prefix.
+ * @param opts.entries Classified source entries; metadata-free hot reloads must match a trusted boot entry.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { entries: any[] }): Promise<void> {
+    const { resolve, relative, isAbsolute } = await import("node:path");
     const state = ((ctx.state as any).input ??= {}) as types.input.State;
     const kinds = (state.kinds ??= {});
+    const boot = ctx.state.procs.boot.entries ?? [];
+    const mounted = ctx.fns.procs.modules.list({});
+    const within = (base: string, path: string) => {
+        const rel = relative(resolve(base), resolve(path));
+        return rel === "" || (rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel));
+    };
+    const ownerOf = (entry: any): string => {
+        const source = entry.root && entry.rootDir ? entry : boot.find(e =>
+            e.kind === "input" && e.abs === entry.abs && e.name === entry.name);
+        if (!source || typeof source.root !== "string" || typeof source.rootDir !== "string" || typeof source.abs !== "string" ||
+            !within(source.rootDir, source.abs) || !mounted.some(m => m.name === source.root && within(m.dir, source.rootDir))) {
+            throw new Error(`${entry.rel}: input kind requires a mounted source owner`);
+        }
+        return source.root;
+    };
+    const protectedOwners: Record<string, string> = {
+        secret: "core", choice: "core", confirm: "core", grid: "core", "planning-review": "core",
+    };
     for (const entry of opts.entries) {
         const name = String(entry.name ?? "").toLowerCase();
         if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new Error(`${entry.rel}: $input_ name must be a lower-case kind such as choice`);
+        const owner = ownerOf(entry);
+        const reserved = Object.hasOwn(protectedOwners, name) ? protectedOwners[name] : undefined;
+        if (reserved && reserved !== owner) throw new Error(`${entry.rel}: input kind ${name} belongs to ${reserved}, not ${owner}`);
+        if (owner !== "core" && !name.startsWith(owner + "-")) throw new Error(`${entry.rel}: input kind ${name} must use owner prefix ${owner}-`);
+        const previous = Object.hasOwn(kinds, name) ? kinds[name] : undefined;
+        if (previous) {
+            // Upgrade registrations created before owner metadata existed, but never
+            // guess from moduleDir: separate plugins can declare the same namespace.
+            const candidates = boot.filter(e => e.kind === "input" && e.name === name && e.rel === previous.rel);
+            const owners = new Set(candidates.map(ownerOf));
+            const priorOwner = previous.owner ?? (owners.size === 1 ? [...owners][0] : undefined);
+            if (priorOwner !== owner) throw new Error(`${entry.rel}: input kind ${name} already belongs to ${priorOwner ?? "an unknown owner"}, not ${owner}`);
+        }
         const imported = entry.mod ?? await import(entry.abs + `?t=${Date.now()}`);
         const def = imported?.default;
         if (!def || typeof def.open !== "function" || typeof def.submit !== "function" || typeof def.done !== "function") {
             throw new Error(`${entry.rel}: $input_ file must default-export { open, submit, done }`);
         }
         const hint = typeof imported.hint === "string" ? imported.hint : undefined;
-        kinds[name] = { ...def, name, module: entry.moduleDir === "." ? "app" : String(entry.moduleDir), rel: entry.rel, hint };
+        kinds[name] = { ...def, name, owner, module: entry.moduleDir === "." ? "app" : String(entry.moduleDir), rel: entry.rel, hint };
         ctx.fns.procs.log.debug({ event: "load.input", msg: name, from: entry.rel });
     }
 }

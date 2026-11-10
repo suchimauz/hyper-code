@@ -1,7 +1,7 @@
 /**
  * Resolve an exact planning proposal from a CSRF-verified human HTTP decision
  *
- * Use only from planning review routes or the native review card route. Approve atomically switches to execute and enqueues the exact plan; keep stays in planning without a new turn. Ordinary replies and generic input.submit cannot approve.
+ * Use only from planning review routes or the native review card route. Approve switches to execute and delivers the exact plan; keep delivers the decision while remaining in plan. Both resume through the common input lifecycle only after remaining waits clear, respecting Stop, archive and paused task plans. Ordinary replies and generic input.submit cannot approve.
  * @param opts.req Current authenticated browser request carrying the session cookie and CSRF header.
  * @param opts.agentId Session that owns the proposal.
  * @param opts.proposalId Immutable proposal identifier being reviewed.
@@ -38,15 +38,14 @@ export default async function (
     await ctx.fns.planning.assertIdle({agentId:opts.agentId});
     const now=Date.now(); proposal.status=target;
     await ctx.fns.procs.db.run({sql:'UPDATE agent_planning SET mode=?,revision=revision+1,proposal=?::jsonb,updated_at=? WHERE agent_id=?',params:[opts.decision==='approve'?'execute':'plan',JSON.stringify(proposal),now,opts.agentId]});
-    const claimed = await ctx.fns.procs.db.run({sql:"UPDATE inputs SET state='submitted',result=?::jsonb,answered_by=?,updated_at=? WHERE id=? AND agent_id=? AND state='open'",params:[JSON.stringify({decision:opts.decision,proposalId:proposal.id}),actor,now,proposal.inputId,opts.agentId]});
-    if (claimed.changes !== 1) throw Object.assign(new Error('This review is no longer open'), {status:409,code:'stale_proposal'});
-    if(opts.decision==='approve') {
-    const text='Implement the explicitly approved plan below. This approves this plan, not unrelated destructive or outward actions; existing specific confirmation requirements remain.\n\n'+proposal.plan;
-    const message=await ctx.fns.session.appendMessage({id:opts.agentId,message:{role:'user',content:text,message_type:'planning_approval'}});
-    const event={type:'user',text,messageIdx:message.idx,ts:now,actor};  await ctx.fns.session.appendEvent({id:opts.agentId,event,ts:now});
-    await ctx.fns.procs.db.run({sql:'UPDATE agents SET stopped_at=NULL,last_error=NULL,next_run_at=?,updated_at=? WHERE id=?',params:[now,now,opts.agentId]});
-    }
-    return {ok:true,scheduled:opts.decision==='approve',planning:await ctx.fns.planning.read({agentId:opts.agentId})};
+    const authority=ctx.state.input?.kinds?.['planning-review']?.completionAuthority;
+    if(!authority) throw new Error('Planning review lifecycle authority is unavailable');
+    const summary=opts.decision==='approve'
+        ? 'Implement the explicitly approved plan below. This approves this plan, not unrelated destructive or outward actions; existing specific confirmation requirements remain.\n\n'+proposal.plan
+        : 'Keep planning. The proposed plan was not approved; continue research or clarification, not implementation.';
+    const completion=await ctx.fns.input.complete({id:proposal.inputId,state:'submitted',summary,result:{decision:opts.decision,proposalId:proposal.id,plan:proposal.plan},actor,authority});
+    if(!completion.completed) throw Object.assign(new Error('This review is no longer open'),{status:409,code:'stale_proposal'});
+    return {ok:true,scheduled:completion.scheduled,planning:await ctx.fns.planning.read({agentId:opts.agentId})};
     }}) as Record<string,unknown>;
     if(!result.duplicate) await ctx.fns.planning.publish({agentId:opts.agentId,proposal:true,wake:result.scheduled===true});
     return result;

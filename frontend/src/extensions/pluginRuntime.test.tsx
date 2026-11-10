@@ -47,3 +47,14 @@ describe('runtime plugin UI registry', () => {
     expect(state.registry.pages.map(p => p.key)).toContain('documentation/search');
   });
 });
+
+it('inputKinds survive approved manifest grants and disappear when approval is absent', async () => {
+ const extension: UiExtension = {id:'alpha',apiVersion:1,inputKinds:[{kind:'alpha-review',component:()=>null}]};
+ let manifest: PluginUiManifest = {apiVersion:1,plugins:[{...entry('alpha','a'.repeat(16)),grants:{inputKinds:['alpha-review']}}]};
+ const importer=vi.fn(async()=>({default:extension}));
+ const runtime=createPluginRuntime({importer,fetchManifest:async()=>manifest});
+ expect((await runtime.refresh()).registry.inputKinds.map(k=>k.kind)).toEqual(['alpha-review']);
+ manifest={apiVersion:1,plugins:[]};
+ expect((await runtime.refresh()).registry.inputKinds).toHaveLength(0);
+ expect(importer).toHaveBeenCalledTimes(1);
+});

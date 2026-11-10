@@ -26,8 +26,9 @@ export function QueueDock({ queue, running, disabled }: Props) {
   useAutoGrow(editorInput, editing ? text : '');
   const close = () => { setEditing(null); editButton.current?.focus(); };
   const save = async () => { if (editing && text.trim() && await queue.perform([editing], 'edit', text.trim())) close(); };
-  if (!rows.length && !queue.error) return null;
+  if (!rows.length && !queue.error && !queue.waitingForInput) return null;
   return <section className="queue-dock" aria-label="Очередь сообщений" aria-busy={!!queue.processing}>
+    {queue.waitingForInput && <p role="status">Агент ждёт ответа в форме. Сообщения останутся в очереди до ответа.</p>}
     {rows.length > 1 && <button type="button" className="queue-header" aria-expanded={open} aria-controls={listId} disabled={forced} onClick={() => setExpanded(!expanded)}><QueueGlyph /><span>В очереди: {rows.length}</span>{!open && queue.sending && <span className="queue-status" role="status">Отправка…</span>}{open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}</button>}
     {open && <ul id={listId} className="queue-list">{rows.map(item => {
       const pending = item === queue.sending;
@@ -46,7 +47,7 @@ export function QueueDock({ queue, running, disabled }: Props) {
           <div className="queue-actions">
             <IconButton size="compact" label="Редактировать сообщение" tooltip={item.files.length ? 'Редактирование вложений недоступно' : 'Редактировать'} disabled={busy || !!item.files.length} onClick={event => { editButton.current = event.currentTarget; setEditing(item); setText(item.text); }}><Pencil size={16} /></IconButton>
             <IconButton size="compact" label="Удалить из очереди" tooltip="Удалить" disabled={busy} onClick={() => void queue.perform([item], 'remove')}><Trash2 size={16} /></IconButton>
-            <IconButton size="compact" label="Направить агенту сейчас" tooltip="Направить агенту сейчас" disabled={busy || !running} onClick={() => void queue.perform([item], 'steer')}><ArrowUp size={16} /></IconButton>
+            <IconButton size="compact" label="Направить агенту сейчас" tooltip="Направить агенту сейчас" disabled={busy || !running || queue.waitingForInput} onClick={() => void queue.perform([item], 'steer')}><ArrowUp size={16} /></IconButton>
           </div>
         </>}
       </li>;

@@ -100,3 +100,17 @@ test('approval route requires owner, same origin and CSRF', async () => {
     expect((await approve(make('owner'), null, { req: req() })).status).toBe(200);
     expect(calls).toEqual([{ name: 'demo', hash: 'a'.repeat(16), revoke: false, approvedBy: 'u' }]);
 });
+
+test('inputKinds grants are owner-only and changes invalidate approval', async () => {
+ const dir = await plugin({ inputKinds: ['demo-review'] }, { 'ui/index.tsx': view, 'ui/helper.ts': "export const helper = 'Demo';" });
+ try {
+  const built = await compile(context(dir), null, {name:'demo'});
+  expect(built.build?.grants.inputKinds).toEqual(['demo-review']);
+  const grants = {pages:[],panels:[],actions:[],canvasKinds:[]};
+  expect((await manifest(context(dir,'user',[{name:'demo',hash:built.build!.hash,grants}]),null,{})).pending[0]?.reason).toBe('changed');
+  for(const kind of ['secret','redmine-approval']) {
+   await writeFile(join(dir,'package.json'), JSON.stringify({procs:{ui:{inputKinds:[kind]}}}));
+   expect((await compile(context(dir),null,{name:'demo'})).build?.error).toContain('must belong');
+  }
+ } finally { await rm(dir,{recursive:true,force:true}); }
+});

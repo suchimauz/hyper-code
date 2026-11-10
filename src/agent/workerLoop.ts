@@ -603,6 +603,7 @@ async function workerPass(ctx: Context, inflight: Set<Promise<unknown>>): Promis
         // No artificial concurrency cap — backpressure comes from the LLM
         // provider (429 / connection errors) and Postgres serialising row writes.
         let drained = 0;
+        await ctx.fns.input.expireDue({}).catch((error: any) => console.error("input expiry failed:", error));
         await recoverStaleRuns(ctx, Date.now()).catch(() => undefined);
         await (ctx.fns.agent as any).recoverOrphanedCompactions({}).catch((error: any) => console.error('compaction recovery failed:', error));
         await ctx.fns.agent.deliverWakes({ now: Date.now() }).catch((error: any) => console.error('wake delivery failed:', error));

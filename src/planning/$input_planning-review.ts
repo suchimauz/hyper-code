@@ -1,6 +1,8 @@
 /** Native card for an immutable plan. Generic input.submit deliberately cannot authorize it. */
 export default {
     icon: 'list-checks', cancel: false,
+    // Server-only identity fence. Exact browser approval remains in planning.review.
+    completionAuthority: {},
     prepare() { throw new Error('Use planning.propose({plan}) to create an exact plan review'); },
     open(ctx: Context, opts: {input: types.input.Row}) {
         const esc=(text: string)=>ctx.fns.procs.ui.escape({text});

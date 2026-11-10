@@ -8,7 +8,7 @@ vi.mock('../components/hyper/ComposerFooter', () => ({ ComposerFooter: () => nul
 const row: QueueItem = { id: 'q/1', sequence: 1, text: 'First message', version: 2, status: 'pending', createdAt: 1, files: [] };
 const json = (body: object) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); sessionStorage.clear(); });
-function queue(items = [row]) { return { items, sending: null, processing: null, error: '', refresh: vi.fn(), enqueue: vi.fn(), perform: vi.fn().mockResolvedValue(true) }; }
+function queue(items = [row]) { return { waitingForInput: false, items, sending: null, processing: null, error: '', refresh: vi.fn(), enqueue: vi.fn(), perform: vi.fn().mockResolvedValue(true) }; }
 it('shows one row immediately, collapses multiple rows, and locks collapse during editing', async () => {
   const q = queue(); const view = render(<QueueDock queue={q} running />);
   expect(screen.getByText('First message')).toBeVisible(); expect(screen.queryByRole('button', { name: /В очереди/ })).toBeNull();
@@ -61,4 +61,17 @@ it('isolates a late list response after agent switching', async () => {
   view.rerender(<LiveComposer agentId="new" running onAccepted={() => {}} />);
   expect(await screen.findByText('New queue')).toBeVisible(); resolveOld(json({ items: [row] }));
   await waitFor(() => expect(screen.queryByText('First message')).toBeNull());
+});
+
+it('idle waiting inputs queue ordinary messages instead of attempting direct send', async () => {
+ const fetcher = vi.fn().mockImplementation((_url:string, init?:RequestInit) => Promise.resolve(json(init?.method === 'POST' ? {ok:true,queueId:'q',version:1} : {items:[row],waitingForInput:true})));
+ vi.stubGlobal('fetch',fetcher);
+ const accepted=vi.fn(); render(<LiveComposer agentId="waiting" running={false} onAccepted={accepted}/>);
+ await screen.findByText('First message');
+ expect(screen.getByText(/Агент ждёт ответа в форме/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'Направить агенту сейчас'})).toBeDisabled();
+ fireEvent.input(screen.getByRole('textbox'),{target:{textContent:'Later'}});
+ fireEvent.click(screen.getByRole('button',{name:'Отправить сообщение'}));
+ await waitFor(()=>expect(accepted).toHaveBeenCalledOnce());
+ expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST').map(([url])=>url)).toEqual(['/agent/waiting/queue']);
 });

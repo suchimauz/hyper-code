@@ -8,9 +8,9 @@
  * Used by the POST /input/<id> route; callable directly to answer or withdraw an input
  * programmatically. Returns the new state and, on a validation failure, the message to show
  * under the still-open form. A second answer to the same input is a no-op.
- * Human answers and cancellations resume durable and plan pauses atomically with
+ * Answers and cancellations preserve Stop and plan pauses atomically with
  * transcript delivery and scheduling; an `agent:<id>` withdrawal preserves pauses.
- * Trusted callers must supply actor accurately; missing actor retains human-answer behavior.
+ * Protected kinds reject generic submission and require their dedicated authenticated handler.
  * @param opts.id Input identifier.
  * @param opts.values Submitted form fields; a repeated name is an array.
  * @param opts.cancel Cancel instead of submitting.
@@ -30,8 +30,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     actor?: string | null;
 }): Promise<{ state: string; error?: string }> {
     const [gate] = await ctx.fns.procs.db.select({ sql: "SELECT agent_id, spec->>'_agentWait' = 'true' AS blocking FROM inputs WHERE id = ?", params: [String(opts.id ?? '')] });
-    if (gate?.blocking === true) {
-        // Ordinary question handlers have no external side effects. Keep their claim,
+    if (gate) {
+        // Protected external actions use dedicated handlers, never this generic path. Keep their claim,
         // validation and delivery in one transaction: process death rolls back to open.
         const result = await ctx.fns.procs.db.transaction({ fn: async () => {
             await ctx.fns.procs.db.select({ sql: 'SELECT id FROM agents WHERE id = ? FOR UPDATE', params: [gate.agent_id] });
@@ -50,7 +50,12 @@ async function submitInput(ctx: Context, opts: { id: string; values?: Record<str
     const id = String(opts.id ?? "");
     // This kind has a separate exact-plan browser transition; generic calls may neither approve nor cancel it.
     const existingInput = await ctx.fns.input.get({ id });
-    if (existingInput?.kind === 'planning-review') return { state: existingInput.state, error: 'Use the human planning review controls' };
+    if (existingInput && ((ctx.state as any).input?.kinds?.[existingInput.kind]?.completionAuthority || existingInput.kind === 'planning-review')) return { state: existingInput.state, error: 'Use this input kind’s dedicated human controls' };
+    const [deadline] = await ctx.fns.procs.db.select({sql: "SELECT (CASE WHEN spec->>'_expiresAt' ~ '^[0-9]{1,16}$' THEN (spec->>'_expiresAt')::bigint END) AS expires_at FROM inputs WHERE id=?", params:[id]});
+    if (deadline?.expires_at && Number(deadline.expires_at) <= Date.now()) {
+        const expired = await ctx.fns.input.complete({id,state:"expired",summary:"Input expired before an answer was received",actor:"system:expiry"});
+        return {state:expired.state};
+    }
     const claimed = await ctx.fns.procs.db.run({
         sql: "UPDATE inputs SET state = 'processing', updated_at = ? WHERE id = ? AND state = 'open' RETURNING id",
         params: [Date.now(), id],
@@ -103,23 +108,9 @@ async function deliver(ctx: Context, input: types.input.Row, state: string, summ
     const persist = async () => {
         await ctx.fns.procs.db.select({ sql: "SELECT id FROM agents WHERE id=? FOR UPDATE", params: [input.agentId] });
         await finish(ctx, input, state, result, reason, actor);
-        // Agent withdrawal is not a human instruction to resume work.
-        const [gate] = await ctx.fns.procs.db.select({ sql: "SELECT spec->>'_agentWait' = 'true' AS blocking FROM inputs WHERE id = ?", params: [input.id] });
-        // Answering a blocking question is not permission to undo a later manual Stop.
-        const human = !actor?.startsWith("agent:") && gate?.blocking !== true;
-        if (human) await ctx.fns.session.mutateScratchpad({ id: input.agentId, mutate: (scratchpad: Record<string, any>, ts: number) => {
-            const plan = scratchpad.plan;
-            if (!plan?.pausedAt) return;
-            plan.pausedAt = null;
-            plan.updatedAt = ts;
-            const active = Array.isArray(plan.tasks) ? plan.tasks.find((task: any) => task.status === 'active') : null;
-            if (active && !active.activeSince) active.activeSince = ts;
-        } });
         await ctx.fns.session.appendMessage({ id: input.agentId, message, ts: now });
         await ctx.fns.procs.db.run({
-            sql: human
-                ? "UPDATE agents SET stopped_at=NULL, last_error=NULL, next_run_at = GREATEST(COALESCE(next_run_at, 0), ?), updated_at = ? WHERE id = ? AND archived_at IS NULL"
-                : "UPDATE agents SET next_run_at = GREATEST(COALESCE(next_run_at, 0), ?), updated_at = ? WHERE id = ? AND archived_at IS NULL AND stopped_at IS NULL",
+            sql: "UPDATE agents SET next_run_at = GREATEST(COALESCE(next_run_at, 0), ?), updated_at = ? WHERE id = ? AND archived_at IS NULL AND stopped_at IS NULL AND NOT EXISTS (SELECT 1 FROM inputs i WHERE i.agent_id=agents.id AND i.spec->>'_agentWait'='true' AND i.state IN ('open','processing')) AND NOT (COALESCE(scratchpad::jsonb,'{}'::jsonb)->'plan'->>'pausedAt' IS NOT NULL)",
             params: [now, now, input.agentId],
         });
     };

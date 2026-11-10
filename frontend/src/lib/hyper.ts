@@ -33,7 +33,7 @@ export function markChatRead(id: string, throughTs: number, signal?: AbortSignal
 export function sendMessage(id: string, text: string, requestId: string, files: File[] = []) {
   const body = new FormData(); body.set('text', text); body.set('requestId', requestId);
   files.forEach(file => body.append('files', file));
-  return requestJson<{ ok: boolean; messageIdx: number }>(`/agent/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Idempotency-Key': requestId }, body });
+  return requestJson<{ ok: boolean; messageIdx?: number; queued?: boolean; queueId?: string }>(`/agent/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Idempotency-Key': requestId }, body });
 }
 export type ContextBudget = { estimatedTokens: number; usedTokens?: number; usedSource?: 'provider' | 'estimate'; contextWindow: number | null; mode: 'full' | 'compact'; fallback: string | null; lastReportedTokens: number | null };
 export type ContextDetails = {

@@ -14,6 +14,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     if (!r) return null;
     const json = (v: any) => (typeof v === "string" ? JSON.parse(v) : v ?? null);
     const spec = { ...(json(r.spec) ?? {}) };
+    delete spec._expiresAt;
     delete spec._agentWait; // Server scheduling metadata is never a client form setting.
     return {
         id: r.id, agentId: r.agent_id, kind: r.kind, state: r.state, title: r.title, message: r.message,

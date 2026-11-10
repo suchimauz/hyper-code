@@ -13,7 +13,7 @@ function harness(turns: any[]) {
     const ctx: any = { state: { agent: { [agent.id]: agent } }, fns: {
         input: { isWaiting: async () => false },
         planning: { read: async ({agentId}: any) => ({version:1,agentId,mode:'execute',revision:0,scope:'session',advisory:true,runningPolicy:'reject',pending:null,proposal:null}) },
-        goal: { delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) },
+        goal: { recordProviderEvent: async()=>{}, delegationScope: async ({ fn }: any) => fn(), runBindingCapture: async () => ({ kind: 'disabled', allowContinuation: false }) },
         session: {
             forAgent: () => null, appendMessage: append,
             syncAgentState: async () => { agent.messages = rows.slice(); },
@@ -21,12 +21,12 @@ function harness(turns: any[]) {
             appendErrorEvent: async ({ error }: any) => { errors.push(error); },
             updateMessageContent: async ({ idx, content }: any) => { rows[idx].content = content; },
         },
-        procs: { events: { emit: noop }, db: { select: async ({ sql }: any) => sql.includes('MAX(idx)') ? [{ i: 0 }] : [{ stopped_at: null }] } },
-        agent: { recordRunLifecycle: async () => {}, statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({ status: 'not_needed' }),
+        procs: { events: { emit: noop }, db: { run:async()=>({changes:1}), select: async ({ sql }: any) => sql.includes('MAX(idx)') ? [{ i: 0 }] : [{ stopped_at: null }] } },
+        agent: { retryWait:async()=>{}, retryClear:async()=>{}, recordRunLifecycle: async () => {}, statusLineForTurn: async () => '', autoCompactIfNeeded: async () => ({ status: 'not_needed' }),
             stop: async () => { stops++; }, stashResult: async ({ output }: any) => ({ content: output }) },
         events: { emitAgentsChanged: noop, refreshAgentMeta: noop },
         markdown: { render: async ({ source }: any) => source },
-        llm: { stream: async () => { if (sampled >= turns.length) throw new Error('unexpected extra model request'); return turns[sampled++]; } },
+        llm: { resolveEndpoint:async()=>({provider:'mock'}), classifyError:({body}:any)=>{throw new Error(body);}, stream: async () => { if (sampled >= turns.length) throw new Error('unexpected extra model request'); return turns[sampled++]; } },
         tools: { call: async () => { calls++; return { output: 'ok' }; }, runs: () => [] },
     } };
     return { ctx, agent, rows, errors, get sampled() { return sampled; }, get calls() { return calls; }, get stops() { return stops; } };

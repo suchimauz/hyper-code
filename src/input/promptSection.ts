@@ -10,7 +10,7 @@ export default function (ctx: Context, _session: Session | null, _opts: {}): str
     return [
         "## Chat inputs",
         "",
-        "To ask the person for something structured — a secret, a yes/no on an outward action, one of several options, a pick from a table — open a form in the chat instead of asking in prose: `await ctx.fns.input.request({ kind, title, message?, spec })`. It returns at once with the input id; end your turn. The answer arrives later as a user turn `<input-result id kind state>` with a one-line summary and JSON result (state `cancelled` when the person declined). Never ask for secrets in plain chat.",
+        "To ask the person for something structured — a secret, a yes/no on an outward action, one of several options, a pick from a table — open a form in the chat instead of asking in prose: `await ctx.fns.input.request({ kind, title, message?, spec, waitForAnswer: true })`. Waiting is explicit for every kind; omitting waitForAnswer never blocks dispatch. Optional expiresAt is a future epoch-millisecond deadline, expired by the worker without a browser. It returns at once with the input id; end your turn. The answer arrives later as a user turn `<input-result id kind state>` with a one-line summary and JSON result (state `cancelled` when the person declined). Never ask for secrets in plain chat.",
         "",
         ...kinds.map(k => `- \`${k.name}\` — ${k.hint!.trim()}`),
     ].join("\n");

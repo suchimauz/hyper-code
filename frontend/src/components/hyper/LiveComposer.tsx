@@ -49,7 +49,7 @@ function SessionComposer({ focusRequest, agentId, running, onAccepted, mascot, p
     const value = text.trim(); if ((!value && !files.length) || lock.current || readOnly) return;
     lock.current = true; setBusy(true); setError('');
     const submission = files.length ? { text: value, key: filesKey.current ?? (filesKey.current = crypto.randomUUID()) } : pending.current?.text === value ? pending.current : { text: value, key: crypto.randomUUID() };
-    const queued = !value.startsWith('/') && (submission.target === 'queue' || queueRetry.current === submission.key || (submission.target !== 'send' && running));
+    const queued = !value.startsWith('/') && (submission.target === 'queue' || queueRetry.current === submission.key || (submission.target !== 'send' && (running || queue.waitingForInput)));
     submission.target = queued ? 'queue' : 'send';
     if (queued) queueRetry.current = submission.key;
     // Files stay in browser memory; never persist their request key for a text-only remount.
@@ -66,7 +66,7 @@ function SessionComposer({ focusRequest, agentId, running, onAccepted, mascot, p
         if (result.status === 'failed' || result.status === 'interrupted') { persist({ text: value, key: crypto.randomUUID() }); throw new Error(result.error || 'Команда не выполнена. Новая отправка начнёт новую попытку.'); }
         notifyPlanningChanged(agentId); setNotice('');
       } else if (queued) await queue.enqueue(value, submission.key, files);
-      else await sendMessage(agentId, value, submission.key, files);
+      else { const ack = await sendMessage(agentId, value, submission.key, files); if (ack.queued) void queue.refresh(); }
       }
       setFiles([]); filesKey.current = null; setRevision(n => n + 1);
       setText(''); pending.current = null;
@@ -92,7 +92,7 @@ function SessionComposer({ focusRequest, agentId, running, onAccepted, mascot, p
     catch (err) { setNotice(''); setError(err instanceof Error ? err.message : String(err)); }
     finally { lock.current = false; setBusy(false); }
   };
-  return <fieldset disabled={readOnly} className={`composer-readonly-boundary ${readOnly ? 'is-archived' : ''}`} aria-label={readOnly ? 'Ввод недоступен' : undefined}><div ref={anchor} className="composer-input-anchor">{dragging && anchor.current?.closest('.chat-panel') && createPortal(<div className="chat-file-drop-overlay" aria-hidden="true">Перетащите файлы, чтобы прикрепить к сообщению</div>, anchor.current.closest('.chat-panel')!)}{mascot}<GoalDock agentId={agentId} running={running} disabled={readOnly || busy} editor={goalEditor} onClose={() => setGoalEditor(null)} onAccepted={onAccepted} /><QueueDock queue={queue} running={running} disabled={readOnly || busy} /><MessageInput focusRequest={focusRequest} onSteerAll={running && queue.items.length ? () => { if (!busy && !readOnly && !queue.processing) void queue.perform(queue.items, 'steer'); } : undefined} commandsEnabled commandMenuOpen={menuOpen} onCommandMenuClose={() => setMenuOpen(false)} onFile={() => fileInput.current?.click()} onCompact={() => { void compact(); }} placeholder={running && queue.items.length ? 'Ctrl/Cmd+Enter — направить всю очередь агенту' : 'Сообщение или /команда…'} onFiles={addFiles} attachments={files.length ? <PendingAttachments files={files} disabled={busy || readOnly} onRemove={removeFile} /> : undefined} hasAttachments={files.length > 0} value={text} disabled={busy || readOnly} running={running && !readOnly} onStop={() => { void stop(); }} onSend={() => { void send(); }}
+  return <fieldset disabled={readOnly} className={`composer-readonly-boundary ${readOnly ? 'is-archived' : ''}`} aria-label={readOnly ? 'Ввод недоступен' : undefined}><div ref={anchor} className="composer-input-anchor">{dragging && anchor.current?.closest('.chat-panel') && createPortal(<div className="chat-file-drop-overlay" aria-hidden="true">Перетащите файлы, чтобы прикрепить к сообщению</div>, anchor.current.closest('.chat-panel')!)}{mascot}<GoalDock agentId={agentId} running={running} disabled={readOnly || busy} editor={goalEditor} onClose={() => setGoalEditor(null)} onAccepted={onAccepted} /><QueueDock queue={queue} running={running} disabled={readOnly || busy} /><MessageInput focusRequest={focusRequest} onSteerAll={running && !queue.waitingForInput && queue.items.length ? () => { if (!busy && !readOnly && !queue.processing) void queue.perform(queue.items, 'steer'); } : undefined} commandsEnabled commandMenuOpen={menuOpen} onCommandMenuClose={() => setMenuOpen(false)} onFile={() => fileInput.current?.click()} onCompact={() => { void compact(); }} placeholder={running && queue.items.length ? 'Ctrl/Cmd+Enter — направить всю очередь агенту' : 'Сообщение или /команда…'} onFiles={addFiles} attachments={files.length ? <PendingAttachments files={files} disabled={busy || readOnly} onRemove={removeFile} /> : undefined} hasAttachments={files.length > 0} value={text} disabled={busy || readOnly} running={running && !readOnly} onStop={() => { void stop(); }} onSend={() => { void send(); }}
     onChange={value => { setText(value); filesKey.current = null; if (value.trim() !== pending.current?.text) persist({ text: value, key: crypto.randomUUID() }); }}
   /></div>
     <input ref={fileInput} type="file" multiple hidden aria-label="Добавить файлы" onChange={event => {

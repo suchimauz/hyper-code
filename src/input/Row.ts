@@ -3,7 +3,7 @@ export type Row = {
     id: string;
     agentId: string;
     kind: string;
-    state: "open" | "processing" | "submitted" | "cancelled";
+    state: "open" | "processing" | "submitted" | "cancelled" | "expired";
     title: string;
     message: string;
     spec: Record<string, any>;

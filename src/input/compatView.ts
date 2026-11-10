@@ -20,9 +20,8 @@ export default async function (
     if(req.headers.get('sec-fetch-site')==='cross-site'||(req.headers.get('origin')&&req.headers.get('origin')!==url.origin))return new Response('Same origin required',{status:403,headers});
     const agentId=url.searchParams.get('agentId')||'';
     if(!/^[A-Za-z0-9_-]{1,128}$/.test(agentId))return new Response('Invalid agent',{status:400,headers});
-    const kinds=['secret','redmine-approval','redmine-time','redmine-time-review','sber-login','tbank-login'];
     const rows=await ctx.fns.procs.db.select({sql:"SELECT i.id,i.kind,i.title FROM inputs i JOIN agents a ON a.id=i.agent_id WHERE i.agent_id=? AND a.archived_at IS NULL AND i.state IN ('open','processing') ORDER BY i.created_at",params:[agentId]});
-    const inputs=(rows as {id:string;kind:string;title:string}[]).filter(r=>kinds.includes(r.kind)).map(r=>({id:r.id,kind:r.kind,title:r.title}));
+    const inputs=(rows as {id:string;kind:string;title:string}[]).map(r=>({id:r.id,kind:r.kind,title:r.title}));
     const id=url.searchParams.get('id');
     if(!id){
         // Secret cards render natively in React: they need the public message, target reference and mode, never a value.

@@ -62,7 +62,8 @@ it.each(['read', 'write', 'edit', 'bash'])('toggles %s from blank header and tim
     await userEvent.click(header);
     await userEvent.click(file);
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls.map(call => call[0])).toEqual(['/canvas/fixture/state', '/canvas/fixture', '/canvas/fixture/state', '/canvas/fixture']);
+    expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(2);
     expect(fetcher).toHaveBeenLastCalledWith('/canvas/fixture', expect.objectContaining({ method: 'POST', body: JSON.stringify({ show: { kind: 'file', args: { path: 'src/real.ts', host: 'home-dev' } } }) }));
   }
   expect(timing.parentElement).toBe(header);

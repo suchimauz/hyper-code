@@ -6,8 +6,14 @@
 // like, how a submission becomes a result, and how the answer looks afterwards.
 
 export type Kind = {
+    /** Server-only dispatch capability for dedicated authenticated completion; generic submit/cancel is denied. Resolve current registered identity after hot reload. Not an authorization sandbox. */
+    completionAuthority?: object;
+    /** Explicit public spec projection for owner-only React cards. Return only display-safe fields; never credentials, completion authority, transport tokens or raw results. Missing hook means metadata-only for plugin kinds. */
+    projectCard?: (ctx: Context, opts: { input: types.input.Row }) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>;
     /** Validate and normalise the spec when the agent opens the input; throw to refuse it. */
     prepare?: (ctx: Context, opts: { spec: Record<string, any> }) => Record<string, any> | Promise<Record<string, any>>;
+    /** Trusted server deadline, read from authoritative state after prepare. Return a future safe epoch-millisecond integer or undefined for no constraint. The caller may shorten but cannot extend it. */
+    deadline?: (ctx: Context, opts: { spec: Record<string, any> }) => number | undefined | Promise<number | undefined>;
     /** Form fields of the open input; the framework wraps them in the form with title, buttons and cancel. */
     open: (ctx: Context, opts: { input: types.input.Row; error?: string | null }) => string | Promise<string>;
     /** Turn submitted fields into a result; throw an Error to show its message under the form and keep it open. */

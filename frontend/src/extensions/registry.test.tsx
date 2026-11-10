@@ -7,7 +7,7 @@ const view = () => <p>Plugin content</p>;
 const plugin: UiExtension = { id: 'example', apiVersion: 1, pages: [{ id: 'main', title: 'Main', component: view }], navigation: [{ page: 'main', title: 'Open main' }], panels: [{ id: 'panel', title: 'Panel', component: view }], actions: [{ id: 'act', title: 'Act', run: () => {} }] };
 const context = { agentId: 'test', theme: 'dark' as const, readOnly: false };
 describe('host extension registry', () => {
-  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],sidebarNavigation:[],panels:[],actions:[],canvasKinds:[],canvasLaunchers:[]}));
+  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],sidebarNavigation:[],panels:[],actions:[],canvasKinds:[],canvasLaunchers:[],inputKinds:[]}));
   it('Canvas kinds require an explicit independent grant and cannot override builtins', () => {
     const extension = { ...plugin, canvasKinds: [{ kind: 'example.map', component: view }] };
     expect(createExtensionRegistry([extension], {}).canvasKinds).toHaveLength(0);
@@ -41,4 +41,11 @@ describe('host extension registry', () => {
     fireEvent.click(screen.getByRole('button',{name:'Fail'})); await waitFor(()=>expect(screen.getByRole('alert').textContent).toBe('Failed safely'));
     expect(screen.getByRole('button',{name:'Fail'}).hasAttribute('disabled')).toBe(false);
   });
+});
+
+it('input cards require explicit owner grants and cannot replace core secure inputs', () => {
+ const extension: UiExtension = { id:'demo', apiVersion:1, inputKinds:[{kind:'demo-review',component:view}] };
+ expect(createExtensionRegistry([extension],{}).inputKinds).toHaveLength(0);
+ expect(createExtensionRegistry([extension],{demo:{inputKinds:['demo-review']}}).inputKinds[0].key).toBe('demo/demo-review');
+ for(const kind of ['secret','confirm','redmine-approval']) expect(()=>createExtensionRegistry([{...extension,inputKinds:[{kind,component:view}]}],{demo:{inputKinds:[kind]}})).toThrow();
 });

@@ -3,7 +3,7 @@ import { requestJson } from './hyper';
 export type QueueItem = { id: string; sequence: number; text: string; version: number; status: 'pending' | 'promoted' | 'removed'; createdAt: number | string; files: { name: string; type: string; size: number }[]; messageIdx?: number };
 const path = (agentId: string) => `/agent/${encodeURIComponent(agentId)}/queue`;
 export function getQueue(agentId: string, signal?: AbortSignal) {
-  return requestJson<{ items: QueueItem[] }>(path(agentId), { signal });
+  return requestJson<{ items: QueueItem[]; waitingForInput?: boolean }>(path(agentId), { signal });
 }
 export function enqueueMessage(agentId: string, text: string, requestId: string, files: File[]) {
   const body = new FormData(); body.set('text', text); body.set('requestId', requestId);
