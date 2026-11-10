@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import lease from "./lease";
 import refreshOnce from "./refreshOnce";
+const viaPool=(ctx:any)=>{if(ctx?.fns?.sshProvider&&!ctx.fns.sshProvider.tunnel)ctx.fns.sshProvider.tunnel=async(o:any)=>{const t=await ctx.fns.codexTunnel.openProduction(o);let done=false;return {port:t.port,signal:t.signal,release:()=>{if(!done){done=true;void t.close()}}}};return ctx};
 
 const tick = () => Bun.sleep(5);
 const track = (p: Promise<() => void>) => { const s = { granted: false, release: undefined as undefined | (() => void) }; void p.then(r => { s.granted = true; s.release = r; }); return s; };
@@ -145,7 +146,7 @@ test("dispatch runs requests of one account in parallel and refreshes expired to
         },
     } };
     const ssh = { provider: "codex" as const, instance: "i", account: "a" };
-    const bodies = await Promise.all([1, 2, 3].map(async () => (await dispatch(ctx, null, { ssh, url: "https://chatgpt.com/backend-api/codex/responses", init: { method: "POST", body: "{}" } })).text()));
+    const bodies = await Promise.all([1, 2, 3].map(async () => (await dispatch(viaPool(ctx), null, { ssh, url: "https://chatgpt.com/backend-api/codex/responses", init: { method: "POST", body: "{}" } })).text()));
     expect(bodies).toEqual(["ok", "ok", "ok"]);
     expect(refreshes).toBe(1);
     expect(peak).toBe(3);

@@ -56,6 +56,8 @@ export default async function (
         committed = true;
         // Drop cached catalogues, including in-flight entries which may reference the old endpoint.
         (ctx.state as typeof ctx.state & {llmModelCatalog?: object}).llmModelCatalog = {};
+        // Pooled provider tunnels were opened with the old endpoint and host pin.
+        await ctx.fns.sshProvider?.closeTunnels?.({instance:opts.previous.name}).catch(() => undefined);
         return next;
     } catch (error) {
         if (error instanceof Error && /pending login|concurrently/.test(error.message)) throw error;
