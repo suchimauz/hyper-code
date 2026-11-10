@@ -92,7 +92,7 @@ export default async function (
     }
     await ctx.fns.llm.accountAuthHealth({ action: "clear", provider: ep.provider, account: ep.account });
     const nextTurnState = res.headers.get("x-codex-turn-state");
-    if (nextTurnState && !turnState && Object.hasOwn(ctx, "goalRequestContext")) turnCtx.codexTurnState = { agentId: agent.id, value: nextTurnState };
+    if (nextTurnState && !turnState) turnCtx.codexTurnState = { agentId: agent.id, value: nextTurnState };
     if (!res.body) throw new Error("empty response body");
 
     let text = "";

@@ -47,6 +47,27 @@ describe("streamCodex — offline (mocked fetch + shared parseSSE)", () => {
     const realFetch = globalThis.fetch;
     afterEach(() => { globalThis.fetch = realFetch; });
 
+    for (const withGoal of [false, true]) test(`replays turn state independently of goal scope (${withGoal})`, async () => {
+        const ctx = mkCtx();
+        if (withGoal) (ctx as any).goalRequestContext = {};
+        const sent: (string | null)[] = [];
+        globalThis.fetch = (async (_url: any, init: any) => {
+            sent.push(new Headers(init.headers).get("x-codex-turn-state"));
+            const response = sseResponse();
+            response.headers.set("x-codex-turn-state", `state-${sent.length}`);
+            return response;
+        }) as any;
+        const a = agent();
+        await stream(ctx, null, { agent: a });
+        await stream(ctx, null, { agent: a });
+        await stream(ctx, null, { agent: a });
+        expect(sent).toEqual([null, "state-1", "state-1"]);
+        // A different agent and a fresh run must not replay this run's token.
+        await stream(ctx, null, { agent: { ...a, id: "other" } });
+        await stream(mkCtx(), null, { agent: a });
+        expect(sent.slice(3)).toEqual([null, null]);
+    });
+
     test("accumulates output_text deltas, reads usage + status, skips [DONE]", async () => {
         globalThis.fetch = (async () => sseResponse(
             'data: {"type":"response.output_text.delta","delta":"Hel"}\n\n',
