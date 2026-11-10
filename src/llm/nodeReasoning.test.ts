@@ -7,7 +7,7 @@ import parseSSE from "./parseSSE";
 import toCodexInput from "./toCodexInput";
 import relay from "../node/relay";
 
-const entry = (account = "su4imauz") => ({ id: `codex/${account}:gpt-6-astra`, provider: "codex", account, api: "responses", kind: "subscription" });
+const entry = (account = "example-account") => ({ id: `codex/${account}:gpt-6-astra`, provider: "codex", account, api: "responses", kind: "subscription" });
 function context(catalog: any[] = [entry(), entry("second")]) {
     const node = { enabled: true, catalog, url: "http://node.invalid/v1" };
     const ctx: any = { state: { agent: {} }, fns: {
@@ -31,7 +31,7 @@ function context(catalog: any[] = [entry(), entry("second")]) {
 }
 
 describe("node reasoning identity and policy", () => {
-    for (const account of ["su4imauz", "second"]) test(`canonical ${account}: capabilities and policy`, async () => {
+    for (const account of ["example-account", "second"]) test(`canonical ${account}: capabilities and policy`, async () => {
         const { ctx } = context();
         const model = `mauzcode/mini6:codex/${account}:gpt-6-astra`;
         ctx.state.agent.test = { id: "test", model, reasoningEffort: "high" };
@@ -63,7 +63,7 @@ describe("node reasoning identity and policy", () => {
 });
 
 describe("node reasoning wire (no generation or network)", () => {
-    for (const account of ["su4imauz", "second"]) test(`streamCodex keeps canonical model and sends effort: ${account}`, async () => {
+    for (const account of ["example-account", "second"]) test(`streamCodex keeps canonical model and sends effort: ${account}`, async () => {
         const { ctx } = context();
         const model = `mauzcode/mini6:codex/${account}:gpt-6-astra`;
         for (const [requested, applied] of [["high", "high"], ["xhigh", "xhigh"], ["auto", "medium"], ["off", "low"]]) {
@@ -77,7 +77,7 @@ describe("node reasoning wire (no generation or network)", () => {
     test("relay strips only canonical identity and preserves reasoning for both accounts", async () => {
         const original = globalThis.fetch;
         try {
-            for (const account of ["su4imauz", "second"]) {
+            for (const account of ["example-account", "second"]) {
                 let body: any;
                 globalThis.fetch = (async (_url: any, init: any) => { body = JSON.parse(init.body); return new Response("data: [DONE]\n\n"); }) as any;
                 const { ctx } = context();

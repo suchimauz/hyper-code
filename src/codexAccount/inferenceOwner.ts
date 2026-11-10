@@ -1,7 +1,7 @@
 /**
  * Resolve authenticated owner identity for isolated Codex inference
  *
- * Use for the selected isolated slot only. Accepts an authenticated owner user or a request-free worker-bound live agent whose durable creator is still an owner. Rejects missing, unknown and mismatched sessions; never derives authority from options or credentials.
+ * Use for any explicitly selected isolated Codex account. Accepts an authenticated owner user or a request-free worker-bound live agent whose durable creator is still an owner. Rejects missing, unknown and mismatched sessions; never derives authority from options or credentials.
  */
 export default async function (
     ctx: Context,

@@ -19,7 +19,7 @@ test('declared validator must actually be loaded',async()=>{const f=fixture();Ob
 const routes = [
  {model:'openai:test',api:'openai',provider:'openai',dialect:'openai'},
  {model:'codex:test',api:'responses',provider:'codex',dialect:'responses'},
- {model:'ssh/aeza-criminal-amarant:codex/su4imauz:gpt-6-astra',api:'responses',provider:'codex',ssh:{provider:'codex'},dialect:'responses'},
+ {model:'ssh/example-host:codex/example-account:gpt-6-astra',api:'responses',provider:'codex',ssh:{provider:'codex'},dialect:'responses'},
  {model:'claude-code:test',api:'anthropic',provider:'claude-code',dialect:'anthropic'},
  {model:'ssh/box:claude-code:test',api:'anthropic',provider:'claude-code',ssh:{provider:'claude-code'},dialect:'anthropic'},
  {model:'anthropic:test',api:'anthropic',provider:'anthropic',dialect:'anthropic'},

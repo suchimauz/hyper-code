@@ -17,9 +17,7 @@ export default async function (
 ): Promise<{name:string;fingerprint:string;owner:string|null}> {
     await ctx.fns.sshAccount.requireOwner({});
     if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(opts.instance) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(opts.account)) throw new Error('Invalid Codex account');
-    const owner = opts.instance === 'aeza-criminal-amarant' && opts.account === 'test'
-        ? await ctx.fns.codexAccount.inferenceOwner({})
-        : session?.user?.id ? String(session.user.id) : null;
+    const owner = await ctx.fns.codexAccount.inferenceOwner({});
     const item = await ctx.fns.sshInstance.get({name:opts.instance});
     if (!item.pinnedHostKey) throw new Error('Codex migration requires a pinned SSH host');
     const hash = (s:string) => new Bun.CryptoHasher('sha256').update(s).digest('hex');

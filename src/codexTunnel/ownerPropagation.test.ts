@@ -6,7 +6,7 @@ import runtime from './runtime';
 import importSelected from './importSelected';
 import dispatch from '../sshProvider/dispatch';
 import providerBinding from '../sshProvider/binding';
-const slot={instance:'aeza-criminal-amarant',account:'test'};
+const slot={instance:'example-host',account:'primary'};
 function fixture(kind='agent',storedOwner='owner-a') {
  const agent={id:'fixture'};
  const session:any=kind==='browser'?{kind:'http',user:{id:'owner-a',role:'owner'}}:{kind,agent,agentId:agent.id};
@@ -34,8 +34,8 @@ test('persisted cross-owner credentials reject before transport',async()=>{
 test('captured runtime rechecks durable owner and exact slot',async()=>{
  const f=fixture();const service=await scopedService(f.ctx,f.session,slot);const b=await f.ctx.fns.codexAccount.binding(slot);f.setRecord({revision:1,value:{version:1,binding:b.fingerprint,owner:'owner-a',mode:'legacy'}});f.ctx.fns.procs.db.select=async()=>[{created_by:'owner-b'}];
  await expect(service.runtime.fetch({ssh:{...slot,provider:'codex'},url:'x',init:{}})).rejects.toThrow('SSH provider request failed; no fallback');
- await expect(service.runtime.fetch({ssh:{...slot,account:'su4imauz',provider:'codex'},url:'x',init:{}})).rejects.toThrow('Scoped owner or slot mismatch');
+ await expect(service.runtime.fetch({ssh:{...slot,account:'example-account',provider:'codex'},url:'x',init:{}})).rejects.toThrow('Scoped owner or slot mismatch');
 });
-test('import still requires actual owner user and protected slot is rejected',async()=>{
- const f=fixture();await expect(importSelected(f.ctx,f.session,{...slot,confirmedUnused:true})).rejects.toThrow('Authenticated owner required');await expect(scopedService(f.ctx,f.session,{...slot,account:'su4imauz'})).rejects.toThrow('Scoped slot prohibited');
+test('import still requires actual owner user; arbitrary account names are supported',async()=>{
+ const f=fixture();await expect(importSelected(f.ctx,f.session,{...slot,confirmedUnused:true})).rejects.toThrow('Authenticated owner required');const service=await scopedService(f.ctx,f.session,{instance:'another-host',account:'another-account'});expect(service.runtime).toBeDefined();
 });
