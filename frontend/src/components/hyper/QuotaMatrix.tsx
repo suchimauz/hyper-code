@@ -1,10 +1,15 @@
-import { Cpu, PlugZap } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronRight, Cpu, PlugZap } from 'lucide-react';
 import { NavigationChatIcon } from './NavigationChatIcon';
 import { NavigationTooltip } from './NavigationTooltip';
 import { QUOTA_PERIODS, quotaAccountCaption, quotaStatusSymbol, quotaTooltip, worstQuotaTone, type QuotaAccount, type QuotaTone } from '../../lib/quotas';
 import './quota-matrix.css';
 
-type Props = { accounts: QuotaAccount[]; compact?: boolean; onOpen?: () => void };
+type Props = { accounts: QuotaAccount[]; compact?: boolean; onOpen?: () => void; defaultExpanded?: boolean; /** Phones only: show a collapsible Usage header (collapsed by default). Desktop keeps the always-visible matrix. */ collapsible?: boolean };
+
+const EXPANDED_KEY = 'hyper.quotaMatrix.expanded';
+function readExpanded(fallback: boolean) { try { const v = localStorage.getItem(EXPANDED_KEY); return v == null ? fallback : v === '1'; } catch { return fallback; } }
+function saveExpanded(value: boolean) { try { localStorage.setItem(EXPANDED_KEY, value ? '1' : '0'); } catch { /* Keep the in-memory choice for this session. */ } }
 
 const STATUS_LABEL: Record<string, string> = { available: 'Available', unavailable: 'Unavailable', disabled: 'Disabled', unknown: 'Unknown' };
 const resetLabel = (at: number | null) => at ? new Date(at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : null;
@@ -51,17 +56,30 @@ function QuotaCard({ account, onOpen }: { account: QuotaAccount; onOpen?: () => 
 }
 
 /** Sidebar quota matrix: four 46px micro-cards per row with 5h / week / month cells. */
-export function QuotaMatrix({ accounts, compact = false, onOpen }: Props) {
+export function QuotaMatrix({ accounts, compact = false, onOpen, defaultExpanded = false, collapsible = false }: Props) {
+  const [expanded, setExpanded] = useState(() => readExpanded(defaultExpanded));
   if (!accounts.length) return null;
+  const tone = worstQuotaTone(accounts);
   if (compact) {
-    const tone = worstQuotaTone(accounts);
     return <div className="quota-compact-cell"><NavigationTooltip delay={0} closeDelay={0} hoverablePopup={false} trigger={<button type="button" className="quota-compact" data-tone={tone} aria-label="Лимиты моделей" onClick={onOpen}><span className="quota-compact-dot" /></button>}>
       <div className="navigation-tooltip-title">Лимиты моделей</div>
       <div className="quota-tooltip-periods">{accounts.map(a => <div key={a.id} className="quota-tooltip-period"><span>{quotaAccountCaption(a)}</span><strong data-tone={a.tone}>{a.kind === 'status' ? quotaStatusSymbol(a.status) : QUOTA_PERIODS.map(p => a.windows?.[p.key]?.usedPercent).map(v => v == null ? '—' : Math.round(v)).join(' · ')}</strong></div>)}</div>
     </NavigationTooltip></div>;
   }
-  return <section className="quota-matrix" aria-label="Лимиты моделей">
+  if (!collapsible) return <section className="quota-matrix" aria-label="Лимиты моделей">
     <div className="quota-matrix-legend" aria-hidden="true">5 ч · Нед. · Мес. <span>использовано, %</span></div>
     <div className="quota-matrix-grid">{accounts.map(a => <QuotaCard key={a.id} account={a} onOpen={onOpen} />)}</div>
+  </section>;
+  const toggle = () => setExpanded(open => { saveExpanded(!open); return !open; });
+  return <section className="quota-matrix" aria-label="Лимиты моделей" data-expanded={expanded || undefined}>
+    <button type="button" className="quota-matrix-toggle" aria-expanded={expanded} onClick={toggle}>
+      <ChevronRight size={12} strokeWidth={1.5} className="quota-matrix-chevron" aria-hidden="true" />
+      <span>Usage</span>
+      <span className="quota-compact-dot" data-tone={tone} aria-hidden="true" />
+    </button>
+    {expanded && <>
+      <div className="quota-matrix-legend" aria-hidden="true">5 ч · Нед. · Мес. <span>использовано, %</span></div>
+      <div className="quota-matrix-grid">{accounts.map(a => <QuotaCard key={a.id} account={a} onOpen={onOpen} />)}</div>
+    </>}
   </section>;
 }

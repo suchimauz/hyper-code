@@ -14,7 +14,7 @@ afterEach(() => { localStorage.clear(); vi.clearAllMocks(); });
 const cells = (id: string) => [...document.querySelectorAll('.quota-card')].find(c => c.getAttribute('aria-label')?.startsWith(id))!;
 
 it('maps partial windows into fixed 5h / week / month cells with backend tone', () => {
-  render(<QuotaMatrix accounts={[codex, kimi]} />);
+  render(<QuotaMatrix accounts={[codex, kimi]}  />);
   expect(screen.getByText('использовано, %')).toBeInTheDocument();
   const c = [...cells('codex').querySelectorAll('[data-period]')].map(e => [e.getAttribute('data-period'), e.textContent, e.getAttribute('data-tone')]);
   expect(c).toEqual([['fiveHour', '—', 'none'], ['weekly', '93', 'error'], ['monthly', '—', 'none']]);
@@ -25,7 +25,7 @@ it('maps partial windows into fixed 5h / week / month cells with backend tone', 
 });
 
 it('renders status-only providers as a health indicator and unmeasured quota as dashes', () => {
-  render(<QuotaMatrix accounts={[gate, unmeasured]} />);
+  render(<QuotaMatrix accounts={[gate, unmeasured]}  />);
   const g = document.querySelector('[data-kind="status"]')!;
   expect(g.querySelector('[data-status="available"]')?.textContent).toBe('✓');
   expect(g.querySelector('[data-period]')).toBeNull();
@@ -59,7 +59,7 @@ it('sidebar places quotas right above the account bar and hides them when empty'
 });
 
 it('uses the shared navigation tooltip with periods, resets and status', async () => {
-  render(<QuotaMatrix accounts={[codex]} />);
+  render(<QuotaMatrix accounts={[codex]}  />);
   await userEvent.hover(screen.getByRole('button', { name: /^codex/ }));
   const tip = await screen.findByRole('tooltip');
   expect(tip).toHaveClass('navigation-tooltip');
@@ -67,4 +67,24 @@ it('uses the shared navigation tooltip with periods, resets and status', async (
   expect(tip.textContent).toContain('Неделя'); expect(tip.textContent).toContain('93%'); expect(tip.textContent).toContain('сброс');
   expect(tip.textContent).not.toContain('5 часов');
   expect(tip.querySelector('.navigation-tooltip-status')?.textContent).toBe('Fresh data');
+});
+
+it('on phones Usage is collapsed by default, expands on click and remembers the choice', async () => {
+  const { unmount } = render(<QuotaMatrix accounts={[kimi, codex]} collapsible />);
+  const toggle = screen.getByRole('button', { name: 'Usage' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(document.querySelector('.quota-card')).toBeNull();
+  expect(toggle.querySelector('.quota-compact-dot')).toHaveAttribute('data-tone', 'error');
+  await userEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(document.querySelectorAll('.quota-card')).toHaveLength(2);
+  unmount();
+  render(<QuotaMatrix accounts={[kimi]} collapsible />);
+  expect(screen.getByRole('button', { name: 'Usage' })).toHaveAttribute('aria-expanded', 'true');
+});
+
+it('desktop always shows the full matrix without a Usage toggle', () => {
+  render(<QuotaMatrix accounts={[kimi, codex]} />);
+  expect(screen.queryByRole('button', { name: 'Usage' })).toBeNull();
+  expect(document.querySelectorAll('.quota-card')).toHaveLength(2);
 });

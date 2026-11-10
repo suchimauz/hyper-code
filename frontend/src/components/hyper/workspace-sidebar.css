@@ -152,3 +152,5 @@
 @media (prefers-reduced-motion: reduce) { .workspace-action > svg, .new-session-icon { transition: none; } .workspace-action:hover:not(:disabled) > svg, .workspace-action:hover:not(:disabled) .new-session-icon { transform: none; } }
 .workspace-folder-icon { flex: 0 0 14px; color: var(--text-tertiary); }
 .workspace-section-chats { padding-left: 12px; }
+/* Short screens (phones, landscape): scroll the whole sidebar so pinned actions never push the list and account out of view. */
+@media (max-height: 640px) { .workspace-sidebar { overflow-y: auto; } .workspace-sidebar .workspace-list { flex: none; overflow: visible; min-height: auto; } }

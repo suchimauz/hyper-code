@@ -8,6 +8,7 @@ import { WorkspaceChatRow } from './WorkspaceChatRow';
 import { NavigationTooltip, workspaceTooltipPath, workspaceCreatedLabel } from './NavigationTooltip';
 import { useWorkspaceExpanded } from '../../hooks/useWorkspaceExpanded';
 import { WorkspaceViewMenu, type WorkspaceView } from './WorkspaceViewMenu';
+import { WorkspaceMoreMenu } from './WorkspaceMoreMenu';
 import { compareChatsByActivity, readWorkspaceView, saveWorkspaceView, workspaceParent, workspaceViewProjects } from '../../lib/workspaceView';
 import { WorkspaceDirectoryDialog } from './WorkspaceDirectoryDialog';
 import { QuotaMatrix } from './QuotaMatrix';
@@ -80,10 +81,16 @@ export function WorkspaceSidebar({ onOpenPeople, peopleActive, extensionNavigati
     {!compact && <div className="workspace-filter"><Search size={14} strokeWidth={1} aria-hidden="true" /><input ref={searchInputRef} aria-keyshortcuts="Meta+/ Control+/" title="Найти агента или проект · ⌘/" aria-label="Найти агента или проект" placeholder="Найти агента или проект…" value={query} onChange={event => setQuery(event.target.value)} /><kbd className="workspace-filter-shortcut" aria-hidden="true">⌘/</kbd>{query && <button aria-label="Очистить фильтр" onClick={() => setQuery('')}><X size={12} /></button>}</div>}
     <div className="workspace-actions">
       <button className="workspace-action" aria-label="New Session" title="New Session" onClick={() => onNewSession?.()} disabled={!onNewSession}><span className="new-session-icon"><Plus size={12} strokeWidth={1.5} /></span>{!compact && <span>New Session</span>}</button>
-      {extensionNavigation.map(item => <button key={item.key} className={`workspace-action ${item.active ? 'is-selected' : ''}`} aria-current={item.active ? 'page' : undefined} aria-label={item.title} title={item.title} onClick={item.onSelect}><Puzzle size={16} strokeWidth={1} />{!compact && <span>{item.title}</span>}</button>)}
-      {onOpenPages && <button className={`workspace-action ${pagesActive ? 'is-selected' : ''}`} aria-current={pagesActive ? 'page' : undefined} aria-label="Pages" title="Pages" onClick={onOpenPages}><PanelsTopLeft size={16} strokeWidth={1} />{!compact && <span>Pages</span>}</button>}
+      {!mobile && <>
       {onOpenPlugins && <button className={`workspace-action ${pluginsActive ? 'is-selected' : ''}`} aria-current={pluginsActive ? 'page' : undefined} aria-label="Plugins" title="Plugins" onClick={onOpenPlugins}><Puzzle size={16} strokeWidth={1} />{!compact && <span>Plugins</span>}</button>}
+      {onOpenPages && <button className={`workspace-action ${pagesActive ? 'is-selected' : ''}`} aria-current={pagesActive ? 'page' : undefined} aria-label="Pages" title="Pages" onClick={onOpenPages}><PanelsTopLeft size={16} strokeWidth={1} />{!compact && <span>Pages</span>}</button>}
       {onOpenAutomation && <button className={`workspace-action ${automationActive ? 'is-selected' : ''}`} aria-current={automationActive ? 'page' : undefined} aria-label="Cron Tasks" title="Cron Tasks" onClick={onOpenAutomation}><Timer size={16} strokeWidth={1} />{!compact && <span>Cron Tasks</span>}</button>}
+      </>}
+      <WorkspaceMoreMenu compact={compact} items={[...(mobile ? [
+        ...(onOpenPlugins ? [{ key: 'plugins', title: 'Plugins', icon: Puzzle, active: !!pluginsActive, onSelect: onOpenPlugins }] : []),
+        ...(onOpenPages ? [{ key: 'pages', title: 'Pages', icon: PanelsTopLeft, active: !!pagesActive, onSelect: onOpenPages }] : []),
+        ...(onOpenAutomation ? [{ key: 'automation', title: 'Cron Tasks', icon: Timer, active: !!automationActive, onSelect: onOpenAutomation }] : []),
+      ] : []), ...extensionNavigation.map(item => ({ key: `extension:${item.key}`, title: item.title, active: item.active, onSelect: item.onSelect }))]} />
       {compact && <button className="workspace-action" aria-label="Workspaces" title="Workspaces" onClick={onToggle}><Folder size={16} strokeWidth={1} /></button>}
     </div>
     {!compact && <><div className={`workspace-list-heading ${view.filter !== 'active' ? 'is-filtered' : ''}`}><span className="workspace-list-label">Workspaces</span><div className="workspace-view-switch" aria-label="Вид чатов"><button aria-pressed={view.filter === 'active'} onClick={() => changeView({ ...view, filter: 'active' })}>Active</button><button aria-pressed={archived} onClick={() => changeView({ ...view, filter: 'archived' })}>Archived</button></div><div className="workspace-heading-actions"><WorkspaceViewMenu view={view} onChange={changeView} /><button className="nav-icon-button" aria-label="Добавить новый Workspace" title="Add workspace" onClick={() => setAdding(true)}><FolderPlus size={16} strokeWidth={1} /></button></div></div>
@@ -96,7 +103,7 @@ export function WorkspaceSidebar({ onOpenPeople, peopleActive, extensionNavigati
         {!loading && !error && !filtered.length && <p className="workspace-empty">{query ? 'Ничего не найдено' : 'Нет рабочих пространств'}</p>}
       </div></>}
     <WorkspaceDirectoryDialog open={adding} onOpenChange={setAdding} onCreated={onRetry} />
-    {quotas && quotas.length > 0 && <QuotaMatrix accounts={quotas} compact={compact} onOpen={onOpenQuotas ?? onOpenSettings} />}
+    {quotas && quotas.length > 0 && <QuotaMatrix accounts={quotas} compact={compact} collapsible={mobile} onOpen={onOpenQuotas ?? onOpenSettings} />}
     <div className="workspace-account">
       {user ? <HoverPanel label="Меню профиля" className="workspace-account-menu" open={accountOpen} onOpenChange={setAccountOpen} trigger={<button className="workspace-profile" aria-label={`Профиль: ${user.name}`} title={compact ? user.name : undefined}>
         <span className="workspace-avatar">{user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : initials}</span>
