@@ -1,6 +1,6 @@
 -- Extensions the working database has in public; the test Postgres needs them before any test migrates
 -- (test ctxs run with search_path pg_temp, where CREATE EXTENSION would fail).
--- vector first: pg_search (ParadeDB >= 0.26) depends on it.
+-- vector first: pg_search (paradedb >= 0.26) depends on it.
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_search;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;

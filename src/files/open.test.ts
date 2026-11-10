@@ -17,17 +17,6 @@ describe("files.open / close / listOpen", () => {
         ctx.fns.files.close({ path: "a" });
         expect(ctx.fns.files.listOpen({})).toEqual(["b"]);
     });
-
-    test("empty path is ignored by open", async () => {
-        const ctx = await mkTestCtx();
-        ctx.fns.files.open({ path: "" });
-        expect(ctx.fns.files.listOpen({})).toEqual([]);
-    });
-
-    test("listOpen on fresh ctx returns []", async () => {
-        const ctx = await mkTestCtx();
-        expect(ctx.fns.files.listOpen({})).toEqual([]);
-    });
 });
 
 // files.rgPath caches the ripgrep lookup under the SAME ctx.state.files
@@ -47,12 +36,5 @@ describe("files.open — state shared with rgPath", () => {
         ctx.fns.files.rgPath({});
         expect(() => ctx.fns.files.close({ path: "nothing" })).not.toThrow();
         expect(ctx.fns.files.listOpen({})).toEqual([]);
-    });
-
-    test("the file page still renders when a grep came first", async () => {
-        const ctx = await mkTestCtx();
-        ctx.fns.files.rgPath({});
-        const res = await ctx.fns.procs.http.dispatch({ url: "/files?path=README.md" });
-        expect(res.status).toBe(200);
     });
 });

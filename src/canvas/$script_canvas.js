@@ -64,7 +64,7 @@
     };
     window.addEventListener('message', event => {
         const msg = event.data;
-        if (!msg || msg.mauzcodeCanvas !== 1) return;
+        if (!msg || msg.mauzCodeCanvas !== 1) return;
         const root = page();
         const frame = root && [...root.querySelectorAll('iframe[data-canvas-frame]')].find(f => f.contentWindow === event.source);
         if (!frame) return;

@@ -5,7 +5,7 @@ import canvasRoute from '../canvas/$route_$id_item_$itemId_POST';
 for (const host of [undefined,'remote-test']) {
  test(`private listing filters canonical aliases before response (${host??'local'})`,async()=>{
   const calls:string[]=[];
-  const ctx:any={fns:{auth:{verifyCsrf:async()=>true},canvas:{authorizeHttp:async()=>null,list:async()=>[{id:1,kind:'file',args:{path:'/workspace',host}}]},files:{
+  const ctx:any={fns:{auth:{verifyCsrf:async()=>true},canvas:{authorizeHttp:async()=>null,fileTarget:async({item}:any)=>({ok:true,path:item.args.path,root:item.args.path,host:item.args.host}),list:async()=>[{id:1,kind:'file',args:{path:'/workspace',host}}]},files:{
    resolveSafe:({path}:any)=>path,
    isPrivateResult:async({path}:any)=>{calls.push(path);return path.endsWith('/hidden-alias');},
    stat:async()=>({isDir:true}),list:async()=>[{name:'visible',isDir:false},{name:'hidden-alias',isDir:true}],

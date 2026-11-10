@@ -1,8 +1,12 @@
 import {test,expect} from 'bun:test';
-import get from './$route_$name_config_GET';
-import post from './$route_$name_config_POST';
+import getRoute from './$route_$name_config_GET';
+import postRoute from './$route_$name_config_POST';
 const owner={user:{role:'owner'}} as any;
-function fixture(){const calls:unknown[]=[];return {calls,ctx:{fns:{plugins:{configuration:async()=>({settings:[{secret:true,configured:true}],secrets:[]}),saveConfiguration:async(o:unknown)=>{calls.push(o);}},auth:{csrfToken:async()=>'token',verifyCsrf:async({token}:any)=>token==='token'},http:{publicOrigin:async()=>'http://localhost'}}} as any};}
+// Routes resolve the person through auth.currentUser(req); the fixture carries the role in a test header.
+const as=(session:any,req:Request)=>{if(session?.user?.role)req.headers.set('x-test-role',session.user.role);return req;};
+const get=(ctx:any,session:any,o:any)=>getRoute(ctx,null,{...o,req:as(session,o.req)});
+const post=(ctx:any,session:any,o:any)=>postRoute(ctx,null,{...o,req:as(session,o.req)});
+function fixture(){const calls:unknown[]=[];return {calls,ctx:{fns:{plugins:{configuration:async()=>({settings:[{secret:true,configured:true}],secrets:[]}),saveConfiguration:async(o:unknown)=>{calls.push(o);}},auth:{currentUser:async({req}:any)=>{const role=req.headers.get('x-test-role');return {required:true,user:role?{role}:null};},csrfToken:async()=>'token',verifyCsrf:async({token}:any)=>token==='token'},http:{publicOrigin:async()=>'http://localhost'}}} as any};}
 const request=(body:unknown,token='token')=>new Request('http://localhost/plugins/demo/config',{method:'POST',headers:{'content-type':'application/json','x-csrf-token':token},body:JSON.stringify(body)});
 test('configuration is owner-only and secret-free',async()=>{const f=fixture();const opts={req:new Request('http://localhost/plugins/demo/config'),params:{name:'demo'}};expect((await get(f.ctx,null,opts)).status).toBe(401);expect((await get(f.ctx,{user:{role:'member'}} as any,opts)).status).toBe(403);const r=await get(f.ctx,owner,opts);expect(await r.json()).toEqual({configuration:{settings:[{secret:true,configured:true}],secrets:[]},csrfToken:'token'});});
 test('JSON writes require owner and CSRF, return no submitted values',async()=>{const f=fixture();for(const [session,token,status] of [[null,'token',401],[{user:{role:'member'}},'token',403],[owner,'bad',403]] as any[]){expect((await post(f.ctx,session,{req:request({values:{'demo.token':'SECRET'}},token),params:{name:'demo'}})).status).toBe(status);}expect(f.calls).toEqual([]);const r=await post(f.ctx,owner,{req:request({values:{'demo.token':'SECRET'}}),params:{name:'demo'}});expect(await r.json()).toEqual({ok:true});expect(f.calls).toHaveLength(1);});

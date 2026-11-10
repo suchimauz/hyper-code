@@ -7,6 +7,7 @@ async function fixture(mode: 'paused' | 'revoked') {
     const ctx: any = { state: { agent: { a: { id: 'a' } } }, fns: {} };
     const noop = async () => {};
     ctx.fns = {
+        input: { expireDue: async () => 0 },
         procs: { env: { mode: () => 'test' }, log: { warn: () => {} }, db: {
             run: async () => ({ changes: 1, rows: [] }),
             select: async ({ sql, params }: any) => {
@@ -28,7 +29,7 @@ async function fixture(mode: 'paused' | 'revoked') {
                 return [];
             },
         } },
-        settings: { getNumber: async () => 0 },
+        settings: { getNumber: async () => 0 }, webPush: { recallStaleError: noop },
         agent: { recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop, wakeWorker: () => { ctx.state.workerWakePending = true; }, run: async () => { runs++; } },
         session: { syncAgentState: noop },
     };

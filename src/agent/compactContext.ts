@@ -24,6 +24,12 @@ export default async function (
     const parent = opts.agent;
     const midTurn = !!opts.signal;
     const controller = parent.abortController;
+    // A failed or stale draft is cleared in the row; mirror the durable value
+    // so the live agent never keeps advertising a draft that no longer exists.
+    const reloadSleepContext = async () => {
+      const current = ((await ctx.fns.procs.db.select({ sql: "SELECT sleep_context FROM agents WHERE id = ?", params: [parent.id] })) as any[])[0]?.sleep_context;
+      parent.sleepContext = current == null ? null : typeof current === "string" ? JSON.parse(current) : current;
+    };
     const ownsRun = () => !midTurn || (controller?.signal === opts.signal && parent.abortController === controller && !opts.signal!.aborted && (parent.activeRunCount ?? 0) === 1 && (parent.currentJobId ?? undefined) === opts.runToken);
     const ownershipSql = midTurn && opts.runToken ? "run_state = 'running' AND run_token = ?" : "run_state = 'idle' AND run_token IS NULL";
     const ownershipParams = midTurn && opts.runToken ? [opts.runToken] : [];
@@ -119,6 +125,7 @@ export default async function (
         generation.status = "stale"; generation.summary = summary;
         const stale = { ...draftContext, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
         await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(stale), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] });
+        await reloadSleepContext();
         await ctx.fns.session.syncAgentState({ agent: parent });
         await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_failed", payload: { revision, error: "Контекст изменился во время сжатия. Попробуйте ещё раз." } });
         return { status: "stale", tokensBefore };
@@ -135,6 +142,7 @@ export default async function (
         delete generation.activatedAt;
         const stale = { ...draftContext, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
         await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(stale), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] });
+        await reloadSleepContext();
         await ctx.fns.session.syncAgentState({ agent: parent });
         await ctx.fns.session.archive({ id: child.id }).catch(() => undefined);
         await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_failed", payload: { revision, error: "Контекст изменился во время сжатия. Попробуйте ещё раз." } });
@@ -151,6 +159,7 @@ export default async function (
       generation.status = "failed";
       const failed = { ...draftContext, draftRevision: null, draftOwner: null, generations: draftContext.generations.map((g: any) => g.revision === revision ? generation : g) };
       await ctx.fns.procs.db.run({ sql: "UPDATE agents SET sleep_context = ?::jsonb WHERE id = ? AND sleep_context->>'draftRevision' = ? AND sleep_context->>'draftOwner' = ? AND (sleep_context->>'activeRevision') IS NOT DISTINCT FROM ?", params: [JSON.stringify(failed), parent.id, String(revision), draftOwner, oldHead == null ? null : String(oldHead)] }).catch(() => undefined);
+      await reloadSleepContext().catch(() => undefined);
       await ctx.fns.session.syncAgentState({ agent: parent });
       await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_failed", payload: { revision, error: String(error?.message ?? error) } }).catch(() => undefined);
       await ctx.fns.session.archive({ id: child.id }).catch(() => undefined);

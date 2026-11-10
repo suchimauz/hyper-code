@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import usageOverview from "./usageOverview";
+import normalizeQuotaWindows from "./normalizeQuotaWindows";
 import listModels from "./listModels";
 import listAccounts from "./listAccounts";
 import accountCredentialExists from "./accountCredentialExists";
@@ -18,7 +19,7 @@ test("live usage hides logged-out Codex, preserves history and remote accounts",
     const ctx = { fns: {
         settings: { getNumber: async ({ fallback }: any) => fallback },
         procs: { db: { select: async () => rows } },
-        llm: { accountCredentialExists: ({ account }: any) => account === "work" || connected },
+        llm: { accountCredentialExists: ({ account }: any) => account === "work" || connected, normalizeQuotaWindows: (o: any) => normalizeQuotaWindows({} as Context, null, o) },
     } } as unknown as Context;
     expect((await usageOverview(ctx, null, { connectedOnly: true })).map(x => x.account)).toEqual(["work", "mini6/codex/one", "mini6/codex/two"]);
     expect(await usageOverview(ctx, null, {})).toHaveLength(4);

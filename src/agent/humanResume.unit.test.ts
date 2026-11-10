@@ -15,6 +15,7 @@ function fixture() {
             select: async ({ sql }: any) => {
                 state.queries.push(sql);
                 if (sql.includes('FOR UPDATE')) { expect(state.tx).toBe(true); state.locked = true; }
+                if (/FROM agents WHERE id\s*=/.test(sql)) return [{ id: 'a', archived_at: null, run_token: null, run_state: 'idle', stopped_at: 123, last_processed_msg_idx: -1 }];
                 if (sql.includes('client_request_id') && state.duplicate) {
                     const fingerprint = new Bun.CryptoHasher('sha256').update(JSON.stringify({ text: 'hello', files: [] })).digest('hex');
                     return [{ idx: 0, payload: { submissionFingerprint: fingerprint } }];
@@ -36,7 +37,8 @@ function fixture() {
         settings: { getNumber: async () => 0 },
         attachments: { saveUploads: async () => [], commitUploads: async () => {} },
         tools: { runs: () => [] },
-        input: { get: async () => input },
+        planning: { read: async () => ({ mode: 'execute' }) },
+        input: { get: async () => input, isWaiting: async () => false },
         session: {
             load: async () => live,
             scrubUnicode: async ({ text }: any) => text,
@@ -67,9 +69,10 @@ test('mobile human message appends, resumes and schedules under row lock', async
     await mobile(f.ctx, null, { req: new Request('http://local/mobile', { method: 'POST', body: JSON.stringify({ text: 'hello' }), headers: { 'content-type': 'application/json' } }), params: { id: 'a' } });
     expect(f.state.resumed).toBe(true); expect(f.plan.pausedAt).toBeNull(); expect(f.state.appended).toBe(1);
 });
-for (const cancel of [false, true]) test(`human input ${cancel ? 'cancellation' : 'answer'} resumes under row lock`, async () => {
-    const f = fixture(); await submit(f.ctx, null, { id: 'i', actor: 'person', cancel });
-    expect(f.state.resumed).toBe(true); expect(f.plan.pausedAt).toBeNull(); expect(f.state.appended).toBe(1);
+test('human input answer is delivered under row lock but does not lift a Stop fence', async () => {
+    const f = fixture(); await submit(f.ctx, null, { id: 'i', actor: 'person' });
+    expect(f.state.appended).toBe(1); expect(f.state.resumed).toBe(false); expect(f.plan.pausedAt).toBe(123);
+    expect(f.state.queries.some(sql => sql.includes('UPDATE agents') && sql.includes('AND stopped_at IS NULL'))).toBe(true);
 });
 test('replayed input submission cannot resume', async () => {
     const f = fixture(); f.state.claimed = false;

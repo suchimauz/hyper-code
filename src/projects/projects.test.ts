@@ -175,10 +175,6 @@ describe('projects persistent backend',()=>{
   let available=['a','b'];
   ctx.state.registry.projects.chats=async()=>available.map(id=>({id,title:id,runState:'idle'}));
   ctx.state.registry.auth.pinnedIds=async()=>new Set();
-  ctx.state.registry.nav={chatItems:(await import('../nav/chatItems')).default,rows:(await import('../nav/rows')).default};
-  ctx.state.registry.ui={popup:(await import('../ui/popup')).default,modelLogo:(await import('../ui/modelLogo')).default};
-  ctx.state.registry.chat={icon:(await import('../chat/icon')).default};
-  ctx.state.registry.procs.ui={escape:(_c:any,_s:any,o:any)=>o.text,attr:()=>'',button:(await import('../procs/ui/button')).default};
   for(const agentId of available)await ctx.fns.projects.open({projectId:p.id,agentId});
   const before=await ctx.fns.procs.db.select({sql:'SELECT * FROM project_tabs',params:[]});
   const request=(suffix='',hx=false)=>route(ctx,null,{req:new Request('http://localhost/projects/view?projectId='+p.id+suffix,{headers:hx?{'HX-Request':'true'}:{}})});

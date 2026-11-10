@@ -4,25 +4,21 @@ import { testCtx } from "../$test";
 const ctx = await testCtx();
 
 test("migrate: up (in id order, idempotent) + status + down", async () => {
-    // Own world: the host app (mauzcode) ships real migrations that testCtx
-    // already applied — a fork gets a fresh pg_temp schema and its own list
-    // (replace the state object wholesale so the parent's list is untouched).
+    // The worker database already holds the core migrations; a fork with its own list adds two whose ids
+    // sort after every real one, so down() (latest applied first) touches only them.
     const c = ctx.fns.procs.env.fork({ mode: "test" });
     (c.state.procs as any).migrate = {
         list: [
-            { id: "001_a", up: (x: Context) => x.fns.procs.db.exec({ sql: "CREATE TABLE a (x INTEGER)" }), down: (x: Context) => x.fns.procs.db.exec({ sql: "DROP TABLE a" }) },
-            { id: "002_b", up: (x: Context) => x.fns.procs.db.exec({ sql: "CREATE TABLE b (y INTEGER)" }) },
+            { id: "zz_test_001_a", up: (x: Context) => x.fns.procs.db.exec({ sql: "CREATE TABLE migrate_test_a (x INTEGER)" }), down: (x: Context) => x.fns.procs.db.exec({ sql: "DROP TABLE migrate_test_a" }) },
+            { id: "zz_test_002_b", up: (x: Context) => x.fns.procs.db.exec({ sql: "CREATE TABLE migrate_test_b (y INTEGER)" }) },
         ],
     };
-    expect((await c.fns.procs.migrate.up({})).applied).toEqual(["001_a", "002_b"]);
+    expect((await c.fns.procs.migrate.up({})).applied).toEqual(["zz_test_001_a", "zz_test_002_b"]);
     expect((await c.fns.procs.migrate.up({})).applied).toEqual([]); // idempotent
     expect((await c.fns.procs.migrate.status({})).every((m: any) => m.applied)).toBe(true);
 
-    expect((await c.fns.procs.migrate.down({})).rolledBack).toEqual(["002_b"]); // last only
-    expect((await c.fns.procs.migrate.status({})).find((m: any) => m.id === "002_b")!.applied).toBe(false);
-});
-
-test("migrate: down on a fresh DB is a no-op (no missing-table error)", async () => {
-    const fresh = ctx.fns.procs.env.fork({ mode: "test" }); // own pg_temp schema, never migrated
-    expect((await fresh.fns.procs.migrate.down({})).rolledBack).toEqual([]);
+    expect((await c.fns.procs.migrate.down({})).rolledBack).toEqual(["zz_test_002_b"]); // last only
+    expect((await c.fns.procs.migrate.status({})).find((m: any) => m.id === "zz_test_002_b")!.applied).toBe(false);
+    expect((await c.fns.procs.migrate.down({})).rolledBack).toEqual(["zz_test_001_a"]);
+    expect(await c.fns.procs.db.select({ sql: "SELECT to_regclass('migrate_test_a')::text AS t" })).toEqual([{ t: null }]);
 });

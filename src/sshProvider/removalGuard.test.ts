@@ -12,7 +12,7 @@ test('guard scopes login to exact provider/account and descriptor to instance; l
  expect(read).not.toContain(hash(['ssh-provider-v1','another-host','codex','removed']));
 });
 test('legacy rollback cannot turn removed tombstone into reusable legacy credentials',async()=>{
- let writes=0;const ctx:any={state:{},fns:{codexTunnel:{mutation:()=>({run:(fn:any)=>fn()}),encryptedStore:()=>({read:async()=>({revision:1,value:{version:1,owner:'o',binding:'b',mode:'removed'}}),save:async()=>writes++})},codexAccount:{binding:async()=>({name:'old',owner:'o',fingerprint:'b'})}}};
+ let writes=0;const ctx:any={state:{},fns:{codexTunnel:{mutation:()=>({run:(fn:any)=>fn()}),encryptedStore:()=>({read:async()=>({revision:1,value:{version:1,owner:'o',binding:'b',mode:'removed'}}),save:async()=>writes++})},codexAccount:{binding:async()=>({name:'old',owner:'o',fingerprint:'b'}),inferenceOwner:async()=>'o'}}};
  const r=runtime(ctx,{user:{id:'o'}} as any,{options:{protectedSlot:'none'}});
  await expect(r.rollback({instance:'host',provider:'codex',account:'removed'})).rejects.toThrow('prohibited');expect(writes).toBe(0);
 });

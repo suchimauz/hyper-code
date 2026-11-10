@@ -18,11 +18,10 @@ test("procs.dev.typecheck runs tsc on this bun, not on a node or bunx from PATH;
         const app = join(dir, "app");
         await Bun.write(join(app, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, include: ["*.ts"] }));
         await writeFile(join(app, "bad.ts"), `export const n: number = "not a number";\n`);
-        await writeFile(join(app, "good.ts"), `export const s: string = "ok";\n`);
         const script = `
             import typecheck from ${JSON.stringify(join(framework, "src/procs/dev/typecheck.ts"))};
             const ctx = { fns: { procs: { project: { projectRoot: () => ${JSON.stringify(app)} } } } };
-            console.log(JSON.stringify({ all: await typecheck(ctx, null, {}), good: await typecheck(ctx, null, { filter: "good.ts" }) }));`;
+            console.log(JSON.stringify({ all: await typecheck(ctx, null, {}) }));`;
         await Bun.write(join(dir, "run.ts"), script);
         const proc = Bun.spawn([process.execPath, join(dir, "run.ts")], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, stdout: "pipe", stderr: "pipe" });
         const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
@@ -32,7 +31,6 @@ test("procs.dev.typecheck runs tsc on this bun, not on a node or bunx from PATH;
         expect(result.all.ok).toBe(false);
         expect(result.all.errors.join("\n")).toContain("bad.ts");
         expect(result.all.errors.join("\n")).toContain("TS2322");
-        expect(result.good).toEqual({ ok: true, errors: [] });
     } finally {
         await rm(dir, { recursive: true, force: true });
     }

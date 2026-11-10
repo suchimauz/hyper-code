@@ -27,18 +27,19 @@ async function scenario(kind:string, retryCount=0, stale=false) {
  return {changes:1,rows:[]};
  };
  const noop=async()=>{};
- ctx.fns={goal: { delegationConsume: async () => ({ status: 'absent' }),continuationValidateStart:async()=>({action:'run',humanPending:true,suppressIdxs:[],continuationIdxs:[]})},events:{emitAgentsChanged:noop},procs:{env:{mode:()=> 'test'},db:{select,run},log:{warn:noop}},settings:{getNumber:async()=>0},session:{syncAgentState:noop,appendErrorEvent:noop},agent:{
+ ctx.fns={input:{expireDue:async()=>0},goal: { delegationConsume: async () => ({ status: 'absent' }),continuationValidateStart:async()=>({action:'run',humanPending:true,suppressIdxs:[],continuationIdxs:[]})},events:{emitAgentsChanged:noop},procs:{env:{mode:()=> 'test'},db:{select,run},log:{warn:noop}},settings:{getNumber:async()=>0},session:{syncAgentState:noop,appendErrorEvent:noop},agent:{
  recoverOrphanedCompactions:noop,deliverWakes:noop,pollWatches:noop,pollTriggers:noop,wakeWorker:()=>{ctx.state.workerWakePending=true;},autoCompactIfNeeded:noop,
  parkOnUsageLimit:async()=>{if(kind==='park-failed')throw new Error('test park failure');wake=true;},run:async()=>{
  if(kind==='success')return {};
  if(kind==='abort')throw new DOMException('aborted','AbortError');
  const e:any=new Error('fixed test failure');e.failure={kind:['usage_limit','park-failed'].includes(kind)?'usage_limit':kind==='transient'?'transient':'fatal',retryable:kind==='transient',message:'fixed test failure'};throw e;
- }},webPush:{notifyError:sent,recordFailure:(o:any)=>record(ctx,null,o)}};
+ }},webPush:{recallStaleError:noop,notifyError:sent,recordFailure:(o:any)=>record(ctx,null,o)}};
  await worker(ctx,null,{});return sent;
 }
-for(const kind of ['success','abort','lost-token','concurrent-post','usage_limit','transient'])test(`worker suppresses terminal push for ${kind}`,async()=>{expect(await scenario(kind)).not.toHaveBeenCalled();});
+for(const kind of ['success','abort','lost-token','concurrent-post','usage_limit'])test(`worker suppresses terminal push for ${kind}`,async()=>{expect(await scenario(kind)).not.toHaveBeenCalled();});
 test('worker sends for fatal owned finalization',async()=>{expect(await scenario('fatal')).toHaveBeenCalledTimes(1);});
-test('worker sends only after transient retry budget exhausted',async()=>{expect(await scenario('transient',1)).toHaveBeenCalledTimes(1);});
+// Model retries live in run(); a transient failure that escapes run() is terminal for the worker.
+test('worker sends for transient failure that escaped run retries',async()=>{expect(await scenario('transient')).toHaveBeenCalledTimes(1);});
 test('worker stale exhaustion sends using revoked durable token',async()=>{expect(await scenario('fatal',0,true)).toHaveBeenCalledWith({agentId:'ab',runToken:'old-run'});});
 
 test('worker stale retry is not terminal',async()=>{expect(await scenario('stale-retry',0,true)).not.toHaveBeenCalled();});

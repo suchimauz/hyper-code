@@ -1,20 +1,38 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { testCtx } from "../$test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
 
-async function indexed(files: Record<string, string>) {
+// One throwaway project on disk and ONE ctx for the whole file (booting a ctx on a custom root costs ~0.5 s;
+// the index itself ~50 ms). Each test replaces the project's files and re-indexes it from empty, so tests
+// stay independent while paying the boot once.
+let shared: { ctx: any; dir: string; root: string };
+beforeAll(async () => {
     const dir = mkdtempSync(join(tmpdir(), "code-coverage-"));
+    mkdirSync(join(dir, "src"), { recursive: true });
+    shared = { ctx: await testCtx({ root: dir }), dir, root: basename(dir) };
+});
+afterAll(() => rmSync(shared.dir, { recursive: true, force: true }));
+
+// Replace the project's files and clear what the previous test left in the graph — without indexing them.
+async function project(files: Record<string, string>) {
+    const { ctx, dir, root } = shared;
+    rmSync(join(dir, "src"), { recursive: true, force: true });
+    mkdirSync(join(dir, "src"), { recursive: true });
+    await ctx.fns.procs.db.exec({ sql: "TRUNCATE code_calls, code_functions, code_types, code_findings, code_file_metrics, code_function_metrics" });
     for (const [rel, body] of Object.entries(files)) {
         const abs = join(dir, "src", rel);
         mkdirSync(join(abs, ".."), { recursive: true });
         writeFileSync(abs, body);
     }
-    const ctx = await testCtx({ root: dir });
-    const root = basename(dir);
-    await ctx.fns.code.index({ root });
-    return { ctx, root, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+    return shared;
+}
+
+async function indexed(files: Record<string, string>) {
+    const { ctx, dir, root } = await project(files);
+    const result = await ctx.fns.code.index({ root });
+    return { ctx, dir, root, result, cleanup: () => {} };
 }
 
 describe("code.coverage", () => {

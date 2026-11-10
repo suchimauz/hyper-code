@@ -51,7 +51,7 @@ describe("SSH native compaction", () => {
         let called = false;
         ctx.fns.sshAccount.fetch = async (opts: any) => {
             called = true;
-            expect(opts.ssh).toBe(ssh);
+            expect(opts.ssh).toEqual(ssh);
             expect(opts.init.headers["chatgpt-account-id"]).toBeUndefined();
             expect(JSON.parse(opts.init.body).input).toEqual([{ type: "compaction_trigger" }]);
             return new Response("stream");
@@ -68,7 +68,7 @@ describe("SSH native compaction", () => {
         ctx.fns.llm.toAnthropicMessages = () => [];
         ctx.fns.llm.claudeCodeCliVersion = async () => "1";
         ctx.fns.sshAccount.fetch = async (opts: any) => {
-            expect(opts.ssh).toBe(ssh);
+            expect(opts.ssh).toEqual(ssh);
             expect(opts.init.headers["anthropic-beta"]).toContain("compact-2026-09-04");
             expect(JSON.parse(opts.init.body).system[0].text).toContain("You are Claude Code");
             return Response.json({ content: [{ type: "compaction", content: "summary", signature: "sig" }], stop_reason: "end_turn" });

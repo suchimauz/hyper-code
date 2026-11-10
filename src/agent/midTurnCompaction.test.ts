@@ -18,6 +18,7 @@ describe('owned mid-turn compaction', () => {
         const agent = await owned(ctx);
         await ctx.fns.session.appendMessage({ id: agent.id, message: { role: 'assistant', content: '', tool_calls: [{ id: 'effect', name: 'write', args: {} }] } });
         await ctx.fns.session.appendMessage({ id: agent.id, message: { role: 'tool', content: 'already done', tool_call_id: 'effect' } });
+        await ctx.fns.session.syncAgentState({ agent });
         const before = await ctx.fns.session.getMessages({ id: agent.id });
         ctx.state.registry.llm.call = () => ({ text: 'summary', usage: {} });
         const result = await ctx.fns.agent.compactContext({ agent, runToken: 'owner', signal: agent.abortController.signal });

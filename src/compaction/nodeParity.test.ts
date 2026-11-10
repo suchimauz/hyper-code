@@ -36,7 +36,9 @@ describe("node native compaction parity without credentials or generation", () =
     });
     test("272K window triggers at 217600 despite configured 700000", async () => {
         const ctx = fixture(); let compacted = 0; let tokens = 217599;
-        ctx.fns.agent = { normalizeSleepContext: () => null, compactContext: async () => { compacted++; return { status: "compacted" }; } };
+        ctx.fns.agent = { normalizeSleepContext: () => null, contextTokens: async () => ({ tokens, source: "provider" }), compactContext: async () => { compacted++; return { status: "compacted" }; } };
+        ctx.fns.compaction.project = async (o: any) => ({ messages: o.messages, mode: "full", fallback: null, revision: null, tailStart: null, activatedAt: null });
+        ctx.fns.compaction.estimateTokens = async () => 0;
         ctx.fns.session = { getMessages: async () => [] };
         ctx.fns.procs = { db: { select: async (o: any) => o.sql.includes("FROM agents") ? [{ run_state: "idle" }] : [{ payload: JSON.stringify({ usage: { prompt_tokens: tokens } }), ts: 1 }] } };
         ctx.fns.settings = { getNumber: async (o: any) => o.key === "autoCompactTokens" ? 700000 : 80 };

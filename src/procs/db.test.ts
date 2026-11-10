@@ -1,6 +1,6 @@
 // FUNCTIONAL test: src/db.test.ts ↔ src/db/ namespace — Postgres via Bun.SQL,
-// fully async. Under NODE_ENV=test the pool is one connection pinned to
-// pg_temp, so plain CREATE TABLE lands in a private, self-cleaning schema.
+// fully async. Tests run on a per-process copy of the migrated template; tables a
+// test creates are dropped by the reset between files (src/_testDb.entry.ts).
 import { test, expect } from "bun:test";
 import { testCtx } from "../$test";
 
@@ -43,14 +43,4 @@ test("db.insert + db.q: round-trip through the DSL", async () => {
     expect(first.changes).toBe(1);
     await ctx.fns.procs.db.insert({ into: "notes", values: { body: "yo", done: 1 } });
     expect(await ctx.fns.procs.db.q({ select: "body", from: "notes", where: { done: 0 } })).toEqual([{ body: "hi" }]);
-});
-
-test("db lives in ctx → env.fork gives an isolated pool (own pg_temp schema)", async () => {
-    const a = ctx.fns.procs.env.fork({ mode: "test" });
-    const b = ctx.fns.procs.env.fork({ mode: "test" });
-    await a.fns.procs.db.exec({ sql: "CREATE TABLE x (n INTEGER)" });
-    await a.fns.procs.db.run({ sql: "INSERT INTO x VALUES (1)" });
-    await b.fns.procs.db.exec({ sql: "CREATE TABLE x (n INTEGER)" });   // b has its OWN pg_temp
-    expect(await b.fns.procs.db.select({ sql: "SELECT count(*)::int AS c FROM x" })).toEqual([{ c: 0 }]);
-    expect(await a.fns.procs.db.select({ sql: "SELECT count(*)::int AS c FROM x" })).toEqual([{ c: 1 }]);
 });

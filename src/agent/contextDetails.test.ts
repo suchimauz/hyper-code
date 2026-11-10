@@ -18,9 +18,9 @@ test('budget builds one preview, partitions system messages and leaves default s
     const ctx: any = { state: { agent: { test: { model: 'mock' } } }, fns: {
         procs: { db: { select: async ({ sql }: any) => sql.includes('FROM agents') ? [{ model: 'mock', sleep_context: null }] : [] } },
         session: { getMessages: async () => [] },
-        agent: { buildLlmRequest: async () => { previews++; return { messages: [{ role: 'system', content: 'abc' }, { role: 'user', content: 'hello' }], system: 'x', context: { mode: 'full', fallback: null, revision: null } }; }, wireTools: () => [] },
+        agent: { buildLlmRequest: async () => { previews++; return { messages: [{ role: 'system', content: 'abc' }, { role: 'user', content: 'hello' }], system: 'x', context: { mode: 'full', fallback: null, revision: null } }; }, wireTools: () => [], contextTokens: async ({ fallbackTokens }: any) => ({ tokens: fallbackTokens, source: 'estimate' }) },
         llm: { resolveEndpoint: async () => ({ api: 'mock' }) },
-        compaction: { contextWindow: async () => 1000, estimateTokens: async ({ messages }: any) => messages.reduce((s: number, m: any) => s + m.content.length, 0) },
+        compaction: { calibration: async () => ({ factor: 1, samples: 0, source: 'heuristic' }), contextWindow: async () => 1000, estimateTokens: async ({ messages }: any) => messages.reduce((s: number, m: any) => s + m.content.length, 0) },
     } };
     const measured = await budget(ctx, null, { agentId: 'test', breakdown: true });
     expect(previews).toBe(1);

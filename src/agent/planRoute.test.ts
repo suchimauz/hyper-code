@@ -38,8 +38,10 @@ describe("POST /agent/:id/plan", () => {
             appendMessage: (opts: any) => { calls.push(["message", opts]); return { idx: 0 }; },
             appendEvent: (opts: any) => { calls.push(["event", opts]); },
             syncAgentState: () => {},
+            mutateScratchpad: () => {},
           },
-          procs: { db: { run: (opts: any) => { calls.push(["db", opts]); } } },
+          procs: { db: { run: (opts: any) => { calls.push(["db", opts]); }, select: () => [], transaction: ({ fn }: any) => fn() } },
+          planning: { read: () => ({ mode: "execute" }) },
           agent: { wakeWorker: () => calls.push(["wake"]) },
         } };
         const req = new Request("http://x/agent/a1/plan", { method: "POST", body: new URLSearchParams({
@@ -47,6 +49,8 @@ describe("POST /agent/:id/plan", () => {
         }) });
         expect((await route(ctx, null, { req, params: { id: "a1" } })).status).toBe(204);
         expect(calls[0]).toEqual({ agent, title: "Edited", tasks: [{ id: "a", title: "A", instructions: "" }] });
+        expect(calls[1]).toMatchObject(["db", { sql: expect.stringContaining("stopped_at=NULL") }]);
+        calls.splice(1, 1);
         expect(calls[1][0]).toBe("message");
         expect(calls[1][1].message).toMatchObject({ role: "user", message_type: "plan_activation" });
         expect(calls[1][1].message.content).toContain("Task ID: a");

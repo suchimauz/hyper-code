@@ -67,17 +67,14 @@ test("People page: owners only; add person; Google-only member needs Google on",
     const cookie = async (u: any) => `${ctx.fns.procs.auth.cookieName({})}=${await ctx.fns.procs.auth.sign({ sub: u.id, name: u.name, role: u.role, days: 1 })}`;
     const asNik = { cookie: await cookie(nik) }, asAnna = { cookie: await cookie(anna) };
     expect((await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/users", headers: asAnna })).status).toBe(403);
-    const page = await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/users", headers: { ...asNik, accept: "text/html" } });
+    const page = await ctx.fns.procs.http.dispatch({ method: "GET", url: "/auth/users", headers: { ...asNik, accept: "application/json" } });
     expect(page.status).toBe(200);
-    const html = await page.text();
-    expect(html).toContain("Anna K");
-    expect(html).toContain("There is no isolation between people");
+    expect(await page.text()).toContain("Anna K");
 
-    const add = (body: Record<string, string>) => ctx.fns.procs.http.dispatch({ method: "POST", url: "/auth/users", headers: asNik, body: new URLSearchParams(body) });
-    const ok = await add({ action: "add", name: "Pavel", email: "pavel@health-samurai.io", password: "password-789" });
-    expect(ok.headers.get("location")).toContain("ok=");
-    const noPw = await add({ action: "add", name: "Olga", email: "olga@health-samurai.io" });
-    expect(decodeURIComponent(noPw.headers.get("location")!)).toContain("Google sign-in is off");
+    const csrf = await ctx.fns.auth.csrfToken({ req: new Request("http://localhost/auth/users", { headers: asNik }) });
+    const add = async (body: Record<string, string>) => (await ctx.fns.procs.http.dispatch({ method: "POST", url: "/auth/users", headers: { ...asNik, accept: "application/json", "content-type": "application/json", "x-csrf-token": csrf }, body: JSON.stringify(body) })).json();
+    expect((await add({ action: "add", name: "Pavel", email: "pavel@health-samurai.io", password: "password-789" })).ok).toContain("Pavel");
+    expect((await add({ action: "add", name: "Olga", email: "olga@health-samurai.io" })).error).toContain("Google sign-in is off");
     expect((await ctx.fns.auth.listUsers({})).map((u: any) => u.id)).toContain("pavel");
 });
 

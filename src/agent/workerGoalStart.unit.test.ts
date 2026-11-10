@@ -11,6 +11,7 @@ async function scenario(action: 'run'|'skip'|'defer'|'disabled', opts: { human?:
     const noop = async () => {};
     const finish = () => { ctx.state.workerLoopRunning = false; ctx.state.workerWakePending = true; };
     ctx.fns = {
+        input: { expireDue: async () => 0 },
         procs: { env: { mode: () => 'test' }, log: { warn: noop }, db: {
             select: async ({ sql, params }: any) => {
                 queries.push(sql);
@@ -42,7 +43,7 @@ async function scenario(action: 'run'|'skip'|'defer'|'disabled', opts: { human?:
                 return { action, humanPending: !!opts.human, continuationIdxs: action === 'disabled' ? [] : [2], suppressIdxs: opts.human ? [2] : [] };
             },
         },
-        session: { syncAgentState: noop, appendErrorEvent: noop }, webPush: { recordFailure: noop },
+        session: { syncAgentState: noop, appendErrorEvent: noop }, webPush: { recallStaleError: noop, recordFailure: noop },
         agent: {
             recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop, autoCompactIfNeeded: noop,
             wakeWorker: () => { wakes++; ctx.state.workerWakePending = true; },

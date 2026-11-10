@@ -1,6 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import call from "./call";
 import resolveReasoningEffort from "./resolveReasoningEffort";
+
+// llm.call backs off 0.5 s / 1.5 s between same-model retries; the retry logic, not the wall clock, is under test.
+const realSleep = Bun.sleep;
+beforeAll(() => { (Bun as any).sleep = async () => {}; });
+afterAll(() => { (Bun as any).sleep = realSleep; });
 
 for (const effort of [undefined, "high", "off", "xhigh", "auto"] as const) {
     test(`SSH Codex reasoning ${effort ?? "omitted"} reaches the wire safely`, async () => {

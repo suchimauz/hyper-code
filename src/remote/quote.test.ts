@@ -2,10 +2,10 @@
 // change that looks like a simplification is a command injection. Every case
 // below was verified against a real bash before being written down.
 import { test, expect } from "bun:test";
-import { testCtx } from "../$test";
+import quoteFn from "./quote";
 
-const ctx = await testCtx();
-const quote = (value: string, path?: boolean) => ctx.fns.remote.quote({ value, path });
+// quote is pure: call it directly instead of booting a full test runtime.
+const quote = (value: string, path?: boolean) => quoteFn({} as Context, null, { value, path });
 
 test("ordinary text is single-quoted, including when empty", () => {
     expect(quote("plain")).toBe("'plain'");

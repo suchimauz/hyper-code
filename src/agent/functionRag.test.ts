@@ -56,8 +56,9 @@ test("buildLlmRequest no longer rewrites history for retrieval", async () => {
         messages: [{ role: "user", content: "send a telegram message", idx: 0 }],
     };
     const result = await build(ctx, null, { agent });
-    const outgoing = result.messages.findLast((message: any) => message.role === "user");
-    expect(outgoing.content).toBe("send a telegram message");
+    // Request-only planning guidance may follow; the user's row itself is untouched.
+    expect(result.messages.some((message: any) => message.role === "user" && message.content === "send a telegram message")).toBe(true);
+    expect(result.messages.some((message: any) => String(message.content).includes("telegram.send"))).toBe(false);
     expect(agent.messages[0].content).toBe("send a telegram message");
 });
 

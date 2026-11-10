@@ -33,6 +33,6 @@ test('empty function-RAG outcomes are persisted through session event APIs',asyn
     const result=await ctx.fns.agent.markFunctionRag({agent:a,messageIdx:0,functions:[],injected:'',gate:'error',needsTool:null,retrieved:0,rerankStatus:'skipped'});
     expect(result.updated).toBe(true);
     const events=await ctx.fns.session.getEvents({id:a.id});const event=events.find(e=>e.type==='user');
-    expect(event.functionRag.gate).toBe('error');expect(event.functionRag.functions).toEqual([]);expect(event.html).toContain('retrieved 0 · kept 0');
+    expect(event.functionRag).toMatchObject({ gate: 'error', functions: [], retrieved: 0, injected: '' });
     expect(a.events.find(e=>e.type==='user')?.functionRag.rerankStatus).toBe('skipped');
 });

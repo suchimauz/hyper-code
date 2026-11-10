@@ -113,39 +113,7 @@ describe.skipIf(!enabled)("remote workspace (agent.workspaceHost)", () => {
         expect(prompt).toContain(`workspace: plain:${home}/proj — REMOTE, on SSH host plain`);
     });
 
-    test("Files UI: directory, file, raw media and saving on the host", async () => {
-        const R = ctx.fns.remote;
-        await R.exec({ host: "plain", command: "mkdir -p 'proj/docs sp' && printf '# Title\\n' > 'proj/docs sp/readme.md' && printf '\\x89PNG\\r\\n\\x1a\\n' > proj/dot.png" });
-        const d = (url: string, accept = "text/html") => ctx.fns.procs.http.dispatch({ url, headers: { accept } });
 
-        expect(await ctx.fns.files.browserUrl({ path: `${home}/proj/docs sp`, host: "plain" })).toBe(`/files/remote/plain${home}/proj/docs%20sp`);
-        const dir = await d(`/files/remote/plain${home}/proj`);
-        expect(dir.status).toBe(200);
-        const dirHtml = await dir.text();
-        expect(dirHtml).toContain("docs sp");
-        expect(dirHtml).toContain(`/files/remote/plain${home}/proj/docs%20sp`);
-
-        const page = await d(`/files/remote/plain${home}/proj/docs%20sp/readme.md`);
-        expect(page.status).toBe(200);
-        expect(await page.text()).toContain("Title");
-
-        const img = await d(`/files/remote/plain${home}/proj/dot.png`, "image/png");
-        expect(img.status).toBe(200);
-        expect(img.headers.get("content-type")).toBe("image/png");
-        expect(new Uint8Array(await img.arrayBuffer())).toEqual(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-
-        const embed = await d(`/files/remote/embed/plain${home}/proj`);
-        expect(embed.status).toBe(200);
-        expect(await embed.text()).toContain(`/files/remote/embed/plain${home}/proj/docs%20sp`);
-
-        const put = await ctx.fns.procs.http.dispatch({ url: `/files?path=${encodeURIComponent(`${home}/proj/saved.txt`)}&host=plain`, method: "PUT", body: "from the editor" });
-        expect(put.status).toBe(200);
-        expect((await R.exec({ host: "plain", command: "cat proj/saved.txt" })).stdout).toBe("from the editor");
-
-        expect((await d(`/files/remote/evil${home}/proj`)).status).toBe(404);
-        expect((await ctx.fns.procs.http.dispatch({ url: `/files?path=/etc/passwd&host=evil`, headers: { accept: "text/html" } })).status).toBe(400);
-        expect((await d(`/files/remote/plain${home}/proj/missing.txt`)).status).toBe(404);
-    });
 
     test("ui.previewFile refuses generic remote-file RPC", async () => {
         const rpc = Object.create(actx);
@@ -158,6 +126,8 @@ describe.skipIf(!enabled)("remote workspace (agent.workspaceHost)", () => {
 
     test("remote.list / stat / readBytes", async () => {
         const R = ctx.fns.remote;
+        // Independent fixtures: the retired SSR editor test no longer creates these files.
+        await R.exec({ host: "plain", command: "mkdir -p 'proj/docs sp'; printf '\\x89PNG\\r\\n\\x1a\\n' > proj/dot.png; printf 'from the editor' > proj/saved.txt" });
         expect((await R.list({ host: "plain", path: "proj" })).map((e: any) => e.name)).toEqual(expect.arrayContaining(["docs sp", "src", "dot.png", "saved.txt"]));
         expect(await R.stat({ host: "plain", path: "proj/saved.txt" })).toMatchObject({ isDir: false, size: 15 });
         expect(await R.stat({ host: "plain", path: "proj/none" })).toBeNull();
@@ -165,18 +135,7 @@ describe.skipIf(!enabled)("remote workspace (agent.workspaceHost)", () => {
         await expect(R.readBytes({ host: "plain", path: "proj/saved.txt", maxBytes: 4 })).rejects.toThrow("too large");
     });
 
-    test("review: relative remote paths in the Files UI resolve to absolute links", async () => {
-        const dir = await ctx.fns.procs.http.dispatch({ url: `/files?host=plain&path=proj`, headers: { accept: "text/html" } });
-        expect(dir.status).toBe(303);
-        expect(dir.headers.get("location")).toBe(`/files/remote/plain${home}/proj`);
-        const file = await ctx.fns.procs.http.dispatch({ url: `/files?host=plain&path=${encodeURIComponent("~/proj/saved.txt")}&tab=code&embed=1`, headers: { accept: "text/html" } });
-        expect(file.headers.get("location")).toBe(`/files/remote/embed/plain${home}/proj/saved.txt?tab=code`);
-        const rpc = Object.create(actx);
-        rpc.session = { ...actx.session, url: new URL("http://localhost/rpc") };
-        const response = await rpc.fns.ui.previewFile({ host: "rg", path: "~" });
-        expect(response).toBeInstanceOf(Response);
-        expect((response as Response).status).toBe(403);
-    });
+
 
     test("review: remote HTML preview assets come back raw, not as UI pages", async () => {
         await ctx.fns.remote.exec({ host: "plain", command: "printf 'console.log(1)\\n' > proj/app.js && printf 'body{}\\n' > proj/style.css" });

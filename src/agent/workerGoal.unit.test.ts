@@ -10,6 +10,7 @@ async function scenario(mode: string) {
     const finish = () => { ctx.state.workerLoopRunning = false; ctx.state.workerWakePending = true; };
     const binding = { goalId: 'captured-goal', revision: 7, allowContinuation: true };
     ctx.fns = {
+        input: { expireDue: async () => 0 },
         procs: { env: { mode: () => 'test' }, log: { warn: noop }, db: {
             select: async ({ sql, params }: any) => {
                 if (sql.startsWith('WITH stale')) return [];
@@ -51,7 +52,7 @@ async function scenario(mode: string) {
             },
         },
         session: { syncAgentState: noop, appendErrorEvent: noop },
-        webPush: { notifyError: noop, recordFailure: noop },
+        webPush: { recallStaleError: noop, notifyError: noop, recordFailure: noop },
         agent: {
             recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop,
             autoCompactIfNeeded: noop, wakeWorker: () => { ctx.state.workerWakePending = true; },
