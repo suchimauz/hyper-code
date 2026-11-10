@@ -30,4 +30,15 @@ describe('compaction history lifecycle', () => {
     await userEvent.click(screen.getByRole('button', { name: /Не удалось/ }));
     expect(screen.getByText('Provider unavailable')).toBeVisible();
   });
+  it('shows provider-measured before as exact and after as an estimate', () => {
+    // No explanatory suffix: the tilde alone marks the estimate.
+    render(<CompactionRow event={{ ...end, tokensBefore: 130051, tokensAfter: 42000, tokensBeforeSource: 'provider', tokensAfterEstimated: true }} />);
+    expect(screen.getByRole('button', { name: /compact/ })).toHaveTextContent(`${(130051).toLocaleString()} → ~${(42000).toLocaleString()} токенов`);
+    expect(screen.getByRole('button', { name: /compact/ })).not.toHaveTextContent(`~${(130051).toLocaleString()}`);
+    expect(screen.getByRole('button', { name: /compact/ })).not.toHaveTextContent('оценка');
+  });
+  it('keeps both counts approximate for estimated or legacy events', () => {
+    render(<CompactionRow event={end} />);
+    expect(screen.getByRole('button', { name: /compact/ })).toHaveTextContent(`~${(3000).toLocaleString()} → ~${(500).toLocaleString()} токенов`);
+  });
 });

@@ -26,9 +26,11 @@ export function ComposerFooter({ agentId, running, busy, revision, onMenuToggle,
     void refresh(); const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 30000);
     return () => { controller.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
   }, [agentId, running, revision]);
-  const percent = budget && budget.contextWindow && budget.contextWindow > 0 ? Math.round(budget.estimatedTokens / budget.contextWindow * 100) : null;
+  const used = budget ? budget.usedTokens ?? budget.estimatedTokens : 0;
+  const exact = budget?.usedSource === 'provider';
+  const percent = budget && budget.contextWindow && budget.contextWindow > 0 ? Math.round(used / budget.contextWindow * 100) : null;
   const label = percent == null ? 'Оценка контекста недоступна' : `${percent}% of context used`;
-  const detail = budget ? `${budget.estimatedTokens.toLocaleString('ru-RU')} токенов${budget.contextWindow ? ` из ${budget.contextWindow.toLocaleString('ru-RU')}` : '; размер окна неизвестен'}. Оценка следующего запроса.` : 'Не удалось получить оценку следующего запроса.';
+  const detail = budget ? `${exact ? '' : '~'}${used.toLocaleString('ru-RU')} токенов${budget.contextWindow ? ` из ${budget.contextWindow.toLocaleString('ru-RU')}` : '; размер окна неизвестен'}. ${exact ? 'Последний запрос по данным провайдера плюс оценка новых сообщений.' : 'Оценка следующего запроса.'}` : 'Не удалось получить оценку следующего запроса.';
   const usage = details?.usage;
   // Input already includes cache reads and writes; adding them again double-counts usage.
   const formatTokens = (n: number | null | undefined) => n == null ? '—' : Math.round(n).toLocaleString('en-US');

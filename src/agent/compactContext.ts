@@ -44,7 +44,10 @@ export default async function (
     const oldHead = sleep?.activeRevision ?? null;
     const projection = await ctx.fns.compaction.project({ model: parent.model, messages: rootMessages, sleepContext: sleep });
     const effective = projection.messages;
+    // Validity compares estimate with estimate; the reported "before" uses the
+    // shared provider-backed measurement when a fresh one exists.
     const tokensBefore = await ctx.fns.compaction.estimateTokens({ messages: effective });
+    const measuredBefore = await ctx.fns.agent.contextTokens({ agentId: parent.id, model: parent.model, fallbackTokens: tokensBefore });
     // Budget complete exchanges, not a minimum text-message count: one image
     // or parallel tool batch must not make the retained suffix unbounded.
     const { tailStart } = await ctx.fns.compaction.selectTail({ messages: rootMessages });
@@ -138,7 +141,7 @@ export default async function (
         return { status: "stale", tokensBefore };
       }
       parent.sleepContext = next;
-      await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_completed", payload: { revision, tokensBefore, tokensAfter, keptMessages: rootMessages.length - tailStart, summary } });
+      await ctx.fns.session.appendEventWithHtml({ id: parent.id, type: "compaction_completed", payload: { revision, tokensBefore: measuredBefore.tokens, tokensBeforeSource: measuredBefore.source, tokensAfter, tokensAfterEstimated: true, keptMessages: rootMessages.length - tailStart, summary } });
       // The draft child has done its only job. Archive it here and in the catch
       // below: otherwise every compaction — successful or failed — leaves a hidden
       // agent row behind that later looks like unfinished delegated work.

@@ -307,7 +307,7 @@ export default async function (
                 ? await ctx.fns.agent.contextBudget({ agentId: agent.id })
                 : await ctx.fns.agent.autoCompactIfNeeded({ agent, runToken, signal: ac.signal, checkOnly: true });
             await assertRunActive();
-            if (budget.contextWindow && budget.estimatedTokens >= budget.contextWindow * 0.9) {
+            if (budget.contextWindow && ('usedTokens' in budget ? budget.usedTokens : budget.estimatedTokens) >= budget.contextWindow * 0.9) {
                 const text = 'Paused before another model request: context is near the model limit and compaction could not reduce it. Compact the context or start a new chat before continuing.';
                 await ctx.fns.session.appendMessage({ id: agent.id, message: { role: 'assistant', content: text } });
                 await assertRunActive();
@@ -400,6 +400,7 @@ export default async function (
         const onRunAbort = () => sampling.abort(ac.signal.reason ?? "run_aborted");
         ac.signal.addEventListener("abort", onRunAbort, { once: true });
         let streamed: any;
+        let requestCoverage: { model: string; coveredIdx: number } | undefined;
         const goalRequestId = crypto.randomUUID();
         let goalProvider = 'unsupported';
         const goalFormat = 'common-stream' as const;
@@ -447,6 +448,9 @@ export default async function (
             }
             await ctx.fns.agent.retryWait({ agentId: agent.id, runToken: runToken ?? null, signal: ac.signal });
             await assertRunActive();
+            // Messages persisted after this point are not measured by this request's usage.
+            const coveredRows = await ctx.fns.procs.db.select({ sql: 'SELECT MAX(idx) AS idx FROM messages WHERE agent_id = ?', params: [agent.id] }) as Array<{ idx: number | string | null }>;
+            requestCoverage = { model: agent.model, coveredIdx: coveredRows[0]?.idx == null ? -1 : Number(coveredRows[0].idx) };
             streamed = await ctx.fns.llm.stream({ agent, signal: sampling.signal, onEvent });
             await ctx.fns.procs.db.run({ sql: 'UPDATE agents SET llm_retry_attempt = 0, llm_retry_pending = NULL WHERE id = ? AND stopped_at IS NULL AND (?::text IS NULL OR run_token = ?)', params: [agent.id, runToken ?? null, runToken ?? null] });
             if (goalRun) goalResult = await ctx.fns.goal.runUsageRecord({ state: goalRun, provider: goalProvider, requestId: goalRequestId, format: goalFormat, usage: streamed.usage });
@@ -510,7 +514,7 @@ export default async function (
         mobileStream.thinking = false;
         const { text, usage } = streamed;
         let { finishReason, toolCalls = [] } = streamed;
-        await ctx.fns.session.recordContextUsage({ id: agent.id, usage, metrics: streamed.metrics });
+        await ctx.fns.session.recordContextUsage({ id: agent.id, usage, metrics: streamed.metrics, ...(requestCoverage ?? {}) });
         await assertRunActive();
         let prose = String(text ?? '');
         // Account the just-finished request BEFORE authorizing its tool batch.

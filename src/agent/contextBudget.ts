@@ -1,7 +1,7 @@
 /**
  * Preview the next request context and expose full-history fallback instead of stale usage
  *
- * Use for the context meter. Reads durable model, compact metadata and history, then assembles the same request as inference in preview mode, including bootstrap, repaired tool pairs, attachment contents and cached relevance choices. Estimates message, system and tool-schema tokens without an LLM or relevance-network call. Estimates are not provider tokenization: last successful provider usage is returned separately, never substituted for the current payload. Returns why a compact checkpoint cannot be used.
+ * Use for the context meter. Reads durable model, compact metadata and history, then assembles the same request as inference in preview mode, including bootstrap, repaired tool pairs, attachment contents and cached relevance choices. Estimates message, system and tool-schema tokens without an LLM or relevance-network call. Estimates are not provider tokenization: last successful provider usage is returned separately, never substituted for the current payload. usedTokens is the shared measurement (agent.contextTokens) used for compaction thresholds and the meter. Returns why a compact checkpoint cannot be used.
  * @param opts.agentId Existing agent whose next outgoing context should be measured without changing its transcript.
  * @param opts.breakdown Include separately rounded component estimates from the same request preview. @default false
  */
@@ -14,7 +14,7 @@ export default async function (
         /** Include aggregate component estimates without building another preview. @default false */
         breakdown?: boolean;
     },
-): Promise<{ estimatedTokens: number; contextWindow: number | null; mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null; messageCount: number; lastReportedTokens: number | null; lastReportedAt: number | null; breakdown?: NonNullable<types.agent.ContextUsageDetails['breakdown']> }> {
+): Promise<{ estimatedTokens: number; /** Shared context measurement: latest provider prompt plus estimated newer messages, or a full estimate when no fresh usage exists. */ usedTokens: number; usedSource: "provider" | "estimate"; contextWindow: number | null; mode: "full" | "compact"; fallback: "missing_generation" | "missing_checkpoint" | "incompatible_checkpoint" | "invalid_boundary" | null; revision: number | null; messageCount: number; lastReportedTokens: number | null; lastReportedAt: number | null; breakdown?: NonNullable<types.agent.ContextUsageDetails['breakdown']> }> {
     const agent = ctx.state.agent[opts.agentId] ?? await ctx.fns.session.load({ id: opts.agentId });
     if (!agent) throw new Error("Agent not found");
     const rows = await ctx.fns.procs.db.select({ sql: "SELECT model, sleep_context FROM agents WHERE id = ?", params: [opts.agentId] }) as Array<{ model: string; sleep_context: Record<string, unknown> | null }>;
@@ -48,5 +48,6 @@ export default async function (
             lastReportedTokens = prompt + completion; lastReportedAt = Number(usageRows[0]?.ts ?? 0);
         }
     } catch { /* Missing or malformed prior usage is not a current budget. */ }
-    return { estimatedTokens, contextWindow: await ctx.fns.compaction.contextWindow({ model: snapshot.model }), ...request.context, messageCount: request.messages.length, lastReportedTokens, lastReportedAt, ...(breakdown ? { breakdown } : {}) };
+    const used = await ctx.fns.agent.contextTokens({ agentId: opts.agentId, model: snapshot.model, fallbackTokens: estimatedTokens });
+    return { estimatedTokens, usedTokens: used.tokens, usedSource: used.source, contextWindow: await ctx.fns.compaction.contextWindow({ model: snapshot.model }), ...request.context, messageCount: request.messages.length, lastReportedTokens, lastReportedAt, ...(breakdown ? { breakdown } : {}) };
 }

@@ -23,7 +23,7 @@ export default async function (
         /** Only measure context after a failed attempt; never call the summarizer. @default false */
         checkOnly?: boolean;
     },
-): Promise<{ status: "compacted" | "below_threshold" | "no_compactor" | "already_compact" | "busy" | "failed" | "stale" | "not_needed" | "over_threshold"; estimatedTokens: number; threshold?: number; contextWindow?: number; error?: string }> {
+): Promise<{ status: "compacted" | "below_threshold" | "no_compactor" | "already_compact" | "busy" | "failed" | "stale" | "not_needed" | "over_threshold"; estimatedTokens: number; source?: "provider" | "estimate"; threshold?: number; contextWindow?: number; error?: string }> {
     const agent = opts.agent;
     let hasCompactor = true;
     try { (await ctx.fns.compaction.resolve({ model: agent.model })); } catch { hasCompactor = false; }
@@ -33,29 +33,20 @@ export default async function (
     const root = agent.parentId ? await ctx.fns.session.getFullMessages({ id: agent.id }) : await ctx.fns.session.getMessages({ id: agent.id });
     const projection = await ctx.fns.compaction.project({ model: agent.model, messages: root, sleepContext: row.sleep_context });
     const effective = projection.messages;
-    // Vision payloads are not text tokens. The provider's own count remains a
-    // lower bound for expensive images, code/JSON and empty-text tool turns.
-    // Legacy assistant usage is only a fallback before dedicated usage events exist.
-    const last = ((await ctx.fns.procs.db.select({ sql: "SELECT payload, ts FROM events e WHERE agent_id = ? AND (type = 'context_usage' OR (type = 'assistant' AND NOT EXISTS (SELECT 1 FROM events usage_event WHERE usage_event.agent_id = e.agent_id AND usage_event.type = 'context_usage'))) ORDER BY idx DESC LIMIT 1", params: [agent.id] })) as any[])[0];
-    let reported = 0;
-    try {
-        const usage = JSON.parse(String(last?.payload ?? "{}"))?.usage ?? {};
-        const prompt = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
-        const completion = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
-        reported = Number.isFinite(prompt) && prompt >= 0 && Number.isFinite(completion) && completion >= 0 ? prompt + completion : 0;
-    } catch { reported = 0; }
-    // A usage recorded before the active compaction describes the old, larger context.
-    const fresh = projection.mode !== 'compact' || Number(last?.ts ?? 0) > Number(projection.activatedAt ?? 0);
-    const estimatedTokens = Math.max(await ctx.fns.compaction.estimateTokens({ messages: effective }), fresh ? reported : 0);
+    // One shared measurement: the latest provider-reported prompt plus an
+    // estimate of only the messages persisted after that request.
+    const measured = await ctx.fns.agent.contextTokens({ agentId: agent.id, model: agent.model, fallbackTokens: await ctx.fns.compaction.estimateTokens({ messages: effective }) });
+    const estimatedTokens = measured.tokens;
+    const source = measured.source;
     const configured = await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactTokens", fallback: 700000 });
     const percent = agent.autoCompactWindowPercent ?? await ctx.fns.settings.getNumber({ module: "agent", scopeType: "global", key: "autoCompactWindowPercent", fallback: 65 });
     const window = (await ctx.fns.compaction.contextWindow({ model: agent.model }));
     const byWindow = window ? Math.floor(window * Math.min(95, Math.max(15, Number(percent ?? 65))) / 100) : Infinity;
     const threshold = Math.max(10000, Number(opts.thresholdTokens ?? Math.min(Number(configured ?? 700000), byWindow)));
-    if (!hasCompactor) return { status: 'no_compactor', estimatedTokens, threshold, contextWindow: window ?? undefined };
-    if (opts.checkOnly) return { status: estimatedTokens < threshold ? 'below_threshold' : 'over_threshold', estimatedTokens, threshold, contextWindow: window ?? undefined };
-    if (projection.mode === 'compact' && projection.tailStart !== null && projection.tailStart >= root.length - 1) return { status: "already_compact", estimatedTokens, threshold, contextWindow: window ?? undefined };
-    if (estimatedTokens < threshold) return { status: "below_threshold", estimatedTokens, threshold, contextWindow: window ?? undefined };
-    try { const result = await ctx.fns.agent.compactContext({ agent, runToken: opts.runToken, signal: opts.signal }); return { status: result.status, estimatedTokens, threshold, contextWindow: window ?? undefined }; }
-    catch (error: any) { const message = String(error?.message ?? error); await ctx.fns.session.appendEventWithHtml({ id: agent.id, type: "auto_compaction_failed", payload: { estimatedTokens, error: message } }).catch(() => undefined); return { status: "failed", estimatedTokens, error: message }; }
+    if (!hasCompactor) return { status: 'no_compactor', estimatedTokens, source, threshold, contextWindow: window ?? undefined };
+    if (opts.checkOnly) return { status: estimatedTokens < threshold ? 'below_threshold' : 'over_threshold', estimatedTokens, source, threshold, contextWindow: window ?? undefined };
+    if (projection.mode === 'compact' && projection.tailStart !== null && projection.tailStart >= root.length - 1) return { status: "already_compact", estimatedTokens, source, threshold, contextWindow: window ?? undefined };
+    if (estimatedTokens < threshold) return { status: "below_threshold", estimatedTokens, source, threshold, contextWindow: window ?? undefined };
+    try { const result = await ctx.fns.agent.compactContext({ agent, runToken: opts.runToken, signal: opts.signal }); return { status: result.status, estimatedTokens, source, threshold, contextWindow: window ?? undefined }; }
+    catch (error: any) { const message = String(error?.message ?? error); await ctx.fns.session.appendEventWithHtml({ id: agent.id, type: "auto_compaction_failed", payload: { estimatedTokens, error: message } }).catch(() => undefined); return { status: "failed", estimatedTokens, source, error: message }; }
 }

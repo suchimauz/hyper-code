@@ -229,6 +229,8 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
                 summary: typeof event.summary === 'string' ? event.summary : null,
                 tokensBefore: typeof event.tokensBefore === 'number' ? event.tokensBefore : null,
                 tokensAfter: typeof event.tokensAfter === 'number' ? event.tokensAfter : null,
+                tokensBeforeSource: event.tokensBeforeSource === 'provider' || event.tokensBeforeSource === 'estimate' ? event.tokensBeforeSource : null,
+                tokensAfterEstimated: event.tokensAfterEstimated === true,
                 keptMessages: typeof event.keptMessages === 'number' ? event.keptMessages : null,
             } : {}),
             attachments: Array.isArray(event.attachments) ? event.attachments.map((attachment: any) => ({
