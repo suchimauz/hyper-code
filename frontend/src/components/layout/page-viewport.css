@@ -1,7 +1,11 @@
 /* Host owns page width. Internal document/iframe layouts remain the author's responsibility. */
 .page-viewport { width: 100%; height: 100%; overflow: hidden; }
-.page-width-content { width: min(100%, calc(var(--chat-content-width) + 64px)); margin-inline: auto; min-width: 0; min-height: 0; height: 100%; overflow: auto; }
-.page-viewport .page-width-content > :is(.plugins-page, .automation-page, .people-draft-page, .hyper-extension-surface, .application-pages) { max-width: none; width: 100%; height: 100%; box-sizing: border-box; }
+.page-scroll-viewport { flex: 1; width: 100%; min-width: 0; min-height: 0; overflow: auto; }
+.page-width-content { width: min(100%, calc(var(--chat-content-width) + 64px)); margin-inline: auto; min-width: 0; min-height: 100%; display: flex; flex-direction: column; }
+/* Page documents grow in the panel scroller; embedded widgets retain their own scrolling. */
+.page-viewport .page-width-content > :is(.plugins-page, .automation-page, .people-draft-page, .hyper-extension-surface, .application-pages) { flex: 1; height: auto; overflow: visible; }
+.page-viewport .application-pages > ul { overflow: visible; }
+.page-viewport .page-width-content > :is(.plugins-page, .automation-page, .people-draft-page, .hyper-extension-surface, .application-pages) { max-width: none; width: 100%; box-sizing: border-box; }
 .page-viewport :is(.plugins-pane, .automation-pane) { max-width: none; padding-inline: 32px; }
 .page-viewport .page-width-content > :is(.people-draft-page, .hyper-extension-surface) { padding-inline: 32px; }
 .page-viewport > .chat-width-toolbar { right: 4px; top: 4px; }
@@ -10,7 +14,7 @@
 .page-viewport > .chat-width-handle--left { right: min(calc(100% - 10px), calc(50% + var(--chat-content-width) / 2 + 22px)); }
 .page-viewport > .chat-width-handle--right { left: min(calc(100% - 10px), calc(50% + var(--chat-content-width) / 2 + 22px)); }
 @media (pointer: coarse), (max-width: 600px) {
-  .page-width-content { width: 100%; flex: 1; }
+  .page-width-content { width: 100%; }
   .page-viewport :is(.plugins-pane, .automation-pane), .page-viewport .page-width-content > :is(.people-draft-page, .hyper-extension-surface) { padding-inline: 16px; }
   .page-viewport > .chat-width-toolbar { position: static; flex: none; }
   .page-viewport > .chat-width-toolbar .icon-button { width: 44px; min-width: 44px; min-height: 44px; }

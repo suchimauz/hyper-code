@@ -3,6 +3,17 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { PageViewport } from '../components/layout/PageViewport';
 import { ChatViewport } from '../components/layout/ChatViewport';
 import { ExtensionSurface } from '../extensions/ExtensionHost';
+it('keeps width controls outside the full-panel scroll container', () => {
+  const { container } = render(<PageViewport active><div>Long page</div></PageViewport>);
+  const viewport = container.querySelector('.page-viewport')!;
+  const scroller = viewport.querySelector(':scope > .page-scroll-viewport')!;
+  expect(scroller).not.toBeNull();
+  expect(scroller.querySelector(':scope > .page-width-content')).toContainElement(screen.getByText('Long page'));
+  expect(scroller.querySelector('[role="separator"]')).toBeNull();
+  expect(viewport.querySelectorAll(':scope > [role="separator"]')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button', { name: 'Страница на всю ширину панели' }));
+  expect(viewport.querySelector(':scope > .page-scroll-viewport')).toBe(scroller);
+});
 const key = 'hyper-ui.page-content-width-v1';
 afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 it('shares the page preference across native and extension pages, independently from chat', () => {
