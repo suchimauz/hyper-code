@@ -6,11 +6,14 @@ import refresh from "../node/refresh";
 test("node choices survive transient refresh failures, but not revocation, disable or authoritative empty catalogues", async () => {
     const originalFetch = globalThis.fetch;
     let mode = "ok";
-    const entries = ["su4imauz", "NylahKamalii9806"].map(account => ({ id: `codex/${account}:gpt-6-astra`, provider: "codex", account, api: "responses", kind: "subscription" }));
+    const entries = ["example-account", "second-account"].map(account => ({ id: `codex/${account}:gpt-6-astra`, provider: "codex", account, api: "responses", kind: "subscription" }));
     const node: any = { name: "mini6", url: "http://node.test", enabled: true, catalog: entries, catalogAt: Date.now() - 600_000, lastError: null };
     const ctx: any = { env: { LMSTUDIO_URL: "http://local.test" }, fns: {
         settings: { get: async () => null },
-        llm: { resolveEndpoint: async () => ({ apiKey: null }) },
+        llm: {
+            resolveEndpoint: async () => ({ apiKey: null }),
+            gatewayHealth: async () => ({ configured: false, status: "configured", reason: "missing-key", checkedAt: null, models: [] }),
+        },
         node: { get: async () => ({ ...node }), list: async () => [{ ...node }], token: async () => "test-only", refresh: (opts: any) => refresh(ctx, null, opts) },
         procs: { events: { refresh: () => {} }, db: { run: async ({ sql, params }: any) => {
             if (sql.includes("SET catalog =")) { node.catalog = JSON.parse(params[0]); node.catalogAt = params[1]; node.lastError = null; }
