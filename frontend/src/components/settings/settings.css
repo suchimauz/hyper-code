@@ -148,3 +148,4 @@
 .push-device-meta code { padding: 0; background: none; }
 .push-device-actions { margin-left: auto; display: inline-flex; gap: 4px; flex: none; align-items: center; }
 .button.push-device-remove, .button.push-device-remove:not(:disabled):hover { color: var(--tool-error); filter: none; }
+.push-confirm-actions { display: inline-flex; align-items: center; gap: 4px; }

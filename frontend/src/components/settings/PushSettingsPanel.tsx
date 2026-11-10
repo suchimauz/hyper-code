@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { BellOff, Check, X } from 'lucide-react';
 import { requestJson } from '../../lib/hyper';
 import { Button } from '../ui/Button';
 import { PushDevices, type PushDevice } from './PushDevices';
@@ -55,6 +56,26 @@ export function PushSettingsPanel() {
     void hashEndpoint();
     return () => { active = false; };
   }, [subscription]);
+  const busyRef = useRef(busy);
+  useEffect(() => { busyRef.current = busy; }, [busy]);
+  // Other devices enable or disable their own push at any time; poll quietly while this panel is open.
+  useEffect(() => {
+    let active = true;
+    const quiet = async () => {
+      if (document.hidden || busyRef.current) return;
+      try {
+        const next = await requestJson<Config>('/webPush/config');
+        if (!active) return;
+        let sub: PushSubscription | null = null;
+        if (!unavailable) { const registration = await navigator.serviceWorker.getRegistration('/'); sub = registration && ownsWorker(registration) ? await registration.pushManager.getSubscription() : null; }
+        if (active) { setConfig(next); setSubscription(sub); }
+      } catch { /* Quiet poll; the next tick or any explicit action retries. */ }
+    };
+    const timer = window.setInterval(() => { void quiet(); }, 5000);
+    const onVisible = () => { if (!document.hidden) void quiet(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [unavailable]);
   const post = (path: string, data: object, current: Config) => requestJson(`/webPush/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': current.csrf }, body: JSON.stringify(data) });
   const enable = async () => {
     if (!config || busy) return;
@@ -75,7 +96,9 @@ export function PushSettingsPanel() {
       const sub = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       try { await post('subscribe', { subscription: sub.toJSON(), userAgent: navigator.userAgent }, fresh); }
       catch (error) { if (!await sub.unsubscribe()) setSubscription(sub); throw error; }
-      remember(binding(fresh)); setConfig(fresh); setSubscription(sub); setMessage('Push notifications enabled on this device.');
+      remember(binding(fresh)); setSubscription(sub);
+      try { setConfig(await requestJson<Config>('/webPush/config')); } catch { setConfig(fresh); }
+      setMessage('Push notifications enabled on this device.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not enable notifications.'); }
     finally { setBusy(false); }
   };
@@ -106,7 +129,9 @@ export function PushSettingsPanel() {
   return <section aria-label="Push notifications">
     <h2>Push notifications</h2><p className="settings-note">Optional notifications for action requests and errors that stop work. No prompt or subscription is created until you enable them.</p>
     <p role="status" aria-live="polite">{message}</p>
-    {subscription ? <><Button disabled={busy} onClick={() => setConfirmDisable(true)}>Disable on this device…</Button>{confirmDisable && <div role="group" aria-label="Confirm disable notifications"><p>Remove this browser’s push subscription? Other devices are not affected.</p><Button disabled={busy} onClick={() => { void disable(); }}>Confirm disable</Button><Button disabled={busy} onClick={() => setConfirmDisable(false)}>Cancel</Button></div>}</> : <Button disabled={busy || !!unavailable || !config?.enabled} onClick={() => { void enable(); }}>Enable on this device</Button>}
+    {subscription ? (confirmDisable
+      ? <div role="group" aria-label="Confirm disable notifications"><p>Remove this browser’s push subscription? Other devices are not affected.</p><span className="push-confirm-actions"><Button variant="ghost" size="compact" className="push-device-remove" aria-label="Confirm disable" title="Confirm disable" disabled={busy} onClick={() => { void disable(); }}><Check size={16} strokeWidth={2} aria-hidden="true" /></Button><Button variant="ghost" size="compact" aria-label="Cancel" title="Cancel" disabled={busy} onClick={() => setConfirmDisable(false)}><X size={16} strokeWidth={2} aria-hidden="true" /></Button></span></div>
+      : <Button disabled={busy} onClick={() => setConfirmDisable(true)}><BellOff size={16} strokeWidth={1.75} aria-hidden="true" />Disable on this device</Button>) : <Button disabled={busy || !!unavailable || !config?.enabled} onClick={() => { void enable(); }}>Enable on this device</Button>}
     <h3>Connected devices</h3>
     <PushDevices devices={config ? config.devices : null} currentHash={deviceHash} onRemove={(id) => { void removeDevice(id); }} busy={busy} />
     <p className="settings-footnote">Notifications are sent for action requests and errors that stop work. Each device manages its own subscription.</p>

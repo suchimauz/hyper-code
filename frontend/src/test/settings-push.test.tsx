@@ -29,7 +29,7 @@ test('opening settings reads only; permission prompt requires button gesture', a
 });
 test('unsubscribe requires explicit confirmation, then uses scoped CSRF transport', async () => {
   const h = setup(true); localStorage.setItem('hyper-push-binding', 'owner:session'); render(<PushSettingsPanel />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Disable on this device…' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Disable on this device' }));
   expect(h.unsubscribe).not.toHaveBeenCalled(); expect(h.fetchMock).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Confirm disable' }));
   await waitFor(() => expect(h.unsubscribe).toHaveBeenCalledTimes(1));
