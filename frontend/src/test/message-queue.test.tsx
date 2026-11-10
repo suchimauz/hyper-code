@@ -68,7 +68,7 @@ it('idle waiting inputs queue ordinary messages instead of attempting direct sen
  vi.stubGlobal('fetch',fetcher);
  const accepted=vi.fn(); render(<LiveComposer agentId="waiting" running={false} onAccepted={accepted}/>);
  await screen.findByText('First message');
- expect(screen.getByText(/Агент ждёт ответа в форме/)).toBeVisible();
+ expect(screen.queryByText(/Агент ждёт ответа в форме/)).toBeNull();
  expect(screen.getByRole('button',{name:'Направить агенту сейчас'})).toBeDisabled();
  fireEvent.input(screen.getByRole('textbox'),{target:{textContent:'Later'}});
  fireEvent.click(screen.getByRole('button',{name:'Отправить сообщение'}));

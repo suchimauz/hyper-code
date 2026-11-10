@@ -26,9 +26,8 @@ export function QueueDock({ queue, running, disabled }: Props) {
   useAutoGrow(editorInput, editing ? text : '');
   const close = () => { setEditing(null); editButton.current?.focus(); };
   const save = async () => { if (editing && text.trim() && await queue.perform([editing], 'edit', text.trim())) close(); };
-  if (!rows.length && !queue.error && !queue.waitingForInput) return null;
+  if (!rows.length && !queue.error) return null;
   return <section className="queue-dock" aria-label="Очередь сообщений" aria-busy={!!queue.processing}>
-    {queue.waitingForInput && <p role="status">Агент ждёт ответа в форме. Сообщения останутся в очереди до ответа.</p>}
     {rows.length > 1 && <button type="button" className="queue-header" aria-expanded={open} aria-controls={listId} disabled={forced} onClick={() => setExpanded(!expanded)}><QueueGlyph /><span>В очереди: {rows.length}</span>{!open && queue.sending && <span className="queue-status" role="status">Отправка…</span>}{open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}</button>}
     {open && <ul id={listId} className="queue-list">{rows.map(item => {
       const pending = item === queue.sending;

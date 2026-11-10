@@ -36,6 +36,6 @@ test('unapproved arbitrary plugin has visible safe fallback; core native kinds a
  fireEvent.click(await screen.findByRole('button',{name:/Plugin review/}));
  expect(screen.getByTitle('Plugin review').getAttribute('src')).toContain('id=x');
  expect(screen.getByText(/восстановите её плагин/)).toBeTruthy();
- expect(screen.getByText('Ожидают ответа или обработки: 5')).toBeTruthy();
+ expect(screen.queryByText(/Ожидают ответа или обработки/)).toBeNull();
  for(const kind of ['choice','confirm','grid','planning-review']) expect(screen.queryByRole('button',{name:new RegExp(kind)})).toBeNull();
 });
