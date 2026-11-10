@@ -448,6 +448,13 @@ export default async function (
             }
             await ctx.fns.agent.retryWait({ agentId: agent.id, runToken: runToken ?? null, signal: ac.signal });
             await assertRunActive();
+            // Collaboration-mode guidance as a persisted row only when it changed, so the
+            // provider prefix cache keeps growing from the tail (see agent.syncPlanningContext).
+            await ctx.fns.agent.syncPlanningContext?.({ agent })?.catch?.((error: any) => {
+                ctx.fns.procs.log?.warn?.({ event: 'agent.planning-context.failed', msg: String(error?.message ?? error), agentId: agent.id });
+                return null;
+            });
+            await assertRunActive();
             // Messages persisted after this point are not measured by this request's usage.
             const coveredRows = await ctx.fns.procs.db.select({ sql: 'SELECT MAX(idx) AS idx FROM messages WHERE agent_id = ?', params: [agent.id] }) as Array<{ idx: number | string | null }>;
             requestCoverage = { model: agent.model, coveredIdx: coveredRows[0]?.idx == null ? -1 : Number(coveredRows[0].idx) };

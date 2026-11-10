@@ -179,9 +179,15 @@ export default async function (
         });
     }
 
-    // Fresh control-plane mode always follows historical/compacted instructions.
+    // Collaboration mode travels as a persisted `planning_context` row (agent.syncPlanningContext),
+    // so it sits inside the cached prefix. Re-sending it at the request tail every time put
+    // new history BEFORE it on the next request, which broke prefix reuse on Responses
+    // backends (cache stuck at ~1920 tokens). Only when the projected history lacks the
+    // current guidance (compaction, preview before the first run) is it added request-only.
     const planningContext = await ctx.fns.planning.prompt({ agentId: agent.id });
-    messages.push({ role: 'user', content: planningContext, excluded_from_cursor: true });
+    let lastPlanning: string | null = null;
+    for (let i = base.length - 1; i >= 0; i--) if ((base[i] as any)?.message_type === 'planning_context') { lastPlanning = String((base[i] as any).content ?? ''); break; }
+    if (lastPlanning !== planningContext) messages.push({ role: 'user', content: planningContext, excluded_from_cursor: true });
 
     return {
         system,
