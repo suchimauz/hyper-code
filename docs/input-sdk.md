@@ -29,11 +29,50 @@ A waiting request ends the tool batch at its next safe boundary, including when 
 - Worker housekeeping calls `input.expireDue` on wake and on an idle cadence of at most 30 seconds. This is not a hard real-time deadline: worker availability, load and bounded batches can delay processing. No browser is needed.
 - Only due **open** rows expire. A `processing` external approval is intentionally not auto-expired or retried: the owning plugin must reconcile external receipts after a crash. Never infer that an interrupted request failed and resend it blindly.
 
+## Atomic mixed-kind batches
+
+Use one `batch` request when a person should answer an ordered chain of questions without resuming the agent between steps:
+
+```ts
+await ctx.fns.input.request({
+  kind: 'batch', title: 'Connection settings',
+  spec: { items: [
+    { key: 'target', kind: 'choice', title: 'Environment', spec: { options: ['staging', 'production'] } },
+    { key: 'token', kind: 'secret', title: 'API token', spec: { saveAs: 'secret://service/token' } },
+    { key: 'ready', kind: 'confirm', title: 'Use these settings?', spec: { details: 'Collect these settings; no external action is performed by this form.' } },
+  ] },
+  waitForAnswer: true,
+});
+```
+
+Each item is `{ key, kind, title, message?, spec?, expiresAt? }`. Keys are unique and stable; batches contain 1–30 items with a fixed order. There is no nesting, branching, skipping required answers or interpolation of previous answers into later specifications. A negative `confirm` answer is a valid answer, not cancellation. `waitForAnswer` remains explicit and applies to the parent only. End the tool turn after requesting; do not poll.
+
+**Next saves a draft, not an answer.** People can go back and edit previously visited steps. Server-acknowledged drafts survive refresh/restart. Only final send atomically applies all answers, encrypted target secrets, the terminal parent state and the one aggregate result. Drafts are not transcript messages and do not appear in ordinary card projections. Success delivers `{ answers: [{ key, kind, result }] }` in item order; a secret result contains only its `ref`.
+
+Cancellation discards every draft, including temporary encrypted secret data, and sends no partial answers. Expiry does the same. A validation/storage error during an accepted final send rolls back every answer and target-secret change, then cancels the batch with `{ reason: 'error', error: { code, message, stepKey? } }`. Safe errors identify the problem without exposing submitted values, SQL or stack traces. Field validation while editing can be corrected without cancelling. Stale or unauthorized requests cannot cancel another valid attempt.
+
+A network timeout is not proof of rollback: the browser refetches the authoritative receipt rather than automatically resending. Failure to publish an update after a successful commit does not reverse that commit. Crash recovery never re-executes external actions or reports an unverified cancellation.
+
+### Collection-only plugin contract
+
+A batch does **not** invoke a member's ordinary `prepare`/`submit` or protected completion handler. It collects data; external sends, payments, Redmine writes and planning-mode changes remain outside the batch and retain their own approval protocols. An existing plugin card is not automatically batch-compatible.
+
+The backend opts in through `Kind.batch: BatchCodec` (version 1). Its synchronous `normalizeSpec`, `validate`, `projectSpec`, `projectDraft` and optional `history` hooks receive data only, not `Context` or `Session`. They must be pure and must not send, persist or authorize anything. `validate` returns a normalized `FormValues`, safe result and summary, or a safe structured validation error. Unknown exceptions are not exposed verbatim. Protected/action kinds and nested `batch`/`planning-review` are rejected before a chain begins. Plugins remain trusted code, **not a sandbox**; these contracts do not make arbitrary same-origin plugin code safe.
+
+The frontend opts in through `ExtensionInputKind.batchComponent`, a controlled editor using exported `ExtensionBatchInputProps` from `@mauzcode/ui`. It consumes the projected spec and draft, emits `onChange`, and respects busy/read-only state. The host owns navigation and final submission. Do not call the standalone submission endpoint from this editor. The existing `component` and `onDone` contract is unchanged. Missing/unapproved batch editors must never fall back to an ordinary component that can perform an action. Non-official bundles still require human hash approval.
+
+Built-in choice, confirm, inline grid and secret support collection. Arbitrary runtime `grid.source` calls are not assumed read-only: supply inline rows until a supported read-only source contract exists. Secret values stay in the isolated field transport and encrypted draft storage, never in the parent React state; returning to a secret step allows keeping or replacing the draft, not revealing it. Repeated `saveAs` destinations within a batch are rejected. Target secrets are not changed until final commit.
+
+History is one durable, expandable batch entry with ordered question/result projections. Cancellation and errors display statuses and safe reasons, never drafts; successful plugin history uses its explicit safe projection, not raw result JSON. Standalone inputs and the legacy choice-only automatic grouping keep their existing behavior.
+
+The batch editor is a native React chat surface. Compatibility/SSR cards provide a safe link back to that chat, not a second editor or generic submit/cancel controls. Existing standalone compatibility documents and isolated secret transports remain supported.
+
+
 ## Backend kind and ownership
 
 A mounted plugin named `demo` can register `$input_demo-note.ts` in its source module. A kind default-exports `types.input.Kind` with required `open`, `submit` and `done` handlers, plus optional `prepare`, `projectCard`, `search`, `part`, `buttons`, `cancel`, `icon` and `completionAuthority`.
 
-Registration checks the **mounted source owner**, not merely the namespace or filename. Non-core kinds must begin with `<owner>-`; a plugin cannot replace `choice`, `confirm`, `grid`, `secret`, `planning-review`, or another owner's kind. Same-owner reload is allowed. Keep the server HTML handlers: they support compatibility consumers even when the primary card is React.
+Registration checks the **mounted source owner**, not merely the namespace or filename. Non-core kinds must begin with `<owner>-`; a plugin cannot replace `choice`, `confirm`, `grid`, `secret`, `batch`, `planning-review`, or another owner's kind. Same-owner reload is allowed. Keep the server HTML handlers: they support compatibility consumers even when the primary card is React.
 
 `GET /input/cards?agentId=…` is owner-only and same-origin. It returns every open/processing card and the latest 100 terminal receipts. Core specs use allowlists. A plugin gets metadata only unless it supplies `projectCard(ctx, { input })`, returning a display-safe object or `null`. The hook receives a row with no raw result/error; project only named public fields. Never spread `input.spec` into the projection. Top-level private keys are filtered, but that is not recursive sanitization: the plugin must exclude credentials, transport tokens, authority objects and secret values everywhere. Titles and messages must also be display-safe.
 

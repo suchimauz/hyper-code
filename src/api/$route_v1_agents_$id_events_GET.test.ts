@@ -8,13 +8,14 @@ describe("GET /api/v1/agents/:id/events", () => {
             { idx: 1097, messageIdx: 1026, ts: 1794102189920, type: 'input', inputId: 'inbc7a809ea1b342b6', kind: 'choice', html: '<form>never expose</form>' },
             { idx: 1098, messageIdx: 1026, ts: 1794102189921, type: 'input', inputId: 'inconfirm', kind: 'confirm', html: '<form>never expose</form>' },
             { idx: 1099, messageIdx: 1026, ts: 1794102189922, type: 'input', inputId: 'ingrid', kind: 'grid', html: '<form>never expose</form>' },
+            { idx: 1102, messageIdx: 1026, ts: 1794102189923, type: 'input', inputId: 'inbatch', kind: 'batch', html: '<form>never expose</form>', draft: 'private', spec: { secret: 'private' } },
             ...['tbank-login', 'redmine-approval'].map((kind, i) => ({ idx: 1100 + i, ts: 1, type: 'input', inputId: 'private', kind, html: 'private form' })),
         ];
         const ctx: any = { state: {}, fns: { auth: { author: async () => null }, mentions: { parse: async () => [] }, procs: { db: { select: async ({ sql }: any) => sql.includes('SELECT 1') ? [{ exists: 1 }] : [{ run_state: 'idle', next_run_at: null }] } }, session: { getEvents: async () => events, getMaxEventIdx: async () => 1100 } } };
         const response = await route(ctx, null, { req: new Request('http://local/api/v1/agents/ebo/events'), params: { id: 'ebo' } });
         const body: any = await response.json();
-        expect(body.events).toHaveLength(4);
-        expect(body.events.map(({ inputId, kind, type, html, text, messageIdx }: any) => ({ inputId, kind, type, html, text, messageIdx }))).toEqual(events.slice(0, 4).map(event => ({ inputId: event.inputId, kind: event.kind, type: 'input', html: null, text: null, messageIdx: 1026 })));
+        expect(body.events).toHaveLength(5);
+        expect(body.events.map(({ inputId, kind, type, html, text, messageIdx }: any) => ({ inputId, kind, type, html, text, messageIdx }))).toEqual(events.slice(0, 5).map(event => ({ inputId: event.inputId, kind: event.kind, type: 'input', html: null, text: null, messageIdx: 1026 })));
         expect(JSON.stringify(body)).not.toContain('never expose');
         expect(JSON.stringify(body)).not.toContain('private');
     });

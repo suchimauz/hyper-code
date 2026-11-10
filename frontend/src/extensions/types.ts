@@ -8,7 +8,9 @@ export type ExtensionCanvasProps = ExtensionViewProps & { item: Readonly<{ id: n
 export type ExtensionInput = Readonly<{ id: string; kind: string; title: string; message?: string; spec?: Record<string, unknown>; state?: string }>;
 /** onDone only refreshes authoritative server state; it never approves or completes an input. */
 export type ExtensionInputProps = ExtensionViewProps & { input: ExtensionInput; onDone: () => void };
-export type ExtensionInputKind = { kind: string; component: ComponentType<ExtensionInputProps> };
+/** Controlled collection-only editor. The batch host owns navigation and atomic completion. Never submit from this component. */
+export type ExtensionBatchInputProps = ExtensionViewProps & { input: ExtensionInput; step: { key: string; index: number; count: number }; draft: Record<string, string | string[]>; onChange: (draft: Record<string, string | string[]>) => void; error?: string; busy?: boolean; readOnly?: boolean };
+export type ExtensionInputKind = { kind: string; component: ComponentType<ExtensionInputProps>; batchComponent?: ComponentType<ExtensionBatchInputProps> };
 export type ExtensionCanvasKind = { kind: string; component: ComponentType<ExtensionCanvasProps> };
 /** Props of a Start-page launcher tab: a local browser tab, unmounted when closed. */
 export type ExtensionLauncherProps = ExtensionViewProps & { tabId: string; active: boolean };

@@ -1,0 +1,10 @@
+/* Batch retains the native question frame, header, options, scrolling body and footer. */
+.batch-card .question-body > p { color: var(--text-secondary); font-size: 12px; }
+.batch-card fieldset { border: 0; min-width: 0; }
+.batch-card fieldset > label:not(.question-option) { display: flex; flex-direction: column; gap: 8px; }
+.batch-card textarea, .batch-card input[type=search] { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: inherit; }
+.batch-card table { width: 100%; text-align: left; font-size: 13px; }
+.batch-card td, .batch-card th { padding: 6px; border-bottom: 1px solid var(--line); }
+.batch-card .question-footer { flex-wrap: wrap; }
+.batch-card .question-footer button:first-child { margin-right: auto; background: transparent; color: var(--text-secondary); }
+.batch-card :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

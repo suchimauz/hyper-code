@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Panel, TextField, requestJson, subscribeLive, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
+import { Button, Dialog, Panel, TextField, requestJson, subscribeLive, type ExtensionViewProps, type ExtensionBatchInputProps, type UiExtension } from '@mauzcode/ui';
 
 /** Read-only dev/test fixture for the public SDK. Never install in the production registry. */
 function Overview({ context }: ExtensionViewProps) {
@@ -31,8 +31,15 @@ function Overview({ context }: ExtensionViewProps) {
   </div>;
 }
 
+/** Paired with the pure collection codec in SDK backend fixture tests. No fetch, form or onDone. */
+export function ExampleBatchNote({ draft, onChange, busy, readOnly }: ExtensionBatchInputProps) {
+  return <TextField label="Заметка набора" value={String(draft.note || '')} disabled={busy || readOnly} onChange={event => onChange({ note: event.target.value })} />;
+}
+function StandaloneNote() { return <p>Демонстрационный тип используется только внутри набора.</p>; }
+
 export const sdkExample: UiExtension = {
   id: 'sdk-example', apiVersion: 1,
+  inputKinds: [{ kind: 'sdk-example.note', component: StandaloneNote, batchComponent: ExampleBatchNote }],
   pages: [{ id: 'overview', title: 'UI SDK', component: Overview }],
   navigation: [{ page: 'overview', title: 'UI SDK' }],
   panels: [{ id: 'overview', title: 'Пример SDK', component: Overview }],

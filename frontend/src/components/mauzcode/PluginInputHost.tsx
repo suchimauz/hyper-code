@@ -33,7 +33,7 @@ export function PluginInputHost({ agentId }: { agentId: string }) {
   }, [agentId]);
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   // /input/cards also returns terminal receipts for chat history; only live inputs are cards.
-  return <>{error && <p role="status">{error}</p>}{inputs.filter(input => input.state === 'open' || input.state === 'processing').map(input => {
+  return <>{error && <p role="status">{error}</p>}{inputs.filter(input => input.kind !== 'batch' && (input.state === 'open' || input.state === 'processing')).map(input => {
     const registration = registry.inputKinds.find(entry => entry.kind === input.kind);
     if (!registration) return null; // The compatibility host remains available for absent/unapproved plugins.
     const Card = registration.component;

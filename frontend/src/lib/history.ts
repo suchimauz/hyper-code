@@ -1,3 +1,4 @@
+import type { BatchSnapshot } from './batches';
 import type { ChoiceInput } from './questions';
 import type { ConfirmInput } from './confirms';
 import type { GridInput } from './grids';
@@ -6,9 +7,9 @@ import { requestJson } from './mauzcode';
 /** Terminal plugin input with a server-computed, display-safe history summary (Kind.history hook). */
 export type PluginHistoryInput = { id: string; agentId: string; kind: string; plugin: true; title: string; message?: string; state: 'submitted' | 'cancelled' | 'expired'; history?: { summary: string; details?: { label: string; value: string }[] } };
 /** Input kinds whose answered cards stay visible as transcript history rows. */
-export type HistoryInput = ChoiceInput | ConfirmInput | GridInput | SecretHistoryInput | PluginHistoryInput;
+export type HistoryInput = ChoiceInput | ConfirmInput | GridInput | SecretHistoryInput | PluginHistoryInput | BatchSnapshot;
 export type NativeHistoryInput = Exclude<HistoryInput, PluginHistoryInput>;
-export const HISTORY_KINDS = ['choice', 'confirm', 'grid', 'secret'] as const;
+export const HISTORY_KINDS = ['choice', 'confirm', 'grid', 'secret', 'batch'] as const;
 export const isHistoryKind = (kind: unknown): kind is NativeHistoryInput['kind'] => (HISTORY_KINDS as readonly unknown[]).includes(kind);
 export const isPluginHistory = (input: HistoryInput): input is PluginHistoryInput => 'plugin' in input && input.plugin === true;
 type CardRow = { id: string; kind: string; title: string; message?: string; state: string; history?: PluginHistoryInput['history'] };

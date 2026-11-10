@@ -69,7 +69,7 @@ it('processing conflict retains draft and permits retry after the server reopens
   await waitFor(() => expect(screen.getByRole('button',{name:'Отправить'})).toBeEnabled()); expect(posted).toBe(true); expect(screen.getByRole('textbox')).toHaveValue('keep me');
 });
 it('minimizes to a compact question without discarding the draft', async () => {
-  vi.spyOn(globalThis,'fetch').mockResolvedValue(response({inputs:[input],csrfToken:'csrf'}));
+  vi.spyOn(globalThis,'fetch').mockImplementation(async url => response(String(url).includes('/ui-lab-api/choices') ? {inputs:[input],csrfToken:'csrf'} : {inputs:[],csrfToken:'csrf'}));
   render(<ConnectedQuestionCard agentId="a" readOnly={false} onAccepted={vi.fn()}><div>Composer</div></ConnectedQuestionCard>);
   fireEvent.click(await screen.findByLabelText(/Другое/)); fireEvent.change(screen.getByRole('textbox'),{target:{value:'retained'}});
   fireEvent.click(screen.getByLabelText('Свернуть вопрос')); expect(screen.getByText('Composer')).toBeVisible(); expect(screen.queryByRole('textbox')).toBeNull();

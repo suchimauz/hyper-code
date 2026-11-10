@@ -31,10 +31,10 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
     }
     const seenInputs = new Set<string>();
     for (const entry of extension.inputKinds ?? []) {
-      if (!/^[a-z][a-zA-Z0-9.-]{0,99}$/.test(entry.kind) || seenInputs.has(entry.kind) || typeof entry.component !== 'function') throw new Error(`Invalid input kind: ${entry.kind}`);
+      if (!/^[a-z][a-zA-Z0-9.-]{0,99}$/.test(entry.kind) || seenInputs.has(entry.kind) || typeof entry.component !== 'function' || (entry.batchComponent !== undefined && typeof entry.batchComponent !== 'function')) throw new Error(`Invalid input kind: ${entry.kind}`);
       seenInputs.add(entry.kind);
       if (!grant?.inputKinds?.includes(entry.kind)) continue;
-      if (['secret', 'choice', 'confirm', 'grid'].includes(entry.kind) || !(entry.kind.startsWith(extension.id + '-') || entry.kind.startsWith(extension.id + '.'))) throw new Error(`Input kind must belong to extension: ${entry.kind}`);
+      if (['secret', 'choice', 'confirm', 'grid', 'batch'].includes(entry.kind) || !(entry.kind.startsWith(extension.id + '-') || entry.kind.startsWith(extension.id + '.'))) throw new Error(`Input kind must belong to extension: ${entry.kind}`);
       if (inputKinds.some(kind => kind.kind === entry.kind)) throw new Error(`Duplicate input kind: ${entry.kind}`);
       inputKinds.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.kind}` }));
     }
