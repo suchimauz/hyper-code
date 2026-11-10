@@ -116,10 +116,14 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         }
     }
 
+    // Plugin inputs join chat history only when their kind declares a server history summary;
+    // private forms (logins etc.) without the hook stay out of the transcript.
+    const inputKinds = (ctx.state as Context['state'] & { input?: { kinds?: Record<string, types.input.Registered> } }).input?.kinds ?? {};
+    const historyKind = (kind: unknown) => typeof kind === 'string' && (['choice', 'confirm', 'grid', 'secret'].includes(kind) || typeof inputKinds[kind]?.history === 'function');
     const mobileEvents = events
-        .filter((event: any) => (event.type === 'input' && ['choice', 'confirm', 'grid', 'secret'].includes(event.kind) && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result", "llm_retry", "tool_busy", "tool_aborted", "goal_transition", "parked", "unparked", "model_changed", "team_update", "wake_up", "canvas_ping", "plan_activation", "goal_activation", "goal_check", "attempt", "attachment_event", "user_message"].includes(String(event.type)))
+        .filter((event: any) => (event.type === 'input' && historyKind(event.kind) && typeof event.inputId === 'string') || ["user", "assistant", "error", "tool_call", "tool_result", "thinking", "stop", "agent_message_outgoing", "compaction_start", "compaction_completed", "compaction_failed", "planning_mode", "planning_proposal", "command_invocation", "command_result", "llm_retry", "tool_busy", "tool_aborted", "goal_transition", "parked", "unparked", "model_changed", "team_update", "wake_up", "canvas_ping", "plan_activation", "goal_activation", "goal_check", "attempt", "attachment_event", "user_message"].includes(String(event.type)))
         .map((event: any) => ({
-            ...(event.type === 'input' ? { inputId: event.inputId, kind: event.kind } : {}),
+            ...(event.type === 'input' ? { inputId: event.inputId, kind: event.kind, ...(['choice', 'confirm', 'grid', 'secret'].includes(event.kind) ? {} : { pluginHistory: true }) } : {}),
             ...(event.type === 'llm_retry' ? {
                 retryId: typeof event.retryId === 'string' ? event.retryId : null,
                 retry: typeof event.retry === 'number' ? event.retry : null,

@@ -1,7 +1,7 @@
 /**
  * Return owner-only safe React input card projections for one active agent
  *
- * Use from the authenticated GET /input/cards route. Includes every pending card and the latest 100 terminal receipts, never raw results, errors or completion authority. Plugin specs require an explicit projectCard hook; core specs are allowlisted.
+ * Use from the authenticated GET /input/cards route. Includes every pending card and the latest 100 terminal receipts, never raw results, errors or completion authority; terminal plugin rows carry an optional server-computed history summary. Plugin specs require an explicit projectCard hook; core specs are allowlisted.
  * @param opts.req Same-origin authenticated browser GET request with agentId query parameter.
  */
 export default async function (
@@ -21,13 +21,14 @@ export default async function (
     if (req.headers.get('sec-fetch-site') === 'cross-site' || (req.headers.get('origin') && req.headers.get('origin') !== url.origin)) return reply({error:'Same origin required'},403);
     const agentId = url.searchParams.get('agentId') || '';
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(agentId)) return reply({error:'Invalid agent'},400);
-    const rows = await ctx.fns.procs.db.select({sql:"WITH eligible AS (SELECT i.id,i.kind,i.state,i.title,i.message,i.spec,i.created_at,i.updated_at FROM inputs i JOIN agents a ON a.id=i.agent_id WHERE i.agent_id=? AND a.archived_at IS NULL), recent AS (SELECT * FROM eligible WHERE state NOT IN ('open','processing') ORDER BY created_at DESC,id DESC LIMIT 100) SELECT * FROM (SELECT * FROM eligible WHERE state IN ('open','processing') UNION ALL SELECT * FROM recent) cards ORDER BY created_at,id",params:[agentId]});
+    const rows = await ctx.fns.procs.db.select({sql:"WITH eligible AS (SELECT i.id,i.kind,i.state,i.title,i.message,i.spec,i.result,i.created_at,i.updated_at FROM inputs i JOIN agents a ON a.id=i.agent_id WHERE i.agent_id=? AND a.archived_at IS NULL), recent AS (SELECT * FROM eligible WHERE state NOT IN ('open','processing') ORDER BY created_at DESC,id DESC LIMIT 100) SELECT * FROM (SELECT * FROM eligible WHERE state IN ('open','processing') UNION ALL SELECT * FROM recent) cards ORDER BY created_at,id",params:[agentId]});
     const inputs: Record<string,unknown>[] = [];
     for (const row of rows) {
      const raw = typeof row.spec === 'string' ? JSON.parse(row.spec) : row.spec;
      const spec: Record<string,unknown> = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
      const input: types.input.Row = {id:String(row.id),agentId,kind:String(row.kind),state:row.state,title:String(row.title),message:String(row.message??''),spec,result:null,error:null,answeredBy:null,createdAt:Number(row.created_at),updatedAt:Number(row.updated_at)};
      let projected: Record<string,unknown> | null = null;
+     let history: types.input.HistorySummary | null = null;
      const pick = (keys:string[]) => Object.fromEntries(keys.filter(k => typeof spec[k] === 'string').map(k => [k,spec[k]]));
      if(input.kind === 'secret') {
       projected = {...pick(['saveAs']),mode:['password','otp','text'].includes(String(spec.mode)) ? spec.mode : 'password'};
@@ -44,10 +45,17 @@ export default async function (
        try { projected=await kind.projectCard(ctx,{input}); }
        catch { console.warn('Input card projection unavailable', {id:input.id,kind:input.kind}); projected=null; }
       }
+      if(kind?.history && !['open','processing'].includes(input.state)) {
+       const stored = typeof row.result === 'string' ? JSON.parse(row.result) : row.result;
+       try {
+        const h = await kind.history(ctx,{input:{...input,result:stored && typeof stored === 'object' ? stored : null}});
+        if(h && typeof h.summary === 'string' && h.summary.trim()) history={summary:h.summary.slice(0,500),...(Array.isArray(h.details)?{details:h.details.filter(d=>d&&typeof d.label==='string'&&typeof d.value==='string').slice(0,20).map(d=>({label:d.label.slice(0,100),value:d.value.slice(0,2000)}))}:{})};
+       } catch { console.warn('Input history projection unavailable', {id:input.id,kind:input.kind}); }
+      }
      }
      // Scheduler keys and capabilities are never public even if a projector accidentally includes them.
      if(projected) projected=Object.fromEntries(Object.entries(projected).filter(([k])=>!k.startsWith('_')&&!['completionAuthority','result','error','answeredBy'].includes(k)));
-     inputs.push({id:input.id,kind:input.kind,title:input.title,message:input.message,state:input.state,waitForAnswer:spec._agentWait===true,createdAt:input.createdAt,updatedAt:input.updatedAt,...(projected?{spec:projected}:{})});
+     inputs.push({id:input.id,kind:input.kind,title:input.title,message:input.message,state:input.state,waitForAnswer:spec._agentWait===true,createdAt:input.createdAt,updatedAt:input.updatedAt,...(projected?{spec:projected}:{}),...(history?{history}:{})});
     }
     return reply({inputs});
 }

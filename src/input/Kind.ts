@@ -10,6 +10,8 @@ export type Kind = {
     completionAuthority?: object;
     /** Explicit public spec projection for owner-only React cards. Return only display-safe fields; never credentials, completion authority, transport tokens or raw results. Missing hook means metadata-only for plugin kinds. */
     projectCard?: (ctx: Context, opts: { input: types.input.Row }) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>;
+    /** Optional display-safe chat-history summary of a terminal input (submitted, cancelled or expired), computed on the server from the stored row including its result. Return null to hide the row. Never include secrets, transport tokens or completion authority. Kinds without this hook do not appear in chat history. */
+    history?: (ctx: Context, opts: { input: types.input.Row }) => types.input.HistorySummary | null | Promise<types.input.HistorySummary | null>;
     /** Validate and normalise the spec when the agent opens the input; throw to refuse it. */
     prepare?: (ctx: Context, opts: { spec: Record<string, any> }) => Record<string, any> | Promise<Record<string, any>>;
     /** Trusted server deadline, read from authoritative state after prepare. Return a future safe epoch-millisecond integer or undefined for no constraint. The caller may shorten but cannot extend it. */

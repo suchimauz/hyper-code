@@ -1,17 +1,17 @@
 import { createContext, useContext, useId, useState } from 'react';
-import { ChevronDown, ChevronUp, CircleCheck, CircleHelp, KeyRound, Table2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleCheck, CircleHelp, KeyRound, Puzzle, Table2 } from 'lucide-react';
 import type { ChatEvent } from '../../lib/hyper';
 import { choiceOptions, type ChoiceInput } from '../../lib/questions';
 import type { ConfirmInput } from '../../lib/confirms';
 import type { GridInput } from '../../lib/grids';
-import { isHistoryKind, type HistoryInput } from '../../lib/history';
+import { isHistoryKind, isPluginHistory, type HistoryInput, type PluginHistoryInput } from '../../lib/history';
 import './tool-row.css';
 import './question-history.css';
 
 export const QuestionHistoryContext = createContext<HistoryInput[]>([]);
 /** Durable choice/confirm/grid identity (or legacy result envelope), never arrival-order pairing. */
 export function choiceResultId(event: ChatEvent): string | null {
-  if (event.type === 'input') return isHistoryKind(event.kind) && /^[A-Za-z0-9_-]{1,128}$/.test(event.inputId || '') ? event.inputId! : null;
+  if (event.type === 'input') return (isHistoryKind(event.kind) || event.pluginHistory === true) && /^[A-Za-z0-9_-]{1,128}$/.test(event.inputId || '') ? event.inputId! : null;
   if (event.type !== 'user') return null;
   const envelope = /^<input-result\s+([^>]+)>[\s\S]*<\/input-result>\s*$/.exec(event.text || '');
   if (!envelope) return null;
@@ -68,8 +68,10 @@ function gridSummary(input: GridInput) {
   if (!rows.length) return 'Ответ не сохранён';
   return `Выбрано ${rows.length}: ${rows.map(cells => cells.find(Boolean) || '—').join(', ')}`;
 }
+const pluginState = (input: PluginHistoryInput) => input.state === 'cancelled' ? 'Отменено' : input.state === 'expired' ? 'Срок истёк' : 'Отправлено';
 function answerSummary(input?: HistoryInput) {
   if (!input) return 'Данные вопроса недоступны';
+  if (isPluginHistory(input)) return input.history?.summary || `${input.title} — ${pluginState(input)}`;
   if (input.state === 'cancelled') return input.kind === 'confirm' ? 'Подтверждение отменено' : input.kind === 'secret' ? 'Ввод секрета отменён' : 'Вопрос отменён';
   if (input.kind === 'secret') return input.result?.ref ? `Сохранено в ${input.result.ref}` : 'Ответ не сохранён';
   if (input.kind === 'confirm') return confirmSummary(input);
@@ -82,6 +84,7 @@ function answerSummary(input?: HistoryInput) {
 }
 /** The same input/output sections as ToolBody, with human question/answer labels. */
 function QuestionBody({ input }: { input: HistoryInput }) {
+  if (isPluginHistory(input)) return null;
   if (input.kind === 'confirm') return input.spec.details ? <p>{input.spec.details}</p> : null;
   if (input.kind === 'secret') return <p>{input.spec.mode === 'otp' ? 'Одноразовый код' : input.spec.mode === 'text' ? 'Скрытое значение' : 'Пароль или ключ'} → <code>{input.spec.saveAs}</code> · значение скрыто</p>;
   if (input.kind === 'grid') return <p>{input.spec.multiple ? 'Выбор нескольких строк' : 'Выбор одной строки'}: {input.spec.columns.map(column => column.label).join(', ')}</p>;
@@ -92,8 +95,19 @@ function GridAnswer({ input }: { input: GridInput }) {
   return <div className="question-history-grid"><table><thead><tr>{input.spec.columns.map((column, index) => <th key={index} scope="col">{column.label}</th>)}</tr></thead>
     <tbody>{rows.map((cells, rowIndex) => <tr key={rowIndex}>{input.spec.columns.map((_, index) => <td key={index}>{cells[index]}</td>)}</tr>)}</tbody></table></div>;
 }
+/** Plugin rows: server-computed summary and label/value details only; never raw results. */
+function PluginAnswer({ input, inputId }: { input: PluginHistoryInput; inputId: string }) {
+  const details = input.history?.details || [];
+  return <>
+    <section className="tool-io-section" aria-label="Форма" data-input-id={inputId}><h4>Форма</h4><div className="question-history-copy"><div>{input.title}</div>{input.message && <p>{input.message}</p>}</div></section>
+    <section className="tool-io-section" aria-label="Результат" data-input-id={inputId}><h4>{pluginState(input)}</h4><div className="question-history-copy">
+      {details.length ? <dl className="question-history-details-list">{details.map((item, index) => <div key={index}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl> : answerSummary(input)}
+    </div></section>
+  </>;
+}
 /** The same input/output sections as ToolBody, with human question/answer labels. */
 function QuestionAnswer({ input, inputId }: { input?: HistoryInput; inputId: string }) {
+  if (input && isPluginHistory(input)) return <PluginAnswer input={input} inputId={inputId} />;
   const answered = input && input.state === 'submitted';
   return <>
     <section className="tool-io-section" aria-label="Вопрос" data-input-id={inputId}><h4>{input ? kindLabel(input.kind) : 'Вопрос'}</h4><div className="question-history-copy">
@@ -105,17 +119,17 @@ function QuestionAnswer({ input, inputId }: { input?: HistoryInput; inputId: str
     </div></section>}
   </>;
 }
-function kindLabel(kind: HistoryInput['kind']) { return kind === 'confirm' ? 'Подтверждение' : kind === 'grid' ? 'Таблица' : kind === 'secret' ? 'Секрет' : 'Вопрос'; }
+function kindLabel(kind: HistoryInput['kind']) { return !isHistoryKind(kind) ? 'Форма' : kind === 'confirm' ? 'Подтверждение' : kind === 'grid' ? 'Таблица' : kind === 'secret' ? 'Секрет' : 'Вопрос'; }
 export function QuestionHistory({ event, events = [event], agentId }: { event: ChatEvent; events?: ChatEvent[]; agentId: string }) {
   const inputs = useContext(QuestionHistoryContext);
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
-  const items = events.map(event => ({ event, input: inputs.find(item => item.id === choiceResultId(event) && item.agentId === agentId && isHistoryKind(item.kind) && ['submitted', 'cancelled'].includes(item.state)) })).filter(item => item.event.type !== 'input' || item.input);
+  const items = events.map(event => ({ event, input: inputs.find(item => item.id === choiceResultId(event) && item.agentId === agentId && (isPluginHistory(item) || (isHistoryKind(item.kind) && ['submitted', 'cancelled'].includes(item.state)))) })).filter(item => item.event.type !== 'input' || item.input);
   if (!items.length) return null;
   const count = items.length;
   const summary = count === 1 ? answerSummary(items[0].input) : items.map(item => item.input?.title || 'Вопрос недоступен').join(' · ');
   const kind = items[0].input?.kind ?? 'choice';
-  const Icon = kind === 'confirm' ? CircleCheck : kind === 'grid' ? Table2 : kind === 'secret' ? KeyRound : CircleHelp;
+  const Icon = !isHistoryKind(kind) ? Puzzle : kind === 'confirm' ? CircleCheck : kind === 'grid' ? Table2 : kind === 'secret' ? KeyRound : CircleHelp;
   const title = count === 1 ? kindLabel(kind) : 'Вопросы';
   return <article className="tool-row question-history" data-chat-flow-kind="question-history" data-event-idx={event.idx} data-input-id={choiceResultId(event)}>
     <button className="tool-row-summary question-history-toggle" type="button" aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(value => !value)}>

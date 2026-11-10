@@ -18,8 +18,18 @@ test('approved native input card receives safe metadata and refresh cannot compl
  expect(requestJson).toHaveBeenCalledTimes(1);
  unmount(); expect(dispose).toHaveBeenCalledTimes(1);
 });
-test.each(['processing','submitted','cancelled','expired','pending',undefined])('%s input props fail closed as read-only receipts',async(state)=>{
- vi.mocked(requestJson).mockResolvedValueOnce({inputs:[{id:'one',kind:'fixture-review',title:'Review',state}]});
+test('processing input renders as a read-only receipt card',async()=>{
+ vi.mocked(requestJson).mockResolvedValueOnce({inputs:[{id:'one',kind:'fixture-review',title:'Review',state:'processing'}]});
  render(<PluginInputHost agentId="owner" />);
  expect(await screen.findByText('Receipt')).toBeTruthy();
+ expect(screen.getAllByRole('heading')).toHaveLength(1); // only the card's own title, no host wrapper
+ expect(screen.queryByText('Обрабатывается')).toBeNull();
+});
+test.each(['submitted','cancelled','expired','pending',undefined])('%s rows are history only, never dock cards',async(state)=>{
+ vi.mocked(requestJson).mockResolvedValueOnce({inputs:[{id:'one',kind:'fixture-review',title:'Review',state}]});
+ render(<PluginInputHost agentId="owner" />);
+ await Promise.resolve(); await Promise.resolve();
+ expect(requestJson).toHaveBeenCalled();
+ expect(screen.queryByText('Receipt')).toBeNull();
+ expect(screen.queryByText('Pending')).toBeNull();
 });

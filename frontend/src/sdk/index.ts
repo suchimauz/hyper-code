@@ -4,6 +4,8 @@
  */
 export { Button, IconButton, Sheet, Stack, Panel, TextField, Dialog } from './components';
 export type { ButtonProps, IconButtonProps, SheetProps, StackProps, PanelProps, TextFieldProps, DialogProps } from './components';
+export { InputCard, InputCardAction, InputCardField, InputCardFields, InputCardFacts } from './InputCard';
+export type { InputCardProps, InputCardActionProps, InputCardFieldProps, InputCardFact } from './InputCard';
 export { requestJson, ApiError } from './api';
 export type { ApiRequestOptions } from './api';
 export { subscribeLive, useLiveSubscription } from './live';

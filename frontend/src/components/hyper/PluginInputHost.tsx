@@ -32,12 +32,13 @@ export function PluginInputHost({ agentId }: { agentId: string }) {
     return () => { refresh.current = () => {}; live.dispose(); };
   }, [agentId]);
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-  return <>{error && <p role="status">{error}</p>}{inputs.map(input => {
+  // /input/cards also returns terminal receipts for chat history; only live inputs are cards.
+  return <>{error && <p role="status">{error}</p>}{inputs.filter(input => input.state === 'open' || input.state === 'processing').map(input => {
     const registration = registry.inputKinds.find(entry => entry.kind === input.kind);
     if (!registration) return null; // The compatibility host remains available for absent/unapproved plugins.
     const Card = registration.component;
     const context: ExtensionInputProps['context'] = { agentId, theme, readOnly: input.state !== 'open' };
     const fallback = <p role="alert">Форма недоступна. <a href={`/input/compat?agentId=${encodeURIComponent(agentId)}&id=${encodeURIComponent(input.id)}&theme=${theme}`} target="_blank" rel="noopener noreferrer">Открыть защищённую страницу</a></p>;
-    return <section key={input.id} aria-label={input.title}><header><h3>{input.title}</h3><p role="status">{input.state === 'open' ? 'Ожидает ответа' : input.state === 'processing' ? 'Обрабатывается' : input.state === 'submitted' ? 'Ответ получен' : input.state === 'cancelled' ? 'Отменено' : input.state === 'expired' ? 'Срок истёк' : 'Недоступно'}</p></header><CardBoundary key={`${registration.key}:${input.id}`} fallback={fallback}><Card context={context} input={input} onDone={() => refresh.current()} /></CardBoundary></section>;
+    return <CardBoundary key={`${registration.key}:${input.id}`} fallback={fallback}><Card context={context} input={input} onDone={() => refresh.current()} /></CardBoundary>;
   })}</>;
 }

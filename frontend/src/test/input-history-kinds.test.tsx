@@ -42,3 +42,22 @@ describe('secret history', () => {
     expect(screen.getByText('Ввод секрета отменён')).toBeTruthy();
   });
 });
+describe('plugin history', () => {
+  const plugin = (state: 'submitted' | 'cancelled' | 'expired', history?: { summary: string; details?: { label: string; value: string }[] }): HistoryInput => ({ id: 'p1', agentId: 'a', kind: 'redmine-approval', plugin: true, title: 'Redmine', state, ...(history ? { history } : {}) });
+  const pluginRequest: ChatEvent = { idx: 1, ts: 1, type: 'input', kind: 'redmine-approval', pluginHistory: true, inputId: 'p1', text: null };
+  it('accepts plugin rows only when the server marked them as history', () => {
+    expect(choiceResultId(pluginRequest)).toBe('p1');
+    expect(choiceResultId(request('p1', 'redmine-approval'))).toBeNull();
+  });
+  it('shows the server summary and details', () => {
+    render(<QuestionHistoryContext.Provider value={[plugin('submitted', { summary: 'Списано 8 ч на #1 — подтверждено', details: [{ label: 'Часы', value: '8' }] })]}><QuestionHistoryList events={[pluginRequest]} agentId="a" /></QuestionHistoryContext.Provider>);
+    expect(screen.getByText('Форма · 1')).toBeTruthy();
+    expect(screen.getByText('Списано 8 ч на #1 — подтверждено')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByText('Часы')).toBeTruthy();
+  });
+  it('falls back to title and state', () => {
+    render(<QuestionHistoryContext.Provider value={[plugin('expired')]}><QuestionHistoryList events={[pluginRequest]} agentId="a" /></QuestionHistoryContext.Provider>);
+    expect(screen.getByText('Redmine — Срок истёк')).toBeTruthy();
+  });
+});

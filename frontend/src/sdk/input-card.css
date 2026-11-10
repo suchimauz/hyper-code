@@ -1,0 +1,21 @@
+/* SDK InputCard: plugin cards reuse the native question frame (questions.css)
+   and only add field/fact layouts on top of the same tokens. */
+.hyper-input-card-body { display:flex; flex-direction:column; gap:12px; }
+.hyper-input-card-body > .question-message { margin-bottom:0; }
+.hyper-input-fields { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px 12px; margin:0 8px; }
+.hyper-input-field { display:flex; flex-direction:column; gap:4px; min-width:0; font-size:12px; line-height:16px; color:var(--text-tertiary); }
+.hyper-input-field.is-wide { grid-column:1 / -1; }
+.hyper-input-field-label { color:var(--text-tertiary); }
+.hyper-input-field-help { color:var(--text-tertiary); font-size:11px; }
+.hyper-input-field :is(input, select, textarea) { box-sizing:border-box; width:100%; min-height:36px; padding:8px 10px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; line-height:18px; }
+.hyper-input-field textarea { min-height:60px; resize:vertical; }
+.hyper-input-field :is(input, select, textarea):focus-visible { outline:2px solid var(--focus-ring); outline-offset:-1px; }
+.hyper-input-field :is(input, select, textarea):disabled { opacity:.6; cursor:default; }
+.hyper-input-facts { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px 12px; margin:0 8px; }
+.hyper-input-facts > div { min-width:0; }
+.hyper-input-facts > .is-wide { grid-column:1 / -1; }
+.hyper-input-facts dt { color:var(--text-tertiary); font-size:11px; line-height:16px; }
+.hyper-input-facts dd { margin:2px 0 0; color:var(--text); font-size:13px; line-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.hyper-input-card fieldset { min-width:0; margin:0; padding:0; border:0; }
+@media(max-width:600px) { .hyper-input-fields, .hyper-input-facts { grid-template-columns:minmax(0, 1fr); } }
+@media(pointer:coarse) { .hyper-input-field :is(input, select, textarea) { min-height:44px; } }

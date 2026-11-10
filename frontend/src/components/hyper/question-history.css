@@ -13,3 +13,9 @@
 .question-history-grid table { border-collapse: collapse; white-space: nowrap; }
 .question-history-grid th { padding: 0 16px 2px 0; color: var(--text-tertiary); font-weight: 500; text-align: left; }
 .question-history-grid td { padding: 2px 16px 0 0; border-top: 1px solid var(--line); }
+/* Plugin history details: label/value pairs from the kind's server history hook. */
+.question-history-details-list { display: grid; gap: 2px; margin: 0; }
+.question-history-details-list > div { display: flex; gap: 8px; }
+.question-history-details-list dt { flex: 0 0 auto; color: var(--text-tertiary); }
+.question-history-details-list dt::after { content: ':'; }
+.question-history-details-list dd { margin: 0; min-width: 0; }

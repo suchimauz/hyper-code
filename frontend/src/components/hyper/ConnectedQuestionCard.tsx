@@ -6,7 +6,7 @@ import { SecureInputHost } from './SecureInputHost';
 import { ConfirmCard } from './ConfirmCard';
 import { clearConfirmComment, getConfirmInputs, pendingConfirm, submitConfirmInput, type ConfirmAnswer, type ConfirmInputsState } from '../../lib/confirms';
 import { GridCard } from './GridCard';
-import type { HistoryInput } from '../../lib/history';
+import { getPluginHistoryInputs, type HistoryInput, type PluginHistoryInput } from '../../lib/history';
 import { clearGridPicks, getGridInputs, pendingGrid, submitGridInput, type GridInputsState } from '../../lib/grids';
 import { closeLocalPushNotification } from '../../lib/pushNotifications';
 import { getSecretInputs, type SecretInputsState } from '../../lib/secrets';
@@ -19,8 +19,9 @@ export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs,
   const [gridState, setGridState] = useState<GridInputsState | null>(null);
   const [gridClosed, setGridClosed] = useState<string[]>([]);
   const [secretState, setSecretState] = useState<SecretInputsState | null>(null);
+  const [pluginHistory, setPluginHistory] = useState<PluginHistoryInput[] | null>(null);
   // History rows need every native kind; each source keeps its last good snapshot.
-  useEffect(() => { if (state || confirmState || gridState || secretState) onInputs?.([...(state?.inputs || []), ...(confirmState?.inputs || []), ...(gridState?.inputs || []), ...(secretState?.inputs || [])]); }, [state, confirmState, gridState, secretState, onInputs]);
+  useEffect(() => { if (state || confirmState || gridState || secretState || pluginHistory) onInputs?.([...(state?.inputs || []), ...(confirmState?.inputs || []), ...(gridState?.inputs || []), ...(secretState?.inputs || []), ...(pluginHistory || [])]); }, [state, confirmState, gridState, secretState, pluginHistory, onInputs]);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,6 +55,9 @@ export function ConnectedQuestionCard({ agentId, readOnly, onAccepted, onInputs,
       // Secret rows feed history only; the open card itself is rendered by SecureInputHost.
       try { const next = await getSecretInputs(agentId, signal); if (!disposed && !signal.aborted && attempt === generation.current) setSecretState(next); }
       catch { /* Keep the last secret history snapshot; the next poll retries. */ }
+      // Plugin rows feed history only (server Kind.history summaries); their open cards live in PluginInputHost.
+      try { const next = await getPluginHistoryInputs(agentId, signal); if (!disposed && !signal.aborted && attempt === generation.current) setPluginHistory(next); }
+      catch { /* Keep the last plugin history snapshot; the next poll retries. */ }
       finally { inFlight = false; }
     };
     void refresh(); const timer = window.setInterval(() => void refresh(), 4000);
