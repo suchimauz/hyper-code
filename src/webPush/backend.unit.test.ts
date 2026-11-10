@@ -48,6 +48,7 @@ function routeHarness(){
  const sub=subscription(),run=mock(async()=>({changes:1}));let existing:any[]=[],conflict=false;
  const select=mock(async({sql}:any)=>{
  if(sql.startsWith('SELECT id FROM users'))return [{id:'u1'}];
+ if(sql.startsWith('SELECT id,endpoint,created_at'))return [{id:'s1',endpoint:sub.endpoint,created_at:1000,expires_at:2000,session_key:'binding',user_agent:'Mozilla/5.0 (iPhone) Safari'}];
  if(sql.startsWith('SELECT owner_id'))return existing;
  if(sql.startsWith('SELECT count'))return [{n:0}];
  if(sql.startsWith('INSERT INTO web_push_subscriptions'))return conflict?[]:[{id:'s1'}];
@@ -69,8 +70,25 @@ test('unsubscribe delete is owner and browser-session scoped',async()=>{
  const h=routeHarness();expect((await handle(h.ctx,{user:{id:'u1'}},{req:h.req({endpoint:h.sub.endpoint}),action:'unsubscribe'})).status).toBe(200);
  expect((h.run.mock.calls[0] as any)[0].params).toEqual([h.sub.endpoint,'u1','binding']);
 });
-test('config exposes hashes and public key only',async()=>{
- const h=routeHarness();const r=await handle(h.ctx,{user:{id:'u1'}},{req:h.req({}),action:'config'});const data=await r.json();expect(data.endpointHashes[0]).toHaveLength(64);expect(JSON.stringify(data)).not.toContain('PRIVATE');expect(JSON.stringify(data)).not.toContain(h.sub.endpoint);
+test('config exposes device hashes and public key only',async()=>{
+ const h=routeHarness();const r=await handle(h.ctx,{user:{id:'u1'}},{req:h.req({}),action:'config'});const data=await r.json();
+ expect(data.devices[0].endpointHash).toHaveLength(64);expect(data.devices[0].current).toBe(true);expect(data.devices[0].userAgent).toBe('Mozilla/5.0 (iPhone) Safari');expect(typeof data.devices[0].createdAt).toBe('number');expect(data.preferences).toBeUndefined();
+ expect(JSON.stringify(data)).not.toContain('PRIVATE');expect(JSON.stringify(data)).not.toContain(h.sub.endpoint);
+});
+test('unsubscribe by subscription id is owner scoped across sessions',async()=>{
+ const h=routeHarness();let r=await handle(h.ctx,{user:{id:'u1'}},{req:h.req({subscriptionId:'dev2'}),action:'unsubscribe'});
+ expect(r.status).toBe(200);expect((h.run.mock.calls[0] as any)[0].params).toEqual(['dev2','u1']);
+ expect((h.run.mock.calls[0] as any)[0].sql).not.toContain('session_key');
+ r=await handle(h.ctx,{user:{id:'u1'}},{req:h.req({bogus:1}),action:'unsubscribe'});expect(r.status).toBe(400);
+});
+test('subscribe persists the opt-in user agent and drops oversize labels',async()=>{
+ const h=routeHarness();const ua='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari';
+ let r=await handle(h.ctx,{user:{id:'u1'}},{req:h.req({subscription:h.sub,userAgent:ua}),action:'subscribe'});expect(r.status).toBe(200);
+ let insert:any=h.select.mock.calls.find((c:any)=>c[0].sql.startsWith('INSERT INTO web_push_subscriptions'));
+ expect(insert[0].params[9]).toBe(ua);
+ const d=routeHarness();r=await handle(d.ctx,{user:{id:'u1'}},{req:d.req({subscription:d.sub,userAgent:'x'.repeat(513)}),action:'subscribe'});expect(r.status).toBe(200);
+ insert=d.select.mock.calls.find((c:any)=>c[0].sql.startsWith('INSERT INTO web_push_subscriptions'));
+ expect(insert[0].params[9]).toBeNull();
 });
 test('project label lookup uses recipient principal and normalized workspace identity',async()=>{
  const h=harness();const previous=h.ctx.fns.procs.db.select;const lookup:any[]=[];

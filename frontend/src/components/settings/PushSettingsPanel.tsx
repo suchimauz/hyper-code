@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { requestJson } from '../../lib/hyper';
 import { Button } from '../ui/Button';
+import { PushDevices, type PushDevice } from './PushDevices';
 
-type Preference = { id: string; title: string | null; input: boolean; error: boolean };
-type Config = { enabled: boolean; publicKey: string | null; userId: string; binding: string; endpointHashes: string[]; csrf: string; preferences: Preference[] };
+type Config = { enabled: boolean; publicKey: string | null; userId: string; binding: string; devices: PushDevice[]; csrf: string };
 const workerPath = '/webPush/web-push-sw.js';
 const ownerKey = 'hyper-push-binding';
 const ownsWorker = (registration: ServiceWorkerRegistration) => [registration.active, registration.waiting, registration.installing].some(worker => worker && new URL(worker.scriptURL).pathname === workerPath);
@@ -25,6 +25,7 @@ export function PushSettingsPanel() {
   const [message, setMessage] = useState('Loading notification settings…');
   const [confirmDisable, setConfirmDisable] = useState(false);
   const [unavailable] = useState(availability);
+  const [deviceHash, setDeviceHash] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     const refresh = async () => {
@@ -36,13 +37,24 @@ export function PushSettingsPanel() {
           sub = registration && ownsWorker(registration) ? await registration.pushManager.getSubscription() : null;
         }
         // Never mutate a stale browser subscription merely by opening settings.
-        if (active) { setConfig(next); setSubscription(sub); setMessage(unavailable || (sub ? 'A browser subscription exists on this device. Disable it before switching accounts or re-enabling.' : next.enabled ? 'Enable device notifications, then choose which main agents can notify you.' : 'Push is not configured on this server.')); }
+        if (active) { setConfig(next); setSubscription(sub); setMessage(unavailable || (sub ? 'A browser subscription exists on this device. Disable it before switching accounts or re-enabling.' : next.enabled ? 'Enable device notifications on each device you want to be notified on.' : 'Push is not configured on this server.')); }
       } catch (error) { if (active) setMessage(error instanceof Error ? error.message : 'Could not load settings.'); }
       finally { if (active) setBusy(false); }
     };
     void refresh();
     return () => { active = false; };
   }, [unavailable]);
+  useEffect(() => {
+    let active = true;
+    // Identify this browser's own device row by hashing its subscription endpoint locally.
+    const hashEndpoint = async () => {
+      if (!subscription?.endpoint) { if (active) setDeviceHash(null); return; }
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(subscription.endpoint));
+      if (active) setDeviceHash([...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join(''));
+    };
+    void hashEndpoint();
+    return () => { active = false; };
+  }, [subscription]);
   const post = (path: string, data: object, current: Config) => requestJson(`/webPush/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': current.csrf }, body: JSON.stringify(data) });
   const enable = async () => {
     if (!config || busy) return;
@@ -61,7 +73,7 @@ export function PushSettingsPanel() {
       if (existingSub) throw new Error('A subscription already exists. Reopen settings and disable it first.');
       const key = Uint8Array.from(atob(fresh.publicKey.replace(/-/g, '+').replace(/_/g, '/')), char => char.charCodeAt(0));
       const sub = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-      try { await post('subscribe', { subscription: sub.toJSON() }, fresh); }
+      try { await post('subscribe', { subscription: sub.toJSON(), userAgent: navigator.userAgent }, fresh); }
       catch (error) { if (!await sub.unsubscribe()) setSubscription(sub); throw error; }
       remember(binding(fresh)); setConfig(fresh); setSubscription(sub); setMessage('Push notifications enabled on this device.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not enable notifications.'); }
@@ -75,25 +87,28 @@ export function PushSettingsPanel() {
       if (storedBinding() === binding(config)) await post('unsubscribe', { endpoint: subscription.endpoint }, config);
       if (!await subscription.unsubscribe()) throw new Error('Could not remove the browser subscription. Retry.');
       remember(null); setSubscription(null); setConfirmDisable(false); setMessage('Push notifications disabled on this device.');
+      try { setConfig(await requestJson<Config>('/webPush/config')); } catch { /* List refresh is cosmetic; the result message above stays. */ }
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not disable notifications.'); }
     finally { setBusy(false); }
   };
-  const save = async (preference: Preference, key: 'input' | 'error', value: boolean) => {
+  // Owner-scoped removal from Settings: retires another device's subscription; that browser keeps its local subscription until it disables notifications itself.
+  const removeDevice = async (id: string) => {
     if (!config || busy) return;
-    const next = { ...preference, [key]: value };
-    const body = new URLSearchParams({ agentId: next.id, csrf: config.csrf, ...(next.input ? { input: 'true' } : {}), ...(next.error ? { error: 'true' } : {}) });
     setBusy(true);
     try {
-      await requestJson('/webPush/preferences', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      setConfig({ ...config, preferences: config.preferences.map(item => item.id === next.id ? next : item) }); setMessage('Notification preferences saved.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save preferences.'); }
+      await post('unsubscribe', { subscriptionId: id }, config);
+      const next = await requestJson<Config>('/webPush/config');
+      setConfig(next);
+      setMessage(next.devices.some(device => device.id === id) ? 'Could not remove the device. Try again.' : 'Device removed. It can re-enable notifications itself.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not remove the device.'); }
     finally { setBusy(false); }
   };
   return <section aria-label="Push notifications">
     <h2>Push notifications</h2><p className="settings-note">Optional notifications for action requests and errors that stop work. No prompt or subscription is created until you enable them.</p>
     <p role="status" aria-live="polite">{message}</p>
     {subscription ? <><Button disabled={busy} onClick={() => setConfirmDisable(true)}>Disable on this device…</Button>{confirmDisable && <div role="group" aria-label="Confirm disable notifications"><p>Remove this browser’s push subscription? Other devices are not affected.</p><Button disabled={busy} onClick={() => { void disable(); }}>Confirm disable</Button><Button disabled={busy} onClick={() => setConfirmDisable(false)}>Cancel</Button></div>}</> : <Button disabled={busy || !!unavailable || !config?.enabled} onClick={() => { void enable(); }}>Enable on this device</Button>}
-    <h3>Main agents</h3>{config?.preferences.length === 0 && <p>No eligible main agents.</p>}
-    {config?.preferences.map(item => <fieldset key={item.id} disabled={busy}><legend>{item.title || item.id}</legend><label className="settings-check"><input type="checkbox" checked={item.input} onChange={event => { void save(item, 'input', event.target.checked); }} />Action required</label><label className="settings-check"><input type="checkbox" checked={item.error} onChange={event => { void save(item, 'error', event.target.checked); }} />Work stopped by error</label></fieldset>)}
+    <h3>Connected devices</h3>
+    <PushDevices devices={config ? config.devices : null} currentHash={deviceHash} onRemove={(id) => { void removeDevice(id); }} busy={busy} />
+    <p className="settings-footnote">Notifications are sent for action requests and errors that stop work. Each device manages its own subscription.</p>
   </section>;
 }

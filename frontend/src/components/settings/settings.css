@@ -137,3 +137,14 @@
 .llm-device-code code { font: 18px/1.4 var(--font-mono) !important; letter-spacing: .15em; user-select: all; background: none !important; }
 .settings-select { min-height: var(--control-height); padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font: inherit; }
 @media (max-width: 700px) { .llm-row-actions { margin-left: 0; width: 100%; } .settings-select { min-height: 44px; } }
+.push-devices { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); overflow: hidden; }
+.push-device { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 10px 14px; font-size: var(--font-sm); line-height: 1.5; }
+.push-device + .push-device { border-top: 1px solid var(--line); }
+.push-device-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: none; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--text-secondary); }
+.push-device-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.push-device-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 500; }
+.push-device-badge { padding: 1px 6px; border: .5px solid var(--line); border-radius: 6px; color: var(--text-secondary); font-size: 11px; line-height: 16px; font-weight: 400; }
+.push-device-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--text-tertiary); font-size: var(--font-xs); }
+.push-device-meta code { padding: 0; background: none; }
+.push-device-actions { margin-left: auto; display: inline-flex; gap: 4px; flex: none; align-items: center; }
+.button.push-device-remove, .button.push-device-remove:not(:disabled):hover { color: var(--tool-error); filter: none; }
