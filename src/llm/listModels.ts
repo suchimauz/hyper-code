@@ -215,6 +215,7 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
         "claude-opus-5-5",
         "claude-fable-5",
         "claude-fable-5-1",
+        "claude-fable-5-2",
     ];
     // Remote credentials and provider network calls remain on the selected SSH host.
     if (typeof ctx.fns.sshAccount?.quotaAccounts === 'function') {
