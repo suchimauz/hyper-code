@@ -9,3 +9,8 @@ for(const mode of ['suspended','recovery'])test(`${mode} caller-token record fai
  const ctx:any={state:{},fns:{sshProvider:{binding:async()=>({name:'slot',owner:'o',fingerprint:'pin'}),lease:async()=>()=>{}},codexTunnel:{encryptedStore:()=>({read:async()=>({value:{owner:'o',binding:'pin',provider:'opencode',mode}})}),openProduction:()=>{throw Error('must not open')}}}};
  await expect(dispatch(ctx,null,{ssh:{provider:'opencode',instance:'i',account:'a'},url:'https://opencode.ai/inference/go/v1/models',init:{}})).rejects.toThrow('no fallback');
 });
+test('inference streams use a 90 s idle deadline under a 30 min total ceiling',async()=>{
+ let seen:any; const ctx:any={state:{},fns:{sshProvider:{binding:async()=>({name:'slot',owner:'o',fingerprint:'pin'}),lease:async()=>()=>{},policy:()=>{},request:async(o:any)=>{seen=o;return new Response('ok')}},codexTunnel:{encryptedStore:()=>({read:async()=>null}),openProduction:async()=>({port:9,signal:new AbortController().signal,close:async()=>{}})}}};
+ await (await dispatch(ctx,null,{ssh:{provider:'opencode',instance:'i',account:'a'},url:'https://opencode.ai/inference/go/v1/models',init:{}})).text();
+ expect(seen.idleTimeoutMs).toBe(90000);expect(seen.timeoutMs).toBe(1800000);
+});

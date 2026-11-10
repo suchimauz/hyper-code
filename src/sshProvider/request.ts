@@ -9,7 +9,8 @@
  * @param opts.headers Authentication and provider metadata headers.
  * @param opts.body POST bytes capped at eight MiB.
  * @param opts.signal Cancellation through body completion.
- * @param opts.timeoutMs Total stream deadline in milliseconds.
+ * @param opts.timeoutMs Total stream deadline in milliseconds, through body EOF. @default 3000 @minimum 1 @maximum 3600000
+ * @param opts.idleTimeoutMs Inactivity deadline in milliseconds: fails with "idle deadline" when neither headers nor body bytes arrive for this long; reset on every received chunk. Use for long model streams instead of a short total deadline. @minimum 1 @maximum 600000
  * @param opts.onDone Once-only terminal cleanup callback.
  */
 export default async function (
@@ -30,8 +31,10 @@ export default async function (
         body?: Uint8Array;
         /** Cancellation through body completion. */
         signal?: AbortSignal;
-        /** Total stream deadline in milliseconds. */
+        /** Total stream deadline in milliseconds, through body EOF. @default 3000 @minimum 1 @maximum 3600000 */
         timeoutMs?: number;
+        /** Inactivity deadline in milliseconds, reset on headers and every received chunk. @minimum 1 @maximum 600000 */
+        idleTimeoutMs?: number;
         /** Once-only terminal cleanup callback. */
         onDone?: ()=>void;
     },
@@ -65,7 +68,7 @@ export default async function (
          s.once('connect',()=>s.write(Buffer.from([5,1,0])));if(signal?.aborted)abort();
          });
         }
-        type Options={proxyPort:number;signal?:AbortSignal;method?:'GET'|'POST';body?:Uint8Array;headers?:Record<string,string>;timeoutMs?:number;onDone?:()=>void;metrics?:{maxBuffered:number;cleanups:number}};
+        type Options={proxyPort:number;signal?:AbortSignal;method?:'GET'|'POST';body?:Uint8Array;headers?:Record<string,string>;timeoutMs?:number;idleTimeoutMs?:number;onDone?:()=>void;metrics?:{maxBuffered:number;cleanups:number}};
         /** Response promise resolves at headers; lifetime deadline/abort persists through EOF or cancel. No automatic redirects or decompression. */
         async function request(url:string,o:Options):Promise<Response>{
          let notified=false;const finish=()=>{if(notified)return;notified=true;try{o.onDone?.()}catch{/* Lease notification must not compromise socket cleanup. */}};
@@ -74,31 +77,35 @@ export default async function (
         async function perform(url:string,o:Options):Promise<Response>{
          const u=ctx.fns.sshProvider.policy({provider:opts.provider,url,method:o.method??'GET'});
          if(!Number.isInteger(o.proxyPort)||o.proxyPort<1||o.proxyPort>65535)throw Error('proxy port');
-         if(o.timeoutMs!==undefined&&(!Number.isFinite(o.timeoutMs)||o.timeoutMs<1||o.timeoutMs>120000))throw Error('deadline range');
+         if(o.timeoutMs!==undefined&&(!Number.isFinite(o.timeoutMs)||o.timeoutMs<1||o.timeoutMs>3600000))throw Error('deadline range');
+         if(o.idleTimeoutMs!==undefined&&(!Number.isFinite(o.idleTimeoutMs)||o.idleTimeoutMs<1||o.idleTimeoutMs>600000))throw Error('idle deadline range');
          if(o.body&&o.body.byteLength>8*1024*1024)throw Error('POST size');
          if((o.method??'GET')==='GET'&&o.body?.byteLength)throw Error('GET body');
          const filtered:Record<string,string>={};for(const [key,value] of Object.entries(o.headers??{})){if(!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key)||/[\r\n\0]/.test(value))throw Error('invalid header');if(['authorization','content-type','accept','chatgpt-account-id','openai-beta','originator','version','session_id','conversation_id','x-client-request-id','x-codex-turn-state','user-agent','anthropic-version','anthropic-beta','x-api-key','x-goog-api-key','x-msh-platform','x-msh-version','x-msh-device-id'].includes(key.toLowerCase()))filtered[key.toLowerCase()]=value;}
          filtered['accept-encoding']='identity';if(o.body)filtered['content-length']=String(o.body.byteLength);o={...o,headers:filtered};
          const deadline=o.timeoutMs??3000,start=Date.now();
-         const socket=await tunnel(u.hostname,443,o.proxyPort,o.signal,deadline);
+         const socket=await tunnel(u.hostname,443,o.proxyPort,o.signal,Math.min(deadline,30000));
          if(o.signal?.aborted){socket.destroy();throw Error('aborted');}
          return new Promise((resolve,reject)=>{
          let secure:import('node:tls').TLSSocket,req:ReturnType<typeof https.request>,res:any,controller:ReadableStreamDefaultController<Uint8Array>|undefined,settled=false,ended=false,cleaned=false;
          const agent=new https.Agent({keepAlive:false});
-         const cleanup=()=>{if(cleaned)return;cleaned=true;if(o.metrics)o.metrics.cleanups++;clearTimeout(timer);o.signal?.removeEventListener('abort',abort);res?.destroy();req?.destroy();secure?.destroy();socket.destroy();agent.destroy();o.onDone?.()};
+         const cleanup=()=>{if(cleaned)return;cleaned=true;if(o.metrics)o.metrics.cleanups++;clearTimeout(timer);clearTimeout(idleTimer);o.signal?.removeEventListener('abort',abort);res?.destroy();req?.destroy();secure?.destroy();socket.destroy();agent.destroy();o.onDone?.()};
          const fail=(e:Error)=>{if(ended)return;ended=true;if(!settled)reject(e);else controller?.error(e);cleanup()};
          const abort=()=>fail(Error('aborted'));
          const timer=setTimeout(()=>fail(Error('request deadline')),Math.max(1,deadline-(Date.now()-start)));
+         let idleTimer:ReturnType<typeof setTimeout>|undefined;
+         const touch=()=>{if(o.idleTimeoutMs===undefined||ended)return;clearTimeout(idleTimer);idleTimer=setTimeout(()=>fail(Error('idle deadline')),o.idleTimeoutMs)};
+         touch();
          o.signal?.addEventListener('abort',abort,{once:true});
          try{
          secure=tls.connect({socket,servername:u.hostname,rejectUnauthorized:true,checkServerIdentity:tls.checkServerIdentity});secure.on('error',fail);
          socket.resume();
          (agent as any).createConnection=()=>secure;
          req=https.request({hostname:u.hostname,port:443,path:u.pathname+u.search,method:o.method??'GET',headers:o.headers,agent},incoming=>{
-         res=incoming;res.on('error',fail);res.on('aborted',()=>fail(Error('upstream aborted')));res.on('close',()=>{if(!ended&&!res.complete)fail(Error('upstream incomplete'))});
+         res=incoming;touch();res.on('readable',touch);res.on('error',fail);res.on('aborted',()=>fail(Error('upstream aborted')));res.on('close',()=>{if(!ended&&!res.complete)fail(Error('upstream incomplete'))});
          if((res.statusCode??0)>=300&&(res.statusCode??0)<400)return fail(Error('redirect refused'));
          res.pause();
-         const pump=()=>{if(ended||!controller)return;while((controller.desiredSize??0)>0){const chunk=res.read(Math.min(16384,res.readableLength));if(!chunk)break;controller.enqueue(new Uint8Array(chunk));}if(o.metrics)o.metrics.maxBuffered=Math.max(o.metrics.maxBuffered,65536-(controller.desiredSize??0)+res.readableLength);if(res.readableLength>2*1024*1024)fail(Error('response buffer limit'))};
+         const pump=()=>{if(ended||!controller)return;while((controller.desiredSize??0)>0){const chunk=res.read(Math.min(16384,res.readableLength));if(!chunk)break;controller.enqueue(new Uint8Array(chunk));touch();}if(o.metrics)o.metrics.maxBuffered=Math.max(o.metrics.maxBuffered,65536-(controller.desiredSize??0)+res.readableLength);if(res.readableLength>2*1024*1024)fail(Error('response buffer limit'))};
          const body=new ReadableStream<Uint8Array>({
          start(c){controller=c;res.on('readable',()=>pump());res.on('end',()=>{if(ended)return;ended=true;c.close();cleanup()})},
          pull(){pump()},cancel(){ended=true;cleanup()}
