@@ -2,6 +2,9 @@
 // validation, the named action and htmx all run exactly as they do for a person.
 /**
  * Submits a named browser form.
+ * Requires a compatibility document with /ui/control.js and the screen client
+ * (window.page); the primary React shell does not provide this bridge.
+ * Uses screen.eval and can time out without a responding consumer.
  * @param opts.form Stable form identifier.
  * @param opts.show Whether to animate the browser interaction.
  * @param opts.settleMs Post-interaction paint delay in milliseconds.

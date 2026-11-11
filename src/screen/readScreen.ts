@@ -8,6 +8,9 @@
 // on a case-insensitive filesystem `state.ts` would BE that file.)
 /**
  * Reads structured state from the connected browser screen.
+ * Requires a compatibility document with /ui/control.js and the screen client
+ * (window.page); the primary React shell does not provide this bridge.
+ * Uses screen.eval and can time out without a responding consumer.
  * @param opts.scope Page region to inspect.
  * @param opts.text Text input or whether screen text should be included.
  * @param opts.maxText Maximum returned text length.

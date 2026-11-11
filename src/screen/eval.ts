@@ -1,14 +1,21 @@
-// Inject JS into the open workspace page and wait for its result. The code is
-// the body of an async function in the tab; the last expression is returned.
+// Send JS to a compatible document and wait for its result. The code is
+// an async function body in that document; use an explicit return for a value.
 //
 // The event only reaches tabs that are subscribed *now* — a page that has just
 // loaded has not finished connecting its event stream, and firing into that gap
-// looks exactly like "no browser is open". So wait for a listener first, and
+// looks like a missing consumer. Any event subscriber counts as a listener,
+// not proof of this bridge or a particular tab. Wait for a listener first, and
 // send again once if the first attempt goes unanswered: a tab that reconnects
 // mid-flight (the stream retries with a backoff) would otherwise miss its only
 // chance.
 /**
- * Evaluates code through the connected browser screen bridge.
+ * Evaluate code through the compatibility document bridge and await its result.
+ * Requires a connected /ui/control.js consumer, retained in minimal SSR ui.layout
+ * but not loaded by the primary React shell. A subscriber count does not prove
+ * that this consumer or a specific target is present; the request can time out.
+ * The consumer ignores eval events without window.page: the screen client is
+ * required even for code that does not call a page helper. For browser automation
+ * discover the browser plugin with English keywords, read its workflow and prerequisites.
  * @param opts.code Code to evaluate in the browser.
  * @param opts.timeoutMs Maximum wait in milliseconds.
  */

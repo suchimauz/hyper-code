@@ -1,9 +1,9 @@
-// Open something in the right pane. Either a URL — the plugin pages carry their
+// In a compatible document, open something in its content pane. Either a URL — the plugin pages carry their
 // whole state in one (`/questionnaire?q=tobacco`), which is the shortest way to
 // put the user in front of something — or an entity, whose own link is followed.
 //
-// Navigation stays partial: htmx swaps the pane and pushes the URL, so the chat,
-// the event stream and this bridge stay alive. A full reload drops all three.
+// The screen client uses partial htmx navigation when available. This describes
+// the compatibility document, not navigation inside the primary React shell.
 //
 // **What comes back is what they are now looking at.** Opening a page and asking
 // what is on it were two calls, and the second one is the one that gets
@@ -14,6 +14,9 @@
 // be made anyway. `read: false` for the rare case where the answer cannot matter.
 /**
  * Opens a URL or described UI entity and optionally reads the resulting screen.
+ * Requires a compatibility document with /ui/control.js and the screen client
+ * (window.page); the primary React shell does not provide this bridge.
+ * Uses screen.eval and can time out without a responding consumer.
  * @param opts.entity Entity kind used to identify the UI element.
  * @param opts.id Prompt or UI entity identifier.
  * @param opts.action Action marker used to identify the UI control.

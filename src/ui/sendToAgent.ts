@@ -1,14 +1,16 @@
-/** Performs the ui.sendToAgent runtime operation. */
 /**
- * Send text to an agent from the browser UI.
+ * Start a background turn with text for an existing idle in-memory agent.
+ * This is a server-side operation, not browser messaging. Optional navigation
+ * emits ui.navigate for compatible consumers; the primary React shell does not
+ * load /ui/control.js. opened reflects the option, not confirmed navigation.
  * @param opts.agentId Target agent identifier.
  * @param opts.text Text to send.
- * @param opts.open Whether to open the target agent after the operation.
+ * @param opts.open Whether to emit best-effort compatibility navigation.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
-        /** Identifier of the agent whose scoped setting is used. */ agentId: string;
+        /** Identifier of the existing in-memory agent to run. */ agentId: string;
         /** Text to send to the agent. */ text: string;
-        /** Whether to open the agent after sending. */ open?: boolean }) {
+        /** Emit best-effort compatibility navigation after sending. @default false */ open?: boolean }) {
     const agent = (ctx.state as any).agent?.[opts.agentId];
     if (!agent) throw new Error('agent not found: ' + opts.agentId);
     const text = (opts.text ?? '').trim();

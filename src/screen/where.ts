@@ -11,8 +11,10 @@
 // `stale` is the honest part: a tab that has said nothing for a while may be
 // closed, on another window, or looking at something else entirely.
 /**
- * Returns the most recently reported browser location.
-  * @param opts.staleAfterMs Stale After Ms.
+ * Return the last location beacon received from a screen client, or null.
+ * Reads server state only, without evaluating code or verifying an active target.
+ * The primary React shell does not provide these compatibility screen beacons.
+ * @param opts.staleAfterMs Age threshold in milliseconds for marking a beacon stale. @default 600000
 */
 export default function (ctx: Context, _session: Session | null, opts?: { staleAfterMs?: number }) {
     const here = (ctx.state.screen as any)?.here;

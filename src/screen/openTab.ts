@@ -1,6 +1,9 @@
 // Open a mounted plugin in a separate browser tab without navigating the current workspace.
 /**
- * Opens a mounted plugin in a new browser tab and verifies that the new tab exists.
+ * Open a mounted plugin through CDP and verify it against the browser tab list.
+ * First requires screen.eval to obtain location.origin from a compatible document;
+ * this is not a bridge-independent alternative for the primary React shell.
+ * It also requires an available Chrome/CDP endpoint and browser.tabs.
  * @param opts.plugin Mounted plugin name.
  */
 export default async function (ctx: Context, _session: Session | null, opts: { plugin: string }) {

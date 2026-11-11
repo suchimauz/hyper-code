@@ -1,6 +1,7 @@
-/** Performs the ui.action runtime operation. */
 /**
- * Invoke a named browser UI action.
+ * Emit a named action for the /ui/control.js compatibility consumer.
+ * The primary React shell does not load this consumer. dispatched:true confirms
+ * emission only, not execution; a matching action must exist in the receiving page.
  * @param opts.name Registered action or input name.
  * @param opts.args Arguments passed to the action.
  * @param opts.agent Agent associated with the operation.

@@ -9,6 +9,9 @@
 //   ctx.fns.screen.step({ say: "Click the row", click: { entity: "file", id: "CLAUDE.md" } })
 /**
  * Plays one turn of an interactive browser tour.
+ * Requires a compatibility document with /ui/control.js and the screen client
+ * (window.page); the primary React shell does not provide this bridge.
+ * Uses screen.eval and can time out without a responding consumer.
  * @param opts.say Caption for this tour turn.
  * @param opts.open URL or described element to open.
  * @param opts.click Described element to click.

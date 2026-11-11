@@ -49,7 +49,7 @@ ctx.fns namespaces:
   files       read, write, list, open, close, stat, exists, mkdir, remove, rename
   events      emitAgentsChanged (app wrapper; server bus is procs.events: emit, subscribe)
   tools       list, call, schemas, validate, promptSection (the $tool_ registry) + read/write/edit/grep/bash/eval
-  ui          eval, action, notify, openAgent, openFile, createAgent, sendToAgent (drives the browser)
+  ui          eval, action, notify, openAgent, openFile (compatibility events); createAgent, sendToAgent (server-side agent operations)
   markdown    render, highlight (shiki)
   repl        eval (hot-reload lives at procs.repl.load)
   git         run, status, commit, push, stage, stageCommitPush
@@ -57,6 +57,8 @@ ctx.fns namespaces:
   procs       framework infra: db, repl.load, dev.genTypes, http.loadRoutes, migrate.up, log, ...
 
 Live discovery: translate intent to English, use ctx.fns.runtime.docs.search({ query }), then runtime.docs.get({ name }); Object.keys(ctx.fns.<ns>) remains useful for a raw namespace listing.
+
+UI compatibility limits: the primary React shell does not load /ui/control.js; minimal SSR ui.layout still does. ui.eval/action return dispatched:true for emission, not execution; navigation and toast events likewise need a compatible consumer. An event subscriber alone proves neither that bridge nor a specific target. screen.eval waits for a result through the compatibility bridge and can time out; its consumer requires window.page from the screen client, even for plain DOM code. screen.openTab first needs screen.eval for the origin before using CDP. These limits do not disable server-side ui.createAgent/sendToAgent effects; their optional navigation is best-effort. For browser automation, discover the browser plugin with plugins.search({ query: "browser automation" }), then plugins.read({ name: "browser" }) and follow its prerequisites rather than guessing APIs or Chrome availability. To show files beside chat, use canvas.show with kind:"file".
 
 Call graph of this codebase (ctx.fns edges, indexed in Postgres, refreshed on every save):
   ctx.fns.code.callers({ name: "session.appendMessage" })        who calls it — file + line

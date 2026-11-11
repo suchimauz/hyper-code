@@ -6,6 +6,9 @@
 //   page.click({ entity: "questionnaire", id: "phq9" })   // the row itself
 /**
  * Clicks a UI element identified by stable data attributes.
+ * Requires a compatibility document with /ui/control.js and the screen client
+ * (window.page); the primary React shell does not provide this bridge.
+ * Uses screen.eval and can time out without a responding consumer.
  * @param opts.entity Entity kind used to identify the UI element.
  * @param opts.id Prompt or UI entity identifier.
  * @param opts.action Action marker used to identify the UI control.

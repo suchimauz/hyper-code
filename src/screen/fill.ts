@@ -6,6 +6,9 @@
 // names that do exist, rather than throwing: the recovery is to look at the list.
 /**
  * Fills fields in a named browser form.
+ * Requires a compatibility document with /ui/control.js and the screen client
+ * (window.page); the primary React shell does not provide this bridge.
+ * Uses screen.eval and can time out without a responding consumer.
  * @param opts.form Stable form identifier.
  * @param opts.values Field names and values to fill.
  * @param opts.show Whether to animate the browser interaction.

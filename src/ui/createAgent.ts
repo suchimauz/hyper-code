@@ -1,8 +1,11 @@
 /**
- * Create an agent and optionally open or seed its conversation.
+ * Create an agent server-side and optionally start a turn with initial text.
+ * Optional navigation emits ui.navigate for compatible consumers only; the
+ * primary React shell does not load /ui/control.js. opened reflects the requested
+ * option, not confirmed navigation. Agent creation and starting a turn do not need that bridge.
  * @param opts.model Model identifier.
  * @param opts.systemPrompt System prompt for the new agent.
- * @param opts.open Whether to open the target agent after the operation.
+ * @param opts.open Whether to emit best-effort compatibility navigation after creation.
  * @param opts.startText Initial user message for the new agent.
  */
 export default async function (
@@ -11,7 +14,7 @@ export default async function (
     opts: {
         /** Model identifier to use. */ model?: string;
         /** Additional system instructions for the new conversation. */ systemPrompt?: string;
-        /** Navigate to the new conversation. @default true */ open?: boolean;
+        /** Emit best-effort compatibility navigation to the new conversation. @default true */ open?: boolean;
         /** Initial user text; a nonblank value starts a background turn. */ startText?: string } = {},
 ): Promise<{ id: string; model: string; opened: boolean; started: boolean; offset?: number }> {
     // Priority: explicit opts.model > declared setting (DB → env → default).
