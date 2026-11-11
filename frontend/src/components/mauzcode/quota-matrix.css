@@ -1,5 +1,5 @@
 /* Quota micro-cards: geometry 1:1 with mauzcode-code $style_quota.css, colours from mauzcode-ui tokens. */
-.quota-matrix { flex-shrink: 0; min-width: 0; padding: 8px 10px 7px; border-top: 1px solid var(--line); }
+.quota-matrix { flex-shrink: 0; min-width: 0; padding: 8px 10px 7px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .quota-matrix-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; margin: 0 2px 7px; font-size: 9px; line-height: 12px; color: var(--text-tertiary); }
 .quota-matrix-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; min-width: 0; }
 .quota-card { display: grid; grid-template-rows: 12px 10px 14px; gap: 1px; min-width: 0; height: 46px; box-sizing: border-box; padding: 3px 2px 2px; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; text-align: center; font-variant-numeric: tabular-nums; cursor: pointer; transition: background var(--duration-feedback), transform .22s cubic-bezier(.2, .8, .2, 1), box-shadow var(--duration-feedback); }
@@ -24,7 +24,7 @@
 .quota-card-status[data-status="unavailable"] { color: var(--tool-error); background: color-mix(in srgb, var(--tool-error) 14%, transparent); }
 .quota-card-cell { display: flex; min-width: 0; }
 .quota-card-cell > .quota-card { flex: 1; }
-.quota-compact-cell { display: flex; justify-content: center; flex-shrink: 0; margin-top: auto; }
+.quota-compact-cell { display: flex; justify-content: center; flex-shrink: 0; margin-top: auto; border-bottom: 1px solid var(--line); }
 .quota-compact { display: flex; align-items: center; justify-content: center; flex-shrink: 0; height: 28px; margin: 0 9px; padding: 0; border: 0; border-top: 1px solid var(--line); background: none; cursor: pointer; }
 .quota-compact-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
 .quota-compact[data-tone="warning"] .quota-compact-dot { background: #c99a06; }

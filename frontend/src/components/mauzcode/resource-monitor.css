@@ -1,0 +1,26 @@
+.workspace-sidebar .resource-monitor-row { display: flex; align-items: center; flex-shrink: 0; gap: 8px; width: 100%; padding: 10px 12px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; text-align: left; font: inherit; font-size: 12px; }
+@media (hover: hover) { .workspace-sidebar .resource-monitor-row:hover { background: var(--hover); color: var(--text); } }
+.workspace-sidebar .resource-monitor-row:active { background: var(--hover); color: var(--text); }
+.workspace-sidebar.is-compact .resource-monitor-row { justify-content: center; }
+@media (pointer: coarse), (max-width: 700px) { .workspace-sidebar .resource-monitor-row { min-height: 44px; } }
+.workspace-sidebar .resource-monitor-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.resource-monitor button:focus-visible, .resource-monitor-table:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.resource-monitor-values { margin-left: auto; font-variant-numeric: tabular-nums; }
+/* Match the quota/settings dialog height cap. Keep its header visible and
+   vertical bounce native; only horizontal boundary feedback is suppressed. */
+.mauzcode-sdk-dialog:has(.resource-monitor) { width: min(900px, calc(100vw - 32px)); max-height: min(800px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; overscroll-behavior-x: none; }
+.mauzcode-sdk-dialog:has(.resource-monitor) > header { flex: none; }
+body:has(.resource-monitor) .mauzcode-sdk-dialog-backdrop { overflow: hidden; overscroll-behavior-x: none; }
+.resource-monitor { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior-x: none; font-size: 13px; font-variant-numeric: tabular-nums; }
+.resource-monitor-muted { color: var(--text-muted); }
+.resource-monitor-cores { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 6px 16px; max-height: 180px; overflow: auto; overscroll-behavior-x: none; }
+.resource-monitor-cores label { display: flex; align-items: center; gap: 6px; }
+.resource-monitor-cores meter { min-width: 30px; flex: 1; width: 70px; accent-color: var(--text); }
+.resource-monitor-cores span { width: 34px; text-align: right; }
+.resource-monitor-memory { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; padding-block: 12px; border-block: 1px solid var(--line); }
+.resource-monitor-memory dd { margin: 4px 0 0; }
+.resource-monitor-table { overflow: auto; max-width: 100%; max-height: 360px; overscroll-behavior-x: none; }
+.resource-monitor table { border-collapse: collapse; width: 100%; text-align: left; white-space: nowrap; }
+.resource-monitor th { position: sticky; top: 0; background: var(--surface-overlay); }
+.resource-monitor td, .resource-monitor th { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.resource-monitor th button { color: inherit; font: inherit; font-weight: 600; background: transparent; border: 0; padding: 6px 0; cursor: pointer; }

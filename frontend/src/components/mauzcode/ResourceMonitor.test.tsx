@@ -1,0 +1,31 @@
+import { act, fireEvent, render, screen, cleanup } from '@testing-library/react';
+import { afterEach, expect, test, vi } from 'vitest';
+import { ResourceMonitor, type Metrics } from './ResourceMonitor';
+import { requestJson } from '../../sdk/api';
+vi.mock('../../sdk/api', () => ({ requestJson: vi.fn() }));
+const metrics: Metrics = { sampledAt: Date.now(), platform: 'linux', cpu: 25, cores: [25, 30], memory: { total: 100, used: 50, available: 50 }, swap: { total: 0, used: 0 }, load: [1, 2, 3], processes: [{ pid: 2, name: 'beta', state: 'S', rss: 100, cpu: 20 }, { pid: 1, name: 'alpha', state: 'R', rss: 200, cpu: 10 }] };
+const flush = async () => { await act(async () => { await Promise.resolve(); }); };
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); Object.defineProperty(document, 'hidden', { configurable: true, value: false }); });
+test('polls summary, fetches details only on opening, sorts processes and aborts on unmount', async () => {
+  vi.useFakeTimers(); vi.mocked(requestJson).mockResolvedValue(metrics);
+  const view = render(<ResourceMonitor />); await flush();
+  expect(requestJson).toHaveBeenLastCalledWith('/serverMetrics/status', expect.anything());
+  fireEvent.click(screen.getByRole('button', { name: /Ресурсы сервера/ })); await flush();
+  expect(requestJson).toHaveBeenLastCalledWith('/serverMetrics/status?details=1', expect.anything());
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'PID' }));
+  const rows = screen.getAllByRole('row'); expect(rows[1]).toHaveTextContent('alpha');
+  fireEvent.click(screen.getByRole('button', { name: 'Закрыть' })); await flush();
+  expect(requestJson).toHaveBeenLastCalledWith('/serverMetrics/status', expect.anything());
+  const signal = vi.mocked(requestJson).mock.calls.at(-1)?.[1]?.signal;
+  view.unmount(); expect(signal?.aborted).toBe(true);
+  const count = vi.mocked(requestJson).mock.calls.length;
+  await act(async () => { vi.advanceTimersByTime(10000); }); expect(requestJson).toHaveBeenCalledTimes(count);
+});
+test('pauses polling in background and reports errors without inventing values', async () => {
+  vi.useFakeTimers(); vi.mocked(requestJson).mockRejectedValue(new Error('Недоступно'));
+  render(<ResourceMonitor />); await flush(); expect(screen.getByText('Недоступно')).toBeInTheDocument();
+  Object.defineProperty(document, 'hidden', { configurable: true, value: true }); fireEvent(document, new Event('visibilitychange'));
+  await act(async () => { vi.advanceTimersByTime(10000); }); expect(requestJson).toHaveBeenCalledTimes(1);
+  Object.defineProperty(document, 'hidden', { configurable: true, value: false }); fireEvent(document, new Event('visibilitychange')); await flush(); expect(requestJson).toHaveBeenCalledTimes(2);
+});

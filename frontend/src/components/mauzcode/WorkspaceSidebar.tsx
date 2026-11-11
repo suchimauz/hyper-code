@@ -12,6 +12,7 @@ import { WorkspaceMoreMenu } from './WorkspaceMoreMenu';
 import { compareChatsByActivity, readWorkspaceView, saveWorkspaceView, workspaceParent, workspaceViewProjects } from '../../lib/workspaceView';
 import { WorkspaceDirectoryDialog } from './WorkspaceDirectoryDialog';
 import { QuotaMatrix } from './QuotaMatrix';
+import { ResourceMonitor } from './ResourceMonitor';
 import type { QuotaAccount } from '../../lib/quotas';
 import './workspace-sidebar.css';
 
@@ -104,6 +105,7 @@ export function WorkspaceSidebar({ onOpenPeople, peopleActive, extensionNavigati
       </div></>}
     <WorkspaceDirectoryDialog open={adding} onOpenChange={setAdding} onCreated={onRetry} />
     {quotas && quotas.length > 0 && <QuotaMatrix accounts={quotas} compact={compact} collapsible={mobile} onOpen={onOpenQuotas ?? onOpenSettings} />}
+    {user?.role === 'owner' && <ResourceMonitor compact={compact} />}
     <div className="workspace-account">
       {user ? <HoverPanel label="Меню профиля" className="workspace-account-menu" open={accountOpen} onOpenChange={setAccountOpen} trigger={<button className="workspace-profile" aria-label={`Профиль: ${user.name}`} title={compact ? user.name : undefined}>
         <span className="workspace-avatar">{user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : initials}</span>
