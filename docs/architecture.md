@@ -8,21 +8,25 @@ The primary shell is React/Vite in `frontend/`, served at `/`. Trusted browser e
 
 Built-in screens live in `frontend/src/core-ui/` (granted in `extensions/installed.ts`); plugin UIs live in `<plugin>/ui/` with `package.json` `procs.ui` grants and are built by the backend at runtime and loaded through `/plugins/ui/manifest` (non-official ones after human approval of the bundle hash; see docs/ui-architecture.md). The SDK example is a test fixture in `frontend/src/test/fixtures/sdk-example.tsx`. Dead `legacyUi.rewriteResponse`/`navigationUrl` helpers are removed; `procs.http.toResponse` still dynamically dispatches HTTP strings/`{ main }` through `ui.layout`. People `/auth/users`, `sidebar.draft`, built-in/plugin SSR pages, Canvas kind renderers/assets and secure input transports remain live: see the [residual consumer map](ui-architecture.md#residual-compatibility-consumers). SSH settings uses a callback to the native `llm-connections` tab, not `/llms`.
 
-## Compatibility SSR: declarative navigation apps
+Shared compatibility is concrete: `src/procs/http/toResponse.ts` dynamically resolves `ui.layout` for HTTP strings/`{ main }`; `src/ui/layout.ts` supplies a minimal document, not the removed shell. `canvas.itemDocument` retains HTML/assets previews where no granted React kind replaces them. `input.compatView` retains protected card transports; Redmine approval remains a separate confirmation authority, not generic input submission or a React grant. Do not delete these consumers because the shell migrated.
 
-The following `$app`/Dock/menu declarations describe existing server-rendered consumers, not automatic registration of React extensions.
+## Navigation data and compatibility declarations
 
-A module that owns a user-facing page can publish it to global navigation with a `$app_<name>.json` file. The `nav/$loader_app.ts` loader collects these declarations; `nav.items` merges them with core pages, plugins, and agents.
+React owns navigation presentation. Existing `$app`, widget, search and Dock declarations are data/compatibility mechanisms, not automatic registration of React SDK extensions.
 
-The left Dock (`dock.render`, called by `ui.layout`) is assembled from `$dock_<name>.ts|json` entries collected by `dock/$loader_dock.ts`, plus the person's pinned chats (`user_agent_state.pinned`) and pages. The global menu button (top) and the person (bottom) are fixed; everything else is placed in a top or bottom zone by the `dock.layout` setting — instance scope `global`, personal scope `user` — over each entry's own `zone`/`order`. Each entry renders in parallel under a timeout and is dropped on error.
+A module that owns a user-facing page can publish it to global navigation with a `$app_<name>.json` file. The `nav/$loader_app.ts` loader collects these declarations; `nav.items` reads registered app declarations and can include agent chats; it has no hard-coded core-page catalogue.
 
-The global menu (⌘/, `ui.navMenu` + GET `/nav/items`) is built from tabs (`nav.tabs`): built-in `home` (core widgets chats, shared, pages, projects) and `plugins` (pages declared by plugin `$app_` files plus every plugin widget placed nowhere), then the person's own tabs from the `nav.layout` setting (instance `global` / env `MAUZCODE_NAV`, personal `user`, edited through POST `/nav/layout` → `nav.editLayout`). With an empty query a tab draws its grid of `$widget_<name>.ts` tiles (`nav/$loader_widget.ts`, drawn by `nav.drawWidget` with timeout and ttl cache); with a query `nav.searchAll` asks the tab's `$search_<name>.ts` sources (`nav/$loader_search.ts`) in parallel, inlines those that answer within 300 ms and leaves htmx placeholders (GET `/nav/group/:token`) for the slower ones. All rows are `types.nav.Item`, drawn by `nav.rows`.
+The old Dock renderer (`dock.render`) and global menu renderer (`ui.navMenu`, `nav.rows`) are removed. `ui.layout` is a minimal document renderer, not a navigation/chat shell. Dock data, `$dock` loading, layout/pinning functions and `/dock/layout` and `/dock/pin` POST routes still exist; shell retirement is not evidence that these runtime capabilities are absent.
+
+`frontendBridge.searchData` still consumes `nav.tabs` → `nav.effectiveLayout`, so `nav.layout` remains live. `/ui-lab-api/search` returns structured tab/widget/search data from this bridge; HTML-only widgets are unsupported there. `/ui-lab-api/navigation` supplies native navigation data. `GET /nav/items` with `Accept: application/json` returns declared application links (not chats); HTML visits redirect to `/?view=applications`. React Applications can open retained built-in/plugin documents. See `src/frontendBridge/searchData.ts`, `src/nav/tabs.ts` and `src/nav/$route_items_GET.ts`.
+
+Illustrative declaration (the module must implement its destination):
 
 ```json
 {
-  "label": "cron tasks",
-  "href": "/cron",
-  "hint": "page · durable background jobs",
+  "label": "Example page",
+  "href": "/example",
+  "hint": "page · example application destination",
   "icon": "ph-clock",
   "group": "System",
   "order": 80
@@ -38,7 +42,7 @@ Core static pages use the same declarations as module pages; `nav.items` contain
 
 Agent-deferred work uses the unified trigger engine described in [Agent triggers](agent-triggers.md): `agent.wake`, `agent.cron`, and `agent.watch` share durable `agent_triggers` storage and deliver prompts into the same conversation.
 
-Everything durable lives in Postgres (paradedb). Everything visible to the user comes from a normal HTTP fetch. There is no queue table — debounce, renewable run lease and run state are columns on `agents`. Realtime uses one shared SSE connection in each visible browser tab; events carry topic invalidations only, and live regions refetch current HTML. Hidden tabs close SSE to avoid exhausting browser per-origin connections.
+Durable conversation state lives in Postgres (paradedb). The scheduling queue is not a separate table — debounce, renewable run lease and run state are columns on `agents`. Realtime uses a shared topic-filtered SSE connection; invalidations trigger authorized HTTP reads of canonical JSON (or HTML for retained compatibility consumers). React also reads transient in-memory stream snapshots through the chat JSON endpoint. Hidden tabs suspend JSON reads; the shared transport releases hidden-tab SSE on HTTP/1.1, while HTTP/2 can keep it connected.
 
 ```mermaid
 graph TB
@@ -50,18 +54,19 @@ graph TB
     end
 
     subgraph DataPlane[Data plane — HTTP]
-        POST["POST /agent/:id"]
-        LP["GET /agent/:id/events.html<br/>(short delta fetch · SSE-triggered)"]
+        POST["POST /agent/:id<br/>(React multipart composer)"]
+        LP["GET /api/v1/agents/:id/events<br/>(latest tail · older history)"]
         SB["React chat status<br/>(authorized JSON)"]
-        SF["live regions<br/>(topic SSE + watchdog)"]
+        SF["React navigation / compatibility documents<br/>(authorized HTTP reads)"]
     end
     subgraph SignalPlane[Signal plane — invalidation and worker wake]
-        SSE["GET /procs/events<br/>(one visible-tab stream)"]
-        TOPICS["topic invalidation<br/>agent:id · agents · plugin topics"]
+        SSE["GET /procs/events<br/>(shared topic-filtered stream)"]
+        TOPICS["topic invalidation<br/>agent:id · agent:id:stream · agents · plugin topics"]
         WS[wakeWorker · process-wide]
     end
 
     POST  --> MSGS
+    POST  --> EVENTS
     POST  --> AGENTS
     POST  --> WS
     LP    --> EVENTS
@@ -86,25 +91,25 @@ Domain operations remain independent of rendering: `session.setTitle`, `chat.set
 1. **The DB is the source of truth.** Messages, events, run-state, scheduling — all in Postgres. Memory is only an execution cache.
 2. **HTTP is the data plane.** Browser fetches visible state through normal short HTTP requests. SSE carries only coalesced invalidation signals; watchdog timers repair missed signals.
 3. **Signals are not data.** State invalidations and `wakeWorker` are hints; consumers re-read Postgres or refetch canonical JSON/HTML. Gap resync repairs missing invalidations; compatibility live-region watchdogs provide an additional fallback.
-4. **One worker. No queue table. Parallel drain.** Run scheduling is two columns on `agents`: `next_run_at` (when to fire) and `run_state` (`'idle' | 'running'`). One in-process `workerLoop` claims every currently-eligible agent in a tight `claimOne()` loop and spawns each as its own promise — different agents run concurrently. Per-agent serialisation is enforced by Postgres row locking on `UPDATE … RETURNING` (two concurrent claims can't both win the same `idle` row), not by an in-memory lock.
+4. **One worker. No worker-job table. Parallel drain.** Run scheduling is two columns on `agents`: `next_run_at` (when to fire) and `run_state` (`'idle' | 'running'`). One in-process `workerLoop` claims every currently-eligible agent in a tight `claimOne()` loop and spawns each as its own promise — different agents run concurrently. Per-agent serialisation is enforced by Postgres row locking on `UPDATE … RETURNING` (two concurrent claims can't both win the same `idle` row), not by an in-memory lock.
 5. **Clear rendering ownership.** React owns the primary shell and SDK extension lifecycle. Shared transport handles SSE gaps; HTMX/controllers own only compatibility fragments. Never attach competing controllers to React-owned DOM.
 
 ---
 
 ## Channels at a glance
 
-The route/form examples below describe the compatibility SSR transport. The primary React frontend uses its authorized API endpoints; SDK extensions use `requestJson`, not an HTMX form contract.
+The primary entry is `/` (`frontend/src/main.tsx` → `LiveApp`); a selected chat is `/?agent=<id>`. `GET /agent/:id` redirects there with 303. There is no active `/agent/:id/events.html` chat transport. SDK extensions use `requestJson`, not an HTMX form contract.
 
-| Concern              | Channel                                           | Driven by                             |
-|----------------------|---------------------------------------------------|---------------------------------------|
-| Initial render       | SSR HTML from `GET /agent/:id`                    | server-rendered                       |
-| New events appear    | short `GET /agent/:id/events.html?offset=N`       | `agent:<id>` SSE invalidation + 30s watchdog |
-| Status & exec time   | React authorized chat JSON                       | live invalidation + refetch |
-| Navigation refresh   | server fragment/live region                       | `agents` invalidation + watchdog      |
-| User submits message | `POST /agent/:id?debounceSeconds=0.1`             | HTMX form submit                      |
-| Delete a message     | `POST /agent/:id/messages/delete`                 | HTMX confirmation + POST              |
-| Stop / fork / archive| route-backed controls                             | forms/HTMX                            |
-| Global notifications | `GET /procs/events`                               | shared topic-filtered SSE client      |
+| Concern | Channel | Driven by |
+|---|---|---|
+| Initial render | React shell + `GET /api/v1/agents` and `/api/v1/agents/:id/events` | client mount / selected chat |
+| Transcript and activity | `GET /api/v1/agents/:id/events`, optional `before` for history | `agent:<id>`, `agent:<id>:stream` invalidations, resync and fallback reads |
+| Navigation | `/api/v1/agents`, `/ui-lab-api/navigation`, `/ui-lab-api/search`, `/nav/items` JSON | React consumers and topic invalidation |
+| User message | `POST /agent/:id` | React multipart composer with request ID / Idempotency-Key; JSON receipt |
+| Stop / archive | `POST /api/v1/agents/:id/stop` and `/archive` | native controls, authorized writes |
+| Global notifications | `GET /procs/events` | shared topic-filtered SSE client |
+
+Authentication and surface-specific ownership/write authorization belong on the backend, independently of React grants/readOnly. `src/$middleware.ts` resolves the authenticated visitor and rejects cross-origin writes when authentication is configured; this alone is not a universal per-agent ACL. SDK writes require the cookie-bound CSRF token, not a fabricated Origin. Core/legacy endpoints retain their actual global and route-specific protections; the current React composer does not explicitly attach that token. Protected surfaces enforce their own checks: for example `canvas.authorizeHttp` checks agent ownership, and `input.batchHttp` checks owner access and CSRF. Frontend helpers are not an authorization boundary.
 
 ---
 
@@ -112,17 +117,17 @@ The route/form examples below describe the compatibility SSR transport. The prim
 
 ```mermaid
 sequenceDiagram
-    participant B as Browser (htmx form)
+    participant B as Browser (React)
     participant S as Server
     participant DB as Postgres
     participant W as workerLoop
     participant L as LLM
 
-    B->>S: POST /agent/:id (text=hi)
-    S->>DB: appendUserMessage → messages
-    S->>DB: UPDATE agents SET next_run_at = MAX(curr, now+5s)
+    B->>S: POST /agent/:id (multipart text, files, requestId)
+    S->>DB: transaction: appendMessage + appendEvent<br/>schedule next_run_at with GREATEST
+    Note over S,DB: admission checks and optional attachment writes omitted
     S->>W: wakeWorker
-    S-->>B: 204 No Content
+    S-->>B: JSON receipt (messageIdx, sendAt)
 
     Note over W: claim via<br/>UPDATE agents SET run_state='running'<br/>WHERE id IN (SELECT … WHERE next_run_at <= now LIMIT 1)<br/>RETURNING id
 
@@ -132,18 +137,22 @@ sequenceDiagram
     W->>DB: appendAssistantMessage / appendEvent / …
     DB-->>S: appendEvent publishes topic agent:id
     S-->>B: SSE invalidation
-    B->>S: short GET events.html?offset=N
-    S-->>B: rendered delta + replacement tail
+    B->>S: GET /api/v1/agents/:id/events
+    S-->>B: JSON latest tail + activity + transient partial
+    Note over B: merge refreshed tail, preserve loaded older history
     W->>DB: fenced finalize WHERE run_token matches;<br/>set idle, clear lease, advance cursor on success,<br/>preserve/reschedule pending user work
     Note over W,DB: transient provider errors retry once;<br/>stale leases use bounded recovery backoff
+```
 
-POST is **one message INSERT + one agent UPDATE**. No queue row. No payload duplicate of the message text — the message itself is the input.
+For an immediately accepted ordinary turn, `agent.acceptMessage` persists the message and visible event, schedules the agent and wakes the worker. The React composer calls it through `POST /agent/:id` (`frontend/src/lib/mauzcode.ts`); debounce uses the explicit query override or configured agent/global value (fallback 5 seconds). Duplicate submissions reuse their receipt; a turn submitted during an input wait can instead return `queued: true` and live in `agent_turn_queue` until promotion. This turn queue is distinct from worker scheduling on the agents row. Commands have a separate control path. The diagram shows the ordinary accepted-turn path, not all admission branches.
+
+The separate native API `POST /api/v1/agents/:id/messages` accepts JSON or multipart, defaults to 100 ms debounce, and returns a 202 JSON receipt with `messageIdx`, `eventIdx` and `sendAt`; it is not the current React composer endpoint.
 
 If two POSTs land within the debounce window, both rows are appended to `messages`, and `next_run_at = MAX(...)` keeps the run scheduled for the latest one. When the worker fires, both messages go to the LLM in one transcript — natural merge.
 
 ## Receive flow
 
-The browser shares one topic-filtered `GET /procs/events` stream. React state consumers refetch authoritative JSON on invalidations and resync after gaps. SDK subscribers must supply `resync` and `onError`, declare topics and clean up on unmount. Over HTTP/2 hidden tabs may keep the stream; over HTTP/1.1 they release it and catch up on return (see [live-updates.md](live-updates.md)). Compatibility SSR chat consumers still request `/agent/:id/events.html?offset=N` and use live-tail/watchdog refreshes; these are not the primary React rendering contract.
+The browser shares one topic-filtered `GET /procs/events` stream. React state consumers refetch authoritative JSON on invalidations and resync after gaps. SDK subscribers must supply `resync` and `onError`, declare topics and clean up on unmount. Over HTTP/2 hidden tabs may keep the stream; over HTTP/1.1 they release it and catch up on return (see [live-updates.md](live-updates.md)). `useMauzCode` refreshes the latest bounded JSON tail and merges it with already loaded history; it does not consume HTML delta tails. `liveRefresh` serializes reads, aborts on disposal and refetches on reconnect/visibility. Connected fallback is 60 seconds; disconnected fallback is 2.5 seconds for chat, 10 seconds for the agent list. Hidden tabs do no JSON reads. Retained HTML consumers use their separate compatibility transports.
 
 
 ---
@@ -152,11 +161,11 @@ The browser shares one topic-filtered `GET /procs/events` stream. React state co
 
 | Event | What happens |
 |---|---|
-| Browser refresh | SSR renders the latest event page and installs a live tail at the next offset. |
-| Lost network | EventSource reconnects; visible regions refresh from their durable offsets. |
-| Hidden tab | It closes SSE, then refreshes all visible topics and reconnects when foregrounded. |
+| Browser refresh | React reads the selected chat's latest bounded JSON page; older history is loaded with `before`. |
+| Lost network | EventSource reconnects; resync refetches canonical snapshots. Disconnected fallback polling remains visible to the user. |
+| Hidden tab | JSON reads stop; HTTP/1.1 releases SSE, HTTP/2 may retain it. Foregrounding reconciles snapshots and reconnects as needed. |
 | Server restart | `loadAll` rehydrates agents; renewable leases reclaim owners whose heartbeat expires. |
-| Invalidation lost | 5s/30s watchdog requests canonical fragments again. |
+| Invalidation lost | React's connected 60s fallback refetches JSON; compatibility consumers retain their own refresh policies. |
 
 ---
 
@@ -209,7 +218,7 @@ No artificial concurrency cap — backpressure comes from the LLM provider (429s
 
 UI and execution use separate signal planes:
 
-- `procs.events`: one topic-filtered SSE stream per visible tab; `appendEvent` publishes `agent:<id>`, and clients coalesce matching live-region refreshes. Hidden tabs close the stream and catch up on return.
+- `procs.events`: one shared topic-filtered SSE stream per browser tab; `appendEvent` publishes `agent:<id>`, and consumers coalesce matching snapshot or compatibility-region refreshes. Hidden tabs suspend React JSON reads; HTTP/1.1 releases their SSE connection, while HTTP/2 may retain it. Foregrounding reconciles current state.
 - `wakeWorker` + `workerLoop.waitForWork`: one process-wide condition variable that wakes the DB queue scanner after schedules/finalization change.
 
 Both carry zero domain data. UI refetches canonical HTML/JSON; worker claims canonical DB rows.
@@ -220,20 +229,14 @@ The worker condvar is process-wide because there is one driver promise. Parallel
 
 ## Offsets and cursors
 
-`events.idx` and `messages.idx` are per-agent monotonic integers. A live transcript tail carries its durable offset in `hx-get`; SSE only triggers a refresh and never owns cursor state:
+Keep these distinct cursor domains separate:
 
-```html
-<div id="msg-tail"
-     hx-get="/agent/:id/events.html?offset=N"
-     data-live-topic="agent:id"
-     hx-trigger="mauzcode-live from:body, every 30s"
-     hx-swap="outerHTML">
-</div>
-```
+- `messages.idx` indexes the LLM transcript. `agents.last_processed_msg_idx` is the worker's durable user-message frontier, not a browser pagination cursor.
+- `events.idx` indexes visible trace/transcript events. `/api/v1/agents/:id/events` returns the latest bounded page by default (80, maximum 200). `before` loads older history; `olderBefore` and `hasOlder` guide pagination. The endpoint also supports inclusive `after` (`fromIdx`) and returns `nextAfter = maxIdx + 1`; that head is not proof that a bounded response included every intervening event.
+- React `useMauzCode` refreshes the latest tail, replaces that range via `mergeTail`, and preserves previously loaded older pages. It does not advance an HTML tail offset or use `nextAfter` as its live fetch loop. See `frontend/src/hooks/useMauzCode.ts`, `frontend/src/lib/mauzcode.ts` and `src/api/$route_v1_agents_$id_events_GET.ts`.
+- SSE replay/gap state belongs to the shared transport, not either database index. A gap requests snapshot resync, not transcript advancement. Transient stream `revision`/`startedAt` are yet another domain used to reconcile `partial` output, not durable message/event cursors.
 
-The response contains new event HTML followed by a replacement tail whose offset is `max_event_idx + 1`. It waits for the next SSE invalidation or watchdog interval; it does not immediately long-poll again.
-
-`session.getMaxEventIdx({ id })` returns the cursor head; `session.getEvents({ id, fromIdx, limit })` returns the slice.
+The retained `GET /agent/:id/events` JSON route has its own `offset`/`nextOffset` contract (`src/agent/$route_$id_events_GET.ts`); it is not an HTML route or the primary React transcript reader.
 
 ---
 
@@ -314,7 +317,7 @@ The shared test fixture is `src/_testCtx.entry.ts` — `mkTestCtx()` returns a f
 
 ## Navigation refresh
 
-Navigation/menu fragments are server-rendered and refreshed from durable state. Writes publish the `agents` topic; watchdogs repair missed invalidations. Project links are derived from agent `workspace_dir`, and the Quick section uses durable `hot:<id>` timestamps.
+React owns sidebar/menu state and refetches structured data, not server-rendered menu fragments. The agent list uses `liveRefresh` on the `agents` topic; native navigation/search use `/ui-lab-api/navigation` and `/ui-lab-api/search`. `frontendBridge.searchData` retains the `nav.tabs`/`nav.layout` data contract. Application destinations come from `/nav/items` JSON. Resync and fallback reads repair missed invalidations; legacy layout/pinning routes remain separate runtime capabilities.
 
 ---
 
@@ -322,21 +325,21 @@ Navigation/menu fragments are server-rendered and refreshed from durable state. 
 
 1. **Per-run audit/checkpoint ledger.** Inline lease state protects ownership but does not retain attempt-by-attempt timing, checkpoints and recovery history.
 2. **Durable side-effect protocol.** External writes still need common idempotency keys, effect reconciliation and explicit unknown outcomes after crashes.
-3. **Live thinking persistence.** Web chat persists final assistant output; mobile has transient in-memory prose, but durable low-cadence thinking/progress events are not a general contract.
+3. **Live thinking persistence.** React and native chat can read transient stream snapshots through the event JSON API; final output is durable, but general durable low-cadence thinking/progress events remain a gap.
 4. **Context-tree memory.** Manual/sleep compaction exists; track/task/episode capsules and retrieval remain design work.
-5. **Authorization scope.** Password/session authentication exists, but fine-grained per-agent/plugin authorization is not implemented.
+5. **Authorization scope.** Authentication and surface-specific ownership/CSRF checks already exist (including Canvas and protected inputs). Do not confuse frontend grants with backend authorization or assume a uniform fine-grained plugin permission model.
 
 ---
 
 ## Why these choices
 
-### Why no queue table?
+### Why no worker-job table?
 
 A chat agent has exactly one input — the user's messages. A separate `agent_jobs` table was duplicating the input log and adding bookkeeping (`payload_json` carrying the same text already in `messages`, `debounce_until` per row when it logically belongs to the agent). One row in `messages` + two columns on `agents` carry the same information with less ceremony. When we later need genuine background workloads (`compact`, `delegate`, `cron`), we can introduce a typed `runs` or `jobs` table — for **runs**, not per-message scheduling.
 
 ### Why SSE invalidation instead of a stateful application WebSocket
 
-The UI needs low-latency change notification, not a second copy of domain state. A shared topic-filtered EventSource carries invalidations; ordinary authorized HTTP requests fetch/replay canonical fragments by URL and offset. This keeps reconnect and correctness DB/HTTP-based while avoiding long-held HTMX requests.
+The UI needs low-latency change notification, not a second copy of domain state. A shared topic-filtered EventSource carries invalidations; ordinary authorized HTTP requests fetch canonical JSON snapshots/history (and retained compatibility documents). Resync after gaps keeps durable conversation correctness DB/HTTP-based; transient stream snapshots remain explicitly non-durable.
 
 ### Why a single driver loop with parallel runs, not multiple worker loops
 
@@ -353,4 +356,4 @@ The primary shell uses React/Vite and a public SDK so built-in and runtime-loade
 
 ### Why no durable `agent.thinking.delta` channel
 
-Live token deltas are transient data, while the shared SSE bus intentionally carries signal-only invalidations. The web transcript therefore persists/render final assistant output and uses an SSE-invalidated status fragment with a 5-second watchdog for liveness. A future thinking overlay should use bounded durable progress events rather than turning the invalidation bus into an alternate transcript.
+The shared SSE bus carries invalidations, not token payloads. The chat events JSON endpoint nevertheless exposes a transient `partial` snapshot while running, plus activity/thinking metadata. React `useMauzCode` reconciles it with `reconcileStream` during final-output handoff, alongside durable events (`frontend/src/lib/streamHandoff.ts`). Thus live prose is already visible in React, but is not a durable thinking transcript or an SSR status fragment. A durable progress contract would require bounded persisted events rather than treating the invalidation bus or in-memory snapshots as history.
