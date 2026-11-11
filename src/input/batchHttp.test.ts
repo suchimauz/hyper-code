@@ -175,8 +175,8 @@ test('real HTTP secret success and rejection never write plaintext into runtime 
 
 test('isolated secret field honors only validated application themes',async()=>{
  const f=await setup();
- for(const [query,expected] of [['dark','dark'],['light','light'],['auto','light dark'],['bad%3Bcolor%3Ared','light dark']]){
+ for(const [query,expected] of [['dark','dark'],['light','light'],['auto','system'],['bad%3Bcolor%3Ared','system']]){
   const response=await f.dispatch('GET','/field?key=secret&theme='+query);
-  expect(response.status).toBe(200);const html=await response.text();expect(html).toContain('color-scheme:'+expected+'}');expect(html).not.toContain('color:red');
+  expect(response.status).toBe(200);const html=await response.text();expect(html).toContain('data-theme="'+expected+'"');expect(html).toContain('/ui/vendor/tokens.css');expect(html).toContain('background:var(--surface)');expect(html).not.toContain('color:red');
  }
 });

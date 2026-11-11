@@ -1,10 +1,18 @@
-/* Batch retains the native question frame, header, options, scrolling body and footer. */
-.batch-card .question-body > p { color: var(--text-secondary); font-size: 12px; }
-.batch-card fieldset { border: 0; min-width: 0; }
-.batch-card fieldset > label:not(.question-option) { display: flex; flex-direction: column; gap: 8px; }
-.batch-card textarea, .batch-card input[type=search] { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: inherit; }
-.batch-card table { width: 100%; text-align: left; font-size: 13px; }
-.batch-card td, .batch-card th { padding: 6px; border-bottom: 1px solid var(--line); }
-.batch-card .question-footer { flex-wrap: wrap; }
-.batch-card .question-footer button:first-child { margin-right: auto; background: transparent; color: var(--text-secondary); }
-.batch-card :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Batch renders through the shared InputFrame and native kind bodies/actions (questions.css); only layout is batch-specific. */
+.batch-card .question-header { align-items:center; }
+.batch-card .question-header > span:nth-child(2) { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.batch-card .question-navigation { gap:2px; flex-shrink:0; }
+.batch-card .question-navigation > span { margin-right:4px; }
+.batch-card .question-navigation button { min-width:24px; min-height:24px; padding:0 4px; font:inherit; }
+.batch-card .question-body > .confirm-actions { display:flex; justify-content:flex-end; margin:8px 8px 0; }
+/* Footer: quiet text actions on the left, status, primary on the right — one row. */
+.question-footer-leading { display:inline-flex; gap:4px; margin-left:-10px; flex-shrink:0; }
+.question-footer .question-footer-leading button { padding:7px 10px; background:transparent; color:var(--text-secondary); white-space:nowrap; box-shadow:none; }
+.question-footer .question-footer-leading button:hover:not(:disabled) { background:var(--hover); color:var(--text); }
+.batch-card .question-footer > span[aria-live] { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.batch-card .question-footer .confirm-actions button { white-space:nowrap; }
+@media(max-width:600px) {
+  .batch-card .question-header > span:nth-child(2) { display:none; }
+  .batch-card .question-footer { flex-wrap:nowrap; }
+  .batch-card .question-footer > span[aria-live] { display:none; }
+}

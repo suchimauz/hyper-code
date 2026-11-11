@@ -51,7 +51,7 @@ describe('atomic collection card', () => {
     expect(vi.mocked(writeBatch).mock.calls[1][2]).not.toHaveProperty('values');
     expect((screen.getByRole('radio', { name: 'Blue' }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole('radio', { name: 'Red' })); fireEvent.click(screen.getByText('Далее')); await screen.findByText('Продолжить?');
-    fireEvent.click(screen.getByLabelText('Нет')); fireEvent.click(screen.getByText('Отправить все ответы'));
+    fireEvent.click(screen.getByRole('button', { name: 'Нет' })); fireEvent.click(screen.getByText('Отправить все ответы'));
     await waitFor(() => expect(writeBatch).toHaveBeenCalledTimes(5));
     expect(vi.mocked(writeBatch).mock.calls[3][2].values).toEqual({ decision: 'no' });
     expect(vi.mocked(writeBatch).mock.calls[4][1]).toBe('submit');
@@ -127,7 +127,20 @@ describe('atomic collection card', () => {
     expect(() => createExtensionRegistry([{ id: 'demo', apiVersion: 1, inputKinds: [{ kind: 'demo.note', component: () => null, batchComponent: 'bad' as never }] }], { demo: { inputKinds: ['demo.note'] } })).toThrow();
   });
   it('collects confirm=false without interpreting it as cancel', () => {
-    const change = vi.fn(); render(<BatchFields item={initial().items[1]} draft={{}} onChange={change} busy={false} />); fireEvent.click(screen.getByLabelText('Нет')); expect(change).toHaveBeenCalledWith({ decision: 'no' });
+    const change = vi.fn(); render(<BatchFields item={initial().items[1]} draft={{}} onChange={change} busy={false} />); fireEvent.click(screen.getByRole('button', { name: 'Нет' })); expect(change).toHaveBeenCalledWith({ decision: 'no' });
+  });
+  it('reuses native bodies and pressed decision buttons inside a step', () => {
+    const change = vi.fn(); render(<BatchFields item={{ ...initial().items[1], spec: { confirmLabel: 'Да', declineLabel: 'Нет', details: '**exact**' } }} draft={{ decision: 'yes' }} onChange={change} busy={false} />);
+    expect(screen.getByRole('button', { name: 'Да' })).toHaveAttribute('aria-pressed', 'true'); expect(screen.getByRole('button', { name: 'Нет' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('exact').tagName).toBe('STRONG');
+    fireEvent.change(screen.getByLabelText('Комментарий'), { target: { value: 'ok' } }); expect(change).toHaveBeenLastCalledWith({ decision: 'yes', comment: 'ok' });
+  });
+  it('filters inline grid rows and records picks as values', () => {
+    const change = vi.fn(); const item = { key: 'g', kind: 'grid', title: 'Строка', spec: { rows: [{ id: 1, name: 'Alpha' }, { id: 2, name: 'Beta' }], columns: [{ key: 'name', label: 'Имя' }], valueKey: 'id', multiple: true }, filled: false, contractVersion: 1 as const };
+    render(<BatchFields item={item} draft={{ pick: ['1'] }} onChange={change} busy={false} />);
+    fireEvent.change(screen.getByLabelText('Фильтр строк'), { target: { value: 'bet' } });
+    expect(screen.getByRole('checkbox', { name: 'Alpha' })).toBeChecked(); fireEvent.click(screen.getByRole('checkbox', { name: 'Beta' }));
+    expect(change).toHaveBeenLastCalledWith({ pick: ['1', '2'] });
   });
   it('renders one expandable history receipt with safe summaries only', () => {
     const state = initial(); state.state = 'submitted'; state.history = { summary: 'Все ответы отправлены', items: [{ key: 'first', kind: 'secret', title: 'Ключ', summary: 'secret://demo/key' }, { key: 'second', kind: 'confirm', title: 'Продолжить?', summary: 'Нет' }] };

@@ -59,7 +59,7 @@ function secretField(row:types.input.Row,csrf:string,theme:string):string{
     const mode=['password','otp','text'].includes(row.spec?.mode)?row.spec.mode:'password';
     const max=Math.max(1,Math.min(Number(row.spec?.maxlength)||256,4096));
     const attrs=mode==='otp'?'inputmode="numeric" autocomplete="one-time-code" placeholder="123456" class="otp"':mode==='password'?'autocomplete="new-password" placeholder="••••••••"':'autocomplete="off"';
-    const css='html,body{margin:0;padding:0;background:transparent;color:var(--text);font-family:var(--font-sans)}'
+    const css='html,body{margin:0;padding:0;background:var(--surface);color:var(--text);font-family:var(--font-sans)}'
         +'form{margin:0;padding:2px}'
         +'input{display:block;width:100%;box-sizing:border-box;min-height:42px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:13px;line-height:20px}'
         +'input::placeholder{color:var(--text-caption)}input:focus{outline:2px solid var(--focus-ring);outline-offset:0}input:disabled{opacity:.6}'

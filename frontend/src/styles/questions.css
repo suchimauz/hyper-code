@@ -29,13 +29,13 @@
 .question-navigation button:disabled { opacity:.4; cursor:default; }
 .question-navigation button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:1px; }
 .question-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 16px 2px 20px; flex-shrink:0; font-size:11px; color:var(--text-tertiary); }
-.question-footer button { padding:7px 14px; min-height:32px; border:0; border-radius:8px; background:var(--text); color:var(--surface); font:inherit; font-size:13px; cursor:pointer; }
-.question-footer button:disabled { opacity:.5; cursor:default; }
-.question-footer button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+:is(.question-footer, .confirm-actions) button { padding:7px 14px; min-height:32px; border:0; border-radius:8px; background:var(--text); color:var(--surface); font:inherit; font-size:13px; cursor:pointer; }
+:is(.question-footer, .confirm-actions) button:disabled { opacity:.5; cursor:default; }
+:is(.question-footer, .confirm-actions) button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 .question-error, .question-load-error { margin:8px 24px; color:var(--tool-error); font-size:12px; }
 .question-card .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 @media(max-width:600px) { .question-frame { padding-inline:0; } .question-header { padding-top:16px; } .question-footer > span { max-width:55%; } }
-@media(pointer:coarse) { .question-option { min-height:44px; } .question-footer button { min-height:44px; } }
+@media(pointer:coarse) { .question-option { min-height:44px; } :is(.question-footer, .confirm-actions) button { min-height:44px; } }
 .question-card [hidden] { display:none; }
 .question-minimize { display:flex; align-items:center; justify-content:center; width:24px; height:24px; margin-top:-4px; padding:0; border:0; border-radius:6px; color:var(--text-secondary); background:transparent; cursor:pointer; }
 .question-minimize:hover { background:var(--hover); }
@@ -81,9 +81,9 @@
 .question-other.confirm-comment { width:calc(100% - 16px); margin:0 8px 4px; }
 .question-other.confirm-comment:disabled { opacity:.6; }
 .confirm-actions { display:inline-flex; gap:8px; margin-left:auto; }
-.question-footer button.confirm-decline { background:transparent; color:var(--text); box-shadow:inset 0 0 0 1px var(--line-strong); }
-.question-footer button.confirm-decline:hover:not(:disabled) { background:var(--hover); }
-.question-footer button.confirm-accept.is-danger { background:var(--tool-error); color:#fff; }
+.confirm-actions button.confirm-decline, .question-footer button.confirm-decline { background:transparent; color:var(--text); box-shadow:inset 0 0 0 1px var(--line-strong); }
+.confirm-actions button.confirm-decline:hover:not(:disabled), .question-footer button.confirm-decline:hover:not(:disabled) { background:var(--hover); }
+.confirm-actions button.confirm-accept.is-danger, .question-footer button.confirm-accept.is-danger { background:var(--tool-error); color:#fff; }
 
 /* Native grid input: filter + compact table in the same frame as choice questions. */
 .grid-filter { display:flex; align-items:center; gap:8px; margin:0 8px 8px; padding:0 10px; height:34px; border:1px solid var(--line-strong); border-radius:8px; color:var(--text-tertiary); }

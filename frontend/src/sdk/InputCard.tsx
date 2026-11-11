@@ -1,7 +1,5 @@
-import { useId, useState, type ButtonHTMLAttributes, type FormEvent, type ReactNode } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import '../styles/scrollbar.css';
-import '../styles/questions.css';
+import type { ButtonHTMLAttributes, FormEvent, ReactNode } from 'react';
+import { InputFrame } from '../components/mauzcode/inputs/InputFrame';
 import './input-card.css';
 
 export type InputCardProps = {
@@ -29,26 +27,9 @@ export type InputCardProps = {
   minimizable?: boolean;
 };
 
-/** The native MauzCode chat input frame for plugin cards: same header, body, footer, collapse and tokens as built-in questions. */
+/** The native MauzCode chat input frame for plugin cards: the same InputFrame the built-in questions and batch render through. */
 export function InputCard({ label, hint, title, message, children, note, actions, error, busy = false, onSubmit, minimizable = true }: InputCardProps) {
-  const titleId = useId();
-  const [minimized, setMinimized] = useState(false);
-  const toggle = () => setMinimized(value => !value);
-  const content = <>
-    {minimized && <button type="button" className="question-expand-strip" aria-label="Развернуть форму" aria-expanded={false} onClick={toggle}><ChevronDown size={16} aria-hidden="true" /></button>}
-    <header className="question-header"><span>{label}</span>{hint && <span>{hint}</span>}{!minimized && minimizable && <button type="button" className="question-minimize" aria-label="Свернуть форму" aria-expanded={true} onClick={toggle}><ChevronUp size={16} /></button>}</header>
-    <h2 id={titleId}>{minimized ? <span className="question-copy-clamped">{title}</span> : title}</h2>
-    <div className="question-body mauzcode-input-card-body" hidden={minimized}>
-      {message && <p className="question-message">{message}</p>}
-      {children}
-    </div>
-    {!minimized && error && <p className="question-error" role="alert">{error}</p>}
-    {(note || actions) && <footer className="question-footer" hidden={minimized}><span>{note}</span>{actions && <span className="confirm-actions">{actions}</span>}</footer>}
-  </>;
-  const className = `question-card mauzcode-input-card${minimized ? ' is-minimized' : ''}`;
-  return <div className="question-frame">{onSubmit
-    ? <form className={className} aria-labelledby={titleId} aria-busy={busy} noValidate={false} onSubmit={event => { event.preventDefault(); onSubmit(event); }}>{content}</form>
-    : <section className={className} aria-labelledby={titleId} aria-busy={busy}>{content}</section>}</div>;
+  return <InputFrame className="mauzcode-input-card" bodyClassName="mauzcode-input-card-body" label={label} hint={hint} title={title} message={message} note={note} actions={actions} error={error} busy={busy} onSubmit={onSubmit} minimizable={minimizable}>{children}</InputFrame>;
 }
 
 export type InputCardActionProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' };
