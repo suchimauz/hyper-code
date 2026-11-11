@@ -166,27 +166,34 @@ Size = max(chars/4 estimate of the effective projection, provider-reported promp
 
 ## UI
 
-The button lives in `src/ui/chatColumn.ts` beside Sleep / Initial Prompt / Fork:
+The React composer exposes **Compact** in the shared **+** and slash-command menus (`frontend/src/components/mauzcode/LiveComposer.tsx`, `MessageInput.tsx` and `CommandMenu.tsx`). Selecting it immediately invokes `/compact`; there is no focus-instructions popup or confirmation form. Opening the menu preserves the draft. Selecting Compact from **+** also preserves existing text and attachments; selecting it from the slash menu consumes the command trigger instead. The menu action sends only `/compact`, not the draft as a normal user message.
+
+Compact is unavailable while the agent is running, and the composer blocks it while busy or read-only (including archived chats). The callback also guards against concurrent local actions. These UI guards do not replace server authorization or idle-state checks. There is no dedicated compaction-cancellation control or focus-instructions editor in this action.
+
+The current React request path is `LiveComposer.compact` → `executeCommand` in `frontend/src/lib/commands.ts` → `commands.http` → `commands.dispatch` → `commands.compact` → `agent.compactContext`:
 
 ```text
-Compact context
+GET  /commands                 # catalogue and CSRF token
+POST /agent/:id/commands        # JSON { text: "/compact", requestId }
 ```
 
-It opens a small popup/form with optional focus instructions and a Compact submit button. Routes (the mobile API has the same one):
+`executeCommand` sends the catalogue's token in `X-CSRF-Token`; `commands.http` resolves an authorized viewer through `projects.principal` and verifies CSRF on POST. That principal check also supports the core-authorized zero-user legacy mode; it is not a universal per-agent ownership check. The compact executor rejects archived or non-idle agents and another pending compact operation. It records durable command invocation/result events and replays the same request key rather than starting a second operation; reuse for different input is rejected. The composer retains its key across uncertain failures or a `running` response and clears it after a terminal response. A failed/interrupted result or request error is shown inline; an interrupted operation is not silently restarted.
+
+Separate compatibility/native endpoints still exist, but are **not** the React menu's transport:
 
 ```text
-POST /agent/:id/compact
-POST /api/v1/agents/:id/compact
+POST /agent/:id/compact         # legacy popup adapter
+POST /api/v1/agents/:id/compact # native API adapter
 ```
 
-Disable/reject while the root is running. Show lifecycle events:
+Both delegate to `commands.compactHttp` and the same command executor. `compactAgent` in `frontend/src/lib/mauzcode.ts` wraps the native API endpoint but is not called by `LiveComposer.compact`. The legacy adapter's popup-close header does not imply that the current composer uses an HTMX popup.
 
-- `compaction_start`: spinner/card, optional cancellation later;
-- `compaction_completed`: `124k → 31k`, retained message count, expandable summary;
-- `compaction_failed`: context unchanged;
-- `not_needed`: concise notification.
+The transcript renders compaction lifecycle events with `CompactionRow.tsx`; `compactionEvents.ts` coalesces events with the same revision in their original chronological position:
 
-V1 may use an HTMX form and synchronous POST if it remains safe; do not inject a normal user message to trigger compaction.
+- `compaction_start`: an inline “Сжимаем контекст…” status row;
+- `compaction_completed`: “Контекст сжат”, token counts when both are present, and an expandable Markdown summary when supplied. The before count is exact only for `tokensBeforeSource: "provider"`; otherwise it is prefixed with `~`. The after count is always an estimate (`~`). This row does not display the retained-message count;
+- `compaction_failed`: “Не удалось сжать контекст” with expandable failure text when supplied;
+- `not_needed`: a command result (`Context compaction: not_needed`) displayed through `CommandRow.tsx`, not a separate compaction-success row or dedicated toast. Command invocation/result events also expose the command's running/completed/failed/interrupted state.
 
 ## Tests required
 
@@ -196,7 +203,7 @@ V1 may use an HTMX form and synchronous POST if it remains safe; do not inject a
 4. Summarizer failure leaves old projection active.
 5. Repeated compaction summarizes the current effective projection.
 6. Hidden compaction child is absent from Team/navigation.
-7. Button and POST route smoke tests.
+7. Existing UI coverage: `frontend/src/test/command-menu.test.tsx` checks shared +/slash entries, draft preservation, immediate Compact selection, running-state guards, catalogue failures and CSRF/request-key command transport; `frontend/src/test/compaction.test.tsx` checks revision coalescing, completed summaries, failure details and exact/estimated token labels. These are component/transport tests, not a live compaction-route smoke test.
 8. Restart/load preserves the active compact projection.
 
 ## Still out of scope
