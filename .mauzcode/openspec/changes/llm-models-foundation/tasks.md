@@ -74,8 +74,8 @@ Verification (block 7): `code.quality` reports the same 8 pre-existing unresolve
 | `6aacde4b` | Connection storage, operations and owner API (block 3) |
 | `136a300c` | Custom provider for four API protocols (block 4) |
 | `dbd3f2ee` | `modelProviders` UI slot and Models settings tab (blocks 5–6) |
-| `c90d31ed` | Fix: body cancellation after a successful response no longer rejects (found in 7.3) |
-| `c27bffb9` | Fix: providers of unmounted plugins and deleted declarations leave the registry without restart |
+| `646663e8` | Fix: body cancellation after a successful response no longer rejects (found in 7.3) |
+| `90472fc5` | Fix: providers of unmounted plugins and deleted declarations leave the registry without restart |
 
 Known outside this change: `plugins.remove` only edits `workspace.json` and does not unmount a plugin discovered from `USER_PLUGINS`; the statically imported core classifier needs a restart after it changes.
 
