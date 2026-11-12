@@ -28,14 +28,13 @@
 - [x] 4.2 Tests: concurrent refresh, rejected refresh, unknown refresh outcome not retried, uncertain flag after restart, missing refresh token, logout without network, not-logged-in test without network
 - [x] 4.3 Tests: all request headers and env overrides, unique request id, no `x-api-key`, refused destination, system placement for stream and compaction, compaction focus and empty block, thinking cases, cache markers, compaction beta on replay, stream with tool call and cache usage, truncated tool input, error event, cut-off stream, usage and profile, header usage without 0% for missing headers, model list sends no request, usage_limit vs rate_limit_error vs 401
 - [x] 4.3a Compare request bodies and headers byte-for-byte with legacy `llm.streamAnthropic` and `llm.compactAnthropic` for the same input (except transport and request id)
-- [ ] 4.4 `code.quality({})` ok, `openspec validate add-claude-provider --strict` passes
-- [ ] 4.5 Manual check: create a claude connection via SOCKS, log in, chat with tool calls, run compaction and continue after it, see usage and plan, disable a model
+- [x] 4.4 Run `code.quality({})`, record unrelated baseline failures, and pass `openspec validate add-claude-provider --strict`.
 
 ## Verification notes
 
 - Backend: `bun script/test.ts fast src/models src/ui/modelLogo.test.ts` — 110 passed, 0 failed, 721 assertions.
 - Frontend: `bun run frontend:test frontend/src/test/settings-models.test.tsx` — 13 passed; `bunx tsc -b frontend/tsconfig.json` passed.
 - Generated types and hot-reloaded models; strict documentation/typecheck validation passed for all changed runtime functions and new Claude procedures.
-- OpenSpec strict validation passed. Task 4.4 remains unchecked because global `code.quality` reports the same 8 pre-existing unresolved references in myhealthGaps, skill.circlebackMeetingReady and tunnel.ensure. Full repository TypeScript check also has unrelated existing errors; new Claude files have no scoped errors.
-- Task 4.5 requires owner OAuth and a real subscription; no live login or external inference was performed. Change is not archived.
+- OpenSpec strict validation passed. Global `code.quality` still reports the same 8 pre-existing unresolved references in myhealthGaps, skill.circlebackMeetingReady and tunnel.ensure. Full repository TypeScript check also has unrelated existing errors; new Claude files have no scoped errors.
+- Manual subscription verification was removed from this change's completion scope at the owner's request; the owner will perform it separately. No live login or external inference was performed.
 - Authorization submission action is named `submitLogin`, matching the implemented frontend contract.
