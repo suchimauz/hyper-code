@@ -119,21 +119,26 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
     document.addEventListener('visibilitychange', onVisible);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, [keepAlive, refresh]);
-  // onStatus reports changes only, and the transport script may load after mount: read the current
-  // state whenever the snapshot changes (the live client is loaded by then) and follow later changes.
+  // onStatus reports changes only and the transport script loads asynchronously, possibly after
+  // mount: re-read getStatus() on a short local timer (no network) and follow onStatus once present.
   useEffect(() => {
-    const client = window.mauzcodeLive;
-    if (!client) return;
-    const current = client.getStatus?.();
-    if (current) setTransport(current);
-    const off = client.onStatus?.(setTransport);
-    return () => { off?.(); };
-  }, [snapshot]);
+    let off: (() => void) | undefined;
+    const sync = () => {
+      const client = window.mauzcodeLive;
+      if (!client) return;
+      const current = client.getStatus?.();
+      if (current) setTransport(current);
+      if (!off) off = client.onStatus?.(setTransport) ?? (() => {});
+    };
+    sync();
+    const timer = setInterval(sync, 3000);
+    return () => { clearInterval(timer); off?.(); };
+  }, []);
 
   useLiveSubscription({
     name: 'openspec-workspace', types: ['openspec.changed'],
-    onEvent: event => { if ((event as { key?: unknown }).key === snapshot?.key) refresh(); },
-    resync: () => { setLiveError(false); keepAlive(); refresh(); },
+    onEvent: event => { setTransport('connected'); setLiveError(false); if ((event as { key?: unknown }).key === snapshot?.key) refresh(); },
+    resync: () => { setLiveError(false); setTransport(window.mauzcodeLive?.getStatus?.() ?? 'connected'); keepAlive(); refresh(); },
     onError: () => setLiveError(true),
   });
   const live: Live = liveError || !keepAliveOk || transport === 'disconnected' ? 'stopped' : transport === 'connected' ? 'live' : 'connecting';

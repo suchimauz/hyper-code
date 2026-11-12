@@ -132,4 +132,15 @@ describe('openspec plugin UI', () => {
       expect(screen.getByText('Not live')).toBeInTheDocument();
     } finally { delete (window as unknown as { mauzcodeLive?: unknown }).mauzcodeLive; }
   });
+
+  it('picks up a transport script that loads after the tab mounted', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<Workspace context={ctx} item={item()} />); await settle();
+      expect(screen.getByText('Connecting…')).toBeInTheDocument();
+      (window as unknown as { mauzcodeLive: unknown }).mauzcodeLive = { subscribe: () => () => {}, getStatus: () => 'connected', onStatus: () => () => {} };
+      await act(async () => { vi.advanceTimersByTime(3100); });
+      expect(screen.getByText('Live')).toBeInTheDocument();
+    } finally { vi.useRealTimers(); delete (window as unknown as { mauzcodeLive?: unknown }).mauzcodeLive; }
+  });
 });
