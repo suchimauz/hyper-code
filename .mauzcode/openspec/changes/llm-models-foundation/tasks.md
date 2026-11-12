@@ -25,12 +25,14 @@ Verification (block 2): `bun test src/models src/socksProxy src/sshProvider/tunn
 
 ## 3. Connection storage and management
 
-- [ ] 3.1 Add `$migration_<ts>_llm_connections.ts` creating `llm_connections` (down drops it) and verify `procs.migrate.up` applies and the schema matches via `information_schema.columns`
-- [ ] 3.2 Implement config validation against field schema plus provider `validate`; verify unit tests for missing required, unknown key, bad select value, bad url
-- [ ] 3.3 Implement `models.create/update/remove/list/get` with secrets in `secret://models/<id>.<field>` (keep on omit, clear on explicit null, delete on remove) and required non-unique account name; verify tests that no secret value appears in any list/get result and secrets are deleted on remove
-- [ ] 3.4 Implement `models.test`, `models.listModels` (provider or manual fallback), `models.usage` (provider report or cached status fallback, disabled → `disabled` without network) and `models.action`; verify unit tests including cache reuse and unknown action
-- [ ] 3.5 Implement owner-only `models.api` with GET/POST routes (same-origin, CSRF, JSON, 64 KiB limit, secret-free responses); verify route tests for 401/403, missing CSRF, oversize body and each action
-- [ ] 3.6 Validate all new functions with `runtime.docs.validate({ strict: true, typecheck: true })`
+- [x] 3.1 Add `$migration_<ts>_llm_connections.ts` creating `llm_connections` (down drops it) and verify `procs.migrate.up` applies and the schema matches via `information_schema.columns`
+- [x] 3.2 Implement config validation against field schema plus provider `validate`; verify unit tests for missing required, unknown key, bad select value, bad url
+- [x] 3.3 Implement `models.create/update/remove/list/get` with secrets in `secret://models/<id>.<field>` (keep on omit, clear on explicit null, delete on remove) and required non-unique account name; verify tests that no secret value appears in any list/get result and secrets are deleted on remove
+- [x] 3.4 Implement `models.test`, `models.listModels` (provider or manual fallback), `models.usage` (provider report or cached status fallback, disabled → `disabled` without network) and `models.action`; verify unit tests including cache reuse and unknown action
+- [x] 3.5 Implement owner-only `models.api` with GET/POST routes (same-origin, CSRF, JSON, 64 KiB limit, secret-free responses); verify route tests for 401/403, missing CSRF, oversize body and each action
+- [x] 3.6 Validate all new functions with `runtime.docs.validate({ strict: true, typecheck: true })`
+
+Verification (block 3): migration `20370201120000_llm_connections` applied; `information_schema.columns` matches D3 (id uuid, provider, account_name, config/secrets/transport jsonb, enabled, created_at/updated_at bigint, all NOT NULL). `bun test src/models` — 51 passed, including 12 connection tests (validation errors per field, secret-free list/get/API bodies, keep/replace/clear secrets, secrets deleted on remove, disabled without provider calls, status-only usage fallback with cache reuse and revision invalidation, unknown action, API 401/403/CSRF/origin/415/413 and every action). All 15 new runtime functions pass `runtime.docs.validate({ strict: true, typecheck: true })`; `GET /models/api` answers 401 unauthenticated on the live server. `code.quality` reports only the same 8 pre-existing unresolved calls outside this block. No changes under `src/llm`, `src/llms`, `src/sshAccount`, `src/sshProvider`.
 
 ## 4. Custom provider
 

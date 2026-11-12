@@ -6,10 +6,10 @@ export type State = {
         rel: string;
         definition: types.models.ProviderDefinition;
     }>;
-    /** Bun.hash(connection id + updated_at) key; expiry and pending work support later health APIs. */
+    /** `<connection id>:<Bun.hash(id + updated_at)>:<test|usage>` key; 60 s expiry with in-flight de-duplication. */
     health?: Record<string, {
         expiresAt: number;
-        result?: types.models.UsageReport;
-        pending?: Promise<types.models.UsageReport>;
+        result?: types.models.UsageReport | types.models.TestResult;
+        pending?: Promise<types.models.UsageReport | types.models.TestResult>;
     }>;
 };
