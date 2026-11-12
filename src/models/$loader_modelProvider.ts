@@ -88,7 +88,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { e
         }
         if (!Array.isArray(definition.transports) || !definition.transports.length || definition.transports.some(t => !["direct", "socks", "ssh-tunnel"].includes(t)) ||
             new Set(definition.transports).size !== definition.transports.length) fail("modelProvider requires unique supported transports");
-        for (const key of ["listModels", "usage", "validate"] as const) {
+        for (const key of ["listModels", "usage", "validate", "stream", "compact"] as const) {
             if (definition[key] !== undefined && typeof definition[key] !== "function") fail(`modelProvider ${key} must be a function`);
         }
         if (definition.actions !== undefined) {

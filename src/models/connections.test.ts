@@ -163,15 +163,32 @@ describe("models test/listModels/usage/action", () => {
 
     test("listModels: provider list, manual fallback on failure, manual without provider", async () => {
         let fail = false;
-        const { ctx, create } = await setup({ listModels: async () => { if (fail) throw new Error(`boom ${KEY}`); return [{ id: "a" }, { id: "a" }, { id: "b", label: "B", contextWindow: 1000 }]; } });
+        let discovered = 0;
+        const { ctx, create } = await setup({ listModels: async () => { discovered++; if (fail) throw new Error(`boom ${KEY}`); return [{ id: "a" }, { id: "a" }, { id: "b", label: "B", contextWindow: 1000 }]; } });
         const c = await create({ config: { baseUrl: "https://api.example", models: ["manual-1"] } });
-        expect(await ctx.fns.models.listModels({ id: c.id })).toEqual({ models: [{ id: "a" }, { id: "b", label: "B", contextWindow: 1000 }], source: "provider" });
+        const first = await ctx.fns.models.listModels({ id: c.id });
+        expect(first).toEqual({ models: [{ id: "a", disabled: false }, { id: "b", label: "B", contextWindow: 1000, disabled: false }], source: "provider", cachedAt: expect.any(Number) });
+        // Cached: no provider call without refresh, and the cache never expires.
+        const n = discovered;
+        expect(await ctx.fns.models.listModels({ id: c.id })).toEqual(first);
+        expect(discovered).toBe(n);
         fail = true;
-        const r = await ctx.fns.models.listModels({ id: c.id });
-        expect(r).toMatchObject({ models: [{ id: "manual-1" }], source: "manual" });
+        const r = await ctx.fns.models.listModels({ id: c.id, refresh: true });
+        expect(discovered).toBe(n + 1);
+        expect(r).toMatchObject({ models: first.models, source: "provider", cachedAt: first.cachedAt });
+        expect(r.error).toBeTruthy();
         noSecrets(r);
+        // refreshAll reports the failure and keeps the cache.
+        const all = await ctx.fns.models.refreshAll({});
+        expect(all.refreshed).toBe(0); expect(all.failed.map((x: { id: string }) => x.id)).toEqual([c.id]);
+        noSecrets(all);
+        fail = false;
+        expect(await ctx.fns.models.refreshAll({})).toEqual({ refreshed: 1, failed: [] });
+        await ctx.fns.procs.db.run({ sql: "UPDATE llm_connections SET models_cache=NULL, models_cached_at=NULL WHERE id=?", params: [c.id] });
+        fail = true;
+        expect(await ctx.fns.models.listModels({ id: c.id })).toMatchObject({ models: [{ id: "manual-1" }], source: "manual", cachedAt: null });
         delete ctx.state.models.providers.acme.definition.listModels;
-        expect(await ctx.fns.models.listModels({ id: c.id })).toEqual({ models: [{ id: "manual-1" }], source: "manual" });
+        expect(await ctx.fns.models.listModels({ id: c.id })).toEqual({ models: [{ id: "manual-1", disabled: false }], source: "manual", cachedAt: null });
     });
 
     test("action: declared runs, unknown is refused without calls, credential results withheld", async () => {
@@ -236,7 +253,7 @@ describe("models.api", () => {
         noSecrets(bodies);
         expect((bodies[4] as any).connection).toMatchObject({ accountName: "w2", secrets: { apiKey: true, org: false } });
         expect(bodies[5]).toMatchObject({ result: { status: "available" } });
-        expect(bodies[6]).toEqual({ models: [{ id: "m" }], source: "manual" });
+        expect(bodies[6]).toEqual({ models: [{ id: "m", disabled: false }], source: "manual", cachedAt: null });
         expect(bodies[8]).toEqual({ result: { got: 1 } });
         const bad = await post({ action: "create", provider: "acme", accountName: "", config: {}, secrets: {} });
         expect(bad.status).toBe(400); expect(await bad.json()).toMatchObject({ field: "accountName" });

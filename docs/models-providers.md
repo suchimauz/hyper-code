@@ -52,6 +52,8 @@ and `test(ctx, conn)`. `description` and `icon` (Lucide name or data URL) are op
 | `listModels(ctx, conn)` | Optional `Promise<ModelInfo[]>` |
 | `usage(ctx, conn)` | Optional `Promise<UsageReport>` |
 | `validate(ctx, config)` | Optional synchronous/async validation; throw to reject |
+| `stream(ctx, conn, req)` | Optional `Promise<StreamResult>`; streaming inference, reached only through `models.stream` |
+| `compact(ctx, conn, req)` | Optional `Promise<CompactResult>`; native compaction, reached only through `models.compact` |
 | `actions[name]` | `{ label, run(ctx, conn, input) }` for provider-owned login/logout or other operations |
 
 These callbacks belong to the declaration object, not the `ctx.fns` procedure
@@ -81,6 +83,65 @@ Provider actions accept and return JSON-compatible `ActionValue`. Returned value
 must contain no credentials or secret references. Core does not implement
 provider-specific authorization. Declaring an action does not itself expose an
 HTTP endpoint or grant permission to invoke it.
+
+## Inference and model availability
+
+`ctx.fns.models.stream({ connectionId, model, instructions, messages, tools?, reasoningEffort?, sessionId, signal?, onEvent? })`
+and `ctx.fns.models.compact({ connectionId, model, instructions, messages, sessionId, signal? })`
+are the only entry points to a provider's `stream`/`compact`. Before calling the
+provider, they re-read the stored connection on **every** request
+(`models.assertModelEnabled`, no cache):
+
+- disabled connection → code `CONNECTION_DISABLED`;
+- model in the connection's `disabledModels` → `Model <model> is disabled by user`,
+  code `MODEL_DISABLED_BY_USER`, `retryable:false`, `replaySafe:false`;
+- provider without the operation → code `UNSUPPORTED`.
+
+None of these send a network request. `StreamRequest.messages` is the
+OpenAI-shaped transcript, `tools` are wire schemas in the provider's API shape,
+and `onEvent` receives `text_delta`, `thinking_delta` and `tool_args_delta`.
+`StreamResult` matches the legacy `llm.stream` result (`text`, `thinking`,
+`finishReason`, `usage`, `toolCalls`). Agents still use legacy `llm.*` routing.
+
+Model lists are cached per connection in Postgres (`models_cache`, `models_cached_at`).
+The cache never expires: `models.listModels` serves it without network access, asks the
+provider only with `refresh: true` (the **Update models** button) or when nothing is
+cached, and keeps the old list when discovery fails. `models.refreshAll`, started hourly
+by `models/$start` (disable with `MODELS_REFRESH=off`), refreshes every enabled connection.
+
+The settings GET payload carries inert provider marks in `providerLogos` (by provider id,
+built with `frontendBridge.iconData`). The `custom` provider has no brand mark: its connections
+always show a generic plug icon, whatever endpoint they use.
+
+The owner toggles models with `models.setModelEnabled({ id, model, enabled })`
+(API op `setModelEnabled`). Disabled models stay in `listModels` with
+`disabled: true`. The legacy `llm.modelPolicy` is not touched.
+
+## Built-in Codex provider
+
+`$modelProvider_codex.ts` connects a ChatGPT subscription through the Codex
+backend. It has one optional field, `clientVersion` (default: detected codex CLI
+version), and allows the `direct`, `socks` and `ssh-tunnel` transports.
+
+Login is the OpenAI device-code flow implemented natively over HTTP
+(`models.codexLogin`). No codex CLI is started and nothing runs on SSH instances,
+so every login request goes through the selected transport. Actions:
+
+- `login`: returns `{ flowId, status, verificationUri, userCode, expiresAt }` and polls in the background;
+- `loginStatus`: returns `{ loggedIn, needsLogin, expiresAt, flow }`;
+- `cancelLogin`;
+- `logout`: deletes the tokens without any network request.
+
+The code-for-token exchange is never retried, and a flow expires after 15 minutes.
+Flows are process-local.
+
+Tokens are stored encrypted in `local_secrets` as `models/<id>.codex-auth` with
+compare-and-swap revisions (`models.codexAuth`). Refresh happens 60 s before
+expiry, through the transport, with one shared refresh per connection. A
+rejected refresh or a backend 401 sets `needsLogin`, and `test` then reports
+`login-required`. Models come from `/backend-api/codex/models`, usage windows
+from `/backend-api/wham/usage`, and streaming and compaction from
+`/backend-api/codex/responses`.
 
 ## Field schemas and transports
 

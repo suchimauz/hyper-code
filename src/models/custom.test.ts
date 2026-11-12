@@ -83,7 +83,7 @@ describe("custom provider spec scenarios", () => {
         const f = await fixture();
         try {
             const view = await f.ctx.fns.models.create({ provider: "custom", accountName: "test", config: { baseUrl: f.server.url.origin, protocol: "openai-chat", models: ["manual", "mock"] } });
-            expect((await f.ctx.fns.models.listModels({ id: view.id })).models).toEqual([{ id: "mock" }, { id: "manual" }]);
+            expect((await f.ctx.fns.models.listModels({ id: view.id })).models).toEqual([{ id: "mock", disabled: false }, { id: "manual", disabled: false }]);
             const status = await f.ctx.fns.models.test({ id: view.id });
             expect(status.status).toBe("available"); expect(status.reason).toBe("models-ok");
             const usage = await f.ctx.fns.models.usage({ id: view.id, refresh: true });
@@ -92,7 +92,9 @@ describe("custom provider spec scenarios", () => {
             expect(f.requests.every(r => r.method === "GET")).toBe(true);
             f.state.modelsStatus = 503;
             const fallback = await f.ctx.fns.models.listModels({ id: view.id });
-            expect(fallback.models).toEqual([{ id: "manual" }, { id: "mock" }]); expect(fallback.error).toBeTruthy(); expect(fallback.source).toBe("manual");
+            expect(fallback.models).toEqual([{ id: "mock", disabled: false }, { id: "manual", disabled: false }]); expect(fallback.error).toBeFalsy(); expect(fallback.source).toBe("provider");
+            const failed = await f.ctx.fns.models.listModels({ id: view.id, refresh: true });
+            expect(failed.models).toEqual(fallback.models); expect(failed.error).toBeTruthy(); expect(failed.source).toBe("provider");
         } finally { f.server.stop(true); }
     });
     test("generation success and failure, models failure short-circuits generation", async () => {

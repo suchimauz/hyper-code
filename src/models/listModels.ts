@@ -1,8 +1,9 @@
 /**
- * List a connection's models from its provider, or its manually configured ids
+ * List a connection's models from its persistent cache, refreshing from the provider on demand
  *
- * Use to fill model pickers for one connection. When the provider implements `listModels` and the connection is enabled, returns the provider's models (sanitized, de-duplicated); otherwise, or when discovery fails, returns the manual `config.models` ids. `source` says which list was returned and `error` carries a safe discovery failure message. Disabled connections never touch the network.
+ * Use to fill model pickers for one connection. The provider's model list is cached in Postgres per connection and never expires: without `refresh` the cached list is returned without network access; the provider is asked only when `refresh` is true (the "Update models" button and the hourly models.refreshAll) or when nothing is cached yet. A successful discovery (sanitized, de-duplicated) replaces the cache; a failed one keeps the previous cache and reports `error`. Without a cache and without a provider list, or for a disabled connection, returns the manual `config.models` ids. `source` says which list was returned, `cachedAt` is when the provider list was fetched. Every model carries `disabled: true` when the owner disabled it on this connection (models.setModelEnabled); disabled models stay listed. Disabled connections never touch the network.
  * @param opts.id Connection UUID.
+ * @param opts.refresh Ask the provider now and update the cache. @default false
  */
 export default async function (
     ctx: Context,
@@ -10,12 +11,24 @@ export default async function (
     opts: {
         /** Connection UUID. */
         id: string;
+        /** Ask the provider now and update the cache. */
+        refresh?: boolean;
     },
-): Promise<{ models: types.models.ModelInfo[]; source: "provider" | "manual"; error?: string }> {
+): Promise<{ models: types.models.ModelInfo[]; source: "provider" | "manual"; cachedAt: number | null; error?: string }> {
     const view = await ctx.fns.models.get({ id: opts.id });
+    const off = new Set(view.disabledModels);
+    const mark = (models: types.models.ModelInfo[]) => models.map(m => ({ ...m, disabled: off.has(m.id) }));
     const manual: types.models.ModelInfo[] = (Array.isArray(view.config.models) ? view.config.models : []).filter((m): m is string => typeof m === "string" && !!m).map(id => ({ id }));
     const def = Object.hasOwn(ctx.state.models?.providers ?? {}, view.provider) ? ctx.state.models!.providers![view.provider]!.definition : undefined;
-    if (!view.enabled || !def?.listModels) return { models: manual, source: "manual" };
+    const rows = await ctx.fns.procs.db.select({ sql: "SELECT models_cache, models_cached_at FROM llm_connections WHERE id=?", params: [view.id] }) as { models_cache: unknown; models_cached_at: unknown }[];
+    const rawCache = typeof rows[0]?.models_cache === "string" ? JSON.parse(rows[0].models_cache) : rows[0]?.models_cache;
+    const cache = Array.isArray(rawCache) ? (rawCache as types.models.ModelInfo[]).filter(m => m && typeof m.id === "string") : null;
+    const cachedAt = cache && rows[0]?.models_cached_at != null ? Number(rows[0].models_cached_at) : null;
+    const fallback = (error?: string) => cache
+        ? { models: mark(cache), source: "provider" as const, cachedAt, ...(error ? { error } : {}) }
+        : { models: mark(manual), source: "manual" as const, cachedAt: null, ...(error ? { error } : {}) };
+    if (!view.enabled || !def?.listModels) return fallback();
+    if (cache && !opts.refresh) return fallback();
     const seen: string[] = [];
     try {
         const { definition, conn } = await ctx.fns.models.resolve({ id: view.id });
@@ -32,8 +45,11 @@ export default async function (
             const contextWindow = n(m.contextWindow), maxOutputTokens = n(m.maxOutputTokens);
             models.push({ id: m.id, ...(typeof m.label === "string" ? { label: m.label.slice(0, 200) } : {}), ...(typeof m.description === "string" ? { description: m.description.slice(0, 500) } : {}), ...(contextWindow ? { contextWindow } : {}), ...(maxOutputTokens ? { maxOutputTokens } : {}) });
         }
-        return { models, source: "provider" };
+        const now = Date.now();
+        // The cache is metadata, not configuration: updated_at stays put so health caches survive.
+        await ctx.fns.procs.db.run({ sql: "UPDATE llm_connections SET models_cache=?::jsonb, models_cached_at=? WHERE id=?", params: [JSON.stringify(models), now, view.id] });
+        return { models: mark(models), source: "provider", cachedAt: now };
     } catch (error) {
-        return { models: manual, source: "manual", error: ctx.fns.models.safeMessage({ message: error, secrets: seen, fallback: "Model discovery failed" }) };
+        return fallback(ctx.fns.models.safeMessage({ message: error, secrets: seen, fallback: "Model discovery failed" }));
     }
 }

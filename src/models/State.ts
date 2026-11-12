@@ -12,4 +12,8 @@ export type State = {
         result?: types.models.UsageReport | types.models.TestResult;
         pending?: Promise<types.models.UsageReport | types.models.TestResult>;
     }>;
+    /** In-flight Codex token refresh per connection id; de-duplicates concurrent refreshes. */
+    codexRefresh?: Record<string, Promise<string>>;
+    /** Process-local Codex device-code login flows by connection id; lost on restart. */
+    loginFlows?: Record<string, types.models.LoginFlow>;
 };

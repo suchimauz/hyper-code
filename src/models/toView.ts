@@ -29,6 +29,7 @@ export default function (
         secrets,
         transport: parse<types.models.TransportSpec>(row.transport, { kind: "direct" }),
         enabled: row.enabled === true,
+        disabledModels: Array.isArray(row.disabled_models) ? [...new Set((row.disabled_models as unknown[]).filter((m): m is string => typeof m === "string"))].sort() : [],
         createdAt: Number(row.created_at),
         updatedAt: Number(row.updated_at),
     };

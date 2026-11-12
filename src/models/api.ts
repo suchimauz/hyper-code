@@ -1,7 +1,7 @@
 /**
  * Owner-only HTTP API for model providers and connections
  *
- * Backs GET/POST /models/api for the Models settings tab. GET returns the provider catalogue, secret-free connections, saved SOCKS proxies, trusted SSH instance names and a cookie-bound CSRF token. POST takes one JSON object `{ action, ... }` with action `providers`, `list`, `get`, `create`, `update`, `remove`, `test`, `models`, `usage` or `action`; it requires same origin, a valid `x-csrf-token`, `application/json` and at most 64 KiB. Non-owners get 403, anonymous 401. Responses never contain secret values or references.
+ * Backs GET/POST /models/api for the Models settings tab. GET returns the provider catalogue, secret-free connections, inert provider logos (`providerLogos` by provider id; null for `custom` and unknown providers), saved SOCKS proxies, trusted SSH instance names and a cookie-bound CSRF token. POST takes one JSON object `{ action, ... }` with action `providers`, `list`, `get`, `create`, `update`, `remove`, `test`, `models` (cached list; `refresh: true` asks the provider and updates the cache), `usage`, `setModelEnabled` (`{ id, model, enabled }`, returns the updated connection) or `action`; it requires same origin, a valid `x-csrf-token`, `application/json` and at most 64 KiB. Non-owners get 403, anonymous 401. Responses never contain secret values or references.
  * @param opts.req Incoming GET or JSON POST request.
  */
 export default async function (
@@ -31,8 +31,15 @@ export default async function (
                 ctx.fns.socksProxy.list({}).catch(() => []),
                 ctx.fns.sshInstance.list({}).catch(() => []),
             ]);
+            // Inert brand marks for known providers; the custom provider always uses the generic UI icon.
+            const providers = ctx.fns.models.providers({});
+            const providerLogos = Object.fromEntries(await Promise.all(providers.map(async p => {
+                if (p.id === "custom") return [p.id, null] as const;
+                try { return [p.id, await ctx.fns.frontendBridge.iconData({ model: `${p.id}:x` })] as const; } catch { return [p.id, null] as const; }
+            })));
             return reply({
-                providers: ctx.fns.models.providers({}),
+                providers,
+                providerLogos,
                 connections,
                 proxies: proxies.map(p => ({ id: p.id, name: p.name, host: p.host, port: p.port })),
                 instances: instances.filter(i => !!i.pinnedHostKey).map(i => i.name),
@@ -87,8 +94,12 @@ export default async function (
                 if (data.confirmed !== true) return reply({ error: "Confirm removal before continuing" }, 400);
                 return reply(await ctx.fns.models.remove({ id }));
             }
+            case "setModelEnabled": {
+                if (typeof data.enabled !== "boolean") return reply({ error: "enabled must be true or false", field: "enabled" }, 400);
+                return reply({ connection: await ctx.fns.models.setModelEnabled({ id, model: typeof data.model === "string" ? data.model : "", enabled: data.enabled }) });
+            }
             case "test": return reply({ result: await ctx.fns.models.test({ id }) });
-            case "models": return reply(await ctx.fns.models.listModels({ id }));
+            case "models": return reply(await ctx.fns.models.listModels({ id, refresh: data.refresh === true }));
             case "usage": return reply({ usage: await ctx.fns.models.usage({ id, refresh: data.refresh === true }) });
             case "action": {
                 if (typeof data.name !== "string" || !data.name) return reply({ error: "Action name required" }, 400);

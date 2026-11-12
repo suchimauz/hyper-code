@@ -32,7 +32,7 @@ export type ModelFieldSpec = { key: string; label: string; required?: boolean; h
 );
 export type ModelTransportSpec = { kind: 'direct' } | { kind: 'socks'; proxyId: string } | { kind: 'ssh-tunnel'; instance: string };
 /** Secret-free connection: `secrets` maps a secret field key to whether a value is stored, never the value. */
-export type ModelConnectionView = Readonly<{ id: string; provider: string; providerRegistered: boolean; accountName: string; config: Readonly<Record<string, unknown>>; secrets: Readonly<Record<string, boolean>>; transport: ModelTransportSpec; enabled: boolean; createdAt: number; updatedAt: number }>;
+export type ModelConnectionView = Readonly<{ id: string; provider: string; providerRegistered: boolean; accountName: string; config: Readonly<Record<string, unknown>>; secrets: Readonly<Record<string, boolean>>; transport: ModelTransportSpec; enabled: boolean; disabledModels?: readonly string[]; createdAt: number; updatedAt: number }>;
 /** Props of a plugin-owned connection form. The component saves through the owner-only /models/api with the CSRF token
  * (SDK requestJson) and then calls onSaved; it never receives secret values. */
 export type ExtensionModelProviderProps = ExtensionViewProps & { provider: ModelProviderView; connection?: ModelConnectionView; onSaved: (connection: ModelConnectionView) => void; onCancel: () => void };

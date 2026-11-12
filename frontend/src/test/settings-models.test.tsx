@@ -112,7 +112,7 @@ it('shows quota windows, or only status and reason without windows', () => {
   expect(screen.getByText(/42% used · resets/)).toBeVisible();
   rerender(<UsageView usage={{ status: 'unavailable', reason: 'models-failed', checkedAt: 1 }} />);
   expect(screen.queryByRole('list', { name: 'Quota windows' })).toBeNull();
-  expect(screen.getByText('Unavailable')).toBeVisible(); expect(screen.getByText('models-failed')).toBeVisible();
+  expect(screen.getByText('Unavailable')).toBeVisible(); expect(screen.getByText('Model list request failed')).toHaveAttribute('title', 'models-failed');
 });
 
 it('uses a granted plugin component for its provider and the schema form otherwise', async () => {
@@ -136,4 +136,117 @@ it('reports owner-only access', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'Only owners can manage model connections' }, 403)));
   render(<ModelsPanel context={context} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Только владелец');
+});
+
+it('toggles models by clicking the row, saving all changes with one Save button', async () => {
+  const posts = mockApi([stored]);
+  const fetchMock = vi.mocked(fetch);
+  const base = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: any, init: RequestInit = {}) => {
+    if ((init.method || 'GET') !== 'GET') {
+      const body = JSON.parse(String(init.body));
+      if (body.action === 'models') { posts.push({ body, headers: init.headers }); return json({ models: body.refresh ? [{ id: 'm1', disabled: true }, { id: 'm2', disabled: true }, { id: 'm3', disabled: false }] : [{ id: 'm1', disabled: false }, { id: 'm2', disabled: true }], source: 'provider', cachedAt: body.refresh ? 2_000_000 : 1_000_000 }); }
+      if (body.action === 'setModelEnabled') { posts.push({ body, headers: init.headers }); return json({ connection: { ...stored, disabledModels: ['m1', 'm2'] } }); }
+    }
+    return base(url, init);
+  });
+  render(<ModelsPanel context={context} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Models' }));
+  const m1 = await screen.findByRole('switch', { name: 'Enabled m1' });
+  const m2 = screen.getByRole('switch', { name: 'Enabled m2' });
+  expect(m1).toBeChecked(); expect(m2).not.toBeChecked();
+  expect(m2.closest('li')).toHaveAttribute('data-model-disabled', 'true');
+  // Clicking the row text toggles the draft only; nothing is sent until Save.
+  fireEvent.click(screen.getByText('m1'));
+  expect(m1).not.toBeChecked();
+  expect(m1.closest('li')).toHaveAttribute('data-model-disabled', 'true');
+  expect(posts.some(p => p.body.action === 'setModelEnabled')).toBe(false);
+  fireEvent.click(m1); fireEvent.click(m1);
+  expect(posts.some(p => p.body.action === 'setModelEnabled')).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Save (1)' }));
+  await waitFor(() => expect(screen.queryByRole('button', { name: /^Save/ })).toBeNull());
+  expect(screen.getByRole('switch', { name: 'Enabled m1' })).not.toBeChecked();
+  expect(posts.filter(p => p.body.action === 'setModelEnabled')).toHaveLength(1);
+  const call = posts.find(p => p.body.action === 'setModelEnabled')!;
+  expect(call.body).toEqual({ action: 'setModelEnabled', id: 'c1', model: 'm1', enabled: false });
+  expect(call.headers).toMatchObject({ 'X-CSRF-Token': 'csrf' });
+  // Opening the list reads the cache; only Update models asks the provider.
+  expect(posts.filter(p => p.body.action === 'models').map(p => p.body.refresh)).toEqual([false]);
+  expect(screen.getByText(/refreshes hourly/)).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Update models' }));
+  expect(await screen.findByRole('switch', { name: 'Enabled m3' })).toBeChecked();
+  expect(posts.filter(p => p.body.action === 'models').map(p => p.body.refresh)).toEqual([false, true]);
+});
+
+it('runs the Codex device login: code, copy, polling, cancel and confirmed logout', async () => {
+  const codexProvider = { id: 'codex', label: 'Codex', fields: [{ key: 'clientVersion', label: 'Client version', type: 'text' }], transports: ['direct', 'socks', 'ssh-tunnel'], actions: [] };
+  const conn = { ...stored, id: 'cx', provider: 'codex', accountName: 'GPT', config: {}, secrets: {} };
+  const posts = mockApi([conn], [codexProvider]);
+  const fetchMock = vi.mocked(fetch);
+  const base = fetchMock.getMockImplementation()!;
+  let loggedIn = false;
+  const flow = { flowId: 'f1', status: 'pending', verificationUri: 'https://auth.openai.com/codex/device', userCode: 'ABCD-1234', expiresAt: Date.now() + 60000 };
+  let current: any = null;
+  fetchMock.mockImplementation(async (url: any, init: RequestInit = {}) => {
+    if ((init.method || 'GET') !== 'GET') {
+      const body = JSON.parse(String(init.body));
+      if (body.action === 'action') {
+        posts.push({ body, headers: init.headers });
+        if (body.name === 'login') { current = flow; return json({ result: flow }); }
+        if (body.name === 'loginStatus') return json({ result: { loggedIn, needsLogin: !loggedIn, expiresAt: null, flow: current } });
+        if (body.name === 'cancelLogin') { current = { ...flow, status: 'failed', message: 'Login cancelled' }; return json({ result: current }); }
+        if (body.name === 'logout') { loggedIn = false; return json({ result: { loggedIn: false, needsLogin: true } }); }
+      }
+    }
+    return base(url, init);
+  });
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+  render(<ModelsPanel context={context} />);
+  const region = await screen.findByRole('region', { name: 'Codex login for GPT' });
+  await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Not logged in'));
+  fireEvent.click(within(region).getByRole('button', { name: 'Log in' }));
+  const link = await within(region).findByRole('link', { name: flow.verificationUri });
+  expect(link).toHaveAttribute('target', '_blank'); expect(link.getAttribute('rel')).toContain('noopener');
+  expect(within(region).getByLabelText('One-time code')).toHaveTextContent('ABCD-1234');
+  expect(within(region).getByRole('status')).toHaveTextContent('Waiting for authorization');
+  fireEvent.click(within(region).getByRole('button', { name: 'Copy code' }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith('ABCD-1234'));
+  fireEvent.click(within(region).getByRole('button', { name: 'Cancel login' }));
+  await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Login cancelled'));
+  expect(posts.filter(p => p.body.action === 'action').map(p => p.body.name)).toEqual(expect.arrayContaining(['loginStatus', 'login', 'cancelLogin']));
+
+  // Polling picks up a successful login.
+  loggedIn = false; current = flow;
+  fireEvent.click(within(region).getByRole('button', { name: 'Log in' }));
+  await within(region).findByLabelText('One-time code');
+  loggedIn = true; current = { ...flow, status: 'succeeded' };
+  await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Logged in'), { timeout: 4000 });
+
+  fireEvent.click(within(region).getByRole('button', { name: 'Log out' }));
+  const confirm = within(region).getByRole('group', { name: 'Confirm logout' });
+  expect(posts.some(p => p.body.name === 'logout')).toBe(false);
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Log out' }));
+  await waitFor(() => expect(posts.some(p => p.body.name === 'logout')).toBe(true));
+  await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Not logged in'));
+}, 10000);
+
+it('shows a brand logo for known providers and always a generic plug for custom connections', async () => {
+  const logo = { src: 'data:image/svg+xml,%3Csvg%3E%3C%2Fsvg%3E', custom: false };
+  const codexProvider = { id: 'codex', label: 'Codex', fields: [], transports: ['direct'], actions: [] };
+  const plain = { ...stored, id: 'c9', accountName: 'Local', config: { baseUrl: 'http://localhost:1', protocol: 'gemini' } };
+  const cx = { ...stored, id: 'cx', provider: 'codex', accountName: 'GPT', config: {} };
+  mockApi([stored, plain, cx], [custom, codexProvider]);
+  const fetchMock = vi.mocked(fetch);
+  const base = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: any, init: RequestInit = {}) => {
+    if ((init.method || 'GET') === 'GET') return json({ providers: [custom, codexProvider], connections: [stored, plain, cx], providerLogos: { codex: logo, custom: null }, proxies: [], instances: [], csrfToken: 'csrf' });
+    if (JSON.parse(String(init.body)).action === 'action') return json({ result: { loggedIn: true, needsLogin: false, flow: null } });
+    return base(url, init);
+  });
+  render(<ModelsPanel context={context} />);
+  const card = (name: string) => screen.findByRole('article', { name });
+  expect((await card('Work')).querySelector('[data-provider-logo]')).toHaveAttribute('data-provider-logo', 'custom');
+  expect((await card('Local')).querySelector('[data-provider-logo]')).toHaveAttribute('data-provider-logo', 'custom');
+  expect((await card('GPT')).querySelector('[data-provider-logo]')).toHaveAttribute('data-provider-logo', 'brand');
 });

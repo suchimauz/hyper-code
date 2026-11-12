@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plug, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { PhosphorIcon } from '../mauzcode/PhosphorIcon';
+import { NavigationChatIcon } from '../mauzcode/NavigationChatIcon';
+import type { NavigationIcon } from '../../lib/navigation';
 import { ApiError } from '../../lib/mauzcode';
 import { usePluginUi } from '../../extensions/pluginRuntime';
 import type { ExtensionContext } from '../../extensions/types';
 import {
-  connectionModels, connectionUsage, createConnection, getModelsState, removeConnection, setConnectionEnabled, testConnection, transportLabel, updateConnection,
+  connectionAction, connectionModels, connectionUsage, createConnection, setModelEnabled, getModelsState, removeConnection, setConnectionEnabled, testConnection, transportLabel, updateConnection,
   type ConnectionInput, type ModelConnectionView, type ModelFieldSpec, type ModelInfo, type ModelProviderView, type ModelsState, type ModelTransportSpec, type ModelUsageReport,
 } from '../../lib/modelConnections';
 import { SettingsField as Field } from './SettingsField';
@@ -16,13 +18,30 @@ const message = (error: unknown, fallback: string) => error instanceof Error && 
 const STATUS_LABEL: Record<ModelUsageReport['status'], string> = { available: 'Available', unavailable: 'Unavailable', configured: 'Configured', disabled: 'Disabled' };
 const TRANSPORT_LABEL: Record<ModelTransportSpec['kind'], string> = { direct: 'Direct', socks: 'SOCKS5 proxy', 'ssh-tunnel': 'SSH tunnel' };
 
+/** Human text for machine reason codes from test/usage; unknown codes are shown as-is. */
+const REASON_LABEL: Record<string, string> = {
+  'models-ok': 'Model list available', 'generation-ok': 'Test generation succeeded', 'usage-ok': 'Usage loaded',
+  'models-failed': 'Model list request failed', 'generation-failed': 'Test generation failed', 'usage-failed': 'Usage request failed',
+  'test-failed': 'Connection test failed', 'request-failed': 'Provider request failed', 'transport-failed': 'Proxy or tunnel unavailable',
+  'unknown-provider': 'Provider is not loaded; restart MauzCode', 'login-required': 'Log in required',
+  'not-tested': 'Not tested yet', disabled: 'Connection disabled',
+};
+export const reasonLabel = (reason: string) => REASON_LABEL[reason] ?? reason;
+
+/** Brand mark for a known provider; custom connections always get a generic plug, others without a mark their declared icon. */
+export function ProviderLogo({ logo, providerId, icon }: { logo?: NavigationIcon | null; providerId: string; icon?: string }) {
+  if (providerId === 'custom') return <span className="models-provider-logo" data-provider-logo="custom" aria-hidden="true"><Plug size={16} strokeWidth={1.5} /></span>;
+  if (logo) return <span className="models-provider-logo" data-provider-logo="brand"><NavigationChatIcon icon={logo} /></span>;
+  return <span className="models-provider-logo" data-provider-logo="icon"><PhosphorIcon icon={icon} size={16} /></span>;
+}
+
 function formatTime(ms: number) { return new Date(ms).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }); }
 
 /** Shared renderer of a UsageReport: status and reason, then quota windows and balance when present. */
 export function UsageView({ usage }: { usage: ModelUsageReport }) {
   const tone = usage.status === 'available' ? 'is-verified' : usage.status === 'unavailable' ? 'is-error' : 'is-pending';
   return <div className="models-usage">
-    <p className="models-usage-status"><span className={`ssh-badge ${tone}`}><span aria-hidden="true" />{STATUS_LABEL[usage.status] ?? usage.status}</span>{usage.reason && <span className="models-usage-reason">{usage.reason}</span>}<span className="models-usage-time">checked {formatTime(usage.checkedAt)}</span></p>
+    <p className="models-usage-status"><span className={`ssh-badge ${tone}`}><span aria-hidden="true" />{STATUS_LABEL[usage.status] ?? usage.status}</span>{usage.reason && <span className="models-usage-reason" title={usage.reason}>{reasonLabel(usage.reason)}</span>}<span className="models-usage-time">checked {formatTime(usage.checkedAt)}</span></p>
     {usage.windows && usage.windows.length > 0 && <ul className="models-windows" aria-label="Quota windows">{usage.windows.map((w, i) => {
       const used = typeof w.usedPercent === 'number' ? Math.max(0, Math.min(100, w.usedPercent)) : null;
       return <li key={`${w.label}-${i}`} className="models-window">
@@ -133,7 +152,8 @@ function ConnectionCard({ connection, provider, actions }: { connection: ModelCo
   const [usage, setUsage] = useState<ModelUsageReport | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [open, setOpen] = useState<Section>(null);
-  const [models, setModels] = useState<{ models: ModelInfo[]; source: string; error?: string } | null>(null);
+  const [models, setModels] = useState<{ models: ModelInfo[]; source: string; cachedAt?: number | null; error?: string } | null>(null);
+  const [updatingModels, setUpdatingModels] = useState(false);
   const confirmRef = useRef<HTMLDivElement>(null);
   const loadUsage = useCallback(async (refresh: boolean, signal?: AbortSignal) => {
     try { setUsage(await connectionUsage(actions.csrf, connection.id, refresh, signal)); setUsageError(null); }
@@ -144,11 +164,34 @@ function ConnectionCard({ connection, provider, actions }: { connection: ModelCo
   const toggle = (section: Exclude<Section, null>) => setOpen(open === section ? null : section);
   const test = async () => { const result = await actions.run('Test', () => testConnection(actions.csrf, connection.id), r => `${connection.accountName}: ${r.message}`); if (result) await loadUsage(true); };
   const showModels = async () => { if (open === 'models') return setOpen(null); setOpen('models'); setModels(null); const r = await actions.run('Models', () => connectionModels(actions.csrf, connection.id)); if (r) setModels(r); };
+  const updateModels = async () => {
+    setUpdatingModels(true);
+    try { const r = await actions.run('Update models', () => connectionModels(actions.csrf, connection.id, true), r => r.error ? `Update failed: ${r.error}` : `${r.models.length} models updated`); if (r) setModels(r); }
+    finally { setUpdatingModels(false); }
+  };
+  // Toggles only edit a local draft; Save sends the changed models, so a click never hits the server.
+  const [draftOff, setDraftOff] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setDraftOff(new Set((models?.models ?? []).filter(m => m.disabled).map(m => m.id))); }, [models]);
+  const changed = (models?.models ?? []).filter(m => !!m.disabled !== draftOff.has(m.id));
+  const toggleDraft = (id: string) => setDraftOff(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const saveModels = async () => {
+    if (!changed.length) return;
+    setSaving(true);
+    try {
+      const saved = await actions.run('Save models', async () => {
+        let last: ModelConnectionView | null = null;
+        for (const m of changed) last = await setModelEnabled(actions.csrf, connection.id, m.id, !draftOff.has(m.id));
+        return last!;
+      }, () => `Saved ${changed.length} model ${changed.length === 1 ? 'change' : 'changes'}`);
+      if (saved) { const off = new Set(saved.disabledModels ?? []); setModels(prev => prev && { ...prev, models: prev.models.map(x => ({ ...x, disabled: off.has(x.id) })) }); }
+    } finally { setSaving(false); }
+  };
   const label = provider?.label ?? connection.provider;
   return <article className="ssh-card" data-model-connection={connection.id} aria-label={connection.accountName}>
     <header className="ssh-card-header">
       <div className="ssh-card-title">
-        <div className="ssh-card-name"><PhosphorIcon icon={provider?.icon} size={18} /><h3>{connection.accountName}</h3>{!connection.enabled && <span className="ssh-badge is-pending"><span aria-hidden="true" />Disabled</span>}</div>
+        <div className="ssh-card-name"><ProviderLogo logo={actions.state.providerLogos?.[connection.provider]} providerId={connection.provider} icon={provider?.icon} /><h3>{connection.accountName}</h3>{!connection.enabled && <span className="ssh-badge is-pending"><span aria-hidden="true" />Disabled</span>}</div>
         <p className="ssh-card-target">{label}{!connection.providerRegistered && ' (provider not loaded)'} · {transportLabel(connection.transport, actions.state.proxies)}</p>
       </div>
       <div className="models-card-buttons">
@@ -162,16 +205,85 @@ function ConnectionCard({ connection, provider, actions }: { connection: ModelCo
       <button type="button" className="ssh-card-tab" aria-expanded={open === 'models'} disabled={!connection.providerRegistered} onClick={() => { void showModels(); }}>Models</button>
       <button type="button" className="ssh-card-tab is-danger" aria-expanded={open === 'remove'} onClick={() => toggle('remove')}>Remove</button>
     </div>
+    {connection.provider === 'codex' && connection.providerRegistered && <CodexLogin connection={connection} actions={actions} />}
     {open === 'edit' && provider && <div className="ssh-card-section"><ProviderForm key={connection.updatedAt} provider={provider} connection={connection} actions={actions} onDone={() => setOpen(null)} /></div>}
     {open === 'models' && <div className="ssh-card-section" aria-live="polite">{!models ? <p className="settings-loading" role="status">Loading models…</p> : <>
       {models.error && <p className="settings-note" role="status">Discovery failed: {models.error}</p>}
-      {models.models.length ? <ul className="models-list" aria-label={`Models of ${connection.accountName}`}>{models.models.map(m => <li key={m.id}><code>{m.id}</code>{m.label && m.label !== m.id && <span> {m.label}</span>}</li>)}</ul> : <p className="settings-note">No models.</p>}
-      <p className="settings-field-hint">Source: {models.source}</p></>}</div>}
+      {models.models.length ? <ul className="models-list" aria-label={`Models of ${connection.accountName}`}>{models.models.map(m => { const off = draftOff.has(m.id); return <li key={m.id} className={off ? 'is-disabled' : undefined} data-model-disabled={off ? 'true' : undefined}>
+        <label className="models-model-row"><input type="checkbox" role="switch" aria-label={`Enabled ${m.id}`} checked={!off} disabled={saving} onChange={() => toggleDraft(m.id)} />
+          <code>{m.id}</code>{m.label && m.label !== m.id && <span className="models-model-label">{m.label}</span>}{off && <span className="ssh-badge is-pending"><span aria-hidden="true" />Disabled</span>}</label>
+      </li>; })}</ul> : <p className="settings-note">No models.</p>}
+      {changed.length > 0 && <div className="ssh-form-actions models-save">
+        <Button variant="ghost" disabled={saving} onClick={() => setDraftOff(new Set(models.models.filter(m => m.disabled).map(m => m.id)))}>Reset</Button>
+        <Button disabled={saving || actions.busy} onClick={() => { void saveModels(); }}>{saving ? 'Saving…' : `Save (${changed.length})`}</Button>
+      </div>}
+      <div className="models-cache-row">
+        <p className="settings-field-hint">{models.cachedAt ? `Updated ${formatTime(models.cachedAt)} · refreshes hourly` : `Source: ${models.source}`}</p>
+        <Button variant="ghost" disabled={updatingModels || actions.busy || !connection.enabled} onClick={() => { void updateModels(); }}><RefreshCw size={14} strokeWidth={1.5} aria-hidden="true" />{updatingModels ? 'Updating…' : 'Update models'}</Button>
+      </div></>}</div>}
     {open === 'remove' && <div className="ssh-card-section settings-confirm" role="group" aria-label="Confirm removal">
       <p className="settings-note">Removes <b>{connection.accountName}</b> and its stored secrets from MauzCode. This cannot be undone.</p>
       <div className="ssh-form-actions" ref={confirmRef}><Button variant="ghost" onClick={() => setOpen(null)}>Cancel</Button><Button className="button--danger" disabled={actions.busy} onClick={() => { void actions.run('Remove', () => removeConnection(actions.csrf, connection.id), () => `${connection.accountName} removed`).then(r => r && actions.reload()); }}>Remove connection</Button></div>
     </div>}
   </article>;
+}
+
+type CodexFlow = { flowId: string; status: 'pending' | 'succeeded' | 'failed' | 'expired'; verificationUri: string; userCode: string; expiresAt: number; message?: string };
+type CodexStatus = { loggedIn: boolean; needsLogin: boolean; expiresAt: number | null; flow: CodexFlow | null };
+
+/** Native Codex device-code login: every request runs on the server through the connection transport. */
+function CodexLogin({ connection, actions }: { connection: ModelConnectionView; actions: Actions }) {
+  const [status, setStatus] = useState<CodexStatus | null>(null);
+  const [flow, setFlow] = useState<CodexFlow | null>(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { csrf } = actions;
+  // actions is rebuilt on every render; keep reload in a ref so polling is not restarted.
+  const reloadRef = useRef(actions.reload); reloadRef.current = actions.reload;
+  const reload = useCallback(() => reloadRef.current(), []);
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const s = await connectionAction<CodexStatus>(csrf, connection.id, 'loginStatus', null, signal);
+      setStatus(s); setFlow(s.flow);
+      return s;
+    } catch { return null; }
+  }, [csrf, connection.id]);
+  useEffect(() => { const c = new AbortController(); void refresh(c.signal); return () => c.abort(); }, [refresh, connection.updatedAt]);
+  const pending = flow?.status === 'pending';
+  useEffect(() => {
+    if (!pending) return;
+    const c = new AbortController();
+    const timer = setInterval(() => { void refresh(c.signal).then(s => { if (s?.flow?.status === 'succeeded') void reload(); }); }, 2000);
+    return () => { clearInterval(timer); c.abort(); };
+  }, [pending, refresh, reload]);
+  const start = async () => { setCopied(false); const f = await actions.run('Log in', () => connectionAction<CodexFlow>(csrf, connection.id, 'login')); if (f) setFlow(f); };
+  const cancel = async () => { const f = await actions.run('Cancel login', () => connectionAction<CodexFlow | null>(csrf, connection.id, 'cancelLogin')); if (f !== null) setFlow(f); };
+  const logout = async () => {
+    const r = await actions.run('Log out', () => connectionAction(csrf, connection.id, 'logout'), () => `${connection.accountName} logged out`);
+    setConfirmLogout(false);
+    if (r) { setFlow(null); await refresh(); await reload(); }
+  };
+  const copy = async () => { if (!flow) return; try { await navigator.clipboard.writeText(flow.userCode); setCopied(true); } catch { setCopied(false); } };
+  const live = !status ? 'Checking login…'
+    : pending ? 'Waiting for authorization in the browser…'
+    : flow?.status === 'failed' || flow?.status === 'expired' ? (flow.message ?? 'Login failed')
+    : status.loggedIn ? 'Logged in' : status.needsLogin && status.expiresAt ? 'Login expired; log in again' : 'Not logged in';
+  return <section className="ssh-card-section models-login" aria-label={`Codex login for ${connection.accountName}`}>
+    <p className="settings-note" role="status" aria-live="polite">{live}</p>
+    {pending && flow && <div className="models-login-code">
+      <p>Open <a href={flow.verificationUri} target="_blank" rel="noopener noreferrer">{flow.verificationUri}</a> and enter the code:</p>
+      <p><code aria-label="One-time code">{flow.userCode}</code> <Button variant="ghost" onClick={() => { void copy(); }}>{copied ? 'Copied' : 'Copy code'}</Button></p>
+      <p className="settings-field-hint">Expires {formatTime(flow.expiresAt)}</p>
+    </div>}
+    {confirmLogout ? <div className="settings-confirm" role="group" aria-label="Confirm logout">
+      <p className="settings-note">Deletes the stored Codex tokens of <b>{connection.accountName}</b>.</p>
+      <div className="ssh-form-actions"><Button variant="ghost" onClick={() => setConfirmLogout(false)}>Cancel</Button><Button className="button--danger" disabled={actions.busy} onClick={() => { void logout(); }}>Log out</Button></div>
+    </div> : <div className="ssh-form-actions">
+      {pending ? <Button variant="ghost" disabled={actions.busy} onClick={() => { void cancel(); }}>Cancel login</Button>
+        : <Button disabled={actions.busy || !connection.enabled} onClick={() => { void start(); }}>{status?.loggedIn ? 'Log in again' : 'Log in'}</Button>}
+      {status?.loggedIn && !pending && <Button variant="ghost" disabled={actions.busy} onClick={() => setConfirmLogout(true)}>Log out</Button>}
+    </div>}
+  </section>;
 }
 
 function AddConnection({ actions, first }: { actions: Actions; first: boolean }) {
@@ -183,6 +295,7 @@ function AddConnection({ actions, first }: { actions: Actions; first: boolean })
   if (!open) return <Button className="ssh-add-toggle" onClick={() => setOpen(true)}><Plus size={14} strokeWidth={1.5} aria-hidden="true" />Add connection</Button>;
   return <section className="ssh-card" aria-label="Add connection">
     <h3>Add connection</h3>
+    {provider && <p className="models-add-provider"><ProviderLogo logo={actions.state.providerLogos?.[provider.id]} providerId={provider.id} icon={provider.icon} />{provider.label}</p>}
     <SelectField name="provider" label="Provider" value={providerId} onChange={setProviderId} options={providers.map(p => ({ value: p.id, label: p.label }))} hint={provider?.description} />
     {provider && <ProviderForm key={provider.id} provider={provider} actions={actions} onDone={() => { if (!first) setOpen(false); }} />}
   </section>;

@@ -14,6 +14,8 @@ export type ConnectionView = {
     secrets: Record<string, boolean>;
     transport: types.models.TransportSpec;
     enabled: boolean;
+    /** Model ids the owner disabled on this connection; inference refuses them. Sorted, unique. */
+    disabledModels: string[];
     /** Unix epoch milliseconds. */
     createdAt: number;
     /** Unix epoch milliseconds; changes on every update. */
