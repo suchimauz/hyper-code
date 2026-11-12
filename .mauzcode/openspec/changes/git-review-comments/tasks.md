@@ -4,8 +4,8 @@ All items describe future implementation. Sections 1–5 and 7 are backend work;
 
 ## 1. Data and migration
 
-- [ ] 1.1 Add `plugins/git/src/gitUi/$migration_<ts>_review_comments.ts` creating `git_review_comments` exactly as in design.md (CHECK constraints for scope/group/side/status, FK `agents(id) ON DELETE CASCADE`, index `(agent_id, host, dir, status)`) with a `down` that drops it; run `procs.migrate.up` and verify the schema through `information_schema.columns`.
-- [ ] 1.2 Add types `types.gitUi.ReviewComment` (row view incl. computed `outdated`) and `types.gitUi.CommentAnchor`; run `procs.dev.genTypes`.
+- [x] 1.1 Add `plugins/git/src/gitUi/$migration_<ts>_review_comments.ts` creating `git_review_comments` exactly as in design.md (CHECK constraints for scope/group/side/status, FK `agents(id) ON DELETE CASCADE`, index `(agent_id, host, dir, status)`) with a `down` that drops it; run `procs.migrate.up` and verify the schema through `information_schema.columns`.
+- [x] 1.2 Add types `types.gitUi.ReviewComment` (row view incl. computed `outdated`) and `types.gitUi.CommentAnchor`; run `procs.dev.genTypes`.
 
 ## 2. Comments API and authorization
 
