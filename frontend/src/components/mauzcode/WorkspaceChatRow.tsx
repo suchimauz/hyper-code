@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { Archive, ArchiveRestore, Pin, PinOff } from 'lucide-react';
 import { NavigationChatIcon } from './NavigationChatIcon';
 import { NavigationTooltip } from './NavigationTooltip';
+import { modelAccount } from '../../lib/models';
 import { replyAge, type ChatAction, type NavigationChat } from '../../lib/navigation';
 
 /** Separate sibling buttons avoid nested interactive elements and accidental chat selection. */
@@ -17,6 +18,7 @@ export function WorkspaceChatRow({ chat, selected, archivedView, pending, onSele
       <div className="navigation-tooltip-title">{chat.title || 'Новый чат'}</div>
       {chat.lastReplyAt != null && <div>{replyAge(chat.lastReplyAt) === 'now' ? 'Just now' : `${replyAge(chat.lastReplyAt)} ago`}</div>}
       {chat.model && <div>{chat.modelLabel || chat.model.split(':').at(-1)}{chat.effort?.label ? ` ${chat.effort.label}` : ''}</div>}
+      {chat.model && <div className="navigation-tooltip-model">{modelAccount(chat.model)}</div>}
       <div className="navigation-tooltip-status"><span className="navigation-tooltip-dot" data-active={active} aria-hidden="true" />{chat.archived ? 'Archived' : active ? 'Running' : chat.runState === 'error' ? 'Error' : chat.runState === 'paused' ? 'Paused' : 'Idle'}</div>
     </NavigationTooltip>
     {onAction && <span className="workspace-chat-actions">

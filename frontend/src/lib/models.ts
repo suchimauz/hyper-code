@@ -47,5 +47,7 @@ export const modelGroup = (option: Pick<ModelOption, 'provider' | 'model' | 'gro
   const route = parseModelRoute(option.model);
   return route.host ? `${route.host} · ${route.provider}/${route.account}` : option.provider;
 };
+// Account name alone, for compact captions under the current model.
+export const modelAccount = (model: string) => parseModelRoute(model).account;
 // Provider and account line under a model name; the SSH host is already shown by the group.
 export const modelSourceLabel = (model: string) => { const { provider, account } = parseModelRoute(model); return `${provider} · ${account}`; };

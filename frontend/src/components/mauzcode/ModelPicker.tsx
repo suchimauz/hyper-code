@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Check, ChevronDown, ChevronRight, Cpu } from 'lucide-react';
 import { NavigationChatIcon } from './NavigationChatIcon';
-import { effortLabel, modelGroup, modelSourceLabel, getDraftModelSettings, getModelSettings, setAgentEffort, setAgentModel, type ModelSettings } from '../../lib/models';
+import { effortLabel, modelAccount, modelGroup, modelSourceLabel, getDraftModelSettings, getModelSettings, setAgentEffort, setAgentModel, type ModelSettings } from '../../lib/models';
 import { rememberSessionSelection } from '../../lib/newSession';
 import './model-picker.css';
 
@@ -100,7 +100,7 @@ export function ModelPicker({ agentId = '', running = false, busy = false, revis
   }}>
     <Popover.Trigger render={<button type="button" className="model-picker-trigger" title={data?.model || 'Выбрать модель'} aria-label={`Выбрать модель: ${label}`} disabled={saving || busy} />}>
       {data?.icon ? <NavigationChatIcon icon={data.icon} /> : <Cpu size={14} strokeWidth={1} />}
-      <span className="model-picker-label">{label}</span>{hasEffort && <span className="model-picker-effort">{effortLabel(effort.requested === 'auto' ? 'auto' : effort.applied)}</span>}<ChevronDown size={14} strokeWidth={1} className="model-picker-chevron" />
+      <span className="model-picker-body"><span className="model-picker-row"><span className="model-picker-label">{label}</span>{hasEffort && <span className="model-picker-effort">{effortLabel(effort.requested === 'auto' ? 'auto' : effort.applied)}</span>}</span>{data?.model && <span className="model-picker-tech">{modelAccount(data.model)}</span>}</span><ChevronDown size={14} strokeWidth={1} className="model-picker-chevron" />
     </Popover.Trigger>
     <Popover.Portal><Popover.Positioner side="top" align="end" sideOffset={8} collisionPadding={12} className="floating-positioner">
       <Popover.Popup ref={popup} className="model-picker-menu" aria-label="Model and effort" aria-busy={saving || loading} onKeyDown={keyboard}>
