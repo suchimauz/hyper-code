@@ -18,8 +18,10 @@
 
 ## 2. Network transport
 
-- [ ] 2.1 Implement `models.fetch` for `direct`, `socks` (`socksProxy.readSaved` + `socksProxy.request`) and `ssh-tunnel` (`sshProvider.tunnel` + `socksProxy.request`, lease released on done/abort) with URL safety, timeout and abort; verify unit tests with mocked proxy/tunnel, including no direct fallback on proxy failure and https-only for proxied transports
-- [ ] 2.2 Implement transport validation (provider allows kind, proxy exists, SSH instance trusted) and verify unit tests for each rejection
+- [x] 2.1 Implement `models.fetch` for `direct`, `socks` (`socksProxy.readSaved` + `socksProxy.request`) and `ssh-tunnel` (`sshProvider.tunnel` + `socksProxy.request`, lease released on done/abort) with URL safety, timeout and abort; verify unit tests with mocked proxy/tunnel, including no direct fallback on proxy failure and https-only for proxied transports
+- [x] 2.2 Implement transport validation (provider allows kind, proxy exists, SSH instance trusted) and verify unit tests for each rejection
+
+Verification (block 2): `bun test src/models src/socksProxy src/sshProvider/tunnel.test.ts src/sshProvider/lease.test.ts` — 98 passed, including 25 transport/validation tests (setup/body timeout, abort, tunnel exit and late lease cleanup). Both runtime functions pass strict documentation/typecheck validation; strict OpenSpec validation passes. Full repository typecheck remains red outside `src/models`; code quality reports 8 existing unresolved calls in private `myhealthGaps`, `skill`, `tunnel` modules. New helpers intentionally await consumers in block 3; no existing LLM routing changed.
 
 ## 3. Connection storage and management
 
