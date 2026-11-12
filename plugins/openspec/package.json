@@ -1,0 +1,14 @@
+{
+  "name": "openspec",
+  "private": true,
+  "type": "module",
+  "procs": {
+    "src": "src",
+    "label": "OpenSpec",
+    "icon": "ph-list-checks",
+    "description": "Spec-driven changes with the OpenSpec CLI, stored in the workspace's .mauzcode/openspec instead of the project root."
+  },
+  "dependencies": {
+    "@fission-ai/openspec": "2.0.0"
+  }
+}
