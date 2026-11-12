@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { SocksProxies } from './socks-proxies';
 import { Button, Panel, TextField, requestJson, ApiError, type ExtensionViewProps, type UiExtension } from '@mauzcode/ui';
 
 type Item = { module: string; key: string; type: string; title?: string; description?: string; source: string; path?: string; value?: string | number | boolean; defaultValue?: unknown; configured?: boolean; options?: string[]; min?: number; max?: number };
@@ -51,4 +52,4 @@ function Declared({ context }: ExtensionViewProps) {
     {items?.filter(i => `${i.module}.${i.key} ${i.title ?? ''}`.toLowerCase().includes(query.toLowerCase())).map(i => <SettingRow key={`${i.module}.${i.key}`} item={i} readOnly={context.readOnly} refresh={refresh} />)}
   </div>;
 }
-export const settingsExtension: UiExtension = { id: 'settings', apiVersion: 1, pages: [{ id: 'overview', title: 'Ключи и подписки', component: Overview }, { id: 'declared', title: 'Объявленные настройки', component: Declared }], navigation: [{ page: 'overview', title: 'Ключи и подписки' }, { page: 'declared', title: 'Объявленные настройки' }] };
+export const settingsExtension: UiExtension = { id: 'settings', apiVersion: 1, pages: [{ id: 'overview', title: 'Ключи и подписки', component: Overview }, { id: 'declared', title: 'Объявленные настройки', component: Declared }, { id: 'proxies', title: 'SOCKS5', component: SocksProxies }], navigation: [{ page: 'overview', title: 'Ключи и подписки' }, { page: 'declared', title: 'Объявленные настройки' }, { page: 'proxies', title: 'SOCKS5' }] };

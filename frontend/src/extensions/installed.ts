@@ -21,7 +21,7 @@ export const coreExtensions: readonly UiExtension[] = [
 export const coreGrants: Readonly<Record<string, ExtensionGrant>> = {
   documentation: { pages: ['search', 'functions'] },
   'agent-meta': { panels: ['overview'] },
-  settings: { pages: ['overview', 'declared'] },
+  settings: { pages: ['overview', 'declared', 'proxies'] },
   'shared-agents': { pages: ['overview'] },
   instances: { pages: ['overview'] },
   utilities: { pages: ['autotext'] },

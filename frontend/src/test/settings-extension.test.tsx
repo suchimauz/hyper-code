@@ -9,7 +9,7 @@ const Declared=settingsExtension.pages![1].component;
 const Overview=settingsExtension.pages![0].component;
 beforeEach(()=>request.mockReset());
 describe('native settings extension',()=>{
- it('registers overview and declared without HTML transport',()=>{expect(settingsExtension.id).toBe('settings');expect(settingsExtension.pages!.map(p=>p.id)).toEqual(['overview','declared']);});
+ it('registers overview and declared without HTML transport',()=>{expect(settingsExtension.id).toBe('settings');expect(settingsExtension.pages!.map(p=>p.id)).toEqual(['overview','declared','proxies']);});
  it('renders secret as empty password, file setting read-only and saves a typed number',async()=>{
  request.mockResolvedValue({items:[{module:'test',key:'secret',type:'secret',configured:true,source:'db'},{module:'test',key:'count',type:'number',value:3,source:'db',min:1,max:9},{module:'test',key:'fixed',type:'text',value:'locked',source:'file',path:'/instance.json'}]});
  render(<Declared context={context}/>);

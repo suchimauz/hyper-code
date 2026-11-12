@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Check, Copy, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { ApiError } from '../../lib/mauzcode';
@@ -9,10 +9,7 @@ type Run = (action: SshAction) => Promise<SshActionResult | null>;
 
 const NAME_PATTERN = '[A-Za-z0-9][A-Za-z0-9_.\\-]*';
 
-function Field({ label, hint, ...input }: { label: string; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
-  const id = useId();
-  return <label className="settings-field" htmlFor={id}><span className="settings-field-label">{label}</span><input id={id} {...input} />{hint && <span className="settings-field-hint">{hint}</span>}</label>;
-}
+import { SettingsField as Field } from './SettingsField';
 
 function readEndpoint(form: HTMLFormElement, name: string) {
   const data = new FormData(form);
