@@ -124,7 +124,7 @@ existing namespace with `await ctx.fns.procs.repl.load({ name: "yourNamespace" }
 entries; removing/renaming a declaration does **not** reconcile stale registry
 entries. Plugin mount/unmount lifecycle is separate from this SDK foundation.
 
-## Catalogue and future UI slot
+## Catalogue
 
 `await ctx.fns.models.providers({})` returns a sorted `ProviderView[]` with only
 `id`, `label`, optional `description`/`icon`, copied field schemas, allowed
@@ -134,13 +134,32 @@ Unknown internal properties are not spread into the result, and secret defaults
 are stripped defensively. Provider authors remain responsible for keeping their
 explicit public metadata free of secrets.
 
-The planned optional UI slot is `modelProviders`: a plugin will declare
-`procs.ui.modelProviders` grants and register a provider component from its
-`ui/index.tsx`, importing React and the public `@mauzcode/ui` entry only. This slot
-is **not implemented in block 1**. The agreed component props are `context`,
-`provider`, optional `connection`, `onSaved` and `onCancel`. Generic schema-driven
-forms remain the fallback. UI grants/approval never replace backend owner checks
-or CSRF protection, and plugin UI approval does not sandbox backend code.
+## UI slot `modelProviders`
+
+A plugin can replace the schema-driven form for its own provider. Grant the id in
+`package.json` and register a component from `ui/index.tsx` (React and the
+public `@mauzcode/ui` entry only):
+
+```json
+{ "procs": { "ui": { "modelProviders": ["acme"] } } }
+```
+
+```tsx
+import type { UiExtension, ExtensionModelProviderProps } from '@mauzcode/ui';
+function AcmeForm({ provider, connection, onSaved, onCancel }: ExtensionModelProviderProps) { /* … */ }
+export default { id: 'acme', apiVersion: 1, modelProviders: [{ provider: 'acme', component: AcmeForm }] } satisfies UiExtension;
+```
+
+Props: `context`, `provider` (`ModelProviderView`), optional `connection`
+(`ModelConnectionView`, secret-free: `secrets` holds only booleans), `onSaved(connection)`
+and `onCancel()`. The component saves through `POST /models/api` with SDK
+`requestJson` (cookie-bound CSRF). Ids must be kebab-case and never `custom`.
+The component is used only when the grant lists the id and the bundle is
+approved; an ungranted entry is ignored and the schema form is used; two
+extensions granting the same id is a registry error. Grants are part of the
+approval comparison, so adding one sends the bundle back for review. UI
+grants/approval never replace backend owner checks or CSRF protection, and plugin
+UI approval does not sandbox backend code.
 
 ## Verification
 

@@ -11,6 +11,7 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
   const actions: ExtensionRegistry['actions'][number][] = [];
   const canvasKinds: ExtensionRegistry['canvasKinds'][number][] = [];
   const canvasLaunchers: ExtensionRegistry['canvasLaunchers'][number][] = [];
+  const modelProviders: ExtensionRegistry['modelProviders'][number][] = [];
   const iconClass = (icon: unknown) => typeof icon === 'string' && /^ph-[a-z0-9-]{1,64}$/.test(icon) ? icon : null;
   const ids = new Set<string>();
   const valid = (id: string) => /^[a-z][a-z0-9-]{0,63}$/.test(id);
@@ -54,6 +55,14 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
       const icon = iconClass(entry.icon) ?? iconClass(Object.hasOwn(icons, extension.id) ? icons[extension.id] : null);
       canvasLaunchers.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.id}`, icon }));
     }
+    const seenProviders = new Set<string>();
+    for (const entry of extension.modelProviders ?? []) {
+      if (typeof entry.provider !== 'string' || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(entry.provider) || seenProviders.has(entry.provider) || typeof entry.component !== 'function') throw new Error(`Invalid model provider component: ${extension.id}/${String(entry.provider)}`);
+      seenProviders.add(entry.provider);
+      if (!grant?.modelProviders?.includes(entry.provider)) continue;
+      if (modelProviders.some(p => p.provider === entry.provider)) throw new Error(`Duplicate model provider component: ${entry.provider}`);
+      modelProviders.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.provider}` }));
+    }
     for (const placement of ['navigation', 'sidebarNavigation'] as const) {
     const seenNav = new Set<string>();
     for (const item of extension[placement] ?? []) {
@@ -66,5 +75,5 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
     }
     }
   }
-  return Object.freeze({ inputKinds: Object.freeze(inputKinds), sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), canvasLaunchers: Object.freeze(canvasLaunchers), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
+  return Object.freeze({ inputKinds: Object.freeze(inputKinds), sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), canvasLaunchers: Object.freeze(canvasLaunchers), modelProviders: Object.freeze(modelProviders), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
 }

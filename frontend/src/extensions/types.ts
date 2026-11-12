@@ -21,6 +21,23 @@ export type ExtensionCanvasLauncher = { id: string; title: string; description?:
   /** One-step launcher: the Start page calls `open` directly and selects the returned server Canvas item, with no local tab. */
   | { open: (context: ExtensionContext) => Promise<{ id: number }>; component?: never }
 );
+/** Secret-free provider catalogue entry served by GET /models/api. */
+export type ModelProviderView = Readonly<{ id: string; label: string; description?: string; icon?: string; fields: readonly ModelFieldSpec[]; transports: readonly ModelTransportSpec['kind'][]; actions: readonly { name: string; label: string }[] }>;
+export type ModelFieldSpec = { key: string; label: string; required?: boolean; help?: string; placeholder?: string } & (
+  | { type: 'text' | 'url'; default?: string }
+  | { type: 'select'; default?: string; options: readonly { value: string; label: string }[] }
+  | { type: 'secret'; default?: never }
+  | { type: 'number'; default?: number }
+  | { type: 'boolean'; default?: boolean }
+);
+export type ModelTransportSpec = { kind: 'direct' } | { kind: 'socks'; proxyId: string } | { kind: 'ssh-tunnel'; instance: string };
+/** Secret-free connection: `secrets` maps a secret field key to whether a value is stored, never the value. */
+export type ModelConnectionView = Readonly<{ id: string; provider: string; providerRegistered: boolean; accountName: string; config: Readonly<Record<string, unknown>>; secrets: Readonly<Record<string, boolean>>; transport: ModelTransportSpec; enabled: boolean; createdAt: number; updatedAt: number }>;
+/** Props of a plugin-owned connection form. The component saves through the owner-only /models/api with the CSRF token
+ * (SDK requestJson) and then calls onSaved; it never receives secret values. */
+export type ExtensionModelProviderProps = ExtensionViewProps & { provider: ModelProviderView; connection?: ModelConnectionView; onSaved: (connection: ModelConnectionView) => void; onCancel: () => void };
+/** Connection form for one provider id; requires a modelProviders grant for that id. */
+export type ExtensionModelProvider = { provider: string; component: ComponentType<ExtensionModelProviderProps> };
 export type ExtensionPage = { id: string; title: string; component: ComponentType<ExtensionViewProps> };
 export type ExtensionPanel = { id: string; title: string; component: ComponentType<ExtensionViewProps> };
 export type ExtensionAction = { id: string; title: string; run: (context: ExtensionContext) => void | Promise<void>; mutates?: boolean };
@@ -39,9 +56,11 @@ export type UiExtension = {
   inputKinds?: readonly ExtensionInputKind[];
   /** Start-page buttons opening local Canvas tabs; each also requires a canvasLaunchers grant. */
   canvasLaunchers?: readonly ExtensionCanvasLauncher[];
+  /** Provider connection forms for the Models settings tab; each also requires a modelProviders grant. */
+  modelProviders?: readonly ExtensionModelProvider[];
   actions?: readonly ExtensionAction[];
 };
-export type ExtensionGrant = Readonly<{ inputKinds?: readonly string[]; pages?: readonly string[]; sidebarNavigation?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[]; canvasLaunchers?: readonly string[] }>;
+export type ExtensionGrant = Readonly<{ inputKinds?: readonly string[]; pages?: readonly string[]; sidebarNavigation?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[]; canvasLaunchers?: readonly string[]; modelProviders?: readonly string[] }>;
 export type RegisteredView = Readonly<{ key: string; title: string; component: ComponentType<ExtensionViewProps> }>;
 /** A granted launcher; `icon` is resolved (launcher icon, else plugin icon, else null → default). */
 export type RegisteredLauncher = Readonly<Omit<ExtensionCanvasLauncher, 'icon'> & { key: string; icon: string | null }>;
@@ -54,5 +73,6 @@ export type ExtensionRegistry = Readonly<{
   panels: readonly RegisteredView[];
   canvasKinds: readonly Readonly<ExtensionCanvasKind & { key: string }>[];
   canvasLaunchers: readonly RegisteredLauncher[];
+  modelProviders: readonly Readonly<ExtensionModelProvider & { key: string }>[];
   actions: readonly RegisteredAction[];
 }>;

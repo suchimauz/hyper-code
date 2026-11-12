@@ -114,3 +114,19 @@ test('inputKinds grants are owner-only and changes invalidate approval', async (
   }
  } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test('modelProviders grants compile, are validated and changes invalidate approval', async () => {
+ const dir = await plugin({ modelProviders: ['acme'] }, { 'ui/index.tsx': view, 'ui/helper.ts': "export const helper = 'Demo';" });
+ try {
+  const built = await compile(context(dir), null, {name:'demo'});
+  expect(built.build?.error).toBeNull();
+  expect(built.build?.grants.modelProviders).toEqual(['acme']);
+  const old = {pages:[],panels:[],actions:[],canvasKinds:[]};
+  expect((await manifest(context(dir,'user',[{name:'demo',hash:built.build!.hash,grants:old}]),null,{})).pending[0]?.reason).toBe('changed');
+  expect((await manifest(context(dir,'user',[{name:'demo',hash:built.build!.hash,grants:built.build!.grants}]),null,{})).plugins).toHaveLength(1);
+  for (const id of ['custom', 'Acme', 'a_b']) {
+   await writeFile(join(dir,'package.json'), JSON.stringify({procs:{ui:{modelProviders:[id]}}}));
+   expect((await compile(context(dir),null,{name:'demo'})).build?.error).toContain('Invalid model provider id');
+  }
+ } finally { await rm(dir,{recursive:true,force:true}); }
+});

@@ -149,3 +149,27 @@
 .push-device-actions { margin-left: auto; display: inline-flex; gap: 4px; flex: none; align-items: center; }
 .button.push-device-remove, .button.push-device-remove:not(:disabled):hover { color: var(--tool-error); filter: none; }
 .push-confirm-actions { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Models tab */
+.ssh-badge.is-error { color: var(--tool-error); background: color-mix(in srgb, var(--tool-error) 12%, transparent); }
+.models-usage { display: flex; flex-direction: column; gap: var(--space-2); }
+.models-usage-status { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--font-sm); }
+.models-usage-reason { font-family: var(--font-mono); font-size: var(--font-xs); color: var(--text-secondary); }
+.models-usage-time { font-size: var(--font-xs); color: var(--text-tertiary); }
+.models-windows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.models-window { display: grid; grid-template-columns: minmax(80px, 140px) minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); font-size: var(--font-sm); }
+.models-window-meta { font-size: var(--font-xs); color: var(--text-tertiary); white-space: nowrap; }
+.models-meter { display: block; height: 6px; border-radius: 999px; background: var(--hover); overflow: hidden; }
+.models-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.models-card-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.models-enabled { align-items: center; }
+.models-enabled input { margin-top: 0; }
+.models-secret { display: flex; flex-direction: column; gap: var(--space-2); }
+.models-textarea { min-height: 64px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font: var(--font-sm)/1.5 var(--font-mono); resize: vertical; }
+.models-textarea:focus-visible, .settings-panel-modal select:focus-visible, .settings-panel-modal input[type="checkbox"]:focus-visible, .settings-panel-modal input[type="radio"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.models-transport { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.models-transport-kinds { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.models-transport-kinds input { accent-color: var(--accent); }
+.models-list { margin: 0; padding-left: 18px; font-size: var(--font-sm); line-height: 1.7; max-height: 220px; overflow: auto; }
+.ssh-card-tab:disabled { opacity: .45; cursor: default; }
+@media (max-width: 560px) { .models-window { grid-template-columns: 1fr; gap: 4px; } }
