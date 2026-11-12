@@ -197,7 +197,8 @@ export default function (_ctx: Context, _session: Session | null, opts: { rel: s
 // `$<kind>_<name>` → that kind, whoever owns it. A typo in the prefix reads as
 // "nobody owns this kind" at load time, with the file named — not as silence.
 function taggedKind(fileName: string): { kind: string; name: string } | null {
-    const m = /^\$([a-z][a-z0-9]*)_(.+)$/.exec(stemOrName(fileName));
+    // mauzcode: declarative kinds may use lower camelCase (e.g. modelProvider).
+    const m = /^\$([a-z][a-zA-Z0-9]*)_(.+)$/.exec(stemOrName(fileName));
     if (!m) return null;
     return { kind: m[1]!, name: m[2]! };
 }

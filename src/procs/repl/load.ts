@@ -43,7 +43,8 @@ export default async function (ctx: Context, _session: Session | null, opts: { n
     return { reloaded: target, count: loaded.length, fns: loaded, ...(others.length ? { files: others } : {}) };
 }
 
-const HOT_KINDS = new Set(['canvas', 'fence', 'input', 'hook', 'point', 'tool', 'setting', 'compaction', 'app']);
+// mauzcode: provider declarations reload with their owning namespace, like other keyed registries.
+const HOT_KINDS = new Set(['canvas', 'fence', 'input', 'hook', 'point', 'tool', 'setting', 'compaction', 'app', 'modelProvider']);
 
 function scheduleDocsIndex(ctx: Context): void {
     if (!(ctx.fns as any).runtime?.docs?.index) return;
