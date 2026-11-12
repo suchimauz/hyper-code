@@ -25,6 +25,19 @@ export default async function (ctx: Context, _session: Session | null, opts: { e
         const rel = relative(resolve(base), resolve(path));
         return rel === "" || (rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel));
     };
+    // Unmounting a plugin reruns boot without its files, so its declarations must
+    // leave the registry now rather than at the next restart.
+    const mountedNames = new Set(mounted.map(m => m.name));
+    for (const [id, provider] of Object.entries(providers)) {
+        if (!mountedNames.has(provider.owner)) delete providers[id];
+    }
+    // A full boot pass (every scanned declaration) also drops files deleted from a
+    // still-mounted owner. A partial namespace reload never prunes other owners.
+    const declared = boot.filter(e => e.kind === "modelProvider");
+    if (declared.length && declared.every(e => opts.entries.some(o => o.abs === e.abs))) {
+        const ids = new Set(opts.entries.map(e => e.name));
+        for (const id of Object.keys(providers)) if (!ids.has(id)) delete providers[id];
+    }
     for (const entry of opts.entries) {
         const id = entry.name;
         if (typeof id !== "string" || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id)) {

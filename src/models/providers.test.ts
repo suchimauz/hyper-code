@@ -76,6 +76,24 @@ describe("model provider SDK and registry", () => {
             await expect(register(fixture(), bad)).rejects.toThrow("mounted source owner");
         }
     });
+    test("unmounted owners and deleted declarations leave the registry without a restart", async () => {
+        const alpha = entry("alpha", "acme"), beta = entry("beta", "zeta");
+        const ctx = fixture([alpha, beta]); await register(ctx, alpha, beta);
+        expect(Object.keys(ctx.state.models.providers ?? {}).sort()).toEqual(["acme", "zeta"]);
+        // A partial namespace reload never prunes other owners' providers.
+        await register(ctx, alpha);
+        expect(Object.keys(ctx.state.models.providers ?? {}).sort()).toEqual(["acme", "zeta"]);
+        // Plugin beta unmounted: the next boot pass has neither its module nor its files.
+        ctx.fns.procs.modules.list = () => ["core", "alpha"].map(name => ({ name, dir: `/mounted/${name}` }));
+        ctx.state.procs.boot.entries = [alpha];
+        await register(ctx, alpha);
+        expect(Object.keys(ctx.state.models.providers ?? {})).toEqual(["acme"]);
+        // A declaration file deleted from a still-mounted owner disappears on the full pass.
+        const omega = entry("alpha", "omega");
+        ctx.state.procs.boot.entries = [omega];
+        await register(ctx, omega);
+        expect(Object.keys(ctx.state.models.providers ?? {})).toEqual(["omega"]);
+    });
     test("metadata-free reload requires matching trusted boot entry", async () => {
         const original = entry(); const stripped = { ...original, root: undefined, rootDir: undefined };
         const ctx = fixture([original]); await register(ctx, stripped);
