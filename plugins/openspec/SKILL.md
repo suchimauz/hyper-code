@@ -17,4 +17,12 @@ All artifacts live in `<workspace>/.mauzcode/openspec`, never in a project-root 
 4. Check: `run({ args: ["validate", "<id>", "--strict"] })`.
 5. Archive: `run({ args: ["archive", "<id>", "--yes"] })` merges deltas into `specs/`.
 
+## Guidance
+
+- Unclear idea: explore first in planning mode (read code, compare options, ask) and create no change until the scope is agreed.
+- Always fetch `instructions <artifact>` right before writing an artifact and follow it — it carries the current rules (ADDED/MODIFIED deltas, `## Purpose` for new capabilities, capability naming, scenario format); do not write artifacts from memory.
+- Before naming capabilities check existing coverage: `list --specs`, then `show <spec-id> --type spec --json --no-scenarios`. With no specs yet, everything the change touches is a new capability named for durable behaviour (`user-auth`, not `add-login`); specs grow change by change.
+- Before `archive`, check the code against `tasks.md` and the change's spec scenarios.
+- Project-wide constraints (e.g. artifact language) belong in `.mauzcode/openspec/config.yaml` under `context`/`rules`; `instructions` injects them.
+
 `list`, `list --specs`, `show <id> --json` and `view` inspect state. `store` commands and `--store` are rejected. Local workspaces only; `dir` overrides the workspace with another absolute local path.
