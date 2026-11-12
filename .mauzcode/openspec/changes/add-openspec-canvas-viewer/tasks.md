@@ -13,11 +13,11 @@
 
 ## 3. HTTP API
 
-- [ ] 3.1 Implement `openspec.handle` plus `$route__GET.ts`/`$route__POST.ts`: `canvas.authorizeHttp` on every request, CSRF on POST, POST opens the tab, GET `op=snapshot|doc|validate` resolves `dir` only from an owned open `openspec.workspace` item; verify with tests for unauthorized agent, foreign/unknown item, missing CSRF, and unsupported op
+- [x] 3.1 Implement `openspec.handle` plus `$route__GET.ts`/`$route__POST.ts`: `canvas.authorizeHttp` on every request, CSRF on POST, POST opens the tab, GET `op=snapshot|doc|validate` resolves `dir` only from an owned open `openspec.workspace` item; verify with tests for unauthorized agent, foreign/unknown item, missing CSRF, and unsupported op
 
 ## 4. Live refresh
 
-- [ ] 4.1 Implement `openspec.watch({ dir })` (recursive `fs.watch`, 300 ms debounce, `openspec.changed` broadcast with opaque key, idle close after 10 minutes, parent-folder watch when uninitialized, polling fallback) and call it from the snapshot op; verify with a test that writing `tasks.md` emits one debounced event with the key and no path
+- [x] 4.1 Implement `openspec.watch({ dir })` (recursive `fs.watch`, 300 ms debounce, `openspec.changed` broadcast with opaque key, idle close after 10 minutes, parent-folder watch when uninitialized, polling fallback) and call it from the snapshot op; verify with a test that writing `tasks.md` emits one debounced event with the key and no path
 
 ## 5. React UI
 
