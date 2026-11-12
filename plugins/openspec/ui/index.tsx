@@ -119,7 +119,16 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
     document.addEventListener('visibilitychange', onVisible);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, [keepAlive, refresh]);
-  useEffect(() => window.mauzcodeLive?.onStatus?.(setTransport), [snapshot !== null]);
+  // onStatus reports changes only, and the transport script may load after mount: read the current
+  // state whenever the snapshot changes (the live client is loaded by then) and follow later changes.
+  useEffect(() => {
+    const client = window.mauzcodeLive;
+    if (!client) return;
+    const current = client.getStatus?.();
+    if (current) setTransport(current);
+    const off = client.onStatus?.(setTransport);
+    return () => { off?.(); };
+  }, [snapshot]);
 
   useLiveSubscription({
     name: 'openspec-workspace', types: ['openspec.changed'],

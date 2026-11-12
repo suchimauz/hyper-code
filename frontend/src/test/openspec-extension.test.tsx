@@ -121,4 +121,15 @@ describe('openspec plugin UI', () => {
     act(() => live.resync?.('reconnect')); await settle();
     expect(screen.queryByText('Not live')).not.toBeInTheDocument();
   });
+
+  it('shows Live when the transport is already connected before the tab mounts', async () => {
+    const listeners: Array<(s: string) => void> = [];
+    (window as unknown as { mauzcodeLive: unknown }).mauzcodeLive = { subscribe: () => () => {}, getStatus: () => 'connected', onStatus: (l: (s: string) => void) => { listeners.push(l); return () => {}; } };
+    try {
+      render(<Workspace context={ctx} item={item()} />); await settle();
+      expect(screen.getByText('Live')).toBeInTheDocument();
+      act(() => listeners.at(-1)?.('disconnected')); await settle();
+      expect(screen.getByText('Not live')).toBeInTheDocument();
+    } finally { delete (window as unknown as { mauzcodeLive?: unknown }).mauzcodeLive; }
+  });
 });
