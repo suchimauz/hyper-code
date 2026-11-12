@@ -1,7 +1,7 @@
 # agent-run-recovery Specification
 
 ## Purpose
-TBD - created by archiving change recover-orphaned-runs-on-startup. Update Purpose after archive.
+Defines how in-flight agent runs are owned by a server process, how runs left behind by a process that is gone return to the queue as soon as another process takes the agent worker lock, and how the heartbeat lease remains the fallback for hung or owner-less runs.
 
 ## Requirements
 
