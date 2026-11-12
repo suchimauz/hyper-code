@@ -48,6 +48,12 @@ export const styles = `
 .osv-alert{display:flex;align-items:center;gap:8px;margin:10px 14px 0;padding:9px 12px;border-radius:10px;
  background:color-mix(in srgb,var(--tool-error,#ec1313) 9%,transparent);color:var(--tool-error,#ec1313);animation:osv-in .35s var(--osv-ease)}
 .osv-status:empty{display:none}
+.osv-live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted,light-dark(#6b6b6b,#a0a0a0));white-space:nowrap}
+.osv-live-dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.6}
+.osv-live[data-state=live] .osv-live-dot{background:var(--success,#2e9d5b);opacity:1}
+.osv-live[data-state=stopped]{color:var(--tool-error,#ec1313)}
+.osv-live-note{margin:10px 14px 0;font-size:12px;color:var(--text-muted,light-dark(#6b6b6b,#a0a0a0))}
+@container osv (max-width:520px){.osv-live{font-size:0;gap:0}.osv-btn[aria-label=Refresh] span{display:none}}
 .osv-valid{margin:10px 14px 0;padding:10px 12px;border-radius:var(--osv-radius);border:1px solid color-mix(in srgb,var(--tool-error,#ec1313) 25%,transparent);
  background:color-mix(in srgb,var(--tool-error,#ec1313) 5%,var(--osv-card));max-height:40cqh;overflow:auto;animation:osv-in .4s var(--osv-spring)}
 .osv-valid[data-ok=true]{border-color:color-mix(in srgb,var(--success,#26713d) 30%,transparent);background:var(--success-soft,color-mix(in srgb,var(--success,#26713d) 8%,transparent))}

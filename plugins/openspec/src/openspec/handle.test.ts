@@ -73,3 +73,12 @@ test('both route wrappers delegate the original request', async () => {
         expect(await route(ctx, null, { req })).toBe(expected);
     }
 });
+
+test('watch op keeps the owned workspace watcher alive and returns only its key', async () => {
+    const { calls, request } = await setup();
+    const response = await request('&itemId=1&op=watch&dir=/foreign');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ result: 'watch' });
+    expect(calls.filter(([name]) => name === 'watch')).toEqual([['watch', { dir: '/owned' }]]);
+    expect(calls.some(([name]) => name === 'snapshot')).toBe(false);
+});

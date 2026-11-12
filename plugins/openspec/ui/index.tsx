@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { requestJson, useLiveSubscription, type ExtensionCanvasProps, type ExtensionContext, type UiExtension } from '@mauzcode/ui';
+import { requestJson, useLiveSubscription, type LiveStatus, type ExtensionCanvasProps, type ExtensionContext, type UiExtension } from '@mauzcode/ui';
 import { styles } from './styles';
 
 type Artifact = { id: string; label: string };
@@ -21,6 +21,19 @@ export function entriesOf(snapshot: Snapshot | null, section: Section): Entry[] 
   const list = section === 'changes' ? snapshot.changes : snapshot.archive;
   return list.map(c => ({ id: c.name, title: c.name, detail: c.progress ? c.progress.done + '/' + c.progress.total + ' tasks' : 'No tasks', progress: c.progress, artifacts: c.artifacts, mtime: c.mtime }));
 }
+/** Archive entry a change moved to (`<date>-<name>`), newest first, or null. */
+export function archivedAs(snapshot: Snapshot | null, name: string): Change | null {
+  return snapshot?.archive.find(c => c.name.endsWith('-' + name) && /^\d{4}-\d{2}-\d{2}-/.test(c.name)) ?? null;
+}
+/** Same artifact kind in an archived copy: `change:x:tasks` → `archive:<date>-x:tasks`. */
+export function archivedDoc(docId: string | null, from: string, to: Change): string | null {
+  const prefix = 'change:' + from + ':';
+  if (docId?.startsWith(prefix)) { const id = 'archive:' + to.name + ':' + docId.slice(prefix.length); if (to.artifacts.some(a => a.id === id)) return id; }
+  return to.artifacts[0]?.id ?? null;
+}
+const KEEP_ALIVE_MS = 2 * 60 * 1000;
+type Live = 'live' | 'connecting' | 'stopped';
+
 /** Next index for arrow/Home/End keys, or null for other keys. */
 export function moveIndex(key: string, index: number, count: number, horizontal: boolean): number | null {
   if (!count) return null;
@@ -43,7 +56,7 @@ function Progress({ progress }: { progress: Change['progress'] }) {
   </span>;
 }
 const Icon = ({ d, size = 14 }: { d: string; size?: number }) => <svg className="osv-icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
-const ICONS = { check: 'M20 6L9 17l-5-5', back: 'M15 18l-6-6 6-6', doc: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5', close: 'M18 6L6 18M6 6l12 12', alert: 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z' };
+const ICONS = { check: 'M20 6L9 17l-5-5', back: 'M15 18l-6-6 6-6', doc: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5', close: 'M18 6L6 18M6 6l12 12', refresh: 'M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5', alert: 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z' };
 const ago = (ms: number) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
 
 /** One-step Start-page launcher: the server opens (or reactivates) the tab for the agent's current local workspace. */
@@ -63,6 +76,8 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
   const [error, setError] = useState(''), [docError, setDocError] = useState('');
   const [validation, setValidation] = useState<Validation | null>(null), [validating, setValidating] = useState(false);
   const [tick, setTick] = useState(0);
+  const [transport, setTransport] = useState<LiveStatus>(() => window.mauzcodeLive?.getStatus?.() ?? 'connecting');
+  const [keepAliveOk, setKeepAliveOk] = useState(true), [liveError, setLiveError] = useState(false);
   const [active, setActive] = useState(0);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]), options = useRef<(HTMLLIElement | null)[]>([]);
   const base = '/openspec?agentId=' + encodeURIComponent(context.agentId || '') + '&itemId=' + item.id;
@@ -90,12 +105,39 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
     return () => { alive = false; };
   }, [base, docId, tick, snapshot?.key, missing]);
 
+  const keyRef = useRef<string | undefined>(undefined);
+  keyRef.current = snapshot?.key;
+  // The server watcher closes after idle minutes without requests; an open tab keeps it alive
+  // and refreshes when the watcher was recreated (it may have missed changes meanwhile).
+  const keepAlive = useCallback(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    requestJson<{ key: string }>(base + '&op=watch').then(r => { setKeepAliveOk(true); if (keyRef.current && r.key !== keyRef.current) refresh(); }).catch(() => setKeepAliveOk(false));
+  }, [base, refresh]);
+  useEffect(() => {
+    const timer = setInterval(keepAlive, KEEP_ALIVE_MS);
+    const onVisible = () => { if (document.visibilityState === 'visible') { keepAlive(); refresh(); } };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [keepAlive, refresh]);
+  useEffect(() => window.mauzcodeLive?.onStatus?.(setTransport), [snapshot !== null]);
+
   useLiveSubscription({
     name: 'openspec-workspace', types: ['openspec.changed'],
     onEvent: event => { if ((event as { key?: unknown }).key === snapshot?.key) refresh(); },
-    resync: () => refresh(),
-    onError: e => setError('Live updates unavailable: ' + errorText(e)),
+    resync: () => { setLiveError(false); keepAlive(); refresh(); },
+    onError: () => setLiveError(true),
   });
+  const live: Live = liveError || !keepAliveOk || transport === 'disconnected' ? 'stopped' : transport === 'connected' ? 'live' : 'connecting';
+
+  // A selected change that was archived follows into the Archive section.
+  useEffect(() => {
+    if (!snapshot || section !== 'changes' || !selected || snapshot.changes.some(c => c.name === selected)) return;
+    const moved = archivedAs(snapshot, selected);
+    if (!moved) return;
+    const nextDoc = archivedDoc(docId, selected, moved);
+    setSection('archive'); setSelected(moved.name); setDocId(nextDoc);
+    save({ section: 'archive', selected: moved.name, doc: nextDoc });
+  }, [snapshot]);
 
   useEffect(() => { const i = entries.findIndex(e => e.id === selected); setActive(i >= 0 ? i : 0); }, [section, snapshot]);
 
@@ -139,10 +181,13 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
         <span className="osv-seg-thumb" aria-hidden="true" />
         {SECTIONS.map((s, i) => <button key={s.id} ref={el => { tabs.current[i] = el; }} role="tab" aria-label={s.label} id={'osv-tab-' + item.id + '-' + s.id} aria-selected={section === s.id} aria-controls={'osv-list-' + item.id} tabIndex={section === s.id ? 0 : -1} onClick={() => switchSection(s.id)} onKeyDown={e => onTabKey(e, i)}>{s.label}{snapshot?.initialized && <span className="osv-count" aria-hidden="true">{counts[s.id]}</span>}</button>)}
       </div>
+      <span className="osv-live" data-state={live} title={live === 'stopped' ? 'Live updates unavailable — use Refresh' : undefined}><span className="osv-live-dot" aria-hidden="true" />{live === 'live' ? 'Live' : live === 'connecting' ? 'Connecting…' : 'Not live'}</span>
+      <button className="osv-btn" onClick={() => { keepAlive(); refresh(); }} aria-label="Refresh"><Icon d={ICONS.refresh} /><span>Refresh</span></button>
       <button className="osv-btn osv-primary" onClick={validate} disabled={validating || !snapshot?.initialized} aria-label="Validate">{validating ? <span className="osv-spin" aria-hidden="true" /> : <Icon d={ICONS.check} />}<span>{validating ? 'Validating…' : 'Validate'}</span></button>
     </header>
     {error && <p role="alert" className="osv-alert"><Icon d={ICONS.alert} />{error}</p>}
     <div role="status" aria-live="polite" className="osv-status">
+      {live === 'stopped' && <p className="osv-live-note">Live updates are unavailable; use Refresh to reload.</p>}
       {validation && <div className="osv-valid" data-ok={validation.ok && !validation.error}>
         <div className="osv-valid-head">
           <span className="osv-valid-dot" aria-hidden="true"><Icon d={validation.ok && !validation.error ? ICONS.check : ICONS.alert} size={12} /></span>

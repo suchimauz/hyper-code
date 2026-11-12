@@ -1,7 +1,7 @@
 /**
  * Serve owned OpenSpec Canvas reads and CSRF-protected workspace tab opening.
  *
- * Use for the OpenSpec GET and POST routes. Authorizes the agent on every request and derives read directories only from owned open OpenSpec items; browser paths and hosts are never used.
+ * Use for the OpenSpec GET and POST routes. Authorizes the agent on every request and derives read directories only from owned open OpenSpec items; browser paths and hosts are never used. GET ops: snapshot (also touches the watcher), watch (keep-alive returning the live key), doc, validate.
  * @param opts.req Incoming browser request with agentId and, for reads, itemId and op.
  */
 export default async function (
@@ -36,6 +36,7 @@ export default async function (
             await ctx.fns.openspec.watch({ dir });
             return Response.json(await ctx.fns.openspec.snapshot({ dir }), { headers });
         }
+        if (op === 'watch') return Response.json(await ctx.fns.openspec.watch({ dir }), { headers });
         if (op === 'doc') return Response.json(await ctx.fns.openspec.document({ dir, id: url.searchParams.get('id') || '' }), { headers });
         if (op === 'validate') return Response.json(await ctx.fns.openspec.validateAll({ dir }), { headers });
         return new Response('Unsupported read operation', { status: 400, headers });

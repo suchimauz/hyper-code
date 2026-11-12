@@ -1,10 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const live = vi.hoisted(() => ({ onEvent: null as null | ((e: unknown) => void), resync: null as null | ((r: string) => void) }));
+const live = vi.hoisted(() => ({ onEvent: null as null | ((e: unknown) => void), resync: null as null | ((r: string) => void), onError: null as null | ((e: unknown) => void) }));
 vi.mock('@mauzcode/ui', async () => ({
   ...await vi.importActual<typeof import('@mauzcode/ui')>('@mauzcode/ui'),
   requestJson: vi.fn(),
-  useLiveSubscription: (o: { onEvent: (e: unknown) => void; resync: (r: string) => void }) => { live.onEvent = o.onEvent; live.resync = o.resync; },
+  useLiveSubscription: (o: { onEvent: (e: unknown) => void; resync: (r: string) => void; onError: (e: unknown) => void }) => { live.onEvent = o.onEvent; live.resync = o.resync; live.onError = o.onError; },
 }));
 import { requestJson } from '@mauzcode/ui';
 import openspec, { Workspace, moveIndex, openWorkspace } from '../../../plugins/openspec/ui';
@@ -13,7 +13,9 @@ import { createExtensionRegistry } from '../extensions/registry';
 const request = vi.mocked(requestJson);
 let done = 1;
 let hasDesign = true;
-const snapshot = () => ({ initialized: true, key: 'k1', specs: [{ id: 'spec:auth', path: 'auth' }], archive: [],
+let archived = false;
+const addX = (kind: string, name: string) => ({ name, mtime: 1, progress: { done, total: 3 }, artifacts: [{ id: kind + ':' + name + ':proposal', label: 'proposal.md' }, ...(hasDesign ? [{ id: kind + ':' + name + ':design', label: 'design.md' }] : [])] });
+const snapshot = () => archived ? ({ initialized: true, key: 'k1', specs: [], archive: [addX('archive', '2026-11-12-add-x')], changes: [] }) : ({ initialized: true, key: 'k1', specs: [{ id: 'spec:auth', path: 'auth' }], archive: [],
   changes: [{ name: 'add-x', mtime: 1, progress: { done, total: 3 }, artifacts: [{ id: 'change:add-x:proposal', label: 'proposal.md' }, ...(hasDesign ? [{ id: 'change:add-x:design', label: 'design.md' }] : [])] },
     { name: 'fix-y', mtime: 1, progress: null, artifacts: [{ id: 'change:fix-y:proposal', label: 'proposal.md' }] }] });
 const settle = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
@@ -21,10 +23,11 @@ const item = (state: Record<string, unknown> = {}) => ({ id: 7, kind: 'openspec.
 const ctx = { agentId: 'ab', theme: 'dark' as const, readOnly: false };
 
 beforeEach(() => {
-  done = 1; hasDesign = true; request.mockReset();
+  done = 1; hasDesign = true; archived = false; request.mockReset();
   request.mockImplementation(async (url: string) => {
     if (url.includes('op=snapshot')) return snapshot();
     if (url.includes('op=doc')) { const id = decodeURIComponent(url.split('id=')[1]); return { id, title: id, html: '<h1>' + id + '</h1>', mtime: 1 }; }
+    if (url.includes('op=watch')) return { key: 'k1' };
     if (url.includes('op=validate')) return { ok: true, items: [{ id: 'add-x', type: 'change', valid: true, issues: [] }] };
     return {};
   });
@@ -91,5 +94,31 @@ describe('openspec plugin UI', () => {
     render(<Workspace context={ctx} item={item()} />); await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Validate' })); await settle();
     expect(screen.getAllByRole('status').some(s => s.textContent?.includes('All 1 items are valid.'))).toBe(true);
+  });
+
+  it('follows a selected change into the archive with the same artifact', async () => {
+    render(<Workspace context={ctx} item={item({ section: 'changes', selected: 'add-x', doc: 'change:add-x:design' })} />); await settle();
+    archived = true;
+    act(() => live.onEvent?.({ type: 'openspec.changed', key: 'k1' })); await settle(); await settle();
+    expect(screen.getByRole('tab', { name: 'Archive' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('article', { name: 'archive:2026-11-12-add-x:design' })).toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith('/canvas/ab/item/7', { method: 'POST', body: { state: { section: 'archive', selected: '2026-11-12-add-x', doc: 'archive:2026-11-12-add-x:design' } } });
+  });
+
+  it('refreshes by hand and keeps the server watcher alive', async () => {
+    render(<Workspace context={ctx} item={item()} />); await settle();
+    const before = request.mock.calls.filter(([u]) => String(u).includes('op=snapshot')).length;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' })); await settle();
+    expect(request.mock.calls.filter(([u]) => String(u).includes('op=snapshot')).length).toBe(before + 1);
+    expect(request.mock.calls.some(([u]) => String(u).includes('op=watch'))).toBe(true);
+  });
+
+  it('announces when live updates stop and recovers after resync', async () => {
+    render(<Workspace context={ctx} item={item()} />); await settle();
+    act(() => live.onError?.(new Error('down'))); await settle();
+    expect(screen.getByText('Not live')).toBeInTheDocument();
+    expect(screen.getAllByRole('status').some(s => s.textContent?.includes('Live updates are unavailable'))).toBe(true);
+    act(() => live.resync?.('reconnect')); await settle();
+    expect(screen.queryByText('Not live')).not.toBeInTheDocument();
   });
 });

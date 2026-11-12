@@ -90,3 +90,20 @@ test('watch rejects nonabsolute and NUL-containing directory arguments', async (
         for (const dir of ['relative', '/tmp/invalid\0path']) await expect(watch(f.ctx, null, { dir })).rejects.toThrow(/absolute workspace/);
     } finally { await f.close(); }
 });
+
+test('watch reports a change moved into the archive', async () => {
+    const f = await setup();
+    try {
+        const { key } = await watch(f.ctx, null, { dir: f.dir });
+        await writeFile(join(f.os, 'changes/test/tasks.md'), '- [x] done');
+        await mkdir(join(f.os, 'changes/archive'), { recursive: true });
+        await Bun.sleep(600);
+        f.events.length = 0;
+        fs.renameSync(join(f.os, 'changes/test'), join(f.os, 'changes/archive/2026-01-01-test'));
+        await Bun.sleep(700);
+        expect(f.events).toEqual([{ type: 'openspec.changed', key }]);
+        const snap = await snapshot(f.ctx, null, { dir: f.dir });
+        expect(snap.changes).toEqual([]);
+        expect(snap.archive.map(c => c.name)).toEqual(['2026-01-01-test']);
+    } finally { await f.close(); }
+});
