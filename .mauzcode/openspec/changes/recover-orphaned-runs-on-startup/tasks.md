@@ -11,7 +11,7 @@
 - [x] 2.1 Keep lease recovery in `workerLoop.ts` untouched and mirror its SET clause and post-processing in `agent.recoverOrphanedRuns` (cross-file helpers are not allowed; a comment ties the two); verify `workerLoop.test.ts` passes unchanged
 - [x] 2.2 Create `agent.recoverOrphanedRuns({ owner })` via `procs.dev.createFunction` using the shared helper; verify tests: foreign owner → idle with retry scheduled; own owner → untouched; `run_owner IS NULL` → untouched; retry limit reached → no retry and failure recorded; stopped agent → no retry
 - [x] 2.3 Call it from `holdWorkerLock` right after a successful lock acquisition (not on every recheck), logging and continuing on error; verify by test or review that it runs once per acquisition and before the first claim
-- [ ] 2.4 Run `runtime.docs.validate({ name, strict: true, typecheck: true })` for new/changed functions and `code.quality({})`; verify ok:true
+- [x] 2.4 Run `runtime.docs.validate({ name, strict: true, typecheck: true })` for new/changed functions and `code.quality({})`; verify ok:true
 
 ## 3. Documentation and integration
 
