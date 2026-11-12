@@ -23,14 +23,15 @@ export default async function (
     const canonical = (model:string) => { try { return ctx.fns.llm.parseModelRoute({model}).route; } catch { return model; } };
     const disabled=new Set(policy.disabledModels.map(canonical));
     const groupLabels=await ctx.fns.frontendBridge.modelGroupLabels({models:Object.values(groups).flat()});
-    const models=await Promise.all(Object.entries(groups).flatMap(([provider,values])=>values.map(async model=>({provider,model,...(groupLabels[model] ? {groupLabel:groupLabels[model]} : {}),label:model.slice(model.lastIndexOf(':')+1),disabled:disabled.has(canonical(model)),icon:await ctx.fns.frontendBridge.iconData({model})}))));
+    const names=await ctx.fns.llm.modelDisplayNames({models:Object.values(groups).flat()});
+    const models=await Promise.all(Object.entries(groups).flatMap(([provider,values])=>values.map(async model=>({provider,model,...(groupLabels[model] ? {groupLabel:groupLabels[model]} : {}),label:names[model]??model.slice(model.lastIndexOf(':')+1),disabled:disabled.has(canonical(model)),icon:await ctx.fns.frontendBridge.iconData({model})}))));
     const enabledDefault=models.find(m=>!m.disabled&&m.model===defaultModel)?.model??models.find(m=>!m.disabled)?.model??'';
     const efforts=['auto','off','minimal','low','medium','high','xhigh'];
     if(req.method==='GET'){
         const url=new URL(req.url),model=canonical(url.searchParams.get('model')||enabledDefault),requested=url.searchParams.get('effort')||'auto';
         if(!models.some(m=>m.model===model&&!m.disabled)||!efforts.includes(requested))return reply({error:'Invalid model or effort'},400);
         const [profile,resolved]=await Promise.all([ctx.fns.llm.reasoningCapabilities({model}),ctx.fns.llm.resolveReasoningEffort({model,effort:requested as types.llm.ReasoningEffort})]);
-        return reply({promptPresets:await ctx.fns.agent.listPromptPresets({}),version:1,model,label:model.slice(model.lastIndexOf(':')+1),icon:await ctx.fns.frontendBridge.iconData({model}),defaultModel:enabledDefault,models,effort:{requested,applied:resolved.applied,supported:profile.supported,defaultEffort:profile.defaultEffort,mode:profile.mode,downgraded:resolved.downgraded},csrfToken:await ctx.fns.auth.csrfToken({req})});
+        return reply({promptPresets:await ctx.fns.agent.listPromptPresets({}),version:1,model,label:models.find(m=>m.model===model)?.label??model.slice(model.lastIndexOf(':')+1),icon:await ctx.fns.frontendBridge.iconData({model}),defaultModel:enabledDefault,models,effort:{requested,applied:resolved.applied,supported:profile.supported,defaultEffort:profile.defaultEffort,mode:profile.mode,downgraded:resolved.downgraded},csrfToken:await ctx.fns.auth.csrfToken({req})});
     }
     const contentType=req.headers.get('content-type')?.split(';')[0]?.trim();
     let data:{requestKey?:string;projectId?:string;model?:string;effort?:string;mascot?:string;text?:string;title?:string;workspaceDir?:string;createWorkspaceDir?:string;promptPreset?:string[];systemPrompt?:string};

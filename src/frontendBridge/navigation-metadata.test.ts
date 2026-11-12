@@ -14,7 +14,7 @@ test('navigation projects durable model/effort and creation dates without per-ch
  const ctx:any={fns:{
   projects:{list:async()=>[{id:'p',title:'P'},{id:'virtual',virtual:true}],chats:async({projectId,archived}:any)=>projectId==='p'&&!archived?rows.map(row=>({...row,runState:'idle'})):[]},
   session:{list:async()=>[]}, frontendBridge:{iconData:async()=>null},
-  llm:{resolveReasoningEffort:async({model,effort}:any)=>{
+  llm:{modelDisplayNames:async()=>({}),resolveReasoningEffort:async({model,effort}:any)=>{
    resolutions++;
    const none=model==='lmstudio:local';
    return {requested:effort,applied:none?'off':effort==='auto'?'medium':effort==='off'?'low':effort,mode:none?'none':'openai-effort',downgraded:none||effort==='off'};

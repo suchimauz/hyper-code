@@ -21,6 +21,8 @@ export default async function (
     const dates=await ctx.fns.procs.db.select({sql:"SELECT m.agent_id,MAX(m.ts) AS ts FROM messages m JOIN agents a ON a.id=m.agent_id WHERE a.visibility='nav' AND m.role='assistant' AND m.content IS NOT NULL AND m.content <> '' AND (m.tool_calls IS NULL OR m.tool_calls='[]'::jsonb) GROUP BY m.agent_id"});
     const lastReply=new Map<string,number>(dates.map(r=>[String(r.agent_id),Number(r.ts)]));
     const iconRows=await ctx.fns.procs.db.select({sql:"SELECT id,icon,model,color_hue,reasoning_effort,created_at FROM agents WHERE visibility='nav'"});
+    const modelNames=await ctx.fns.llm.modelDisplayNames({models:[...new Set(iconRows.map(row=>String(row.model??'')).filter(Boolean))]});
+    const modelLabel=(model:string)=>modelNames[model]??model.slice(model.lastIndexOf(':')+1);
     const icons=new Map(await Promise.all(iconRows.map(async row=>[String(row.id),await ctx.fns.frontendBridge.iconData({icon:row.icon,model:row.model})] as const)));
     // Native capability resolution is cache-only, including MauzCode/OpenCode routes.
     // Share one resolution per distinct pair rather than repeating work for every chat.
@@ -31,9 +33,9 @@ export default async function (
         const requested=String(row.reasoning_effort??'auto') as types.llm.ReasoningEffort;
         const key=JSON.stringify([model,requested]);
         if(!efforts.has(key)) efforts.set(key,ctx.fns.llm.resolveReasoningEffort({model,effort:requested}).then(resolved=>({requested:resolved.requested,applied:resolved.applied,label:resolved.mode==='none'?null:labels[resolved.requested==='auto'?'auto':resolved.applied],downgraded:resolved.downgraded})));
-        return [String(row.id),{colorHue:row.color_hue==null?null:Number(row.color_hue),modelLabel:model.slice(model.lastIndexOf(':')+1),effort:await efforts.get(key)!,createdAt:row.created_at==null?null:Number(row.created_at)}] as const;
+        return [String(row.id),{colorHue:row.color_hue==null?null:Number(row.color_hue),modelLabel:modelLabel(model),effort:await efforts.get(key)!,createdAt:row.created_at==null?null:Number(row.created_at)}] as const;
     })));
-    const chatMetadata=(id:string,model:string)=>metadata.get(id)??{colorHue:null,modelLabel:String(model??'').slice(String(model??'').lastIndexOf(':')+1),effort:null,createdAt:null};
+    const chatMetadata=(id:string,model:string)=>metadata.get(id)??{colorHue:null,modelLabel:modelLabel(String(model??'')),effort:null,createdAt:null};
     const mapChat=(chat:types.projects.Chat)=>({id:chat.id,icon:icons.get(chat.id)??null,title:summaries.get(chat.id)?.title||chat.title,model:chat.model,...chatMetadata(chat.id,chat.model),runState:chat.runState,teamRunningCount:chat.teamRunningCount??0,hasUnread:chat.hasUnread,archived:chat.archived,pinned:pins.has(chat.id),pinnedAt:pins.get(chat.id)??null,lastReplyAt:lastReply.get(chat.id)??null});
     const result=[];
     for(const p of projects){const chats=[...await ctx.fns.projects.chats({projectId:p.id}),...await ctx.fns.projects.chats({projectId:p.id,archived:true})].map(mapChat).sort((a,b)=>(b.lastReplyAt??0)-(a.lastReplyAt??0)||a.id.localeCompare(b.id));result.push({id:p.id,icon:p.icon??null,createdAt:projectCreated.get(p.id)??null,title:p.title,dir:p.dir,host:p.host,virtual:p.virtual??false,archived:p.archived??false,runningCount:p.runningCount??0,unreadCount:p.unreadCount??0,chats});}

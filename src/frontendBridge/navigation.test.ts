@@ -17,7 +17,7 @@ test('fixed endpoints return private JSON only and bounded failure messages',asy
  expect(await (await endpoint(ctx,session,{req:req('search')})).json()).toEqual({mode:'home'});
 });
 test('navigation preserves native project identity/archive and uses native titles plus actual reply times',async()=>{
- const ctx={fns:{projects:{list:async()=>[{id:'p',title:'Project',dir:'/a',host:'remote'}],chats:async({archived}:any)=>[{id:archived?'old':'a',title:'a',model:'m',archived:!!archived,runState:'idle',hasUnread:true}]},session:{list:async()=>[{id:'a',title:'Real title'}]},procs:{db:{select:async({sql}:any)=>sql.startsWith('SELECT m.')?[{agent_id:'a',ts:'12345'}]:[]}}}} as any;
+ const ctx={fns:{llm:{modelDisplayNames:async()=>({})},projects:{list:async()=>[{id:'p',title:'Project',dir:'/a',host:'remote'}],chats:async({archived}:any)=>[{id:archived?'old':'a',title:'a',model:'m',archived:!!archived,runState:'idle',hasUnread:true}]},session:{list:async()=>[{id:'a',title:'Real title'}]},procs:{db:{select:async({sql}:any)=>sql.startsWith('SELECT m.')?[{agent_id:'a',ts:'12345'}]:[]}}}} as any;
  const data=await navigation(ctx,session,{});expect(data.projects[0].host).toBe('remote');expect(data.projects[0].chats[0]).toMatchObject({title:'Real title',lastReplyAt:12345,hasUnread:true});expect(data.projects[0].chats[1]).toMatchObject({archived:true,lastReplyAt:null});
  await expect(navigation(ctx,null,{})).rejects.toThrow('Unauthorized');
 });
@@ -28,7 +28,7 @@ test('search uses native tabs/providers, strips actions/SVG and unsafe links',as
  await expect(search(ctx,null,{})).rejects.toThrow('Unauthorized');
 });
 test('navigation projects personal native pins for project and unassigned chats',async()=>{
- const ctx:any={fns:{projects:{list:async()=>[{id:'p'}],chats:async({archived}:any)=>archived?[]:[{id:'a',archived:false}]},session:{list:async()=>[]},procs:{db:{select:async({sql,params}:any)=>{
+ const ctx:any={fns:{llm:{modelDisplayNames:async()=>({})},projects:{list:async()=>[{id:'p'}],chats:async({archived}:any)=>archived?[]:[{id:'a',archived:false}]},session:{list:async()=>[]},procs:{db:{select:async({sql,params}:any)=>{
   if(sql.includes('user_agent_state')){expect(params).toEqual(['visitor']);return [{agent_id:'a',updated_at:'100'},{agent_id:'b',updated_at:'200'}];}
   if(sql.includes('workspace_dir IS NULL'))return [{id:'b',archived_at:42},{id:'c',archived_at:null}];
   return [];

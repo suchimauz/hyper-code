@@ -62,7 +62,7 @@ export default async function (
         const model=String(row.model??'');
         return {id:String(row.id),title:String(row.title??''),icon:await ctx.fns.frontendBridge.iconData({icon:row.icon,model:row.model}),colorHue:row.color_hue==null?null:Number(row.color_hue),runState:String(row.run_state??'idle'),
             tokens:(details.coverage?.tokenRequests??0)>0&&input!=null&&output!=null?finite(input+output):null,
-            durationMs:finite(row.duration_ms),modelLabel:model.slice(model.lastIndexOf(':')+1),lastReplyAt:finite(row.last_reply_at)};
+            durationMs:finite(row.duration_ms),modelLabel:(await ctx.fns.llm.modelDisplayNames({models:[model]}))[model]??model.slice(model.lastIndexOf(':')+1),lastReplyAt:finite(row.last_reply_at)};
     }));
     };
     const [children,siblings]=await Promise.all([loadChildren(agentId),parent?loadChildren(parent.id):Promise.resolve([])]);
