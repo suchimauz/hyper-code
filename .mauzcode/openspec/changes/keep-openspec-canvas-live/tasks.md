@@ -13,5 +13,9 @@
 ## 3. Verification
 
 - [x] 3.1 `code.quality({})` ok, plugin and frontend tests pass
-- [ ] 3.2 Manual: open tab, wait past idle timeout, archive a change, see it move within a few seconds
+- [x] 3.2 Manual: open tab, wait past idle timeout, archive a change, see it move within a few seconds
 - [x] 3.3 `openspec validate keep-openspec-canvas-live --strict` passes
+
+## Verification notes
+
+- 3.2 (2026-11-12): real Chrome tab on `/?agent=ek`. Closed the server watcher by hand to simulate idle expiry; the open tab recreated it within 22 s. Then a selected probe change was moved into `changes/archive`, and within 2.5 s the tab switched to Archive, opened `2026-11-12-probe-live-check` and showed `Live`. Probe removed afterwards.
