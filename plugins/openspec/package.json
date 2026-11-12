@@ -6,7 +6,16 @@
     "src": "src",
     "label": "OpenSpec",
     "icon": "ph-list-checks",
-    "description": "Spec-driven changes with the OpenSpec CLI, stored in the workspace's .mauzcode/openspec instead of the project root."
+    "description": "Spec-driven changes with the OpenSpec CLI, stored in the workspace's .mauzcode/openspec instead of the project root.",
+    "ui": {
+      "entry": "ui/index.tsx",
+      "canvasKinds": [
+        "openspec.workspace"
+      ],
+      "canvasLaunchers": [
+        "openspec"
+      ]
+    }
   },
   "dependencies": {
     "@fission-ai/openspec": "2.0.0"
