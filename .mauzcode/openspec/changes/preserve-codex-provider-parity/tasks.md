@@ -39,18 +39,18 @@ All items below describe future implementation, not work completed by the specif
 
 ## 6. Separately authorized live acceptance
 
-> Partial: a run on the SDK side only (gpt-6-luna, user-approved) is recorded in `live-acceptance.md`. Still open: the legacy-client comparison, conclusive cache evidence and an explicit budget. Offline evidence is in `src/models/codexParity.test.ts` and `src/models/codex.test.ts`.
+> Done: user-approved live comparison on gpt-6-luna (~155k of ~200k tokens), see `live-acceptance.md`.
 
-- [ ] 6.1 Discover safe existing credential references and obtain explicit account/connection, model and request/token budget approval before live traffic; record authorization scope without credential values and keep this task incomplete if unavailable.
-- [ ] 6.2 Run approved isolated normal/tool-continuation/compact/checkpoint-replay sequences through independent legacy and SDK clients on the same model and comparable account conditions; verify correctness and SDK independence without changing user conversations.
-- [ ] 6.3 Record sanitized versions, transport, request conditions, timing/order, input/output/cache-read tokens and quota observations; distinguish cache effectiveness evidence from wire parity, explicitly mark zero/missing cache metrics inconclusive and avoid a numerical hit-rate equality claim.
-- [ ] 6.4 Verify the live evidence satisfies the approved budget and required scenarios, or record the blocker and leave acceptance unfinished; never replace missing live evidence with mock successes.
+- [x] 6.1 Discover safe existing credential references and obtain explicit account/connection, model and request/token budget approval before live traffic; record authorization scope without credential values and keep this task incomplete if unavailable.
+- [x] 6.2 Run approved isolated normal/tool-continuation/compact/checkpoint-replay sequences through independent legacy and SDK clients on the same model and comparable account conditions; verify correctness and SDK independence without changing user conversations.
+- [x] 6.3 Record sanitized versions, transport, request conditions, timing/order, input/output/cache-read tokens and quota observations; distinguish cache effectiveness evidence from wire parity, explicitly mark zero/missing cache metrics inconclusive and avoid a numerical hit-rate equality claim.
+- [x] 6.4 Verify the live evidence satisfies the approved budget and required scenarios, or record the blocker and leave acceptance unfinished; never replace missing live evidence with mock successes.
 
 ## 7. Final review
 
-> 7.1 stays open until the live acceptance in group 6 has evidence. Offline checks: `bun test src/models src/secrets` passed 138/0 and `src/llm` passed 434/0. `runtime.docs.validate` in strict mode passed for every changed function, and tsc reports only pre-existing errors in connections.test.ts.
+> Offline: `bun test src/models src/secrets` 138/0, `src/llm` 434/0, strict docs validation ok; tsc only pre-existing connections.test.ts errors. Live: `live-acceptance.md`.
 
-- [ ] 7.1 Run strict OpenSpec validation and review the acceptance report against every new requirement, including independence and live evidence; verify all completed task claims have evidence and unresolved implementation/live work remains unchecked.
+- [x] 7.1 Run strict OpenSpec validation and review the acceptance report against every new requirement, including independence and live evidence; verify all completed task claims have evidence and unresolved implementation/live work remains unchecked.
 - [x] 7.2 Review final implementation diff for scope, credential safety and no production agent migration, and document rollout/revert instructions without a hidden legacy fallback; verify another provider's unrelated cleanup is not included.
 
 ## Workflow follow-up
