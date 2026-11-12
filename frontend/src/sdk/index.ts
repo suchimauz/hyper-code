@@ -10,4 +10,4 @@ export { requestJson, ApiError } from './api';
 export type { ApiRequestOptions } from './api';
 export { subscribeLive, useLiveSubscription } from './live';
 export type { LiveEvent, LiveStatus, LiveSubscriptionOptions } from './live';
-export type { UiExtension, ExtensionInput, ExtensionInputProps, ExtensionBatchInputProps, ExtensionInputKind, ExtensionContext, ExtensionViewProps, ExtensionCanvasProps, ExtensionCanvasKind, ExtensionCanvasLauncher, ExtensionLauncherProps, ExtensionModelProvider, ExtensionModelProviderProps, ModelProviderView, ModelConnectionView, ModelFieldSpec, ModelTransportSpec } from '../extensions/types';
+export type { UiExtension, ExtensionInput, ExtensionInputProps, ExtensionBatchInputProps, ExtensionInputKind, ExtensionContext, ExtensionViewProps, ExtensionCanvasProps, ExtensionCanvasKind, ExtensionCanvasLauncher, ExtensionLauncherProps } from '../extensions/types';

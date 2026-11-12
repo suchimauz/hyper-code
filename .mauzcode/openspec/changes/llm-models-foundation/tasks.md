@@ -43,18 +43,14 @@ Verification (block 4): 10 custom tests passed in an isolated Bun subprocess exe
 
 ## 5. UI SDK slot
 
-- [x] 5.1 Accept `procs.ui.modelProviders` grants in `plugins/uiCompile.ts`, `UiGrants` and `uiManifest`; verify plugin tests that grants compile and change detection includes the new key
-- [x] 5.2 Add `modelProviders` to `UiExtension`, registry (grant check, duplicates) and `@mauzcode/ui` exports; verify frontend registry tests for granted, ungranted and duplicate entries
-
-Verification (block 5): `procs.ui.modelProviders` accepted by `uiCompile` (kebab-case ids, `custom` rejected), stored in `UiGrants` and included in `uiManifest` approval equality (older approvals without the key → `changed`). `bun test src/plugins/ui.test.ts` — 6 passed. Frontend: `UiExtension.modelProviders`, registry grant/duplicate checks, SDK exports `ExtensionModelProvider(Props)`, `ModelProviderView`, `ModelConnectionView`, `ModelFieldSpec`, `ModelTransportSpec`; registry tests 10 passed. `docs/models-providers.md` and plugins SKILL.md document the slot; doc example test still passes.
+- [ ] 5.1 Accept `procs.ui.modelProviders` grants in `plugins/uiCompile.ts`, `UiGrants` and `uiManifest`; verify plugin tests that grants compile and change detection includes the new key
+- [ ] 5.2 Add `modelProviders` to `UiExtension`, registry (grant check, duplicates) and `@mauzcode/ui` exports; verify frontend registry tests for granted, ungranted and duplicate entries
 
 ## 6. Models settings tab
 
-- [x] 6.1 Add `frontend/src/lib/models.ts` client and `ModelsPanel` (list, usage view, add/edit with schema-driven form and write-only secrets, transport picker with saved proxies and trusted SSH instances, test, enable/disable, remove with confirmation, plugin component when granted)
-- [x] 6.2 Add the "Models" tab (lucide `Boxes`) to `SETTINGS_TABS` keeping "LLM Connections"; verify frontend tests for tab presence, schema form, secret edit behaviour, remove confirmation and plugin component use
-- [x] 6.3 Check accessibility (labels, keyboard, focus, theme, reduced motion) and verify with frontend tests and a manual screenshot of the tab
-
-Verification (block 6): client is `frontend/src/lib/modelConnections.ts` (`lib/models.ts` already holds the chat model picker). `ModelsPanel` + `UsageView`, tab `models` (Boxes) after LLM Connections, also `?settings=models`. `frontend/src/test/settings-models.test.tsx` — 8 passed (tab presence, schema form + CSRF create, write-only secret keep/clear, remove confirmation with focus, test/enable, quota windows vs status-only, granted vs ungranted plugin component, owner-only error). `tsc -b frontend` clean. Full vitest: 693 passed, 2 failed (live-navigation, quota-matrix) — both fail identically on HEAD. Accessibility: every control labelled (labelledby), native buttons/inputs for keyboard, visible focus rings for select/checkbox/radio/textarea, theme tokens only, no animations added (reduced-motion rule covers the modal). Manual screenshot: `.mauzcode/tmp/ee/models-tab.png`. `code.quality` unchanged (8 pre-existing unresolved).
+- [ ] 6.1 Add `frontend/src/lib/models.ts` client and `ModelsPanel` (list, usage view, add/edit with schema-driven form and write-only secrets, transport picker with saved proxies and trusted SSH instances, test, enable/disable, remove with confirmation, plugin component when granted)
+- [ ] 6.2 Add the "Models" tab (lucide `Boxes`) to `SETTINGS_TABS` keeping "LLM Connections"; verify frontend tests for tab presence, schema form, secret edit behaviour, remove confirmation and plugin component use
+- [ ] 6.3 Check accessibility (labels, keyboard, focus, theme, reduced motion) and verify with frontend tests and a manual screenshot of the tab
 
 ## 7. Integration checks
 
