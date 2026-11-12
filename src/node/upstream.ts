@@ -26,7 +26,7 @@ export default async function (
         /** Client session id forwarded to cache-keyed providers. */
         sessionId?: string;
     },
-): Promise<{ url: string; headers: Record<string, string>; kind: string } | null> {
+): Promise<{ url: string; headers: Record<string, string>; kind: string; noFallback?:boolean } | null> {
     const account = opts.account ?? "default";
     const ep = await ctx.fns.llm.resolveEndpoint({ model: `${opts.provider}${account === "default" ? "" : `/${account}`}:x` });
     if (ep.api !== opts.api) throw new Error(`model api mismatch: ${opts.provider} speaks ${ep.api}, request is ${opts.api}`);
@@ -65,7 +65,7 @@ export default async function (
     } else {
         headers.authorization = `Bearer ${apiKey}`;
     }
-    return { url: ep.url, headers, kind: ep.kind };
+    return { url: ep.url, headers, kind: ep.kind, ...(ep.noFallback ? {noFallback:true} : {}) };
 }
 
 function accountIdOf(token: string): string {

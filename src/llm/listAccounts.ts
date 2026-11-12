@@ -75,14 +75,14 @@ export default async function (
     // need that implementation detail to understand or switch accounts.
     if (!filter || filter === "anthropic-oauth" || filter === "claude-code") {
         const rows = (await ctx.fns.procs.db.select({
-            sql: "SELECT account, label, expires_at FROM oauth_credentials WHERE provider = ? ORDER BY account",
+            sql: "SELECT account, label, expires_at, refresh_uncertain FROM oauth_credentials WHERE provider = ? ORDER BY account",
             params: ["anthropic-oauth"],
         })) as any[];
         for (const row of rows) {
             const item = entry("anthropic-oauth", String(row.account ?? "default"), "oauth", byKey, reconnectKeys);
             item.label = row.label ? String(row.label) : (item.account === "default" ? "Claude managed" : item.account);
             out.push(item);
-            if (Number(row.expires_at) <= now) { item.needsReconnect = true; item.available = false; }
+            if (row.refresh_uncertain || Number(row.expires_at) <= now) { item.needsReconnect = true; item.available = false; }
         }
     }
 
@@ -91,13 +91,13 @@ export default async function (
     // provider (`xai`) rather than their persistence adapter (`xai-oauth`).
     if (!filter || filter === "xai" || filter === "xai-oauth") {
         const rows = (await ctx.fns.procs.db.select({
-            sql: "SELECT account, label, expires_at FROM oauth_credentials WHERE provider = ? ORDER BY account",
+            sql: "SELECT account, label, expires_at, refresh_uncertain FROM oauth_credentials WHERE provider = ? ORDER BY account",
             params: ["xai-oauth"],
         })) as any[];
         for (const row of rows) {
             const item = entry("xai", String(row.account ?? "default"), "oauth", byKey, reconnectKeys);
             item.label = row.label ? String(row.label) : (item.account === "default" ? "Grok managed" : item.account);
-            if (Number(row.expires_at) <= now) { item.needsReconnect = true; item.available = false; }
+            if (row.refresh_uncertain || Number(row.expires_at) <= now) { item.needsReconnect = true; item.available = false; }
             out.push(item);
         }
     }
@@ -216,7 +216,7 @@ function entry(provider: string, account: string, source: "file" | "oauth" | "ke
         provider,
         account,
         label: account === "default" ? provider : `${provider} · ${account}`,
-        model: known?.model ?? `${provider}${account === "default" ? "" : `/${account}`}:`,
+        model: known?.model ?? `${provider}/${account}:`,
         source,
         sshInstance: undefined as string | undefined,
         // "Available" means there is quota left to switch INTO — the whole point

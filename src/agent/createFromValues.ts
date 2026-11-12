@@ -28,7 +28,7 @@ systemPrompt?: string }): Promise<{ agent?: any; confirmation?: { dir: string; v
         const project = opts.projectId ? await ctx.fns.projects.get({ projectId: opts.projectId }) : null;
         if (opts.projectId && !project) return { error: 'Project not found' };
         const workspaceDir = project ? project.dir : await ctx.fns.workspace.normalize({ dir: requestedWorkspace, create: opts.createWorkspaceDir === '1' });
-        const model = String(opts.model ?? '').trim() || (await ctx.fns.settings.modelDefault({})) || ctx.env.MODEL || 'claude-code:claude-opus-5';
+        const model = ctx.fns.llm.parseModelRoute({ model: String(opts.model ?? '').trim() || (await ctx.fns.settings.modelDefault({})) || ctx.env.MODEL || 'claude-code/default:claude-opus-5' }).route;
         const presets = await ctx.fns.agent.listPromptPresets({});
         const ids = (Array.isArray(opts.promptPreset) ? opts.promptPreset : opts.promptPreset ? [opts.promptPreset] : []) as (keyof typeof presets)[];
         const presetText = ids.filter(id => Object.prototype.hasOwnProperty.call(presets, id)).map(id => presets[id].text.trim()).filter(Boolean).join('\n\n');

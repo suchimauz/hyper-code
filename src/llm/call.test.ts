@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import call from "./call";
 import resolveReasoningEffort from "./resolveReasoningEffort";
+import parseModelRouteFn from "./parseModelRoute";
 
 // llm.call backs off 0.5 s / 1.5 s between same-model retries; the retry logic, not the wall clock, is under test.
 const realSleep = Bun.sleep;
@@ -9,9 +10,9 @@ afterAll(() => { (Bun as any).sleep = realSleep; });
 
 for (const effort of [undefined, "high", "off", "xhigh", "auto"] as const) {
     test(`SSH Codex reasoning ${effort ?? "omitted"} reaches the wire safely`, async () => {
-        const model = "ssh/sol:codex:gpt-6.1";
+        const model = "ssh/sol:codex/default:gpt-6.1";
         const requests: any[] = [], capabilityModels: string[] = [];
-        const ctx: any = { fns: { llm: {
+        const ctx: any = { fns: { llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             resolveEndpoint: async () => ({ api: "responses", provider: "codex", modelId: "gpt-6.1", url: "https://codex.invalid/responses", apiKey: "fake", ssh: "sol" }),
             resolveReasoningEffort: async (opts: any) => resolveReasoningEffort(ctx, null, opts),
             reasoningCapabilities: async ({ model }: any) => {
@@ -39,7 +40,7 @@ for (const effort of [undefined, "high", "off", "xhigh", "auto"] as const) {
 for (const effort of [undefined, "high"] as const) {
     test(`OpenCode Responses reasoning ${effort ?? "omitted"} stays catalog-owned`, async () => {
         let request: any, reasoningOpts: any;
-        const ctx: any = { fns: { llm: {
+        const ctx: any = { fns: { llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             resolveEndpoint: async () => ({ api: "responses", provider: "opencode", modelId: "go-model", url: "https://go.invalid", apiKey: "fake" }),
             resolveReasoningEffort: async () => { throw new Error("must not use Codex resolver"); },
             opencodeReasoningBody: async (opts: any) => { reasoningOpts = opts; return { reasoning: { effort: "low" } }; },
@@ -49,7 +50,7 @@ for (const effort of [undefined, "high"] as const) {
             },
         } } };
         await call(ctx, null, { model: "opencode:go-model", user: "hello", reasoningEffort: effort, max_tokens: 321, temperature: 0 });
-        expect(reasoningOpts).toEqual({ model: "opencode:go-model", modelId: "go-model", api: "responses", effort });
+        expect(reasoningOpts).toEqual({ model: "opencode/default:go-model", modelId: "go-model", api: "responses", effort });
         expect(request.reasoning).toEqual({ effort: "low" });
         expect(request.max_output_tokens).toBe(321);
         expect(request.temperature).toBe(0);
@@ -62,17 +63,17 @@ describe("llm.call", () => {
         let resolved = "";
         const ctx: any = { fns: {
             settings: { modelDefault: async () => "mock:test" },
-            llm: { resolveEndpoint: async ({ model }: any) => { resolved = model; return { api: "mock", provider: "mock", modelId: "test", url: "mock://local", apiKey: null }; } },
+            llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), resolveEndpoint: async ({ model }: any) => { resolved = model; return { api: "mock", provider: "mock", modelId: "test", url: "mock://local", apiKey: null }; } },
         } };
         const result = await call(ctx, null, { user: "hello" });
-        expect(resolved).toBe("mock:test");
+        expect(resolved).toBe("mock/default:test");
         expect(result.text).toBe("hello");
     });
 
     test("normalizes fenced structured JSON from providers without native schema support", async () => {
         const ctx: any = { fns: {
             settings: { modelDefault: async () => "mock:test" },
-            llm: { resolveEndpoint: async () => ({ api: "mock", provider: "mock", modelId: "test", url: "mock://local", apiKey: null }) },
+            llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), resolveEndpoint: async () => ({ api: "mock", provider: "mock", modelId: "test", url: "mock://local", apiKey: null }) },
         } };
         const format = { type: "json_schema", json_schema: { schema: { type: "object", required: ["ok"], additionalProperties: false, properties: { ok: { type: "boolean" } } } } };
         const result = await call(ctx, null, { user: "```json\n{\"ok\":true}\n```", response_format: format });
@@ -87,7 +88,7 @@ describe("llm.call", () => {
         }) as any;
         try {
             const token = `x.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "a" } })).toString("base64url")}.x`;
-            const ctx: any = { fns: { settings: { modelDefault: async () => "codex:test" }, llm: {
+            const ctx: any = { fns: { settings: { modelDefault: async () => "codex:test" }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
                 resolveEndpoint: async () => ({ api: "responses", provider: "codex", modelId: "test", url: "https://example.test", apiKey: token, account: "a" }),
                 refreshCodex: async () => token,
             } } };
@@ -105,7 +106,7 @@ describe("llm.call", () => {
             return Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
         }) as any;
         try {
-            const ctx: any = { fns: { settings: { modelDefault: async () => "openai:test" }, llm: {
+            const ctx: any = { fns: { settings: { modelDefault: async () => "openai:test" }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
                 resolveEndpoint: async () => ({ api: "openai", provider: "openai", modelId: "test", url: "https://example.test", apiKey: "key" }),
             } } };
             const result = await call(ctx, null, { user: "hello", temperature: 0 });
@@ -125,7 +126,7 @@ describe("llm.call", () => {
             return Response.json({ choices: [{ message: { content: "Продолжение" }, finish_reason: "stop" }] });
         }) as any;
         try {
-            const ctx: any = { fns: { llm: { resolveEndpoint: async () => ({ api: "openai", provider: "groq", modelId: "openai/gpt-oss-20b", url: "https://example.test", apiKey: "key" }) } } };
+            const ctx: any = { fns: { llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), resolveEndpoint: async () => ({ api: "openai", provider: "groq", modelId: "openai/gpt-oss-20b", url: "https://example.test", apiKey: "key" }) } } };
             const result = await call(ctx, null, { user: "начало", model: "groq:openai/gpt-oss-20b", max_tokens: 200, groqReasoningEffort: "low", noFallback: true });
             expect(result.text).toBe("Продолжение");
             expect(request.reasoning_effort).toBe("low");
@@ -138,7 +139,7 @@ describe("llm.call", () => {
         let request: any;
         globalThis.fetch = (async (_url: any, init: any) => { request = JSON.parse(init.body); return Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }); }) as any;
         try {
-            const ctx: any = { fns: { llm: { resolveEndpoint: async () => ({ api: "openai", provider: "openrouter", modelId: "z-ai/glm-5.3-flash", url: "https://example.test", apiKey: "key" }) } } };
+            const ctx: any = { fns: { llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), resolveEndpoint: async () => ({ api: "openai", provider: "openrouter", modelId: "z-ai/glm-5.3-flash", url: "https://example.test", apiKey: "key" }) } } };
             const result = await call(ctx, null, { user: "начало", model: "openrouter:z-ai/glm-5.3-flash", openrouterReasoningEffort: "low", noFallback: true });
             expect(result.text).toBe("ok");
             expect(request.reasoning).toEqual({ effort: "low", exclude: true });
@@ -153,7 +154,7 @@ describe("llm.call", () => {
             return new Response('data: {"type":"response.completed","response":{"status":"completed","output_text":"ok"}}\n\ndata: [DONE]\n\n', { status: 200, headers: { "x-ratelimit-limit-tokens": "1000", "x-ratelimit-remaining-tokens": "900" } });
         }) as any;
         try {
-            const ctx: any = { fns: { settings: { modelDefault: async () => "xai:grok-4.6" }, llm: {
+            const ctx: any = { fns: { settings: { modelDefault: async () => "xai:grok-4.6" }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
                 resolveEndpoint: async () => ({ api: "responses", provider: "xai", modelId: "grok-4.6", url: "https://api.x.ai/v1/responses", apiKey: null, account: "default" }),
                 getXaiOAuthToken: async () => "xai-token",
                 recordUsage: async () => null,
@@ -183,12 +184,12 @@ describe("llm.call", () => {
         try {
             const ctx: any = { fns: {
                 settings: { modelDefault: async () => "openai:primary", getString: async () => "openai:fallback" },
-                llm: { resolveEndpoint: async ({ model }: any) => ({ api: "openai", provider: "openai", modelId: model, url: "https://example.test", apiKey: "key", kind: "api" }) },
+                llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), resolveEndpoint: async ({ model }: any) => ({ api: "openai", provider: "openai", modelId: model, url: "https://example.test", apiKey: "key", kind: "api" }) },
             } };
             const result = await call(ctx, null, { user: "hello" });
             expect(result.text).toBe("ok");
-            expect(result.model).toBe("openai:primary");
-            expect(result.fallback?.attempts).toEqual([{ model: "openai:primary", count: 3 }]);
+            expect(result.model).toBe("openai/default:primary");
+            expect(result.fallback?.attempts).toEqual([{ model: "openai/default:primary", count: 3 }]);
         } finally { globalThis.fetch = previousFetch; }
     });
 
@@ -204,13 +205,13 @@ describe("llm.call", () => {
                     return Response.json(raw);
                 }) as any;
                 try {
-                    const ctx: any = { env: {}, fns: { llm: {
+                    const ctx: any = { env: {}, fns: { llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
                         resolveEndpoint: async ({ model }: any) => {
                             resolved.push(model);
                             return { api: "anthropic", provider, modelId: "claude-opus-4-6", url: "https://example.test", apiKey: "api-key", account: "work" };
                         },
                         refreshClaudeCode: async ({ account }: any) => { expect(account).toBe("work"); return "cli-token"; },
-                        getAnthropicOAuthToken: async ({ account }: any) => { expect(account).toBe("work"); return "oauth-token"; },
+                        claudeFetch:(o:any)=>fetch(o.url,o.init), getAnthropicOAuthToken: async ({ account }: any) => { expect(account).toBe("work"); return "oauth-token"; },
                         claudeCodeCliVersion: async () => "2.1.260",
                     } } };
                     const model = `${provider}/work:claude-opus-4-6`;
@@ -243,14 +244,14 @@ describe("llm.call", () => {
         const resolved: string[] = [];
         globalThis.fetch = (async () => new Response('{"error":{"message":"limited"}}', { status: 429 })) as any;
         try {
-            const ctx: any = { env: {}, fns: { llm: {
+            const ctx: any = { env: {}, fns: { llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
                 resolveEndpoint: async ({ model }: any) => { resolved.push(model); return { api: "anthropic", provider: "claude-code", modelId: "claude-fable-5-1", url: "https://example.test", account: "default" }; },
                 refreshClaudeCode: async () => "cli-token",
                 claudeCodeCliVersion: async () => "2.1.260",
             } } };
             await expect(call(ctx, null, { user: "hello", model: "claude-code:claude-fable-5-1", noFallback: true })).rejects.toThrow('claude-code 429: {"error":{"message":"limited"}}');
             expect(resolved.length).toBeGreaterThan(0);
-            expect(resolved.every(model => model === "claude-code:claude-fable-5-1")).toBe(true);
+            expect(resolved.every(model => model === "claude-code/default:claude-fable-5-1")).toBe(true);
         } finally { globalThis.fetch = previousFetch; }
     });
 
@@ -265,17 +266,17 @@ describe("llm.call", () => {
         try {
             const ctx: any = { env: {}, fns: {
                 settings: { modelDefault: async () => "claude-code:test", getString: async () => "codex:fallback" },
-                llm: {
+                llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
                     resolveEndpoint: async ({ model }: any) => { resolved.push(model); return { api: "anthropic", provider: model.startsWith("claude-code") ? "claude-code" : "anthropic-oauth", modelId: "test", url: "https://example.test", apiKey: null, account: "default", kind: "subscription" }; },
                     refreshClaudeCode: async () => "cli-token",
-                    getAnthropicOAuthToken: async () => "oauth-token",
+                    claudeFetch:(o:any)=>fetch(o.url,o.init), getAnthropicOAuthToken: async () => "oauth-token",
                     claudeCodeCliVersion: async () => "2.1.260",
                 },
             } };
             const result = await call(ctx, null, { user: "hello" });
             expect(result.text).toBe("oauth ok");
-            expect(result.model).toBe("anthropic-oauth:test");
-            expect(resolved).toEqual(["claude-code:test", "claude-code:test", "claude-code:test", "anthropic-oauth:test"]);
+            expect(result.model).toBe("anthropic-oauth/default:test");
+            expect(resolved).toEqual(["claude-code/default:test", "claude-code/default:test", "claude-code/default:test", "anthropic-oauth/default:test"]);
         } finally { globalThis.fetch = previousFetch; }
     });
 
@@ -285,7 +286,7 @@ describe("llm.call", () => {
 for (const api of ['anthropic','openai','responses']) test(`deadline aborts ${api} HTTP without orphan retry`, async()=>{
  const previous=globalThis.fetch; let calls=0,aborted=false;
  globalThis.fetch=(async(_url:any,init:any)=>{calls++;return await new Promise((resolve,reject)=>{init.signal.addEventListener('abort',()=>{aborted=true;reject(init.signal.reason);},{once:true});});}) as any;
- try {const ctx:any={fns:{llm:{resolveEndpoint:async()=>({api,provider:api==='anthropic'?'kimi-coding':api==='responses'?'codex':'openai',modelId:'k3',url:'https://example.test',apiKey:'fake'}),refreshKimiCode:async()=> 'fake',refreshCodex:async()=> 'fake'}}};
+ try {const ctx:any={fns:{llm:{ parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),resolveEndpoint:async()=>({api,provider:api==='anthropic'?'kimi-coding':api==='responses'?'codex':'openai',modelId:'k3',url:'https://example.test',apiKey:'fake'}),refreshKimiCode:async()=> 'fake',refreshCodex:async()=> 'fake'}}};
  await expect(call(ctx,null,{user:'x',model:'kimi-coding:k3',noFallback:true,timeoutMs:30})).rejects.toThrow();expect(calls).toBe(1);expect(aborted).toBe(true);
  } finally {globalThis.fetch=previous;}
 });
@@ -295,7 +296,7 @@ for (const api of ["openai", "anthropic", "responses"]) {
     test(`Go ${api} forwards explicit session and endpoint without billing fallback`, async () => {
         const requests: any[] = [];
         const endpoint = { api, provider: "opencode", modelId: "go-model", url: `https://go.invalid/${api}`, apiKey: "fake" };
-        const ctx: any = { fns: { llm: {
+        const ctx: any = { fns: { llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             resolveEndpoint: async () => endpoint,
             opencodeReasoningBody: async () => ({ marker: "reasoning-preserved" }),
             opencodeFetch: async (request: any) => {
@@ -317,7 +318,7 @@ for (const api of ["openai", "anthropic", "responses"]) {
 
 test("Go retries keep session stable and never try configured paid fallbacks", async () => {
     const sessions: any[] = [], models: string[] = [];
-    const ctx: any = { fns: { settings: { getString: async () => { throw new Error("must not read paid fallback chain"); } }, llm: {
+    const ctx: any = { fns: { settings: { getString: async () => { throw new Error("must not read paid fallback chain"); } }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
         resolveEndpoint: async ({ model }: any) => { models.push(model); return { api: "openai", provider: "opencode", modelId: "go-model", url: "https://go.invalid", apiKey: "fake" }; },
         opencodeReasoningBody: async () => ({}),
         opencodeFetch: async ({ sessionId }: any) => { sessions.push(sessionId); return new Response("", { status: 503 }); },
@@ -325,5 +326,5 @@ test("Go retries keep session stable and never try configured paid fallbacks", a
     await expect(call(ctx, null, { model: "opencode:go-model", user: "hello" })).rejects.toThrow("opencode 503");
     expect(sessions).toHaveLength(3);
     expect(new Set(sessions).size).toBe(1);
-    expect(models.every(model => model === "opencode:go-model")).toBe(true);
+    expect(models.every(model => model === "opencode/default:go-model")).toBe(true);
 });

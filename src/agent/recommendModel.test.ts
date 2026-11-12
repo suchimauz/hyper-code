@@ -1,13 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import recommend from './recommendModel';
+import parseModelRouteFn from '../llm/parseModelRoute';
 
 function fixture() {
     const calls: any[] = [];
-    const state = { enabled: true, catalog: ['mock/work:alpha', 'mock:beta'], denied: [] as string[], unavailable: [] as string[], answer: { type: 'choice', choice: 'c0', confidence: 0.9, probabilities: { abstain: 0.1, c0: 0.9 } } as any };
+    const state = { enabled: true, catalog: ['mock/work:alpha', 'mock/default:beta'], denied: [] as string[], unavailable: [] as string[], answer: { type: 'choice', choice: 'c0', confidence: 0.9, probabilities: { abstain: 0.1, c0: 0.9 } } as any };
     const ctx: any = { fns: {
         agent: { current: async () => ({ id: 'caller' }) },
         procs: { db: { select: async () => [{ jev_model_routing_enabled: state.enabled }] } },
         llm: {
+            parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             listModels: async () => { calls.push('catalog'); return { mock: state.catalog }; },
             modelPolicy: async ({model}: any) => { if (state.denied.includes(model)) throw Error('disabled'); },
             resolveEndpoint: async ({model}: any) => { if (state.unavailable.includes(model)) throw Error('unavailable'); return { apiKey: 'SECRET', account: 'PRIVATE' }; },
@@ -25,7 +27,7 @@ describe('advisory Jev model recommendation (no network)', () => {
     test('mandatory unknown capabilities abstain without discovery', async () => {for(const opts of [{requireTools:true},{requireVision:true},{minContextTokens:1000},{privacy:'local-only'}]){const f=fixture();expect((await f.run(opts)).reason).toBe('unverifiable-required-capability');expect(f.calls).toEqual([]);}});
     test('catalog/policy/availability intersection', async () => {for(const kind of ['catalog','denied','unavailable'] as const){const f=fixture();if(kind==='catalog')f.state.catalog=[];else f.state[kind]=['mock/work:alpha'];expect((await f.run()).reason).toBe('no-eligible-candidates');expect(f.calls.length).toBe(1);}});
     test('same model across accounts is ambiguous without sending aliases', async () => {const f=fixture();f.state.catalog.push('mock/personal:alpha');expect((await f.run({allowedModels:f.state.catalog.filter(x=>x.endsWith(':alpha'))})).reason).toBe('ambiguous-candidates');});
-    test('bare local catalogue IDs qualify only within their provider group', async () => {const f=fixture();f.ctx.fns.llm.listModels=async()=>({lmstudio:['alpha']});expect((await f.run({allowedModels:['lmstudio:alpha']})).id).toBe('lmstudio:alpha');expect((await f.run({allowedModels:['mock:alpha']})).reason).toBe('no-eligible-candidates');});
+    test('bare local catalogue IDs qualify only within their provider group', async () => {const f=fixture();f.ctx.fns.llm.listModels=async()=>({lmstudio:['lmstudio/default:alpha']});expect((await f.run({allowedModels:['lmstudio:alpha']})).id).toBe('lmstudio/default:alpha');expect((await f.run({allowedModels:['mock:alpha']})).reason).toBe('no-eligible-candidates');});
     test('duplicates deduplicated', async () => {const f=fixture();expect((await f.run({allowedModels:['mock/work:alpha','mock/work:alpha']})).id).toBe('mock/work:alpha');});
     test('strict distributions and confidence', async () => {for(const answer of [{choice:'outside'}, {confidence:NaN}, {probabilities:{abstain:0.2,c0:0.9}}, {probabilities:{abstain:0,c0:1,extra:0}}, {probabilities:{c0:1}}, {probabilities:{abstain:-0.1,c0:1.1}}]){const f=fixture();Object.assign(f.state.answer,answer);expect((await f.run()).reason).toBe('invalid-response');}});
     test('ties and low confidence abstain', async () => {for(const answer of [{confidence:0.59},{probabilities:{abstain:0.5,c0:0.5}}]){const f=fixture();Object.assign(f.state.answer,answer);expect((await f.run()).reason).toBe('ambiguous-response');}});

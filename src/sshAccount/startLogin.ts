@@ -21,6 +21,7 @@ export default async function (
     return ctx.fns.codexTunnel.mutationRun({operation:'login',instance:opts.instance,account:opts.account,provider:opts.provider,work:async()=>{
     await ctx.fns.sshAccount.requireOwner({});
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,39}$/.test(opts.account) || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/.test(opts.instance) || !['codex','claude-code'].includes(opts.provider)) throw new Error('Invalid remote account');
+    if((opts as typeof opts & {proxyId?:string}).proxyId)throw new Error("Saved proxies cannot be used with SSH instance login");
     const connection = await ctx.fns.sshInstance.connection({name:opts.instance});
     const state = ctx.state.sshAccount ??= {};
     const flows = state.flows ??= new Map();

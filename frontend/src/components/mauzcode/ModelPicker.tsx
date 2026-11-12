@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Check, ChevronDown, ChevronRight, Cpu } from 'lucide-react';
 import { NavigationChatIcon } from './NavigationChatIcon';
-import { effortLabel, modelGroup, getDraftModelSettings, getModelSettings, setAgentEffort, setAgentModel, type ModelSettings } from '../../lib/models';
+import { effortLabel, modelGroup, modelSourceLabel, getDraftModelSettings, getModelSettings, setAgentEffort, setAgentModel, type ModelSettings } from '../../lib/models';
 import { rememberSessionSelection } from '../../lib/newSession';
 import './model-picker.css';
 
@@ -88,7 +88,7 @@ export function ModelPicker({ agentId = '', running = false, busy = false, revis
   };
   const groups = new Map<string, ModelSettings['models']>();
   for (const option of data?.models ?? []) {
-    if (!`${option.label} ${option.provider} ${option.model}`.toLowerCase().includes(query.trim().toLowerCase())) continue;
+    if (!`${option.label} ${option.provider} ${option.model} ${modelGroup(option)}`.toLowerCase().includes(query.trim().toLowerCase())) continue;
     const key = modelGroup(option); const group = groups.get(key) ?? []; group.push(option); groups.set(key, group);
   }
   const effort = data?.effort;
@@ -111,8 +111,8 @@ export function ModelPicker({ agentId = '', running = false, busy = false, revis
           </div>}
           {page === 'models' && <>{(data?.models.length ?? 0) > 4 && <input className="model-picker-search" aria-label="Search models" placeholder="Search models" value={query} onChange={event => setQuery(event.target.value)} />}
             <div role="menu" aria-label="Model" className="model-picker-scroll">{[...groups].map(([provider, options]) => <section role="group" aria-label={provider} key={provider}>
-              <div className="model-picker-group">{provider}</div>{options.map(option => <button type="button" key={option.model} role="menuitemradio" aria-checked={option.model === data?.model} className="model-picker-option" title={option.disabled ? `${option.model} — недоступна по политике провайдера` : option.model} disabled={option.disabled || saving || running || busy} onClick={() => void choose('model', option.model)}>
-                <NavigationChatIcon icon={option.icon} /><span>{option.label}</span><span className="model-picker-check">{option.model === data?.model && <Check size={16} strokeWidth={1} />}</span>
+              <div className="model-picker-group">{provider}</div>{options.map(option => <button type="button" key={option.model} role="menuitemradio" aria-checked={option.model === data?.model} className="model-picker-option" aria-label={option.label} aria-description={modelSourceLabel(option.model) || undefined} title={option.disabled ? `${option.model} — недоступна по политике провайдера` : option.model} disabled={option.disabled || saving || running || busy} onClick={() => void choose('model', option.model)}>
+                <NavigationChatIcon icon={option.icon} /><span className="model-picker-option-text"><span>{option.label}</span>{modelSourceLabel(option.model) && <span className="model-picker-option-source" aria-hidden="true">{modelSourceLabel(option.model)}</span>}</span><span className="model-picker-check">{option.model === data?.model && <Check size={16} strokeWidth={1} />}</span>
               </button>)}
             </section>)}{!groups.size && <p className="model-picker-note">Модели не найдены</p>}</div></>}
           {page === 'effort' && <div role="menu" aria-label="Effort">{[...new Set(['auto', ...(effort?.supported ?? [])])].map(value => <button type="button" role="menuitemradio" key={value} aria-checked={value === effort?.requested} className="model-picker-option" disabled={saving || running || busy} onClick={() => void choose('effort', value)}><span>{effortLabel(value)}</span><span className="model-picker-check">{value === effort?.requested && <Check size={16} strokeWidth={1} />}</span></button>)}</div>}

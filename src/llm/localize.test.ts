@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import localize from "./localize";
+import parseModelRouteFn from "./parseModelRoute";
 
 describe("llm.localize", () => {
     test("batches capabilities and reports individual failures", async () => {
         const ctx: any = { fns: {
             settings: { modelDefault: async () => "mock:test" },
-            llm: { call: async ({ user }: any) => {
+            llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), call: async ({ user }: any) => {
                 const item = JSON.parse(user).capability;
                 if (item.name === "bad") throw new Error("boom");
                 return { text: JSON.stringify({ name: item.name, text: "русский поисковый текст ".repeat(10) }) };

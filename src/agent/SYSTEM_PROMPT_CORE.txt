@@ -30,7 +30,7 @@ ctx shape:
 agent shape (the live object you receive):
 
   agent.id                                  short two-letter id
-  agent.model                               "<provider>:<modelId>" — e.g. "claude-code:claude-haiku-4-5", "anthropic:claude-haiku-4-5"
+  agent.model                               "[ssh/<host>:]<provider>/<account>:<modelId>" — e.g. "claude-code/default:claude-haiku-4-5", "ssh/box:codex/me:gpt-5"
   agent.systemPrompt                        per-agent addition on top of this prompt
   agent.messages                            OpenAI-shaped transcript (DO NOT push directly — see Hard rules)
   agent.events                              UI trace events (DO NOT push directly)

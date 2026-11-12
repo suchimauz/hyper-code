@@ -7,14 +7,16 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         const body = await opts.req.text();
         if (body.length > 24000) return Response.json({ error: "Text is too long" }, { status: 413, headers: json });
         const input = JSON.parse(body);
-        const allowed = ["codex:gpt-6-luna", "claude-code:claude-haiku-4-5", "codex:gpt-5.6-luna", "groq:openai/gpt-oss-20b", "groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b", "openrouter:z-ai/glm-5.3-flash"];
+        const route = (model: unknown) => { try { return ctx.fns.llm.parseModelRoute({ model: String(model) }).route; } catch { return ""; } };
+        input.model = route(input.model);
+        const allowed = ["codex:gpt-6-luna", "claude-code:claude-haiku-4-5", "codex:gpt-5.6-luna", "groq:openai/gpt-oss-20b", "groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b", "openrouter:z-ai/glm-5.3-flash"].map(route);
         if (!allowed.includes(input.model)) return Response.json({ error: "Unsupported model" }, { status: 400, headers: json });
         if (typeof input.before !== "string" || typeof input.after !== "string" || input.before.length + input.after.length > 16000 || !input.before.trim()) return Response.json({ error: "Enter some text first (max 16000 characters)" }, { status: 400, headers: json });
         const rewrite = input.rewrite === true;
         if (rewrite && (typeof input.tail !== "string" || input.tail.length < 2 || input.tail.length > 300 || !input.before.endsWith(input.tail))) return Response.json({ error: "Invalid sentence tail" }, { status: 400, headers: json });
         const started = performance.now();
-        const gptOss = /^groq:openai\/gpt-oss-(20b|120b)$/.test(input.model);
-        const glmFlash = input.model === "openrouter:z-ai/glm-5.3-flash";
+        const gptOss = /^groq\/default:openai\/gpt-oss-(20b|120b)$/.test(input.model);
+        const glmFlash = input.model === "openrouter/default:z-ai/glm-5.3-flash";
         const result = await ctx.fns.llm.call({ model: input.model, noFallback: true, timeoutMs: 15000, max_tokens: glmFlash ? 300 : gptOss ? 240 : 120,
             ...(glmFlash ? { openrouterReasoningEffort: "low" as const } : {}),
             ...(gptOss ? { groqReasoningEffort: "low" as const } : {}),

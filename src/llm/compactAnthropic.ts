@@ -57,8 +57,8 @@ export default async function (
     const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
     const res = ssh
         ? await ctx.fns.sshAccount.fetch({ ssh, url: ep.url, init })
-        : await fetch(ep.url, init);
-    if (!res.ok) throw new Error(`anthropic compaction ${res.status}: ${(await res.text()).slice(0, 500)}`);
+        : ep.provider === "anthropic-oauth" ? await ctx.fns.llm.claudeFetch({account:ep.account,requireProxy:ep.noFallback,url:ep.url,init}) : await fetch(ep.url, init);
+    if (!res.ok) {const info=ctx.fns.llm.classifyError({provider:ep.provider,account:ep.account,kind:ep.kind,status:res.status,body:await res.text(),headers:res.headers});throw Object.assign(new Error(info.message),{failure:info,code:info.code,noFallback:ep.noFallback===true||res.headers.get("x-mauzcode-no-fallback")==="true"});}
     const raw: any = await res.json();
     const block = (raw.content ?? []).find((b: any) => b?.type === "compaction");
     const iteration = (raw.usage?.iterations ?? []).find((i: any) => i?.type === "compaction") ?? {};

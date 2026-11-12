@@ -26,5 +26,6 @@ export default function (ctx: Context, _session: Session | null, _opts?: {}): Ar
             verificationUri: flow.verificationUri ?? null, userCode: flow.userCode ?? null,
             needsCode: false, error: flow.error ?? null,
         }));
-    return [...cli, ...xai, ...kimi];
+    const claude=[...((ctx.state as any).llm?.anthropicOAuth?.pending?.values?.() ?? [])].filter((f:any)=>f.expiresAt>Date.now()&&["pending","exchanging","failed"].includes(f.status)).map((f:any)=>({id:String(f.id),provider:"anthropic-oauth",account:String(f.account),status:f.status==="failed"?"failed" as const:"pending" as const,verificationUri:f.authorizationUrl??null,userCode:null,needsCode:f.status==="pending",error:f.error??null}));
+    return [...cli, ...xai, ...kimi, ...claude];
 }

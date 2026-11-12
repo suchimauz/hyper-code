@@ -62,6 +62,7 @@ describe("llm.refreshUsage", () => {
 
     test("fetches Claude OAuth usage and converts percentages for recordUsage", async () => {
         const ctx: any = await mkTestCtx();
+        await ctx.fns.llm.saveAnthropicOAuth({account:"pro",access:"oauth-token",refresh:"refresh",expiresAt:Date.now()+3600000});
         ctx.state.registry.llm.getAnthropicOAuthToken = async () => "oauth-token";
         ctx.state.registry.llm.connectFetch = async (_c: any, _s: any, opts: any) => {
             if (opts.url === "https://api.anthropic.com/api/oauth/profile") {

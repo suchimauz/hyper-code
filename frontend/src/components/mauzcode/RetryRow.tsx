@@ -26,7 +26,7 @@ export function RetryRow({ event }: { event: ChatEvent }) {
   return <div className="compaction-row retry-row" data-event-idx={event.idx} data-retry-state={state} data-active={active || undefined}>
     <button type="button" className="compaction-row-toggle" disabled={!detail} aria-expanded={detail ? open : undefined} onClick={() => setOpen(value => !value)}>
       <span className="compaction-row-leading" aria-hidden="true"><RotateCw className="compaction-row-context" size={14} />{detail && (open ? <ChevronDown className="compaction-row-disclosure" size={14} /> : <ChevronRight className="compaction-row-disclosure" size={14} />)}</span>
-      <span>retry {event.retry ?? 1}/{maximum}</span><span className="compaction-row-sep" aria-hidden="true" /><span className="compaction-row-label" role={active ? 'status' : undefined}>{label}{code && ` · ${code}`}</span>
+      <span>retry {event.retry ?? 1}/{maximum}</span><span className="compaction-row-sep" aria-hidden="true" /><span className="compaction-row-label" role={active ? 'status' : undefined}>{label}{code && ` · ${code}`}{event.failureMessage && ` · ${event.failureMessage}`}</span>
     </button>
     {open && detail && <pre className="compaction-row-body retry-row-body">{detail}</pre>}
   </div>;

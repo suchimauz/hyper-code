@@ -3,7 +3,9 @@ import type { NavigationIcon } from './navigation';
 
 export type QuotaWindow = { usedPercent: number; windowMinutes?: number | null; resetsAt?: number | null };
 /** Secret-free subscription account row as exposed by the UI Lab bridge. */
+export type SavedProxy = {id:string;name:string|null;host:string;port:number};
 export type LlmAccount = {
+  proxy?: SavedProxy | null;
   provider: string; account: string; label: string; source: string; sshInstance: string | null;
   available: boolean; needsReconnect: boolean; usedPercent: number | null; resetsAt: number | null;
   windows: { primary?: QuotaWindow; secondary?: QuotaWindow; tertiary?: QuotaWindow } | null;
@@ -22,12 +24,12 @@ export type LlmLogin = {
   id: string | null; provider: string; account: string; instance: string | null; status: string;
   verificationUri: string | null; userCode: string | null; needsCode: boolean; callbackSubmitted: boolean; error: string | null;
 };
-export type LlmConnectionsState = { accounts: LlmAccount[]; logins: LlmLogin[]; instances: string[]; csrfToken: string; providerIcons?: Record<string, NavigationIcon | null> };
+export type LlmConnectionsState = { proxies?:SavedProxy[]; accounts: LlmAccount[]; logins: LlmLogin[]; instances: string[]; csrfToken: string; providerIcons?: Record<string, NavigationIcon | null> };
 export type LoginProvider = 'codex' | 'claude-code' | 'kimi-coding' | 'xai';
 export type LlmAction =
-  | { action: 'login'; provider: LoginProvider; account: string; instance?: string }
+  | { action: 'login'; provider: LoginProvider; account: string; instance?: string; method?:'cli'|'oauth'; proxyId?:string|null }
   | { action: 'code'; id?: string; provider?: string; account?: string; code: string }
-  | { action: 'cancel'; id: string }
+  | { action: 'cancel'; id: string; provider?:string }
   | { action: 'users'; provider: string; account: string }
   | { action: 'remove'; provider: string; account: string; confirmed: true; archiveUsers?: boolean };
 export type LlmActionResult = { message?: string; id?: string | null; users?: { id: string; title: string | null; model: string | null }[]; archived?: string[] };

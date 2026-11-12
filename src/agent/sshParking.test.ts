@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import park from "./parkOnUsageLimit";
 import setModel from "./setModel";
+import parseModelRouteFn from "../llm/parseModelRoute";
 
 function fixture() {
     const rows = [
@@ -12,7 +13,7 @@ function fixture() {
     ];
     const ctx = { state: { agent: {} }, fns: {
         procs: { db: { select: async ({sql,params}: {sql: string; params?: unknown[]}) => sql.includes("WHERE id = ?") ? [{ ...rows.find(row => row.id === params?.[0]), run_state: "idle", scratchpad: JSON.stringify({ parked: { provider: "codex", account: "ssh.alpha.main" } }) }] : rows, run: async () => ({ changes: 1 }) } },
-        llm: { recordUsage: async () => {}, resolveEndpoint: async () => ({ provider: "codex", account: "ssh.beta.main", kind: "subscription", ssh: { instance: "beta", provider: "codex", account: "main" } }) },
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), recordUsage: async () => {}, resolveEndpoint: async () => ({ provider: "codex", account: "ssh.beta.main", kind: "subscription", ssh: { instance: "beta", provider: "codex", account: "main" } }) },
         session: { mutateScratchpad: async ({mutate}: { mutate: (value: object) => void }) => { const scratchpad = {}; mutate(scratchpad); return { scratchpad }; }, appendEvent: async () => {}, load: async () => null },
         events: { refreshAgentMeta: () => {}, emitAgentsChanged: () => {} },
         ui: { notify: async () => {} }, agent: { unpark: async () => {} },

@@ -8,7 +8,7 @@ test('registry stable UUID, duplicate labels, safe listing and optimistic revisi
  await expect(c.fns.socksProxy.update({...base,id:a.id,revision:1})).rejects.toMatchObject({status:409});
  await expect(c.fns.socksProxy.remove({id:a.id,revision:1})).rejects.toMatchObject({status:409});
  await c.fns.socksProxy.remove({id:a.id,revision:2});await c.fns.socksProxy.remove({id:a.id,revision:2});
- expect(await c.fns.socksProxy.list({})).toEqual([b]);
+ expect(await c.fns.socksProxy.list({})).toEqual([{...b,users:[]}]);
 });
 test('encrypted pair preserve replace disable and deletion; list never leaks',async()=>{
  const c=await setup();let a=await c.fns.socksProxy.create({...base,auth:true,username:'user',password:' secret '});
@@ -32,7 +32,7 @@ test('record and secret operations roll back together on persistence and encrypt
  c.state.registry.procs.db.run=run;c.env.MAUZCODE_OAUTH_ENCRYPTION_KEY='invalid';await expect(c.fns.socksProxy.create({...base,auth:true,username:'u',password:'p'})).rejects.toThrow();expect((await c.fns.socksProxy.list({})).length).toBe(1);
 });
 test('saved records and encrypted credentials survive a module reload',async()=>{
- const c=await setup();const a=await c.fns.socksProxy.create({...base,auth:true,username:'persisted',password:'persistent-secret'});await c.fns.procs.repl.load({name:'socksProxy'});expect(await c.fns.socksProxy.list({})).toEqual([a]);expect((await c.fns.socksProxy.readSaved({id:a.id})).password).toBe('persistent-secret');
+ const c=await setup();const a=await c.fns.socksProxy.create({...base,auth:true,username:'persisted',password:'persistent-secret'});await c.fns.procs.repl.load({name:'socksProxy'});expect(await c.fns.socksProxy.list({})).toEqual([{...a,users:[]}]);expect((await c.fns.socksProxy.readSaved({id:a.id})).password).toBe('persistent-secret');
 });
 test('strict local validation accepts IPs and rejects URLs, bad ports and incomplete pairs',async()=>{
  const c=await setup();expect((await c.fns.socksProxy.validate({...base,host:'[2001:0db8::1]'})).host).toBe('2001:db8::1');expect((await c.fns.socksProxy.validate({...base,host:'127.0.0.1'})).host).toBe('127.0.0.1');

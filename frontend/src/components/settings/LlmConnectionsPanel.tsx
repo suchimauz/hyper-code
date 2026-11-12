@@ -7,7 +7,7 @@ import { Button } from '../ui/Button';
 import { NavigationChatIcon } from '../mauzcode/NavigationChatIcon';
 import type { NavigationIcon } from '../../lib/navigation';
 import { ApiError } from '../../lib/mauzcode';
-import { accountSlot, getLlmConnections, LOGIN_PROVIDERS, REMOVABLE, runLlmAction, type LlmAccount, type LlmAction, type LlmActionResult, type LlmLogin, type LoginProvider, type QuotaWindow } from '../../lib/llmConnections';
+import { accountSlot, getLlmConnections, LOGIN_PROVIDERS, REMOVABLE, runLlmAction, type LlmAccount, type LlmAction, type LlmActionResult, type LlmLogin, type LoginProvider, type QuotaWindow, type SavedProxy } from '../../lib/llmConnections';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
 type Run = (action: LlmAction, quiet?: boolean) => Promise<LlmActionResult | null>;
@@ -40,22 +40,31 @@ function Quota({ item }: { item: LlmAccount }) {
   return <span className="llm-quota-list">{windows.map(({ key, w }) => <span key={key} className={`llm-quota ${tone(w.usedPercent)}`} title={w.resetsAt ? `Resets ${new Date(w.resetsAt).toLocaleString()}` : undefined}>{windowLabel(w, key)} {Math.round(w.usedPercent)}%{w.resetsAt ? ` · ${resetIn(w.resetsAt)}` : ''}</span>)}</span>;
 }
 
-function LoginForm({ provider, instances, run, busy, onDone, account }: { provider: LoginProvider; instances: string[]; run: Run; busy: boolean; onDone: () => void; account?: { name: string; instance: string | null } }) {
+function LoginForm({ provider, instances, proxies = [], run, busy, onDone, account }: { provider: LoginProvider; instances: string[]; proxies?:SavedProxy[]; run: Run; busy: boolean; onDone: () => void; account?: { name: string; instance: string | null; method?:"cli"|"oauth"; proxy?:SavedProxy|null } }) {
   const id = useId();
+  const [instance, setInstance] = useState(account?.instance ?? "");
+  const [method, setMethod] = useState<"cli"|"oauth">(account?.method ?? "cli");
+  const [proxyId, setProxyId] = useState(account?.proxy?.id ?? "");
+  const localClaude = provider === "claude-code" && !instance;
   const remote = provider !== 'xai' && instances.length > 0;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const instance = account ? account.instance ?? '' : String(data.get('instance') ?? '');
-    const ok = await run({ action: 'login', provider, account: account?.name ?? String(data.get('account') ?? '').trim(), ...(instance ? { instance } : {}) });
+    const ok = await run({ action: 'login', provider, account: account?.name ?? String(data.get('account') ?? '').trim(), ...(instance ? { instance } : {}), ...(localClaude ? {method, ...(!account ? {proxyId:proxyId || null} : {})} : {}) });
     if (ok) onDone();
   };
   return <form className="ssh-form llm-login-form" onSubmit={submit}>
     {account ? <p className="settings-note">Reconnect <code>{account.name}</code>{account.instance ? <> on SSH <code>{account.instance}</code></> : null}. The official {PROVIDER_NAME[provider]} sign-in opens below.</p>
       : <div className="ssh-grid">
         <label className="settings-field" htmlFor={`${id}-a`}><span className="settings-field-label">Account name</span><input id={`${id}-a`} name="account" required maxLength={40} pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" placeholder="work or personal" autoComplete="off" spellCheck={false} /><span className="settings-field-hint">Letters, digits, _ or -. Not “default”.</span></label>
-        {remote && <label className="settings-field" htmlFor={`${id}-i`}><span className="settings-field-label">SSH Instance</span><select id={`${id}-i`} name="instance" className="settings-select" defaultValue=""><option value="">This machine (local)</option>{instances.map(name => <option key={name} value={name}>{name}</option>)}</select><span className="settings-field-hint">Where the CLI signs in and keeps credentials.</span></label>}
+        {remote && <label className="settings-field" htmlFor={`${id}-i`}><span className="settings-field-label">SSH Instance</span><select id={`${id}-i`} name="instance" className="settings-select" value={instance} onChange={event=>{setInstance(event.target.value);setProxyId("");setMethod("cli");}}><option value="">This machine (local)</option>{instances.map(name => <option key={name} value={name}>{name}</option>)}</select><span className="settings-field-hint">Where the CLI signs in and keeps credentials.</span></label>}
       </div>}
+    {localClaude && !account && <div className="ssh-grid">
+      <label className="settings-field" htmlFor={`${id}-method`}><span className="settings-field-label">Login method</span><select id={`${id}-method`} className="settings-select" value={method} onChange={e=>setMethod(e.target.value as "cli"|"oauth")}><option value="cli" disabled={!!proxyId}>CLI</option><option value="oauth">OAuth</option></select><span className="settings-field-hint">{proxyId ? "A proxy requires OAuth; CLI login is unavailable." : "Choose CLI or MauzCode-managed OAuth."}</span></label>
+      <label className="settings-field" htmlFor={`${id}-proxy`}><span className="settings-field-label">SOCKS5 proxy</span><select id={`${id}-proxy`} className="settings-select" value={proxyId} onChange={e=>{setProxyId(e.target.value);if(e.target.value)setMethod("oauth");}}><option value="">No proxy</option>{proxies.map(p=><option key={p.id} value={p.id}>{p.name || `${p.host}:${p.port}`}</option>)}</select><span className="settings-field-hint">{proxies.length ? "All account requests use this proxy, with no direct fallback." : "Add a proxy in Settings → SOCKS5 first."}</span></label>
+    </div>}
+    {provider === "claude-code" && instance && <p className="settings-note">Saved proxies are available only on this machine, not on an SSH instance.</p>}
+    {localClaude && method === "oauth" && <p className="settings-note">OAuth authorization opens in your browser, which uses its own network. {account?.proxy && `Account proxy: ${account.proxy.name || account.proxy.host}. Reconnect preserves this route.`}</p>}
     <div className="ssh-form-actions"><Button variant="ghost" type="button" onClick={onDone}>Cancel</Button><Button variant="primary" type="submit" disabled={busy}>{account ? 'Reconnect' : 'Start login'}</Button></div>
   </form>;
 }
@@ -79,11 +88,11 @@ function PendingLogin({ login, run, busy }: { login: LlmLogin; run: Run; busy: b
       {login.userCode && <div className="llm-device-code"><span>Device code</span><code>{login.userCode}</code></div>}
       {login.callbackSubmitted && <p className="settings-note" role="status">Callback submitted. Status refreshes automatically. If login does not finish, cancel and start again; do not resend the callback.</p>}
       {login.needsCode && <form className="ssh-form" onSubmit={submit} autoComplete="off">
-        <label className="settings-field" htmlFor={id}><span className="settings-field-label">{login.instance ? 'Callback URL' : 'Authorization code'}</span><input id={id} type="password" value={code} onChange={event => setCode(event.target.value)} required placeholder={login.instance ? 'http://localhost:…/callback?code=…' : 'Paste the code from the browser'} spellCheck={false} /><span className="settings-field-hint">{login.instance ? 'After sign-in the browser may show a localhost error. Copy the full address from that tab. It is sent privately to the SSH server.' : 'Sent directly to the running CLI and never stored.'}</span></label>
+        <label className="settings-field" htmlFor={id}><span className="settings-field-label">{login.instance ? 'Callback URL' : 'Authorization code'}</span><input id={id} type="password" value={code} onChange={event => setCode(event.target.value)} required placeholder={login.instance ? 'http://localhost:…/callback?code=…' : 'Paste the code from the browser'} spellCheck={false} /><span className="settings-field-hint">{login.instance ? 'After sign-in the browser may show a localhost error. Copy the full address from that tab. It is sent privately to the SSH server.' : login.provider === 'anthropic-oauth' ? 'Sent to the pending OAuth flow; never stored as chat text.' : 'Sent directly to the running CLI and never stored.'}</span></label>
         <div className="ssh-form-actions"><Button type="submit" variant="primary" disabled={busy || !code.trim()}>Submit</Button></div>
       </form>}
     </>}
-    {login.id && (login.instance || login.provider === 'kimi-coding') && !failed && <div className="ssh-form-actions"><Button variant="ghost" disabled={busy} onClick={() => { void run({ action: 'cancel', id: login.id! }); }}>Cancel login</Button></div>}
+    {login.id && (login.instance || login.provider === 'kimi-coding' || login.provider === 'anthropic-oauth') && !failed && <div className="ssh-form-actions"><Button variant="ghost" disabled={busy} onClick={() => { void run({ action: 'cancel', id: login.id!, ...(login.provider === 'anthropic-oauth' ? {provider:login.provider} : {}) }); }}>Cancel login</Button></div>}
   </div>;
 }
 
@@ -111,6 +120,9 @@ function AccountRow({ item, instances, run, busy, csrf }: { item: LlmAccount; in
       <span className={`llm-dot ${state}`} aria-hidden="true" />
       <span className="llm-row-name">{slot.name}</span>
       {slot.instance && <span className="llm-tag" title="Requests leave through this SSH instance">SSH · {slot.instance}</span>}
+      {item.provider === "anthropic-oauth" && <span className="llm-tag">OAuth</span>}
+      {item.provider === "claude-code" && <span className="llm-tag">CLI</span>}
+      {item.proxy && <span className="llm-tag" title="All requests use this proxy; no direct fallback">SOCKS5 · {item.proxy.name || `${item.proxy.host}:${item.proxy.port}`}</span>}
       {item.planType && <span className="llm-tag">{item.planType}</span>}
       {item.parkedAgents > 0 && <span className="llm-tag is-warning">{item.parkedAgents} parked</span>}
       <span className="llm-row-actions">
@@ -123,7 +135,7 @@ function AccountRow({ item, instances, run, busy, csrf }: { item: LlmAccount; in
       {!item.available && !item.needsReconnect && <span className="llm-quota is-unknown">unavailable</span>}
     </div>
     {item.provider === 'codex' && <CodexAccountReset key={item.account} account={item.account} csrfToken={csrf} disabled={busy} />}
-    {open === 'reconnect' && <LoginForm provider={login} instances={instances} run={run} busy={busy} onDone={() => setOpen(null)} account={{ name: slot.instance ? slot.name : item.account, instance: slot.instance && /^ssh\./.test(item.account) ? slot.instance : null }} />}
+    {open === 'reconnect' && <LoginForm provider={login} instances={instances} run={run} busy={busy} onDone={() => setOpen(null)} account={{ method:item.provider==="anthropic-oauth"?"oauth":"cli",proxy:item.proxy, name: slot.instance ? slot.name : item.account, instance: slot.instance && /^ssh\./.test(item.account) ? slot.instance : null }} />}
     {open === 'remove' && <RemoveAccount item={item} run={run} busy={busy} onDone={() => setOpen(null)} />}
   </li>;
 }
@@ -133,6 +145,7 @@ export function LlmConnectionsPanel() {
   const [accounts, setAccounts] = useState<LlmAccount[] | null>(null);
   const [logins, setLogins] = useState<LlmLogin[]>([]);
   const [instances, setInstances] = useState<string[]>([]);
+  const [proxies,setProxies] = useState<SavedProxy[]>([]);
   const [csrf, setCsrf] = useState('');
   const [icons, setIcons] = useState<Record<string, NavigationIcon | null>>({});
   const [loadError, setLoadError] = useState<{ text: string; forbidden: boolean } | null>(null);
@@ -142,7 +155,7 @@ export function LlmConnectionsPanel() {
   const loading = useRef(false);
   const load = useCallback(async (signal?: AbortSignal) => {
     if (loading.current && !signal) return; loading.current = true;
-    try { const data = await getLlmConnections(signal); setAccounts(data.accounts); setLogins(data.logins); setInstances(data.instances); setCsrf(data.csrfToken); setIcons(data.providerIcons ?? {}); setLoadError(null); }
+    try { const data = await getLlmConnections(signal); setAccounts(data.accounts); setLogins(data.logins); setInstances(data.instances); setProxies(data.proxies ?? []); setCsrf(data.csrfToken); setIcons(data.providerIcons ?? {}); setLoadError(null); }
     catch (error) { if (signal?.aborted) return; setLoadError({ text: error instanceof Error ? error.message : 'Не удалось загрузить LLM Connections', forbidden: error instanceof ApiError && error.status === 403 }); }
     finally { loading.current = false; }
   }, []);
@@ -182,7 +195,7 @@ export function LlmConnectionsPanel() {
               <span className="llm-group-count">{rows.length || ''}</span>
               {group.login && <Button variant="ghost" className="llm-add" aria-expanded={adding === group.login} onClick={() => setAdding(adding === group.login ? null : group.login!)}><Plus size={14} strokeWidth={1.5} />Add account</Button>}
             </header>
-            {adding === group.login && group.login && <LoginForm provider={group.login} instances={instances} run={run} busy={busy} onDone={() => setAdding(null)} />}
+            {adding === group.login && group.login && <LoginForm proxies={proxies} provider={group.login} instances={instances} run={run} busy={busy} onDone={() => setAdding(null)} />}
             {flows.map(login => <PendingLogin key={`${login.id ?? ''}${login.provider}/${login.account}`} login={login} run={run} busy={busy} />)}
             {rows.length > 0 ? <ul className="llm-rows">{rows.map(item => <AccountRow key={`${item.provider}/${item.account}`} item={item} instances={instances} run={run} busy={busy} csrf={csrf} />)}</ul>
               : !flows.length && <p className="settings-footnote">{group.hint ?? 'No accounts yet.'}</p>}

@@ -40,10 +40,10 @@ export default async function (
         let ids: string[] = [];
         try {
             const groups = await ctx.fns.llm.listModels({});
-        // Local catalogue entries are bare IDs. Qualify only by their own group,
-        // never infer that another provider can serve the same model slug.
-        const catalog = new Set(Object.entries(groups).flatMap(([provider, models]) => models.map(model => model.includes(':') ? model : `${provider}:${model}`)));
-            for (const id of [...new Set(opts.allowedModels)]) {
+        // Catalogue entries are canonical routes; legacy aliases in allowedModels map onto them.
+        const catalog = new Set(Object.values(groups).flat());
+        const canonical = (model: string) => { try { return ctx.fns.llm.parseModelRoute({ model }).route; } catch { return ''; } };
+            for (const id of [...new Set(opts.allowedModels.map(canonical))]) {
                 if (!catalog.has(id)) continue;
                 try {
                     await ctx.fns.llm.modelPolicy({ action: 'assert', model: id });

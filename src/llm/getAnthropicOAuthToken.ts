@@ -1,40 +1,44 @@
-// Cross-process single-flight refresh. Bun.SQL's reserved connection keeps the
-// row lock and token request in one transaction.
-/** Returns a fresh Anthropic OAuth access token for one credential slot. */
 /**
- * Fetch a valid Anthropic OAuth access token, refreshing it when expired.
- * @param opts.account Credential slot within the provider; "default" is the single-login case.
+ * Return a valid Claude OAuth token without replaying an ambiguous refresh.
+ * Serializes same-slot refreshes in process and durably marks rotation before sending.
+ * A pre-send proxy failure clears the marker; an uncertain outcome requires reconnect.
+ * @param opts.account Local managed OAuth credential slot.
  */
 export default async function (ctx: Context, _session: Session | null, opts?: {
-    /** Credential slot within the provider. @default "default" */ account?: string }): Promise<string> {
-    const pool: any = await ctx.fns.procs.db.conn();
-    const provider = "anthropic-oauth";
-    const account = String(opts?.account ?? "").trim() || "default";
-    try {
-        return await pool.begin(async (tx: any) => {
-            const rows: any[] = Array.from(await tx.unsafe(
-                "SELECT access_enc, refresh_enc, expires_at FROM oauth_credentials WHERE provider = $1 AND account = $2 FOR UPDATE", [provider, account],
-            ));
-            const row = rows[0];
-            if (!row) throw new Error(`Anthropic OAuth is not connected for account "${account}"; connect it in LLM settings`);
-            if (Number(row.expires_at) > Date.now()) {
-                return await ctx.fns.llm.decryptOAuthSecret({ provider, field: "access", envelope: row.access_enc });
-            }
-            const oldRefresh = await ctx.fns.llm.decryptOAuthSecret({ provider, field: "refresh", envelope: row.refresh_enc });
-            const token = await ctx.fns.llm.exchangeAnthropicOAuth({ grant: "refresh_token", refreshToken: oldRefresh });
-            const refresh = token.refresh ?? oldRefresh;
-            const [accessEnc, refreshEnc] = await Promise.all([
-                ctx.fns.llm.encryptOAuthSecret({ provider, field: "access", value: token.access }),
-                ctx.fns.llm.encryptOAuthSecret({ provider, field: "refresh", value: refresh }),
-            ]);
-            await tx.unsafe(`UPDATE oauth_credentials SET access_enc=$1, refresh_enc=$2, expires_at=$3,
-                scopes=COALESCE($4, scopes), version=version+1, updated_at=$5 WHERE provider=$6 AND account=$7`,
-                [accessEnc, refreshEnc, token.expiresAt, token.scopes, Date.now(), provider, account]);
+    /** Local credential slot. @default "default" */ account?: string;
+}): Promise<string> {
+    const provider='anthropic-oauth', account=String(opts?.account??'').trim()||'default';
+    const root=ctx.state as typeof ctx.state & {claudeRefreshes?:Map<string,Promise<string>>};
+    const flights=root.claudeRefreshes??=new Map<string,Promise<string>>();
+    const active=flights.get(account);if(active)return active;
+    const flight=(async()=>{
+        const row=await ctx.fns.procs.db.transaction({fn:async()=>{
+            const value=(await ctx.fns.procs.db.select({sql:'SELECT access_enc,refresh_enc,expires_at,version,refresh_uncertain FROM oauth_credentials WHERE provider=? AND account=? FOR UPDATE',params:[provider,account]}))[0];
+            if(!value)throw new Error(`Anthropic OAuth is not connected for account "${account}"`);
+            if(value.refresh_uncertain)throw Object.assign(new Error('OAUTH_OUTCOME_UNKNOWN: previous refresh outcome is unknown; reconnect the account'),{code:'OAUTH_OUTCOME_UNKNOWN',retryable:false,noFallback:true});
+            value.needsRefresh=Number(value.expires_at)<=Date.now();
+            if(value.needsRefresh)await ctx.fns.procs.db.run({sql:'UPDATE oauth_credentials SET refresh_uncertain=TRUE WHERE provider=? AND account=?',params:[provider,account]});
+            return value;
+        }}) as {access_enc:string;refresh_enc:string;expires_at:number;version:number;needsRefresh:boolean};
+        if(!row.needsRefresh)return ctx.fns.llm.decryptOAuthSecret({provider,field:'access',envelope:row.access_enc});
+        let sent=false;
+        try {
+            const refresh=await ctx.fns.llm.decryptOAuthSecret({provider,field:'refresh',envelope:row.refresh_enc});
+            sent=true;
+            const token=await ctx.fns.llm.exchangeAnthropicOAuth({grant:'refresh_token',refreshToken:refresh,account});
+            const [accessEnc,refreshEnc]=await Promise.all([ctx.fns.llm.encryptOAuthSecret({provider,field:'access',value:token.access}),ctx.fns.llm.encryptOAuthSecret({provider,field:'refresh',value:token.refresh??refresh})]);
+            const saved=await ctx.fns.procs.db.run({sql:'UPDATE oauth_credentials SET access_enc=?,refresh_enc=?,expires_at=?,scopes=COALESCE(?,scopes),version=version+1,updated_at=?,refresh_uncertain=FALSE WHERE provider=? AND account=? AND version=? AND refresh_uncertain=TRUE',params:[accessEnc,refreshEnc,token.expiresAt,token.scopes,Date.now(),provider,account,row.version]}) as {changes:number};
+            if(!saved.changes)throw new Error('OAuth account changed during refresh');
             return token.access;
-        });
-    } catch (e: any) {
-        const msg = String(e?.message ?? e);
-        if (msg.startsWith("Anthropic OAuth ")) throw e;
-        throw new Error("Anthropic OAuth refresh failed; reconnect in LLM settings");
-    }
+        } catch(error) {
+            const e=error as Error & {requestSent?:boolean};
+            if(!sent||e.requestSent===false){
+                await ctx.fns.procs.db.run({sql:'UPDATE oauth_credentials SET refresh_uncertain=FALSE WHERE provider=? AND account=? AND version=?',params:[provider,account,row.version]});
+                throw error;
+            }
+            throw Object.assign(new Error('OAUTH_OUTCOME_UNKNOWN: token rotation could not be completed safely; reconnect the account'+(/^(PROXY_|OAUTH_|Anthropic OAuth )/.test(e.message)?' ('+e.message.slice(0,300)+')':'')),{code:'OAUTH_OUTCOME_UNKNOWN',retryable:false,noFallback:true});
+        }
+    })();
+    flights.set(account,flight);
+    try{return await flight;}finally{if(flights.get(account)===flight)flights.delete(account);}
 }

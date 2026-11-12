@@ -4,6 +4,7 @@ import resolveEndpoint from "./resolveEndpoint";
 import call from "./call";
 import listModels from "./listModels";
 import relay from "../node/relay";
+import parseModelRouteFn from "./parseModelRoute";
 
 // Offline storage double: every mutation is one SQL statement scoped to one key.
 function fixture() {
@@ -30,7 +31,7 @@ function fixture() {
             get: async () => { credentials++; throw new Error("Credentials must not be accessed"); },
         },
         secrets: { resolveSetting: async () => { credentials++; throw new Error("Credentials must not be accessed"); } },
-        llm: {},
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),},
     } };
     ctx.fns.llm.modelPolicy = (opts: any) => modelPolicy(ctx, null, opts);
     ctx.fns.llm.resolveEndpoint = (opts: any) => resolveEndpoint(ctx, null, opts);
@@ -77,7 +78,7 @@ describe("llm.modelPolicy", () => {
         }) as typeof fetch;
         try {
             const groups = await listModels(ctx, null);
-            for (const model of routes) expect(Object.values(groups).flat()).toContain(model);
+            for (const model of routes) expect(Object.values(groups).flat()).toContain(model.replace(/^([a-z-]+):/, "$1/default:"));
             expect(catalogueRequests).toBe(1);
             await expect(resolveEndpoint(ctx, null, { model: routes[0]! })).rejects.toMatchObject({ code: "MODEL_DISABLED_BY_USER" });
         } finally { globalThis.fetch = originalFetch; }
@@ -87,7 +88,7 @@ describe("llm.modelPolicy", () => {
         kv.set("other", "true");
         kv.set("llm:model-disabled:" + encodeURIComponent("mock:b"), "false");
         kv.set("llm:model-disabled:" + encodeURIComponent("mock:a"), "true");
-        expect(await modelPolicy(ctx, null, { action: "list" })).toEqual({ disabledModels: ["mock:a"] });
+        expect(await modelPolicy(ctx, null, { action: "list" })).toEqual({ disabledModels: ["mock/default:a"] });
     });
 
     test("default account aliases share a canonical key and each set is an isolated atomic write", async () => {
@@ -95,10 +96,10 @@ describe("llm.modelPolicy", () => {
         await modelPolicy(ctx, null, { action: "set", model: "codex/default:gpt-test", disabled: true });
         expect(writes).toHaveLength(1);
         expect(writes[0]!.sql).toContain("ON CONFLICT (key) DO UPDATE");
-        expect(writes[0]!.params).toEqual(["llm:model-disabled:" + encodeURIComponent("codex:gpt-test"), "true"]);
-        expect(await modelPolicy(ctx, null, { action: "list" })).toEqual({ disabledModels: ["codex:gpt-test"] });
+        expect(writes[0]!.params).toEqual(["llm:model-disabled:" + encodeURIComponent("codex/default:gpt-test"), "true"]);
+        expect(await modelPolicy(ctx, null, { action: "list" })).toEqual({ disabledModels: ["codex/default:gpt-test"] });
         await expect(modelPolicy(ctx, null, { action: "assert", model: "codex:gpt-test" })).rejects.toMatchObject({
-            message: "Model is disabled by user: codex:gpt-test", code: "MODEL_DISABLED_BY_USER", retryable: false, replaySafe: false,
+            message: "Model is disabled by user: codex/default:gpt-test", code: "MODEL_DISABLED_BY_USER", retryable: false, replaySafe: false,
         });
         await modelPolicy(ctx, null, { action: "set", model: "codex:gpt-test", disabled: false });
         expect(writes).toHaveLength(2);
@@ -110,8 +111,9 @@ describe("llm.modelPolicy", () => {
     test("named accounts, SSH and node identities remain distinct", async () => {
         const { ctx } = fixture();
         const routes = ["codex/work:m", "ssh/box:codex/default:m", "mauzcode/default:codex:m", "mauzcode/node:codex/work:m"];
+        const canonicalRoutes = ["codex/work:m", "ssh/box:codex/default:m", "mauzcode/default:codex:m", "mauzcode/node:codex/work:m"];
         await Promise.all(routes.map(model => modelPolicy(ctx, null, { action: "set", model, disabled: true })));
-        expect((await modelPolicy(ctx, null, { action: "list" })).disabledModels).toEqual([...routes].sort());
+        expect((await modelPolicy(ctx, null, { action: "list" })).disabledModels).toEqual([...canonicalRoutes].sort());
         for (const model of ["codex:m", "codex/personal:m", "ssh/other:codex/default:m", "mauzcode/other:codex/work:m"]) {
             await modelPolicy(ctx, null, { action: "assert", model });
         }
@@ -120,7 +122,7 @@ describe("llm.modelPolicy", () => {
 
     test("bare local model is equivalent to lmstudio/default", async () => {
         const { ctx } = fixture();
-        expect(await modelPolicy(ctx, null, { action: "set", model: "local-model", disabled: true })).toEqual({ disabledModels: ["lmstudio:local-model"] });
+        expect(await modelPolicy(ctx, null, { action: "set", model: "local-model", disabled: true })).toEqual({ disabledModels: ["lmstudio/default:local-model"] });
         await expect(modelPolicy(ctx, null, { action: "assert", model: "lmstudio/default:local-model" })).rejects.toMatchObject({ code: "MODEL_DISABLED_BY_USER" });
     });
 

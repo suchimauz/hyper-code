@@ -9,7 +9,7 @@ describe("Anthropic compaction beta relay", () => {
             const model = `${provider}/named:claude-test`;
             const block = { type: "compaction", content: "summary", signature: "exact-signature" };
             const payload = { model, messages: [{ role: "user", content: [block, { type: "text", text: "continue" }] }], compaction: { type: "summarize" } };
-            const ctx: any = { fns: { node: {
+            const ctx: any = { fns: { llm:{claudeFetch:(o:any)=>fetch(o.url,o.init)}, node: {
                 authorize: async () => ({ ok: true, client: { providers: [provider], name: "client" }, hops: 0 }),
                 catalog: async () => [{ id: model, provider, account: "named", api: "anthropic", ...(chained ? { via: "mauzcode/next" } : {}) }],
                 get: async () => ({ url: "http://next" }), token: async () => "next-token",

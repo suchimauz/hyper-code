@@ -12,7 +12,7 @@ export default async function (
     },
 ): Promise<{ provider: string; model: string; localized: Record<string, string>; failed: string[] }> {
     const model = String(opts.model ?? "").trim() || await ctx.fns.settings.modelDefault({});
-    if (!opts.functions.length || !opts.locales.length) return { provider: model.split(":")[0] ?? "default", model, localized: {}, failed: [] };
+    if (!opts.functions.length || !opts.locales.length) return { provider: ctx.fns.llm.parseModelRoute({ model }).provider, model, localized: {}, failed: [] };
     const localized: Record<string, string> = {};
     const failed: string[] = [];
     for (let offset = 0; offset < opts.functions.length; offset += 5) {
@@ -23,7 +23,7 @@ export default async function (
             else failed.push(group[settled.indexOf(row)]!.name);
         }
     }
-    return { provider: model.split(":")[0] ?? "default", model, localized, failed };
+    return { provider: ctx.fns.llm.parseModelRoute({ model }).provider, model, localized, failed };
 }
 
 async function retryLocalize(ctx: Context, model: string, locales: string[], item: { name: string; text: string }): Promise<{ name: string; text: string }> {

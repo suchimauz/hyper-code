@@ -20,7 +20,7 @@ test('browser owner authentication and CSRF origin protections fail closed',asyn
 test('browser safe snapshots CRUD conflict and saved-only check responses',async()=>{
  const c=await setup();const call=(r:Request)=>c.fns.socksProxy.browserApi({req:r});
  const added=await call(req({action:'add',host:'localhost',port:1080,auth:false}));expect(added.status).toBe(200);const {item}=await added.json();
- const listed=await call(new Request('https://app.test/settings/proxies'));expect(await listed.json()).toEqual({items:[item]});expect(listed.headers.get('cache-control')).toBe('no-store');
+ const listed=await call(new Request('https://app.test/settings/proxies'));expect(await listed.json()).toEqual({items:[{...item,users:[]}]});expect(listed.headers.get('cache-control')).toBe('no-store');
  expect((await call(req({action:'update',id:item.id,revision:2,host:'localhost',port:1080,auth:false}))).status).toBe(409);
  let args:any;c.state.registry.socksProxy.check=async(_c:any,_s:any,o:any)=>{args=o;return {code:'rate_limit',retryAfter:3};};const checked=await call(req({action:'check',id:item.id,host:'evil',password:'sensitive'}));expect(args).toEqual({id:item.id});expect(checked.status).toBe(429);expect(checked.headers.get('retry-after')).toBe('3');
  c.state.registry.socksProxy.create=async()=>{throw new Error('password=LEAK_ME secret://socksProxy/private');};const failed=await call(req({action:'add'}));expect(failed.status).toBe(500);expect(await failed.text()).not.toMatch(/LEAK_ME|secret:\/\//);

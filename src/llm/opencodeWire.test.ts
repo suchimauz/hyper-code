@@ -4,13 +4,14 @@ import call from "./call";
 import streamOpenAI from "./streamOpenAI";
 import streamAnthropic from "./streamAnthropic";
 import streamCodex from "./streamCodex";
+import parseModelRouteFn from "./parseModelRoute";
 
 type Api = "openai" | "anthropic" | "responses";
 function harness(api: Api, effort = "high", values = ["none", "low", "medium", "high", "max"], toggle = false) {
     const captured: any[] = [];
     const ctx: any = { env: {}, state: {}, fns: {
         agent: { buildLlmRequest: async () => ({ system: "sys", messages: [{ role: "user", content: "hi" }] }), wireTools: () => [], cacheRoot: async () => "root" },
-        llm: {
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             resolveEndpoint: async () => ({ provider: "opencode", api, modelId: "m", apiKey: "fake", url: "https://opencode.ai/zen/v1/messages" }),
             opencodeCatalog: async (opts: any) => { expect(opts).toEqual({ cachedOnly: true }); return { models: [{ id: "m", api, reasoningOptions: [...(values.length ? [{ type: "effort", values }] : []), ...(toggle ? [{ type: "toggle" }] : [])] }] }; },
             resolveReasoningEffort: async (opts: any) => ({ applied: opts.effort === "auto" ? "low" : opts.effort, mode: api === "anthropic" ? "anthropic-adaptive" : "openai" }),

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import setModel from "./setModel";
+import parseModelRouteFn from "../llm/parseModelRoute";
 
 function fixture() {
     const calls: string[] = [];
@@ -8,7 +9,7 @@ function fixture() {
     let claimOnUpdate = false;
     let storedModel = "mock:old";
     const ctx: any = { state: { agent: { a: live } }, fns: {
-        llm: { resolveEndpoint: async () => ({ kind: "local" }) },
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), resolveEndpoint: async () => ({ kind: "local" }) },
         procs: { db: {
             select: async ({ sql }: any) => sql.includes("WHERE id") ? [{ id: "a", model: storedModel, run_state: state, scratchpad: "{}" }] : [],
             run: async ({ sql, params }: any) => {
@@ -41,7 +42,7 @@ test("setModel permits idle switch despite stale abortController", async () => {
     const f = fixture();
     const result = await setModel(f.ctx, null, { id: "a", model: "mock:new" });
     expect(result.changed).toEqual(["a"]);
-    expect(f.model()).toBe("mock:new");
+    expect(f.model()).toBe("mock/default:new");
     expect(f.calls).toEqual(["update", "event", "unpark", "compact"]);
 });
 

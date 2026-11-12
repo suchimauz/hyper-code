@@ -55,6 +55,9 @@ export default function (
     const err = parsed?.error ?? parsed ?? null;
     const code = String(err?.type ?? err?.code ?? "");
     const serverMessage = typeof err?.message === "string" ? err.message : "";
+    // Authenticated relay reports a stable, sanitized proxy failure envelope.
+    const proxyFailure = /^(PROXY_|OAUTH_OUTCOME_UNKNOWN$)/.test(code) ? _ctx.fns.llm.proxyFailure({error:{code,message:serverMessage,retryable:err?.retryable},provider,account}) : null;
+    if(proxyFailure)return proxyFailure;
 
     // Anthropic and OpenAI both use Retry-After; it is a directive, not a hint.
     const retryAfterMs = parseRetryAfter(header("retry-after"), now);

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import call from "./call";
+import parseModelRouteFn from "./parseModelRoute";
 
 // MiniMax selects its server budget; neither generic caller budgets nor the
 // removed plan setting should cap its hidden reasoning.
@@ -13,7 +14,7 @@ async function captureRequest(run: (callMiniMax: (opts: { max_tokens?: number })
     }) as any;
     const ctx: any = { state: {}, env: {}, fns: {
         settings: { getNumber: async () => 16384 },
-        llm: { resolveEndpoint: async () => ({ url: "https://example.test/v1/messages", modelId: "MiniMax-M3.1-Flash", apiKey: "k", provider: "minimax-coding", account: "default", kind: "subscription", api: "anthropic" }) },
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), resolveEndpoint: async () => ({ url: "https://example.test/v1/messages", modelId: "MiniMax-M3.1-Flash", apiKey: "k", provider: "minimax-coding", account: "default", kind: "subscription", api: "anthropic" }) },
     } };
     const callMiniMax = (opts: { max_tokens?: number }) => call(ctx, null, { model: "minimax-coding:MiniMax-M3.1-Flash", user: "hi", noFallback: true, ...opts });
     try { await run(callMiniMax); }

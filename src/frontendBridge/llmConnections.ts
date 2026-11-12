@@ -1,7 +1,7 @@
 /**
  * List and manage owner LLM subscription accounts for the UI Lab settings screen
  *
- * Use for the React Settings → LLM Connections tab. GET returns secret-free account rows (provider, slot, label, quota windows, reconnect state), safe in-progress login hints (authorization link, device code), trusted SSH instance names and a cookie-bound CSRF token. POST accepts one JSON action after owner, same-origin, CSRF, content-type and size checks: login (start official Codex, Claude Code, Kimi Coding or Grok login locally or on an SSH instance), code (submit a Claude one-time code or SSH callback URL), cancel (stop a remote login), users (agents using an account) and remove (delete an account, requires confirmed:true). Never returns tokens or credentials.
+ * Use for the React Settings → LLM Connections tab. GET returns secret-free account rows (provider, slot, label, quota windows, reconnect state), safe in-progress login hints (authorization link, device code), trusted SSH instance names and a cookie-bound CSRF token. POST accepts one JSON action after owner, same-origin, CSRF, content-type and size checks: login (start official Codex, Claude Code, Kimi Coding or Grok login locally or on an SSH instance), code (submit a Claude one-time code or SSH callback URL), cancel (stop a remote login), users (agents using an account) and remove (delete an account, requires confirmed:true). Local Claude supports CLI or managed OAuth; a saved proxy requires local OAuth and is immutable after creation. GET includes safe proxy choices and bindings. OAuth code/cancel use the exact pending flow. Never returns tokens or credentials.
  * @param opts.req Authenticated owner GET, or CSRF-protected JSON POST with action and its fields.
  */
 export default async function (
@@ -29,12 +29,14 @@ export default async function (
     };
     if(req.method==='GET'){
         try{
-            const [accounts,instances]=await Promise.all([ctx.fns.llm.listAccounts({}),ctx.fns.sshInstance.list({}).catch(()=>[])]);
+            const [accounts,instances,proxies]=await Promise.all([ctx.fns.llm.listAccounts({}),ctx.fns.sshInstance.list({}).catch(()=>[]),ctx.fns.socksProxy.list({})]);
+            const accountRows=await Promise.all(accounts.map(async a=>({...a,proxy:a.provider==="anthropic-oauth"?await ctx.fns.llm.accountProxy({provider:a.provider,account:a.account}):null})));
             const providers=[...new Set(['codex','claude-code','anthropic-oauth','kimi-coding','xai','opencode','zai-coding','minimax-coding',...accounts.map(a=>a.provider)])];
             const icons=Object.fromEntries(await Promise.all(providers.map(async p=>{try{return [p,await ctx.fns.frontendBridge.iconData({model:p+':x'})] as const}catch{return [p,null] as const}})));
             return reply({
                 providerIcons:icons,
-                accounts:accounts.map(a=>({provider:a.provider,account:a.account,label:a.label,source:a.source,sshInstance:(a as {sshInstance?:string|null}).sshInstance??null,available:a.available,needsReconnect:a.needsReconnect,usedPercent:a.usedPercent,resetsAt:a.resetsAt,windows:a.windows,planType:a.planType,parkedAgents:a.parkedAgents})),
+                proxies:proxies.map(p=>({id:p.id,name:p.name,host:p.host,port:p.port})),
+                accounts:accountRows.map(a=>({proxy:a.proxy,provider:a.provider,account:a.account,label:a.label,source:a.source,sshInstance:(a as {sshInstance?:string|null}).sshInstance??null,available:a.available,needsReconnect:a.needsReconnect,usedPercent:a.usedPercent,resetsAt:a.resetsAt,windows:a.windows,planType:a.planType,parkedAgents:a.parkedAgents})),
                 logins:flows(),
                 instances:instances.filter(i=>!!i.pinnedHostKey).map(i=>i.name),
                 csrfToken:await ctx.fns.auth.csrfToken({req}),
@@ -58,6 +60,13 @@ export default async function (
             case 'login':{
                 if(provider!=='codex'&&provider!=='claude-code'&&provider!=='kimi-coding'&&provider!=='xai')return reply({error:'Unsupported provider'},400);
                 if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(account)||account==='default')return reply({error:'Account name: 1–40 letters, digits, _ or -, not "default"'},400);
+                const method=str("method")||"cli";
+                const proxyId=str("proxyId");
+                if(data.proxyId!==undefined&&data.proxyId!==null&&typeof data.proxyId!=="string")return reply({error:"Invalid proxy selection"},400);
+                if(!["cli","oauth"].includes(method))return reply({error:"Unsupported login method"},400);
+                if(proxyId&&(provider!=="claude-code"||instance||method!=="oauth"))return reply({error:"Proxy requires local Claude OAuth login"},400);
+                if(method==="oauth"&&(provider!=="claude-code"||instance))return reply({error:"OAuth selection is only available for local Claude"},400);
+                if(provider==="claude-code"&&!instance&&method==="oauth"){await ctx.fns.llm.startAnthropicOAuth({account,...(data.proxyId!==undefined?{proxyId:proxyId||null}:{})});return reply({id:null,message:"OAuth authorization started. The browser uses its own network."},201);}
                 if(instance&&provider==='xai')return reply({error:'Grok does not support SSH login'},400);
                 if(instance){
                     const flow=provider==='kimi-coding'?await ctx.fns.sshAccount.startKimiLogin({instance,account}):await ctx.fns.sshAccount.startLogin({instance,provider:provider as 'codex'|'claude-code',account});
@@ -71,6 +80,7 @@ export default async function (
             case 'code':{
                 const code=typeof data.code==='string'?data.code.trim():'';
                 if(!code||code.length>4096)return reply({error:'Code required'},400);
+                if(provider==="anthropic-oauth"){await ctx.fns.llm.completeAnthropicOAuth({input:code});return reply({message:"Claude OAuth account connected."});}
                 if(id){
                     const flow=await ctx.fns.sshAccount.status({id});
                     if(flow.instance){await ctx.fns.sshAccount.submitCode({id,code});return reply({message:'Callback sent. Refresh status to see the CLI result.'});}
@@ -81,7 +91,8 @@ export default async function (
             }
             case 'cancel':{
                 if(!id)return reply({error:'Login id required'},400);
-                await ctx.fns.sshAccount.cancel({id});
+                if(provider==="anthropic-oauth")await ctx.fns.llm.cancelAnthropicOAuth({id});
+                else await ctx.fns.sshAccount.cancel({id});
                 return reply({message:'Authorization cancelled.'});
             }
             case 'users':{

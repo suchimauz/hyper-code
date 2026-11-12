@@ -3,6 +3,7 @@ import resolve from "./resolveEndpoint";
 import classify from "./classifyError";
 import park from "../agent/parkOnUsageLimit";
 import setModel from "../agent/setModel";
+import parseModelRouteFn from "./parseModelRoute";
 
 const catalog = ["a", "b"].map(account => ({ id: `codex/${account}:gpt-test`, provider: "codex", account, api: "responses", kind: "subscription" }));
 function fixture(entries = catalog) {
@@ -19,7 +20,7 @@ function fixture(entries = catalog) {
         procs: { db: { select: async () => rows, run: async () => ({ changes: 1 }) } },
         session: { mutateScratchpad: async ({mutate}: any) => { const scratchpad = {}; mutate(scratchpad); return {scratchpad}; }, appendEvent: async () => {} },
         events: { refreshAgentMeta: () => {} }, ui: { notify: async () => {} },
-        llm: { recordUsage: async () => {} },
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), recordUsage: async () => {} },
     } };
     return {ctx, rows};
 }

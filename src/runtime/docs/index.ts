@@ -86,7 +86,7 @@ async function runIndex(
         const retrievalHash = Bun.hash(searchText).toString(16);
         rows.push({ name: doc.name, namespace, summary: doc.summary ?? "", doc: doc.doc ?? "", signature: doc.signature ?? "", opts_type: doc.optsType ?? "",
             return_type: doc.returnType ?? "", params_schema: doc.paramsSchema ?? {}, rel: doc.rel ?? "", line: doc.line ?? null, search_text: searchText,
-            content_hash: retrievalHash, localized_text: localizedText, localization_provider: localizedText ? localizationModel.split(":")[0] : null,
+            content_hash: retrievalHash, localized_text: localizedText, localization_provider: localizedText ? ctx.fns.llm.parseModelRoute({ model: localizationModel }).provider : null,
             localization_model: localizedText ? localizationModel : null, localization_locales: localizedText ? localesKey : null,
             localization_hash: localizationHash, updated_at: now });
         if (opts.force || old?.content_hash !== retrievalHash || !old?.embedded || old?.embedding_provider !== provider || old?.embedding_model !== model) changed.push({ name: doc.name, text: searchText, hash: retrievalHash });

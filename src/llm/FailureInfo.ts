@@ -14,7 +14,7 @@ export type FailureInfo = {
      * fatal       — nothing to retry; surface the message.
      */
     /** Stable machine code; never infer retry eligibility from display messages. */
-    code: "RATE_LIMIT" | "SERVER" | "TIMEOUT" | "TRANSPORT" | "EMPTY_RESPONSE" | "SSH_TRANSPORT" | "AUTH" | "QUOTA" | "USAGE_LIMIT" | "OVERFLOW" | "SSH_PERMANENT" | "FATAL";
+    code: "RATE_LIMIT" | "SERVER" | "TIMEOUT" | "TRANSPORT" | "EMPTY_RESPONSE" | "SSH_TRANSPORT" | "AUTH" | "QUOTA" | "USAGE_LIMIT" | "OVERFLOW" | "SSH_PERMANENT" | "FATAL" | "PROXY_DNS" | "PROXY_CONNECT" | "PROXY_TIMEOUT" | "PROXY_CONNECTION_LOST" | "PROXY_AUTH" | "PROXY_PROTOCOL" | "PROXY_TLS" | "PROXY_DENIED" | "PROXY_CONFIG" | "OAUTH_OUTCOME_UNKNOWN";
     kind: "usage_limit" | "rate_limit" | "transient" | "auth" | "overflow" | "fatal";
     /** Provider name, e.g. "codex". */
     provider: string;

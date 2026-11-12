@@ -23,9 +23,9 @@ describe('model retry row', () => {
   });
   it('expands failure details', async () => {
     render(<RetryRow event={base} />);
-    expect(screen.queryByText(/connection reset/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /retry 2\/5/ }));
     expect(screen.getByText(/connection reset/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /retry 2\/5/ }));
+    expect(screen.getAllByText(/connection reset/)).toHaveLength(2);
   });
   it('is routed from the transcript, not rendered as an assistant message', () => {
     const { container } = render(<TranscriptMessage event={base} agentId="ab" />);

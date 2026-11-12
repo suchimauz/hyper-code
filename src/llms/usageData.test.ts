@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test";
 import usageData from "./usageData";
+import parseModelRouteFn from "../llm/parseModelRoute";
 
 function setup() {
     let refreshes = 0;
     const ctx: any = { state: {}, fns: {
-        llm: {
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             refreshUsage: () => { refreshes++; return new Promise(() => {}); },
             usageOverview: async (opts: {}) => {
                 expect(opts).toEqual({ connectedOnly: true });
@@ -23,7 +24,7 @@ test("nonblocking shared refresh, local unknown, remote stale and narrow gateway
     const first = await usageData(ctx, null, {});
     await usageData(ctx, null, {});
     expect(refreshes()).toBe(1);
-    expect(first.entries[0]).toMatchObject({ models: ["codex:a"], usedPercent: null, tone: "neutral" });
+    expect(first.entries[0]).toMatchObject({ models: ["codex/default:a"], usedPercent: null, tone: "neutral" });
     expect(first.entries[0].quotaStatus).toBeUndefined();
     expect(first.entries[1]).toMatchObject({ models: ["mauzcode/remote:a"], quotaStatus: "stale", usedPercent: 90, tone: "error", node: "remote" });
     expect(first.gateway).toEqual({ status: "available", reason: "models-ok", models: ["oneapi:a"] });
@@ -97,7 +98,7 @@ test("default desktop mode never reads inventory or rewrites named routes", asyn
 
 test("coding-plan labels show the chosen egress instance", async () => {
     const ctx: any = { state: {}, fns: {
-        llm: {
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             refreshUsage: () => new Promise(() => {}),
             usageOverview: async () => [
                 { provider: "zai-coding", account: "default", label: "Z.ai", model: "zai-coding:", usedPercent: 10, resetsAt: null, planType: "Coding Plan", resetCredits: null, parkedAgents: 0, tone: "neutral", updatedAt: Date.now() },
@@ -121,7 +122,7 @@ test("coding-plan labels show the chosen egress instance", async () => {
 // that instance, never under Local, while its model route stays <provider>:.
 test("a plan with a chosen SSH instance reports that identity and keeps its model route", async () => {
     const ctx: any = { state: {}, fns: {
-        llm: {
+        llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o),
             refreshUsage: () => new Promise(() => {}),
             usageOverview: async () => [
                 { provider: "minimax-coding", account: "default", label: "MiniMax", model: "minimax-coding:", usedPercent: 12, resetsAt: null, planType: "M Plan", resetCredits: null, parkedAgents: 0, tone: "neutral", updatedAt: Date.now() },
@@ -138,7 +139,7 @@ test("a plan with a chosen SSH instance reports that identity and keeps its mode
     expect(mm.account).toBe("ssh.edge.default");
     expect(mm.label).toBe("MiniMax · edge");
     expect(mm.model).toBe("minimax-coding:");
-    expect(mm.models).toEqual(["minimax-coding:MiniMax-M3.1-Flash"]);
+    expect(mm.models).toEqual(["minimax-coding/default:MiniMax-M3.1-Flash"]);
     expect(entries.find((e: any) => e.provider === "zai-coding")!.account).toBe("default");
 });
 
@@ -155,7 +156,7 @@ test('OpenCode Console desktop and mobile stay PAYG unavailable', async () => {
   const {entries} = await usageData(ctx,null,{includeConnected});
   const rows = entries.filter((e:any)=>e.provider==='opencode');
   expect(rows).toHaveLength(1);
-  expect(rows[0]).toMatchObject({label:'OpenCode Console · edge',usedPercent:null,resetsAt:null,quotaStatus:'unavailable',tone:'neutral',planType:'Pay as you go',models:['opencode:gpt']});
+  expect(rows[0]).toMatchObject({label:'OpenCode Console · edge',usedPercent:null,resetsAt:null,quotaStatus:'unavailable',tone:'neutral',planType:'Pay as you go',models:["opencode/default:gpt"]});
   expect(rows[0]!.windows).toBeUndefined();
  }
  configured=false;
@@ -215,7 +216,7 @@ test('Go preserves all measured windows and normal quota tone on both surfaces',
  let budgets=0;ctx.fns.llm.opencodeUsage=async()=>{budgets++;return {available:true,spentUsd:99};};
  for(const includeConnected of [false,true]){
   const row=(await usageData(ctx,null,{includeConnected})).entries.find((e:any)=>e.provider==='opencode')!;
-  expect(row).toMatchObject({usedPercent:80,resetsAt:now+30000,tone:'error',windows,models:['opencode:glm'],account:'ssh.edge.default'});
+  expect(row).toMatchObject({usedPercent:80,resetsAt:now+30000,tone:'error',windows,models:['opencode/default:glm'],account:'ssh.edge.default'});
   expect(row.quotaStatus).toBeUndefined();expect(row.memberBudget).toBeUndefined();
  }
  expect(budgets).toBe(0);

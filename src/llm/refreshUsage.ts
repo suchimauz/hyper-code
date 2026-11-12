@@ -189,7 +189,8 @@ export default async function (
             : await ctx.fns.llm.getAnthropicOAuthToken({ account });
         if (!remoteResponse && !token) throw new Error("credential is unavailable");
         const base = String(ctx.env.CLAUDE_CODE_BASE_API_URL ?? "https://api.anthropic.com").replace(/\/$/, "");
-        const res = remoteResponse ?? await ctx.fns.llm.connectFetch({
+        const claudeFetch = provider === "anthropic-oauth" ? (o:{url:string;ms?:number;init:RequestInit}) => ctx.fns.llm.claudeFetch({account,...o}) : ctx.fns.llm.connectFetch;
+        const res = remoteResponse ?? await claudeFetch({
             url: `${base}/api/oauth/usage`,
             ms: timeoutMs,
             init: { method: "GET", headers: {
@@ -209,7 +210,7 @@ export default async function (
         let planType: string | null = null;
         try {
             if (!remoteResponse) {
-                const profileRes = await ctx.fns.llm.connectFetch({
+                const profileRes = await claudeFetch({
                     url: `${base}/api/oauth/profile`,
                     ms: timeoutMs,
                     init: { method: "GET", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" } },

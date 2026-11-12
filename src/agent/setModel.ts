@@ -35,7 +35,9 @@ export default async function (
         expectedModel?: string;
     },
 ): Promise<{ changed: string[]; model: string; from: string | null }> {
-    const model = String(opts.model ?? "").trim();
+    const raw = String(opts.model ?? "").trim();
+    // Store only the canonical [ssh/<host>:]<provider>/<account>:<model> route.
+    const model = raw ? ctx.fns.llm.parseModelRoute({ model: raw }).route : "";
     const now = opts.now ?? Date.now();
     if (!model) throw new Error("setModel: model is required");
     if (opts.expectedModel !== undefined && opts.scope === "provider") throw new Error("setModel: expectedModel requires agent scope");
@@ -81,9 +83,10 @@ export default async function (
         const before = ((await ctx.fns.procs.db.select({ sql: "SELECT model, run_state FROM agents WHERE id = ? AND archived_at IS NULL", params: [id] })) as any[])[0];
         if (!before) throw new Error(`setModel: agent not found: ${id}`);
         const previous = before.model ? String(before.model) : null;
-        if (opts.expectedModel !== undefined && previous !== opts.expectedModel) throw new Error("setModel: model changed; reopen settings and retry");
+        const canon = (value: string | null) => { if (!value) return value; try { return ctx.fns.llm.parseModelRoute({ model: value }).route; } catch { return value; } };
+        if (opts.expectedModel !== undefined && canon(previous) !== canon(opts.expectedModel)) throw new Error("setModel: model changed; reopen settings and retry");
         const live = (ctx.state as any).agent?.[id];
-        if (previous === model && (!live || live.model === model)) continue;
+        if (canon(previous) === model && (!live || canon(live.model ?? null) === model)) continue;
         if (before.run_state === "running" || Number(live?.activeRunCount ?? 0) > 0) {
             throw new Error(`setModel: agent ${id} is running; wait for the run to finish`);
         }

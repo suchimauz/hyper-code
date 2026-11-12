@@ -22,10 +22,10 @@ describe("agent.setModel", () => {
 
         const result = await ctx.fns.agent.setModel({ id: a.id, model: "mock:other" });
 
-        expect(result).toMatchObject({ changed: [a.id], model: "mock:other", from: "mock:test" });
+        expect(result).toMatchObject({ changed: [a.id], model: "mock/default:other", from: "mock:test" });
         const row = (await ctx.fns.procs.db.select({ sql: "SELECT model FROM agents WHERE id = ?", params: [a.id] }))[0];
-        expect(row.model).toBe("mock:other");
-        expect((await ctx.fns.session.getEvents({ id: a.id })).at(-1)).toMatchObject({ type: "model_changed", from: "mock:test", to: "mock:other" });
+        expect(row.model).toBe("mock/default:other");
+        expect((await ctx.fns.session.getEvents({ id: a.id })).at(-1)).toMatchObject({ type: "model_changed", from: "mock:test", to: "mock/default:other" });
     });
 
     test("an unknown provider fails here, not on the agent's next turn", async () => {

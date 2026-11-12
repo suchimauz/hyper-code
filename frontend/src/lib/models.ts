@@ -1,7 +1,7 @@
 import { requestJson } from './mauzcode';
 import type { NavigationIcon } from './navigation';
 import { readSessionSelection } from './newSession';
-export type ModelOption = { provider: string; model: string; label: string; disabled: boolean; icon: NavigationIcon | null };
+export type ModelOption = { provider: string; model: string; label: string; groupLabel?: string; disabled: boolean; icon: NavigationIcon | null };
 export type ModelSettings = {
   agentId: string; model: string; label: string; icon: NavigationIcon | null;
   models: ModelOption[];
@@ -14,9 +14,10 @@ export async function getDraftModelSettings(model: string, effort: string, signa
   type Config = Omit<ModelSettings, 'agentId'> & { defaultModel: string };
   const catalogue = await requestJson<Config>('/ui-lab-api/new-session', { signal });
   const available = catalogue.models.filter(option => !option.disabled);
-  const remembered = readSessionSelection().model;
-  const selected = available.find(option => option.model === model)?.model
-    ?? available.find(option => option.model === remembered)?.model ?? available[0]?.model ?? '';
+  // Legacy aliases of a remembered or requested route still select the canonical catalogue entry.
+  const same = (value: string) => (option: ModelOption) => !!value && (option.model === value || parseModelRoute(option.model).route === parseModelRoute(value).route);
+  const selected = available.find(same(model))?.model
+    ?? available.find(same(readSessionSelection().model ?? ''))?.model ?? available[0]?.model ?? '';
   if (!selected) throw new Error('Нет доступных моделей');
   const config = selected === catalogue.model ? catalogue : await requestJson<Config>(`/ui-lab-api/new-session?${new URLSearchParams({ model: selected })}`, { signal });
   const requested = normalizeEffort(effort, config.effort.supported);
@@ -31,8 +32,20 @@ export async function setAgentEffort(id: string, effort: string) {
 }
 export const normalizeEffort = (effort: string, supported: string[]) => supported.includes(effort) ? effort : 'auto';
 export const effortLabel = (value: string) => ({ auto: 'Default', off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Max' }[value] ?? value);
-// SSH routes look like `ssh/<host>:<provider>/<account>:<model>`; group them per host account so accounts don't mix.
-export const modelGroup = (option: Pick<ModelOption, 'provider' | 'model'>) => {
-  const match = /^ssh\/([^:]+):([^:]+):/.exec(option.model);
-  return match ? `${match[1]} · ${match[2]}` : option.provider;
+// Canonical route template shared with the server (llm.parseModelRoute): `[ssh/<host>:]<provider>/<account>:<model>`.
+export type ModelRoute = { host: string | null; provider: string; account: string; model: string; route: string };
+export const parseModelRoute = (value: string): ModelRoute => {
+  const ssh = /^ssh\/([^:]+):(.+)$/.exec(value);
+  const host = ssh ? ssh[1] : null; const rest = ssh ? ssh[2] : value;
+  const m = /^([a-z][\w-]*)(?:\/([\w.-]+))?:(.+)$/.exec(rest);
+  const provider = m ? m[1] : 'lmstudio'; const account = m?.[2] ?? 'default'; const model = m ? m[3] : rest;
+  return { host, provider, account, model, route: `${host ? `ssh/${host}:` : ''}${provider}/${account}:${model}` };
 };
+// SSH routes are grouped per host account so accounts don't mix.
+export const modelGroup = (option: Pick<ModelOption, 'provider' | 'model' | 'groupLabel'>) => {
+  if (option.groupLabel) return option.groupLabel;
+  const route = parseModelRoute(option.model);
+  return route.host ? `${route.host} · ${route.provider}/${route.account}` : option.provider;
+};
+// Provider and account line under a model name; the SSH host is already shown by the group.
+export const modelSourceLabel = (model: string) => { const { provider, account } = parseModelRoute(model); return `${provider} · ${account}`; };

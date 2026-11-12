@@ -74,7 +74,9 @@ export default async function (
 
         // Use the shared catalogue cache: it refreshes nodes with a five-minute TTL,
         // retains transient failures, and omits denied/disabled/empty catalogues.
-        const models = await ctx.fns.llm.listModels({});
+        // Canonical routes only, so `${provider}/${account}:` prefixes match legacy aliases too.
+        const canonical = (model: string) => { try { return ctx.fns.llm.parseModelRoute ? ctx.fns.llm.parseModelRoute({ model }).route : model; } catch { return model; } };
+        const models = Object.fromEntries(Object.entries(await ctx.fns.llm.listModels({})).map(([group, list]) => [group, [...new Set((list as string[]).map(canonical))]]));
         const planInstance = (provider: "zai-coding" | "minimax-coding" | "opencode") => ctx.fns?.llm?.codingInstance
             ? ctx.fns.llm.codingInstance({ provider }).catch(() => ({ instance: null }))
             : Promise.resolve({ instance: null });
@@ -92,7 +94,7 @@ export default async function (
         for (const entry of entries) {
             // The catalogue prefix follows the provider identity, so compute it
             // before any ssh account identity is borrowed for usage grouping.
-            const cataloguePrefix = `${entry.provider}${entry.account === "default" ? "" : `/${entry.account}`}:`;
+            const cataloguePrefix = `${entry.provider}/${entry.account}:`;
             // Go uses normal subscription snapshots; only PAYG has a monetary budget.
             if (entry.provider === "opencode") {
                 entry.label = (opencodeGo ? "OpenCode Go" : "OpenCode Console") + (opencodePlan.instance ? ` · ${opencodePlan.instance}` : "");
@@ -148,7 +150,7 @@ export default async function (
             const catalogue = Object.values(models).flat();
             entry.models = catalogue.filter(model => model.startsWith(prefix));
             if (opts.includeConnected && entry.account !== "default" && !entry.models.length) {
-                const base = `${entry.provider}:`;
+                const base = `${entry.provider}/default:`;
                 entry.models = [...new Set(catalogue.filter(model => model.startsWith(base)).map(model => `${prefix}${model.slice(base.length)}`))];
             }
         }

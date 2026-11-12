@@ -92,3 +92,23 @@ it('reports draft config errors and retries using a read-only model projection',
  expect(url.searchParams.get('effort')).toBeNull();
 });
 
+it('shows and searches proxy account groups while saving the original OAuth route',async()=>{
+ let state=structuredClone(original);
+ const model='anthropic-oauth/work:opus';
+ state.models.push({provider:'anthropic-oauth',model,label:'opus',groupLabel:'socks5 · Office proxy · claude/work',disabled:false,icon:null});
+ const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>{
+  if(init?.method==='POST'){state={...state,model:JSON.parse(init.body as string).model,label:'opus'};return json({ok:true,model});}
+  return json(state);
+ });
+ vi.stubGlobal('fetch',fetcher);
+ render(<ModelPicker {...props}/>);
+ await userEvent.click(await screen.findByRole('button',{name:'Выбрать модель: gpt-5'}));
+ await userEvent.click(await screen.findByRole('menuitem',{name:/Model gpt-5/}));
+ expect(screen.getByRole('group',{name:'socks5 · Office proxy · claude/work'})).toBeVisible();
+ await userEvent.type(screen.getByRole('textbox',{name:'Search models'}),'Office proxy');
+ expect(screen.queryByRole('menuitemradio',{name:'gpt-5'})).toBeNull();
+ await userEvent.click(screen.getByRole('menuitemradio',{name:'opus'}));
+ await waitFor(()=>expect(props.onSaved).toHaveBeenCalledOnce());
+ const post=fetcher.mock.calls.find(([,init])=>init?.method==='POST');
+ expect(JSON.parse(post![1]!.body as string)).toEqual({model});
+});

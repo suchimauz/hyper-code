@@ -81,7 +81,7 @@ export default async function (
             provider: snapshot.provider,
             account,
             label: account === "default" ? snapshot.provider : `${snapshot.provider} · ${account}`,
-            model: `${snapshot.provider}${account === "default" ? "" : `/${account}`}:`,
+            model: `${snapshot.provider}/${account}:`,
             usedPercent,
             resetsAt: worst?.resetsAt ?? null,
             planType: snapshot.planType ?? null,

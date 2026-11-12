@@ -2,7 +2,10 @@ import { test, expect } from "bun:test";
 import request from "./request";
 import policy from "./policy";
 
-const ctx: any = { fns: { sshProvider: { policy: (o: any) => policy(ctx, null, o) } } };
+import transport from "../socksProxy/request";
+import connect from "../socksProxy/connect";
+import transportError from "../socksProxy/transportError";
+const ctx: any = { fns: { socksProxy: {request:(o:any)=>transport(ctx,null,o),connect:(o:any)=>connect(ctx,null,o),transportError:(o:any)=>transportError(ctx,null,o)}, sshProvider: { policy: (o: any) => policy(ctx, null, o) } } };
 const base = { provider: "codex", url: "https://chatgpt.com/backend-api/codex/models", proxyPort: 1 };
 
 test("deadlines outside the supported ranges are refused before networking", async () => {

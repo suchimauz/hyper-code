@@ -1,8 +1,8 @@
 import { createServer } from "node:http";
 
-/** Performs the llm.startAnthropicOAuth runtime operation. */
 /**
- * Start the Anthropic OAuth authorization flow.
+ * Start PKCE authorization for a local Claude OAuth account with immutable proxy selection.
+ * Use instead of CLI login when a saved SOCKS5 proxy is selected.
  * @param opts.listen Whether to listen locally for the OAuth callback.
  * @param opts.account Credential slot the resulting tokens are saved into.
  * @param opts.label Human-readable name for the account, e.g. the e-mail.
@@ -11,10 +11,13 @@ export default async function (
     ctx: Context,
     _session: Session | null,
     opts?: {
-        /** Value used for the listen option. */ listen?: boolean;
+        /** Listen on the configured loopback callback; manual paste remains available. @default true */ listen?: boolean;
         /** Credential slot to log into, allowing a second Claude account. @default "default" */ account?: string;
-        /** Human-readable account name shown in the UI. */ label?: string | null },
+        /** Human-readable account name shown in the UI. */ label?: string | null;
+        /** Saved proxy for a new account; reconnect preserves its existing binding. */ proxyId?: string | null },
 ): Promise<{ authorizationUrl: string; expiresAt: number; callbackListening: boolean }> {
+    const account = String(opts?.account ?? "").trim() || "default";
+    const proxyId = await ctx.fns.llm.loginProxy({account,proxyId:opts?.proxyId});
     const state = randomBase64Url(32);
     const verifier = randomBase64Url(32);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
@@ -22,14 +25,13 @@ export default async function (
     const c = ctx.fns.llm.anthropicOAuthConstants({});
     const root: any = ((ctx.state as any).llm ??= {});
     const store: any = (root.anthropicOAuth ??= { pending: new Map(), lastError: null });
-    for (const p of store.pending.values()) try { p.server?.close(); } catch {}
+    for (const p of store.pending.values()) {p.status="cancelled";p.verifier=null;try { p.server?.close(); } catch { /* Listener already closed. */ }}
     store.pending.clear();
     store.lastError = null;
     // Which credential slot this login fills travels with the pending flow, so
     // the callback saves a second Claude account instead of overwriting the
     // first one.
-    const account = String(opts?.account ?? "").trim().slice(0, 40) || "default";
-    const pending: any = { state, verifier, redirectUri: c.redirectUri, account, label: opts?.label ?? null, createdAt: Date.now(), expiresAt: Date.now() + 10 * 60_000, status: "pending", server: null };
+    const pending: any = { id:crypto.randomUUID(), state, verifier, proxyId, redirectUri: c.redirectUri, account, label: opts?.label ?? null, createdAt: Date.now(), expiresAt: Date.now() + 10 * 60_000, status: "pending", server: null };
     store.pending.set(state, pending);
 
     let callbackListening = false;

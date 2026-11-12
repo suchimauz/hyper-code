@@ -9,7 +9,8 @@ function setup(){
  const rec=(fn:string,result:any)=>async(opts:any)=>{calls.push({fn,opts});if(result instanceof Error)throw result;return result;};
  const ctx:any={state:{sshAccount:{flows:new Map([['r1',{id:'r1',instance:'box',provider:'claude-code',account:'a',status:'pending',verificationUri:'https://claude.ai/oauth/authorize',userCode:null,error:null,expiresAt:Date.now()+60000,process:{},callbackConnection:{bin:'ssh',args:[],host:'h'}}]])}},fns:{
   http:{publicOrigin:async()=>'https://mauzcode.test'},auth:{csrfToken:async()=>'csrf',verifyCsrf:async({token}:any)=>token==='csrf'},
-  llm:{listAccounts:async()=>[account],accountLoginStatus:()=>[{provider:'codex',account:'new',status:'pending',verificationUri:'https://auth.openai.com/device',userCode:'ABCD',needsCode:false,error:null}],startAccountLogin:rec('startAccountLogin',{}),startXaiOAuth:rec('startXaiOAuth',{}),accountUsers:rec('accountUsers',[{id:'ag',title:'T',model:null}]),removeAccount:rec('removeAccount',{removed:true,provider:'codex',account:'work',archived:[]})},
+  socksProxy:{list:async()=>[]},
+  llm:{accountProxy:async()=>null,startAnthropicOAuth:rec("oauth",{}),cancelAnthropicOAuth:rec("cancelOAuth",{ok:true}),completeAnthropicOAuth:rec("completeOAuth",{ok:true}),listAccounts:async()=>[account],accountLoginStatus:()=>[{provider:'codex',account:'new',status:'pending',verificationUri:'https://auth.openai.com/device',userCode:'ABCD',needsCode:false,error:null}],startAccountLogin:rec('startAccountLogin',{}),startXaiOAuth:rec('startXaiOAuth',{}),accountUsers:rec('accountUsers',[{id:'ag',title:'T',model:null}]),removeAccount:rec('removeAccount',{removed:true,provider:'codex',account:'work',archived:[]})},
   sshInstance:{list:async()=>[{name:'box',pinnedHostKey:'k'},{name:'raw',pinnedHostKey:null}]},
   sshAccount:{startLogin:rec('sshStartLogin',{id:'r2'}),startKimiLogin:rec('kimi',{id:'k1'}),status:async({id}:any)=>({id,instance:id==='r1'?'box':null}),submitCode:rec('submitCode',{ok:true}),cancel:rec('cancel',{ok:true})},
   llms:{submitLoginCode:rec('submitLoginCode','<html>')},
@@ -44,4 +45,18 @@ test('remote diagnostics JSON projects bounded fields and omits transport and ra
  const response=await run(s,get());const text=await response.text();const row=JSON.parse(text).logins.find((f:any)=>f.id==='r1');
  expect(row.diagnostics.stages).toHaveLength(4);expect(row.diagnostics.reason).toBe('tls');expect(row.needsCode).toBe(false);expect(row.callbackSubmitted).toBe(true);
  expect(text).not.toContain('SECRET');expect(text).not.toContain('callbackConnection');expect(text).not.toContain('process');
+});
+
+test('Claude proxy login validates local OAuth before dispatch and routes completion/cancel',async()=>{
+ const s=setup();
+ for(const patch of [{method:'cli',proxyId:'p'},{method:'oauth',proxyId:'p',instance:'box'},{method:'oauth',proxyId:'p',provider:'codex'}]){
+  expect((await run(s,post({action:'login',provider:'claude-code',account:'work',...patch}))).status).toBe(400);
+ }
+ expect(s.calls).toHaveLength(0);
+ expect((await run(s,post({action:'login',provider:'claude-code',account:'work',method:'oauth',proxyId:'p'}))).status).toBe(201);
+ expect(s.calls[0]).toEqual({fn:'oauth',opts:{account:'work',proxyId:'p'}});
+ expect((await run(s,post({action:'code',provider:'anthropic-oauth',account:'work',code:'code#state'}))).status).toBe(200);
+ expect(s.calls.at(-1)).toEqual({fn:'completeOAuth',opts:{input:'code#state'}});
+ expect((await run(s,post({action:'cancel',provider:'anthropic-oauth',id:'flow'}))).status).toBe(200);
+ expect(s.calls.at(-1)).toEqual({fn:'cancelOAuth',opts:{id:'flow'}});
 });

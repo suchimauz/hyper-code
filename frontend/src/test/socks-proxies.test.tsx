@@ -18,3 +18,10 @@ describe('SOCKS5 settings',()=>{
  it('focuses the labelled form and preserves standalone IPv6 paste',async()=>{render(<SocksProxies context={{...context,theme:'light'}}/>);fireEvent.click(screen.getByRole('button',{name:'Добавить прокси'}));expect(screen.getByLabelText('Метка')).toHaveFocus();const host=screen.getByLabelText('IP или DNS-имя');const cancelled=fireEvent.paste(host,{clipboardData:{getData:()=> '2001:db8::1'}});expect(cancelled).toBe(true);expect(screen.queryByRole('alert')).not.toBeInTheDocument();expect(screen.getByLabelText('Порт')).toHaveAttribute('min','1');});
  it('disables mutations in read-only context',async()=>{render(<SocksProxies context={{...context,readOnly:true}}/>);expect(await screen.findByRole('button',{name:'Удалить'})).toBeDisabled();expect(screen.getByRole('button',{name:'Проверить'})).toBeDisabled();expect(screen.getByRole('button',{name:'Добавить прокси'})).toBeDisabled();});
 });
+
+it('shows linked accounts and disables deleting an in-use proxy',async()=>{
+ request.mockResolvedValue({items:[{...item,users:[{provider:'anthropic-oauth',account:'work'}]}]});
+ render(<SocksProxies context={context}/>);
+ expect(await screen.findByRole('button',{name:'Удалить'})).toBeDisabled();
+ expect(screen.getByText(/anthropic-oauth\/work/)).toBeVisible();
+});

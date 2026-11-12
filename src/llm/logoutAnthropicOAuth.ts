@@ -19,8 +19,12 @@ export default async function (ctx: Context, _session: Session | null, opts?: {
     }
     const store: any = (ctx.state as any).llm?.anthropicOAuth;
     if (store) {
-        for (const p of store.pending?.values?.() ?? []) try { p.server?.close(); } catch {}
-        store.pending?.clear?.();
+        for (const [state,p] of store.pending ?? []) {
+            if(!opts?.all && p.account !== account)continue;
+            p.status="cancelled";p.verifier=null;
+            try { p.server?.close(); } catch { /* Listener already closed. */ }
+            store.pending.delete(state);
+        }
         store.lastError = null;
     }
     return { ok: true };

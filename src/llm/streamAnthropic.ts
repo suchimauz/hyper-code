@@ -150,7 +150,7 @@ export default async function (
     }
 
     const ssh = ep.ssh ? { ...ep.ssh, provider: ep.ssh.provider } : undefined;
-    const transport = ep.provider === "opencode" ? ctx.fns.llm.opencodeFetch : ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh,...request}) : ctx.fns.llm.connectFetch;
+    const transport = ep.provider === "opencode" ? ctx.fns.llm.opencodeFetch : ssh ? (request: {url:string;init:{method?:string;headers?:Record<string,string>;body?:string;signal?:AbortSignal}}) => ctx.fns.sshAccount.fetch({ssh,...request}) : ep.provider === "anthropic-oauth" ? (request: {url:string;init:RequestInit}) => ctx.fns.llm.claudeFetch({account:ep.account,requireProxy:ep.noFallback,...request}) : ctx.fns.llm.connectFetch;
     if ((ctx as Context & { goalRequestContext?: { authority?: types.goal.DelegationAuthority } }).goalRequestContext?.authority) await ctx.fns.goal.requestAuthorize({});
     const res = await transport({ url: ep.url, ...(ep.provider === "opencode" ? { sessionId: agent.id } : {}), init: {
         method: "POST",
@@ -204,10 +204,10 @@ export default async function (
     try {
     for await (const { event, data } of ctx.fns.llm.parseSSE({ body: res.body })) {
         let msg: any;
-        try { msg = JSON.parse(data); } catch (error) { if (ep.ssh) throw error; continue; }
+        try { msg = JSON.parse(data); } catch (error) { if (ep.ssh || ep.noFallback) throw error; continue; }
         const type = event ?? msg.type ?? "message";
         if (type === "message_stop") { terminal = true; break; }
-        if (type === "error" && ep.ssh) {
+        if (type === "error" && (ep.ssh || ep.noFallback)) {
             const info = ctx.fns.llm.classifyError({
                 provider: ep.provider, account: ep.quotaAccount ?? ep.account, kind: ep.kind,
                 body: JSON.stringify(msg), headers: res.headers,
@@ -253,10 +253,15 @@ export default async function (
         }
     }
 
+    if (ep.noFallback && !terminal) throw Object.assign(new Error("PROXY_CONNECTION_LOST: Anthropic stream ended without message_stop"),{code:"PROXY_CONNECTION_LOST",retryable:true,noFallback:true});
     if (ep.ssh && !terminal) throw new Error("Anthropic stream ended without message_stop");
     } catch (error) {
         // A provider's terminal refusal is not an interrupted SSH inference.
         if (error && typeof error === 'object' && 'failure' in error) throw error;
+        if(ep.noFallback && !opts.signal?.aborted) {
+            const failure=ctx.fns.llm.proxyFailure({error:error as Error,provider:ep.provider,account:ep.account}) ?? (error instanceof SyntaxError ? {code:"PROXY_PROTOCOL" as const,kind:"fatal" as const,provider:ep.provider,account:ep.account,retryable:false,message:"PROXY_PROTOCOL: invalid Anthropic stream"} : {code:"PROXY_CONNECTION_LOST" as const,kind:"transient" as const,provider:ep.provider,account:ep.account,retryable:true,message:"PROXY_CONNECTION_LOST: proxied response stream interrupted"});
+            throw Object.assign(new Error(failure.message),{failure,code:failure.code,retryable:failure.retryable,noFallback:true});
+        }
         if (ep.ssh && !opts.signal?.aborted) {
             throw Object.assign(new Error("SSH inference interrupted; provider acceptance is uncertain. Resume manually.", { cause: error }), {
                 transportFailure: { kind: "ssh_transport", phase: "ambiguous", retryable: false },

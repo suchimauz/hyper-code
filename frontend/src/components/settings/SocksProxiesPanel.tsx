@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { SettingsField as TextField } from './SettingsField';
 import './settings.css';
 
-type Proxy = { id: string; name: string | null; host: string; port: number; hasAuth: boolean; revision: number };
+type Proxy = { id: string; name: string | null; host: string; port: number; hasAuth: boolean; revision: number; users?:Array<{provider:string;account:string}> };
 type Check = { ok: boolean; revision: number; checkedAt: string; durationMs: number; query?: string; country?: string; regionName?: string; city?: string; isp?: string; org?: string; as?: string; timezone?: string; message?: string; code?: string };
 const checkErrors: Record<string, string> = { timeout:'Время проверки истекло.', proxy_dns:'Не удалось разрешить имя прокси.', proxy_connect:'Не удалось подключиться к прокси.', auth_refused:'Прокси отклонил аутентификацию.', connect_refused:'Прокси отклонил соединение с сервисом.', http_error:'Сервис вернул ошибку HTTP.', rate_limit:'Лимит проверок исчерпан. Повторите позже.', invalid_response:'Сервис вернул некорректный ответ.', cancelled:'Проверка отменена.' };
 const endpoint = (item: Proxy) => `${item.host.includes(':') ? `[${item.host}]` : item.host}:${item.port}`;
@@ -61,7 +61,8 @@ export function SocksProxiesPanel({ context }: ExtensionViewProps) {
       <button type="button" className="ssh-card-tab" disabled={busy || context.readOnly} onClick={()=>edit(item)}>Редактировать</button>
       <button type="button" className="ssh-card-tab" title="Проверка через ip-api.com (HTTP)" disabled={busy || context.readOnly || checking.includes(item.id) || editing?.id===item.id} onClick={()=>void check(item)}>{checking.includes(item.id)?'Проверка…':'Проверить'}</button>
       {checking.includes(item.id) && <button type="button" className="ssh-card-tab" onClick={()=>active.current.get(item.id)?.abort()}>Отменить проверку</button>}
-      <button type="button" className="ssh-card-tab is-danger" disabled={busy || context.readOnly} onClick={event=>{removeButton.current=event.currentTarget;setRemoving(item);}}>Удалить</button></div>
+      <button type="button" className="ssh-card-tab is-danger" disabled={busy || context.readOnly || !!item.users?.length} title={item.users?.length ? "Прокси привязан к аккаунтам" : undefined} onClick={event=>{removeButton.current=event.currentTarget;setRemoving(item);}}>Удалить</button></div>
+      {!!item.users?.length && <p className="settings-note">Используется: {item.users.map(u=>`${u.provider}/${u.account}`).join(", ")}. Удаление недоступно, пока есть привязки.</p>}
       {removing?.id===item.id && <div className="settings-confirm" role="group" aria-label="Удаление прокси" onKeyDown={event=>{if(event.key==='Escape' && !busy){event.preventDefault();event.stopPropagation();setRemoving(null);removeButton.current?.focus();}}}>
         <p className="settings-note">Удалить прокси «{item.name || endpoint(item)}»?</p>
         <div className="settings-actions"><Button autoFocus disabled={busy} onClick={()=>{setRemoving(null);removeButton.current?.focus();}}>Отмена</Button><Button variant="primary" disabled={busy || context.readOnly} onClick={()=>{invalidate(item.id);setRemoving(null);void mutate({action:'remove',id:item.id,revision:item.revision});}}>Удалить прокси</Button></div>

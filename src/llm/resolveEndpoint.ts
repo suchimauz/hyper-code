@@ -21,6 +21,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     api: "openai" | "anthropic" | "responses" | "gemini" | "mock";
     /** For mauzcode/<node> models: the provider the node uses upstream (e.g. claude-code). */
     upstream?: string;
+    /** Selected account prohibits alternate models or direct networking. */ noFallback?: boolean;
     /** Node-scoped upstream quota identity; transport account remains the node name. */
     quotaAccount?: string;
     /** Remote SSH execution route. For codex/claude-code credentials live on the
@@ -61,7 +62,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         if (!entry) throw new Error(`mauzcode/${account} does not offer model ${modelId}`);
         if (!["openai", "anthropic", "responses", "mock"].includes(String(entry.api))) throw Object.assign(new Error(`mauzcode/${account}: provider unavailable`), { retryable: false, replaySafe: false });
         const path = entry.api === "openai" ? "chat" : entry.api;
-        return { url: `${node.url}/${path}`, apiKey: await ctx.fns.node.token({ name: account }), modelId: entry.id, provider, account, kind: entry.kind, api: entry.api, upstream: entry.provider, quotaAccount: `${account}/${entry.provider}/${entry.account ?? "default"}` };
+        return { url: `${node.url}/${path}`, apiKey: await ctx.fns.node.token({ name: account }), modelId: entry.id, provider, account, kind: entry.kind, api: entry.api, upstream: entry.provider, ...(entry.noFallback ? {noFallback:true} : {}), quotaAccount: `${account}/${entry.provider}/${entry.account ?? "default"}` };
     }
     if (provider === "oneapi") {
         const baseUrl = (await declaredString('oneapiBaseUrl')(ctx))?.replace(/\/+$/, '');
@@ -106,7 +107,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
             return { url, apiKey, modelId, provider, account, kind: p.kind, api: p.api, ssh: { instance, provider, account: 'default' } };
         }
     }
-    return { url, apiKey, modelId, provider, account, kind: p.kind, api: p.api };
+    const noFallback = provider === "anthropic-oauth" && !!(await ctx.fns.llm.accountProxy({provider,account}));
+    return { url, apiKey, modelId, provider, account, kind: p.kind, api: p.api, ...(noFallback ? {noFallback:true} : {}) };
 }
 
 type ProviderConfig = {

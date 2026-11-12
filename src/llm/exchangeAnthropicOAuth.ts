@@ -13,6 +13,10 @@ export default async function (
     ctx: Context,
     _session: Session | null,
     opts: {
+        /** Local credential slot; pending login uses the target slot. @default "default" */ account?: string;
+        /** Validated pending OAuth proxy selection; existing bindings cannot change. */ proxyId?: string | null;
+        /** Caller cancellation through token response consumption. */ signal?: AbortSignal;
+    } & ({
         /** Authorization-code grant discriminator. */ grant: "authorization_code";
         /** Authorization code returned by Anthropic. */ code: string;
         /** OAuth state returned with the authorization code. */ state: string;
@@ -21,7 +25,7 @@ export default async function (
     } | {
         /** Refresh-token grant discriminator. */ grant: "refresh_token";
         /** Refresh token used to rotate credentials. */ refreshToken: string;
-    },
+    }),
 ): Promise<{ access: string; refresh: string | null; expiresAt: number; scopes: string | null }> {
     const c = ctx.fns.llm.anthropicOAuthConstants({});
     const body: any = opts.grant === "authorization_code" ? {
@@ -32,14 +36,18 @@ export default async function (
     };
     let res: Response;
     try {
-        res = await fetch(c.tokenUrl, {
+        res = await ctx.fns.llm.claudeFetch({account:opts.account ?? "default",proxyId:opts.proxyId,url:c.tokenUrl,ms:30000,init: {
             method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
-            body: JSON.stringify(body), signal: AbortSignal.timeout(30_000),
-        });
-    } catch { throw new Error("Anthropic OAuth connection unavailable"); }
-    if (!res.ok) { await res.text().catch(() => ""); throw new Error("Anthropic OAuth token exchange rejected"); }
+            body: JSON.stringify(body), signal: opts.signal ? AbortSignal.any([opts.signal,AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
+        }});
+    } catch (error) {
+        const e=error as Error & {code?:string;requestSent?:boolean};
+        if (e.requestSent === false) throw error;
+        throw Object.assign(new Error("OAUTH_OUTCOME_UNKNOWN: token exchange may have completed; reconnect the account" + (e.code?.startsWith("PROXY_") ? ` (${e.code}: ${e.message.slice(0,250)})` : "")),{code:"OAUTH_OUTCOME_UNKNOWN",retryable:false,noFallback:true,requestSent:true});
+    }
+    if (!res.ok) { await res.text().catch(() => ""); throw new Error(`Anthropic OAuth token exchange rejected (HTTP ${res.status})`); }
     let data: any;
-    try { data = await res.json(); } catch { throw new Error("Anthropic OAuth token exchange returned an invalid response"); }
+    try { data = await res.json(); } catch (error) {const e=error as Error & {code?:string};throw Object.assign(new Error("OAUTH_OUTCOME_UNKNOWN: token response was interrupted or invalid; reconnect"+(e.code?.startsWith("PROXY_")?` (${e.code}: ${e.message.slice(0,250)})`:"")),{code:"OAUTH_OUTCOME_UNKNOWN",retryable:false,noFallback:true,requestSent:true});}
     if (typeof data.access_token !== "string" || !data.access_token || typeof data.expires_in !== "number") {
         throw new Error("Anthropic OAuth token exchange returned an invalid response");
     }

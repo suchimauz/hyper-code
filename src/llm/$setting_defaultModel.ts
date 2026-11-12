@@ -1,7 +1,7 @@
 export default {
     type: 'enum',
     env: 'MODEL',
-    default: 'claude-code:claude-opus-5',
+    default: 'claude-code/default:claude-opus-5',
     options: [
         'claude-code:claude-opus-5',
         'kimi-coding:k3',

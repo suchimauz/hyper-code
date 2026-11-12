@@ -46,23 +46,26 @@ export default async function (
     const signal = opts.signal && deadline ? AbortSignal.any([opts.signal, deadline]) : opts.signal ?? deadline;
     const user = String(opts.user ?? "").trim();
     if (!user) throw new Error("llm.call: user is required");
-    const primary = String(opts.model ?? await ctx.fns.settings.modelDefault({})).trim();
-    if (!primary) throw new Error("llm.call: model is required");
+    const rawPrimary = String(opts.model ?? await ctx.fns.settings.modelDefault({})).trim();
+    if (!rawPrimary) throw new Error("llm.call: model is required");
+    const canonical = (model: string) => ctx.fns.llm.parseModelRoute({ model }).route;
+    const primary = canonical(rawPrimary);
     // Reject an opted-out primary before reading or constructing any fallback routes.
     if (ctx.fns.llm.modelPolicy) await ctx.fns.llm.modelPolicy({ action: "assert", model: primary });
     if (/^(?:ssh\/[^:]+:)?cursor(?:\/|:)/.test(primary)) {
         throw Object.assign(new Error('Provider unavailable'), { retryable: false, replaySafe: false });
     }
     // A Go plan request must never cross into a billed provider fallback.
-    const isOpenCode = /^opencode(?:\/|:)/.test(primary);
+    const isOpenCode = /^opencode\//.test(primary);
     const sessionId = opts.sessionId ?? (isOpenCode ? Bun.randomUUIDv7() : undefined);
-    const noFallback = opts.noFallback || isOpenCode;
+    const primaryRoute = await ctx.fns.llm.resolveEndpoint({model:primary});
+    const noFallback = opts.noFallback || isOpenCode || primaryRoute.noFallback === true;
     const configuredFallbacks = noFallback ? "" : await (ctx.fns.settings.getString?.({
         module: "llm", scopeType: "global", key: "fallbackModels",
-        fallback: "codex:gpt-5.4-mini,kimi-coding:kimi-for-coding",
+        fallback: "codex/default:gpt-5.4-mini,kimi-coding/default:kimi-for-coding",
     }) ?? Promise.resolve(""));
-    const alternate = alternateAnthropicModel(primary);
-    const models = [primary, ...(alternate ? [alternate] : []), ...String(configuredFallbacks ?? "").split(",").map(x => x.trim()).filter(Boolean)]
+    const alternate = noFallback ? null : alternateAnthropicModel(primary);
+    const models = [primary, ...(alternate ? [alternate] : []), ...String(configuredFallbacks ?? "").split(",").map(x => x.trim()).filter(Boolean).flatMap(model => { try { return [canonical(model)]; } catch { return []; } })]
         .filter((model, index, all) => all.indexOf(model) === index);
     const attempted: string[] = [];
     const attempts: Array<{ model: string; count: number }> = [];
@@ -75,7 +78,7 @@ export default async function (
                 count++;
                 try {
                     signal?.throwIfAborted();
-                    const result = await callModel(ctx, { ...opts, model, user, signal, sessionId });
+                    const result = await callModel(ctx, { ...opts, model, user, signal, sessionId, endpoint:model===primary&&count===1?primaryRoute:undefined });
                     attempts.push({ model, count });
                     return attempted.length === 1 && count === 1
                         ? { ...result, model }
@@ -83,15 +86,22 @@ export default async function (
                 } catch (error) {
                     signal?.throwIfAborted();
                     lastError = error;
-                    if (count >= 3 || !shouldRetrySameModel(error)) throw error;
-                    await Bun.sleep(count === 1 ? 500 : 1_500);
+                    const failure=(error as {failure?:types.llm.FailureInfo}).failure ?? (/^(PROXY_|OAUTH_OUTCOME_UNKNOWN$)/.test(String((error as {code?:string})?.code??"")) ? ctx.fns.llm.proxyFailure({error:error as Error,provider:primaryRoute.provider,account:primaryRoute.account}) : null);
+                    if (failure?.code.startsWith("PROXY_")) {
+                        const decision=await ctx.fns.llm.retryDecision({failure,retry:count-1});
+                        if(!decision.retry)throw error;
+                        await ctx.fns.llm.retryDelay({ms:decision.delayMs,signal});
+                    } else {
+                        if (count >= 3 || !shouldRetrySameModel(error)) throw error;
+                        await Bun.sleep(count === 1 ? 500 : 1_500);
+                    }
                 }
             }
         } catch (error) {
             signal?.throwIfAborted();
             lastError = error;
             attempts.push({ model, count });
-            if (noFallback || !shouldFallback(error) || model === models.at(-1)) throw error;
+            if (noFallback || (error as {noFallback?:boolean}).noFallback || !shouldFallback(error) || model === models.at(-1)) throw error;
         }
     }
     throw lastError;
@@ -101,7 +111,7 @@ async function callModel(ctx: Context, opts: any): Promise<{ text: string; finis
     const model = String(opts.model).trim();
     const user = String(opts.user).trim();
     const system = String(opts.system ?? "").trim();
-    const endpoint = await ctx.fns.llm.resolveEndpoint({ model });
+    const endpoint = opts.endpoint ?? await ctx.fns.llm.resolveEndpoint({ model });
 
     if (endpoint.api === "mock") return normalizeStructured({ text: user, finishReason: "stop", usage: null, raw: { mock: true } }, opts.response_format);
     const result = (endpoint.provider === "mauzcode" ? endpoint.upstream : endpoint.provider) === "xai" ? await xaiResponses(ctx, endpoint, { ...opts, user, system })
@@ -118,9 +128,9 @@ function alternateAnthropicModel(model: string): string | null {
     const provider = match[1]!;
     const account = match[2] ?? "default";
     const modelId = match[3]!;
-    if (provider === "claude-code") return `anthropic-oauth:${modelId}`;
-    if (account !== "default") return `anthropic-oauth:${modelId}`;
-    return `claude-code:${modelId}`;
+    if (provider === "claude-code") return `anthropic-oauth/default:${modelId}`;
+    if (account !== "default") return `anthropic-oauth/default:${modelId}`;
+    return `claude-code/default:${modelId}`;
 }
 
 function shouldRetrySameModel(error: unknown): boolean {
@@ -166,7 +176,13 @@ async function xaiResponses(ctx: Context, endpoint: any, opts: any) {
         },
         body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) {
+        if(endpoint.provider === "opencode")throw new Error(await opencodeError(response,[endpoint.apiKey,opts.user,opts.system]));
+        const body=await response.text();
+        if(!endpoint.noFallback && response.headers.get("x-mauzcode-no-fallback")!=="true")throw new Error(`${endpoint.provider} ${response.status}: ${body}`);
+        const info=ctx.fns.llm.classifyError({provider:endpoint.provider,account:endpoint.account,kind:endpoint.kind,status:response.status,body,headers:response.headers});
+        throw Object.assign(new Error(info.message),{failure:info,code:info.code,retryable:info.retryable,noFallback:endpoint.noFallback===true||response.headers.get("x-mauzcode-no-fallback")==="true"});
+    }
     const raw: any = await readResponsesSSE(response);
     if (endpoint.provider === "xai") ctx.fns.llm.refreshUsage?.({ provider: endpoint.provider, account: endpoint.account, maxAgeMs: 60_000 })?.catch(() => undefined);
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
@@ -197,7 +213,7 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
     }
     // ChatGPT Codex backend controls output limits and sampling; neither
     // max_output_tokens nor temperature is accepted by the subscription API.
-    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : endpoint.provider === "anthropic-oauth" ? (url:string,init:RequestInit) => ctx.fns.llm.claudeFetch({account:endpoint.account,requireProxy:endpoint.noFallback,url,init}) : fetch;
     const response = await transport(endpoint.url, {
         signal: opts.signal,
         method: "POST",
@@ -213,7 +229,13 @@ async function responses(ctx: Context, endpoint: any, opts: any) {
         },
         body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) {
+        if(endpoint.provider === "opencode")throw new Error(await opencodeError(response,[endpoint.apiKey,opts.user,opts.system]));
+        const body=await response.text();
+        if(!endpoint.noFallback && response.headers.get("x-mauzcode-no-fallback")!=="true")throw new Error(`${endpoint.provider} ${response.status}: ${body}`);
+        const info=ctx.fns.llm.classifyError({provider:endpoint.provider,account:endpoint.account,kind:endpoint.kind,status:response.status,body,headers:response.headers});
+        throw Object.assign(new Error(info.message),{failure:info,code:info.code,retryable:info.retryable,noFallback:endpoint.noFallback===true||response.headers.get("x-mauzcode-no-fallback")==="true"});
+    }
     const raw: any = await readResponsesSSE(response);
     return { text: responseText(raw), finishReason: raw.status === "completed" ? "stop" : raw.status ?? null, usage: raw.usage, raw };
 }
@@ -282,10 +304,16 @@ async function openAI(ctx: Context, endpoint: any, opts: any) {
     if (opts.response_format != null) body.response_format = opts.response_format;
     // A coding plan can leave through a chosen SSH instance; the plan key
     // rides the bridge, so the authorization header stays as built here.
-    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : endpoint.provider === "anthropic-oauth" ? (url:string,init:RequestInit) => ctx.fns.llm.claudeFetch({account:endpoint.account,requireProxy:endpoint.noFallback,url,init}) : fetch;
     let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) });
     if (endpoint.provider !== "opencode") response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) }));
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) {
+        if(endpoint.provider === "opencode")throw new Error(await opencodeError(response,[endpoint.apiKey,opts.user,opts.system]));
+        const body=await response.text();
+        if(!endpoint.noFallback && response.headers.get("x-mauzcode-no-fallback")!=="true")throw new Error(`${endpoint.provider} ${response.status}: ${body}`);
+        const info=ctx.fns.llm.classifyError({provider:endpoint.provider,account:endpoint.account,kind:endpoint.kind,status:response.status,body,headers:response.headers});
+        throw Object.assign(new Error(info.message),{failure:info,code:info.code,retryable:info.retryable,noFallback:endpoint.noFallback===true||response.headers.get("x-mauzcode-no-fallback")==="true"});
+    }
     const raw: any = await response.json();
     const choice = raw?.choices?.[0] ?? {};
     return { text: String(choice?.message?.content ?? ""), finishReason: choice?.finish_reason ?? null, usage: raw?.usage, raw };
@@ -331,10 +359,16 @@ async function anthropic(ctx: Context, endpoint: any, opts: any) {
         if (opts.system) body.system.push({ type: "text", text: opts.system });
     } else if (opts.system) body.system = opts.system;
     if (opts.temperature != null) body.temperature = opts.temperature;
-    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : fetch;
+    const transport = endpoint.provider === "opencode" ? (url: string, init: RequestInit) => ctx.fns.llm.opencodeFetch({ url, init, sessionId: opts.sessionId }) : endpoint.ssh ? (url: string, init: any) => ctx.fns.sshAccount.fetch({ssh:endpoint.ssh,url,init}) : endpoint.provider === "anthropic-oauth" ? (url:string,init:RequestInit) => ctx.fns.llm.claudeFetch({account:endpoint.account,requireProxy:endpoint.noFallback,url,init}) : fetch;
     let response = await transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) });
     if (endpoint.provider !== "opencode") response = await retryWithoutUnsupportedTemperature(response, body, () => transport(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) }));
-    if (!response.ok) throw new Error(endpoint.provider === "opencode" ? await opencodeError(response, [endpoint.apiKey, opts.user, opts.system]) : `${endpoint.provider} ${response.status}: ${await response.text()}`);
+    if (!response.ok) {
+        if(endpoint.provider === "opencode")throw new Error(await opencodeError(response,[endpoint.apiKey,opts.user,opts.system]));
+        const body=await response.text();
+        if(!endpoint.noFallback && response.headers.get("x-mauzcode-no-fallback")!=="true")throw new Error(`${endpoint.provider} ${response.status}: ${body}`);
+        const info=ctx.fns.llm.classifyError({provider:endpoint.provider,account:endpoint.account,kind:endpoint.kind,status:response.status,body,headers:response.headers});
+        throw Object.assign(new Error(info.message),{failure:info,code:info.code,retryable:info.retryable,noFallback:endpoint.noFallback===true||response.headers.get("x-mauzcode-no-fallback")==="true"});
+    }
     const raw: any = await response.json();
     return { text: (raw.content ?? []).filter((x: any) => x.type === "text").map((x: any) => x.text).join(""), finishReason: raw.stop_reason ?? null, usage: raw.usage, raw };
 }

@@ -20,13 +20,14 @@ export default async function (
     const owner=await ctx.fns.projects.principal({});
     if(req.method==='POST'&&!await ctx.fns.auth.verifyCsrf({req,token:req.headers.get('x-csrf-token')||''}))return reply({error:'Invalid request token'},403);
     const [groups,defaultModel,policy]=await Promise.all([ctx.fns.llm.listModels({}),ctx.fns.settings.modelDefault({}),ctx.fns.llm.modelPolicy({action:'list'})]);
-    const canonical=(model:string)=>(model.includes(':')?model:'lmstudio:'+model).replace(/^(?!mauzcode\/)([^/:]+)\/default:/,'$1:');
+    const canonical = (model:string) => { try { return ctx.fns.llm.parseModelRoute({model}).route; } catch { return model; } };
     const disabled=new Set(policy.disabledModels.map(canonical));
-    const models=await Promise.all(Object.entries(groups).flatMap(([provider,values])=>values.map(async model=>({provider,model,label:model.slice(model.lastIndexOf(':')+1),disabled:disabled.has(canonical(model)),icon:await ctx.fns.frontendBridge.iconData({model})}))));
+    const groupLabels=await ctx.fns.frontendBridge.modelGroupLabels({models:Object.values(groups).flat()});
+    const models=await Promise.all(Object.entries(groups).flatMap(([provider,values])=>values.map(async model=>({provider,model,...(groupLabels[model] ? {groupLabel:groupLabels[model]} : {}),label:model.slice(model.lastIndexOf(':')+1),disabled:disabled.has(canonical(model)),icon:await ctx.fns.frontendBridge.iconData({model})}))));
     const enabledDefault=models.find(m=>!m.disabled&&m.model===defaultModel)?.model??models.find(m=>!m.disabled)?.model??'';
     const efforts=['auto','off','minimal','low','medium','high','xhigh'];
     if(req.method==='GET'){
-        const url=new URL(req.url),model=url.searchParams.get('model')||enabledDefault,requested=url.searchParams.get('effort')||'auto';
+        const url=new URL(req.url),model=canonical(url.searchParams.get('model')||enabledDefault),requested=url.searchParams.get('effort')||'auto';
         if(!models.some(m=>m.model===model&&!m.disabled)||!efforts.includes(requested))return reply({error:'Invalid model or effort'},400);
         const [profile,resolved]=await Promise.all([ctx.fns.llm.reasoningCapabilities({model}),ctx.fns.llm.resolveReasoningEffort({model,effort:requested as types.llm.ReasoningEffort})]);
         return reply({promptPresets:await ctx.fns.agent.listPromptPresets({}),version:1,model,label:model.slice(model.lastIndexOf(':')+1),icon:await ctx.fns.frontendBridge.iconData({model}),defaultModel:enabledDefault,models,effort:{requested,applied:resolved.applied,supported:profile.supported,defaultEffort:profile.defaultEffort,mode:profile.mode,downgraded:resolved.downgraded},csrfToken:await ctx.fns.auth.csrfToken({req})});
@@ -90,7 +91,7 @@ export default async function (
     }
     const project=data.projectId?await ctx.fns.projects.get({projectId:data.projectId}):null;if(data.projectId&&!project)return reply({error:'Project not found'},404);
     if(!data.projectId&&advanced.createWorkspaceDir!=='1'){try{await ctx.fns.workspace.normalize({dir:advanced.workspaceDir,create:false});}catch(error){return reply({error:String(error instanceof Error?error.message:error)},422);}}
-    const model=data.model||enabledDefault;if(!models.some(m=>m.model===model&&!m.disabled))return reply({error:'Model unavailable'},400);
+    const model=canonical(data.model||enabledDefault);if(!models.some(m=>m.model===model&&!m.disabled))return reply({error:'Model unavailable'},400);
     if(data.effort!==undefined&&(typeof data.effort!=='string'||!efforts.includes(data.effort)))return reply({error:'Invalid effort'},400);
     const effort=(data.effort??'auto') as types.llm.ReasoningEffort;
     const profile=await ctx.fns.llm.reasoningCapabilities({model});

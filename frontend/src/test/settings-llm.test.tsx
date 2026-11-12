@@ -6,7 +6,7 @@ const codex = { provider: 'codex', account: 'ssh.box.work', label: 'box · codex
 const claude = { ...codex, provider: 'claude-code', account: 'personal', sshInstance: null, needsReconnect: true, windows: null, planType: null };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-function mockApi(state: { accounts?: unknown[]; logins?: unknown[]; instances?: string[] }, post?: (body: any) => Response) {
+function mockApi(state: { accounts?: unknown[]; logins?: unknown[]; instances?: string[]; proxies?:unknown[] }, post?: (body: any) => Response) {
   const calls: { method: string; body?: any; headers?: any }[] = [];
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit = {}) => {
     if (_url === '/llms/settings') return json({models:[],disabledModels:[],instances:[],plans:{},tier:'standard',nodes:[],clients:[],csrfToken:'csrf'});
@@ -97,4 +97,30 @@ it('allows cancelling local Kimi device authorization', async () => {
   render(<LlmConnectionsPanel />);
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel login' }));
   await waitFor(() => expect(calls.find(c => c.method === 'POST')?.body).toEqual({ action: 'cancel', id: 'k1' }));
+});
+
+it('local Claude proxy forces OAuth; SSH clears and never sends proxy selection', async()=>{
+ const calls=mockApi({instances:['box'],proxies:[{id:'p1',name:'Work proxy',host:'proxy.test',port:1080}]});
+ render(<LlmConnectionsPanel/>);const group=await screen.findByRole('region',{name:'Claude'});
+ fireEvent.click(within(group).getByRole('button',{name:/Add account/}));
+ fireEvent.change(within(group).getByLabelText(/Account name/),{target:{value:'work'}});
+ fireEvent.change(within(group).getByLabelText(/SOCKS5 proxy/),{target:{value:'p1'}});
+ expect(within(group).getByLabelText(/Login method/)).toHaveValue('oauth');
+ expect(within(group).getByRole('option',{name:'CLI'})).toBeDisabled();
+ fireEvent.click(within(group).getByRole('button',{name:'Start login'}));
+ await waitFor(()=>expect(calls.find(c=>c.method==='POST')?.body).toMatchObject({provider:'claude-code',method:'oauth',proxyId:'p1'}));
+ fireEvent.click(within(group).getByRole('button',{name:/Add account/}));
+ fireEvent.change(within(group).getByLabelText(/Account name/),{target:{value:'remote'}});
+ fireEvent.change(within(group).getByLabelText(/SOCKS5 proxy/),{target:{value:'p1'}});
+ fireEvent.change(within(group).getByLabelText(/SSH Instance/),{target:{value:'box'}});
+ expect(within(group).queryByLabelText(/SOCKS5 proxy/)).not.toBeInTheDocument();
+ fireEvent.click(within(group).getByRole('button',{name:'Start login'}));
+ await waitFor(()=>expect(calls.filter(c=>c.method==='POST').at(-1)?.body).toEqual({action:'login',provider:'claude-code',account:'remote',instance:'box'}));
+});
+it('OAuth reconnect preserves route and never offers CLI or proxy changes',async()=>{
+ const calls=mockApi({accounts:[{...claude,provider:'anthropic-oauth',proxy:{id:'p1',name:'Work proxy',host:'proxy.test',port:1080}}]});render(<LlmConnectionsPanel/>);
+ const group=await screen.findByRole('region',{name:'Claude'});fireEvent.click(within(group).getByRole('button',{name:'Reconnect'}));
+ expect(within(group).queryByLabelText(/SOCKS5 proxy/)).not.toBeInTheDocument();expect(within(group).queryByLabelText(/Login method/)).not.toBeInTheDocument();
+ fireEvent.click(within(group).getAllByRole('button',{name:'Reconnect'}).at(-1)!);
+ await waitFor(()=>expect(calls.find(c=>c.method==='POST')?.body).toEqual({action:'login',provider:'claude-code',account:'personal',method:'oauth'}));
 });

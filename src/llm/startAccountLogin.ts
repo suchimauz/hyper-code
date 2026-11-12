@@ -26,6 +26,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
 }): Promise<{ provider: string; account: string; status: "pending"; verificationUri: string | null; userCode: string | null }> {
     const provider = opts.provider;
     if (provider !== "codex" && provider !== "claude-code") throw new Error("Unsupported CLI login provider");
+    if ((opts as typeof opts & {proxyId?:string}).proxyId)throw new Error("Proxy requires local OAuth login, not CLI");
+    if(provider==="claude-code" && await ctx.fns.llm.accountProxy({provider:"anthropic-oauth",account:String(opts.account??"").trim()}))throw new Error("Account uses a proxy; reconnect with OAuth");
     const account = String(opts.account ?? "").trim();
     if (!/^[\w.-]{1,40}$/.test(account) || account === "default") throw new Error("account must be a short name other than default");
     const path = ctx.fns.llm.accountCredentialPath({ provider, account });

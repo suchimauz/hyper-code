@@ -13,6 +13,9 @@
 .model-picker-option > span:not(.navigation-chat-icon):not(.model-picker-check) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .model-picker-option:disabled,.model-picker-cell:disabled { opacity:.45; cursor:default; }
 .model-picker-option { padding:5px 7px; line-height:18px; }
+.model-picker-option-text { display:flex; flex-direction:column; }
+.model-picker-option-text > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.model-picker-option-source { color:var(--text-tertiary); font-size:11px; line-height:14px; }
 .model-picker-chevron { transition:transform 120ms; }
 @media(prefers-reduced-motion:reduce) { .model-picker-chevron { transition:none; } }
 .model-picker-check { width:16px; height:16px; flex:none; margin-left:auto; }

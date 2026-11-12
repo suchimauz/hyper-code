@@ -23,6 +23,7 @@ function makeRegistry() {
 const mkCtx = (env: Record<string, string> = {}) => {
     const ctx: any = { env, state: { settings: { registry: makeRegistry() } } };
     ctx.fns = {
+        llm:{accountProxy:async()=>null},
         procs: { db: { select: async () => [] } },   // no DB rows in unit-test
         settings: {
             getString: (opts: any) => getString(ctx, null, opts),

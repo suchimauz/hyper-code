@@ -85,6 +85,7 @@ export default async function (
     }
     const started = performance.now();
     let upstream: Response;
+    try {
     if (entry.via) {
         const nodeName = entry.via.replace(/^mauzcode\//, "");
         const node = await ctx.fns.node.get({ name: nodeName });
@@ -104,9 +105,16 @@ export default async function (
         if (metadata["anthropic-beta"]) {
             headers["anthropic-beta"] = [...new Set([...(headers["anthropic-beta"] ?? "").split(","), metadata["anthropic-beta"]].map(value => value.trim()).filter(Boolean))].join(",");
         }
-        upstream = await fetch(up.url, { method: "POST", headers, body: wireBody, signal: opts.req.signal });
+        upstream = entry.provider === "anthropic-oauth" ? await ctx.fns.llm.claudeFetch({account:entry.account,requireProxy:up.noFallback||entry.noFallback,url:up.url,init:{method:"POST",headers,body:wireBody,signal:opts.req.signal}}) : await fetch(up.url, { method: "POST", headers, body: wireBody, signal: opts.req.signal });
+    }
+    } catch(error) {
+        if(opts.req.signal.aborted)throw error;
+        const failure=ctx.fns.llm.proxyFailure({error:error as Error,provider:entry.provider,account:entry.account});
+        if(!failure)throw error;
+        return Response.json({error:{type:failure.code,message:failure.message,retryable:failure.retryable,noFallback:true}},{status:502,headers:{"cache-control":"no-store","x-mauzcode-no-fallback":"true"}});
     }
     const out = new Headers({ "cache-control": "no-store" });
+    if(entry.noFallback || upstream.headers.get("x-mauzcode-no-fallback")==="true")out.set("x-mauzcode-no-fallback","true");
     for (const name of ["content-type", "retry-after", "request-id", "anthropic-request-id", "x-request-id"]) { const v = upstream.headers.get(name); if (v) out.set(name, v); }
     upstream.headers.forEach((v, k) => { if (/ratelimit/i.test(k)) out.set(k, v); });
     ctx.fns.procs.log.info({ event: "node.relay", client: auth.client.name, model, api: opts.api, via: entry.via ?? entry.provider, status: upstream.status, durationMs: Math.round(performance.now() - started) });

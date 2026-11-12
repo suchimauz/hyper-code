@@ -25,13 +25,13 @@ export default async function (
         /** Current hop count. @default 0 */
         hops?: number;
     },
-): Promise<Array<{ id: string; api: "anthropic" | "responses" | "openai"; provider: string; account: string; kind: "subscription" | "api"; via?: string }>> {
+): Promise<Array<{ id: string; api: "anthropic" | "responses" | "openai"; provider: string; account: string; kind: "subscription" | "api"; via?: string; noFallback?: boolean }>> {
     const allow = new Set((opts.providers ?? []).filter(Boolean));
     // Own models only from listModels; node models come from the cache below.
     // listModels would refresh nodes, and a node that points back at us would
     // recurse through our own /models until the hop limit.
     const all = await ctx.fns.llm.listModels({ skipNodes: true });
-    const out: Array<{ id: string; api: "anthropic" | "responses" | "openai"; provider: string; account: string; kind: "subscription" | "api"; via?: string }> = [];
+    const out: Array<{ id: string; api: "anthropic" | "responses" | "openai"; provider: string; account: string; kind: "subscription" | "api"; via?: string; noFallback?: boolean }> = [];
     const seen = new Set<string>();
     // Identity includes provider and credential: never merge independent quotas.
     const groups = Object.entries(all);
@@ -47,7 +47,7 @@ export default async function (
             try { ep = await ctx.fns.llm.resolveEndpoint({ model: full }); } catch { continue; }
             if (ep.api === "mock" || ep.api === "gemini" || provider === 'opencode' || ep.kind === "local" || seen.has(id)) continue;
             seen.add(id);
-            out.push({ id, api: ep.api, provider, account, kind: ep.kind });
+            out.push({ id, api: ep.api, provider, account, kind: ep.kind, ...(ep.noFallback ? {noFallback:true} : {}) });
         }
     }
     // Chained: what our own nodes offer, from their cached catalogue only, one
@@ -62,7 +62,7 @@ export default async function (
                 if (entry.via || seen.has(entry.id)) continue;
                 if (allow.size && !allow.has(entry.provider)) continue;
                 seen.add(entry.id);
-                out.push({ id: entry.id, api: entry.api, provider: entry.provider, account: entry.account, kind: entry.kind, via: `mauzcode/${node.name}` });
+                out.push({ id: entry.id, api: entry.api, provider: entry.provider, account: entry.account, kind: entry.kind, via: `mauzcode/${node.name}`, ...(entry.noFallback ? {noFallback:true} : {}) });
             }
         }
     }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import page from "./$route__GET";
 import suggest from "./$route_suggest_POST";
+import parseModelRouteFn from "../llm/parseModelRoute";
 
 describe("autotext sandbox", () => {
     test("redirects to native utilities", async () => {
@@ -9,7 +10,7 @@ describe("autotext sandbox", () => {
         expect(result.headers.get('Location')).toBe('/?view=extension:utilities/autotext');
     });
     test("rewrite endpoint validates the tail and returns structured replacement", async () => {
-        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { call: async (opts: any) => {
+        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), call: async (opts: any) => {
             expect(opts.system).toContain("fixing spelling");
             return { text: JSON.stringify({ text: "Вторая фраза закончена." }), model: opts.model };
         } } } } as any;
@@ -22,15 +23,15 @@ describe("autotext sandbox", () => {
         expect((await suggest(ctx, null, { req: invalid })).status).toBe(400);
     });
     test("rejects unlisted model without invoking the provider", async () => {
-        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { call: () => { throw new Error("called provider"); } } } } as any;
+        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), call: () => { throw new Error("called provider"); } } } } as any;
         const req = new Request("http://localhost/autotext/suggest", { method: "POST", body: JSON.stringify({ model: "evil", before: "hello", after: "" }) });
         const res = await suggest(ctx, null, { req });
         expect(res.status).toBe(400);
         expect((await res.json() as any).error).toBe("Unsupported model");
     });
     test("routes selected Groq model to the same bounded provider call", async () => {
-        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { call: async (opts: any) => {
-            expect(opts.model).toBe("groq:openai/gpt-oss-20b");
+        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), call: async (opts: any) => {
+            expect(opts.model).toBe("groq/default:openai/gpt-oss-20b");
             expect(opts.noFallback).toBe(true);
             expect(opts.max_tokens).toBe(240);
             expect(opts.groqReasoningEffort).toBe("low");
@@ -42,8 +43,8 @@ describe("autotext sandbox", () => {
         expect((await res.json() as any).text).toBe(" мир");
     });
     test("GLM Flash uses OpenRouter with low reasoning budget", async () => {
-        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { call: async (opts: any) => {
-            expect(opts.model).toBe("openrouter:z-ai/glm-5.3-flash");
+        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), call: async (opts: any) => {
+            expect(opts.model).toBe("openrouter/default:z-ai/glm-5.3-flash");
             expect(opts.openrouterReasoningEffort).toBe("low");
             expect(opts.max_tokens).toBe(300);
             return { text: " светятся фонари.", model: opts.model };
@@ -54,7 +55,7 @@ describe("autotext sandbox", () => {
         expect((await res.json() as any).text).toBe(" светятся фонари.");
     });
     test("returns model output and elapsed time", async () => {
-        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { call: async (opts: any) => {
+        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), call: async (opts: any) => {
             expect(opts.noFallback).toBe(true);
             expect(opts.max_tokens).toBe(120);
             return { text: " продолжение", model: opts.model };
@@ -67,7 +68,7 @@ describe("autotext sandbox", () => {
         expect(body.ms).toBeGreaterThanOrEqual(0);
     });
     test("suppresses NO_SUGGESTION without losing ordinary whitespace", async () => {
-        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { call: async () => ({ text: " NO_SUGGESTION ", model: "codex:gpt-6-luna" }) } } } as any;
+        const ctx = { fns: { auth: { verifyCsrf: async () => true }, llm: { parseModelRoute: (o: any) => parseModelRouteFn({} as any, null, o), call: async () => ({ text: " NO_SUGGESTION ", model: "codex:gpt-6-luna" }) } } } as any;
         const req = new Request("http://localhost/autotext/suggest", { method: "POST", body: JSON.stringify({ model: "codex:gpt-6-luna", before: "Это статья", after: "" }) });
         const res = await suggest(ctx, null, { req });
         expect((await res.json() as any).text).toBe("");

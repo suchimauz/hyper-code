@@ -492,9 +492,11 @@ export default async function (
             }
             if (!sampling.signal.aborted && error?.name !== 'AbortError') {
                 await assertRunActive();
-                const provider = (await ctx.fns.llm.resolveEndpoint({ model: agent.model })).provider;
+                const route = /^(?:([^/:]+)(?:\/([^:]+))?):/.exec(agent.model);
+                const proxyError = /^(PROXY_|OAUTH_OUTCOME_UNKNOWN$)/.test(String(error?.code??""));
+                const provider = error?.failure?.provider ?? (proxyError ? route?.[1] ?? "unknown" : (await ctx.fns.llm.resolveEndpoint({model:agent.model})).provider);
                 const transport = error?.transportFailure;
-                const classified = error?.failure ?? ctx.fns.llm.classifyError({ provider, body: String(error?.message ?? error) });
+                const classified = error?.failure ?? (/^(PROXY_|OAUTH_OUTCOME_UNKNOWN$)/.test(String(error?.code??"")) ? ctx.fns.llm.proxyFailure({error,provider,account:route?.[2]??"default"}) : null) ?? ctx.fns.llm.classifyError({ provider, body: String(error?.message ?? error) });
                 const failure: types.llm.FailureInfo = transport?.kind === 'ssh_transport'
                     ? { ...classified, kind: transport.phase === 'permanent' ? 'fatal' : 'transient',
                         code: transport.phase === 'permanent' ? 'SSH_PERMANENT' : 'SSH_TRANSPORT',

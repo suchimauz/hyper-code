@@ -48,7 +48,7 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
         if (res.ok) {
             const body: any = await res.json();
             const ids = (body.data ?? []).map((m: any) => m.id).filter(Boolean);
-            if (ids.length) out.lmstudio = ids;
+            if (ids.length) out.lmstudio = ids.map((id: string) => `lmstudio/default:${id}`);
         }
     } catch { /* unreachable — skip */ }
 
@@ -281,5 +281,9 @@ async function build(ctx: Context, opts?: { skipNodes?: boolean }): Promise<Reco
         const failures = ((ctx.state as any).llmModelCatalogFailures ??= {});
         failures[opts?.skipNodes ? "skipNodes" : "all"] = { at: Date.now(), codex: codexUnavailable };
     }
+    // One template for every producer: [ssh/<host>:]<provider>/<account>:<model>, account always explicit.
+    for (const [group, models] of Object.entries(out)) out[group] = [...new Set(models.map(model => {
+        try { return ctx.fns.llm.parseModelRoute({ model }).route; } catch { return model; }
+    }))];
     return out;
 }

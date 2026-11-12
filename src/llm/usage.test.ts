@@ -245,13 +245,13 @@ describe("llm.usageOverview", () => {
     test("connected xAI inventory remains visible before a quota snapshot exists", async () => {
         // Inventory, not active sessions, owns connection identity. No auth or provider I/O.
         const ctx: any = {state:{llmUsageRefresh:{startedAt:Date.now()}},fns:{
-            llm:{usageOverview:async()=>[],listAccounts:async()=>[{provider:"xai",account:"default",label:"Grok",model:"xai:grok-4.6",available:true,parkedAgents:0,planType:null}],listModels:async()=>({xai:["xai:grok-4.6"]})},
+            llm:{usageOverview:async()=>[],listAccounts:async()=>[{provider:"xai",account:"default",label:"Grok",model:"xai:grok-4.6",available:true,parkedAgents:0,planType:null}],listModels:async()=>({xai:["xai/default:grok-4.6"]})},
             node:{list:async()=>[]},
         }};
         const entry = (await usageData(ctx,null,{includeConnected:true})).entries.find(e=>e.provider==="xai");
         expect(entry).toBeDefined();
         expect(entry!.model).toBe("xai:grok-4.6");
-        expect(entry!.models).toEqual(["xai:grok-4.6"]);
+        expect(entry!.models).toEqual(["xai/default:grok-4.6"]);
         expect(entry!.usedPercent).toBeNull();
         expect(entry!.available).toBe(true);
     });
