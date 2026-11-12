@@ -87,7 +87,8 @@ export default {
     async stream(ctx, conn, req) {
         const instructions = req.instructions.startsWith(IDENTITY) ? req.instructions.slice(IDENTITY.length).trimStart() : req.instructions;
         const bootstrap = instructions ? [{ role: "user", content: instructions }, { role: "assistant", content: "Understood. Ready to act." }] : [];
-        const convo = [...bootstrap, ...req.messages.filter(m => m.role !== "system")];
+        // Claude does not declare checkpoints, so models.stream never passes checkpoint entries here.
+        const convo = [...bootstrap, ...(req.messages as Record<string, unknown>[]).filter(m => m.role !== "system")];
         const cacheableMessageCount = (req.cacheableMessageCount ?? req.messages.length) + bootstrap.length;
         const messages = ctx.fns.llm.toAnthropicMessages({ messages: convo, cacheableMessageCount });
         const mark = (message: typeof messages[number] | undefined) => {
@@ -154,7 +155,7 @@ export default {
     async compact(ctx, conn, req) {
         const system = [{ type: "text", text: IDENTITY }];
         if (req.instructions.trim()) system.push({ type: "text", text: req.instructions });
-        const messages = ctx.fns.llm.toAnthropicMessages({ messages: req.messages.filter(m => m.role !== "system") });
+        const messages = ctx.fns.llm.toAnthropicMessages({ messages: (req.messages as Record<string, unknown>[]).filter(m => m.role !== "system") });
         const compaction: { type: string; instructions?: string } = { type: "summarize" };
         if (req.focus?.trim()) compaction.instructions = ("Summarize this conversation into a handoff checkpoint so another model can seamlessly continue: goal, progress, decisions, constraints, exact identifiers/paths/errors, and next steps.\n\nFocus: " + req.focus.trim()).slice(0, 16384);
         const body = { model: req.model, max_tokens: req.maxTokens ?? 32000, messages, compaction, system };

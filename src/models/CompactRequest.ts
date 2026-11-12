@@ -4,8 +4,8 @@ export type CompactRequest = {
     model: string;
     /** Effective instructions for the compacted transcript. */
     instructions: string;
-    /** OpenAI-shaped chat transcript to compact. */
-    messages: Record<string, unknown>[];
+    /** Ordered transcript to compact; may contain earlier native checkpoint entries for providers declaring capabilities.checkpoints. */
+    messages: (Record<string, unknown> | types.models.CheckpointEntry)[];
     /** Optional handoff guidance identifying what the compacted context should preserve. */
     focus?: string;
     /** Provider output token budget for compaction. @minimum 1 */

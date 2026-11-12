@@ -88,8 +88,13 @@ export default async function (ctx: Context, _session: Session | null, opts: { e
         }
         if (!Array.isArray(definition.transports) || !definition.transports.length || definition.transports.some(t => !["direct", "socks", "ssh-tunnel"].includes(t)) ||
             new Set(definition.transports).size !== definition.transports.length) fail("modelProvider requires unique supported transports");
-        for (const key of ["listModels", "usage", "validate", "stream", "compact"] as const) {
+        for (const key of ["listModels", "usage", "validate", "stream", "compact", "reasoningProfile"] as const) {
             if (definition[key] !== undefined && typeof definition[key] !== "function") fail(`modelProvider ${key} must be a function`);
+        }
+        if (definition.capabilities !== undefined) {
+            const caps = definition.capabilities as Record<string, unknown>;
+            if (!caps || typeof caps !== "object" || Array.isArray(caps) || Object.entries(caps).some(([k, v]) => !["continuationState", "checkpoints", "reasoning"].includes(k) || typeof v !== "boolean")) fail("modelProvider capabilities must be known boolean flags");
+            if (caps.checkpoints && !definition.compact) fail("modelProvider checkpoints capability requires compact");
         }
         if (definition.actions !== undefined) {
             if (!definition.actions || typeof definition.actions !== "object" || Array.isArray(definition.actions)) fail("modelProvider actions must be a named object");

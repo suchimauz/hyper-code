@@ -86,8 +86,8 @@ HTTP endpoint or grant permission to invoke it.
 
 ## Inference and model availability
 
-`ctx.fns.models.stream({ connectionId, model, instructions, messages, tools?, reasoningEffort?, sessionId, signal?, onEvent? })`
-and `ctx.fns.models.compact({ connectionId, model, instructions, messages, sessionId, signal? })`
+`ctx.fns.models.stream({ connectionId, model, instructions, messages, tools?, reasoningEffort?, sessionId, promptCacheKey?, runId?, state?, signal?, onEvent? })`
+and `ctx.fns.models.compact({ connectionId, model, instructions, messages, sessionId, focus?, maxTokens?, signal? })`
 are the only entry points to a provider's `stream`/`compact`. Before calling the
 provider, they re-read the stored connection on **every** request
 (`models.assertModelEnabled`, no cache):
@@ -102,6 +102,48 @@ OpenAI-shaped transcript, `tools` are wire schemas in the provider's API shape,
 and `onEvent` receives `text_delta`, `thinking_delta` and `tool_args_delta`.
 `StreamResult` matches the legacy `llm.stream` result (`text`, `thinking`,
 `finishReason`, `usage`, `toolCalls`). Agents still use legacy `llm.*` routing.
+
+### Additive SDK contracts
+
+Every field below is optional and opt-in. A provider declares support with
+`capabilities: { continuationState?, checkpoints?, reasoning? }` and, for
+reasoning, an optional `reasoningProfile(ctx, model)`. The loader rejects
+unknown flags and `checkpoints` without `compact`. Claude and custom declare
+none, so their requests, results and compaction (`focus`, `maxTokens`, cache
+fields) are unchanged.
+
+| Contract | Request | Result | Without the capability |
+| --- | --- | --- | --- |
+| Cache identity | `promptCacheKey` (falls back to `sessionId`) | — | ignored |
+| Run state | `runId`, `state` (from the previous request of the same run) | `state: ProviderState` | `state` → `UNSUPPORTED` |
+| Ordered input | `messages` may contain `{ type: "checkpoint", checkpoint }` at its exact position | — | → `UNSUPPORTED` |
+| Checkpoint | — | `compact` adds `checkpoint: Checkpoint` (`kind: "native-checkpoint"`, `version: 1`, provider, connectionId, model, opaque `payload`) | only `item` |
+| Reasoning | `reasoningEffort` (unchanged) → `req.reasoning: ReasoningResolution` | `reasoning: { requested, applied, fallbackReason, source, profile? }` | value passed through untouched |
+| Quota | — | `quota: { windows[{ name, usedPercent, windowMinutes?, resetAt? }], source }` | absent |
+| Failures | — | thrown `Error` with `code`, `status`, `retryable`, `replaySafe`, `failure: FailureInfo` | existing errors |
+
+`models.checkInput` validates all of this **before any network request**: an
+aborted signal → `CANCELLED`; a checkpoint whose provider, connection or model
+differs, or that is malformed, → `INVALID_INPUT`; `state` without `runId`, or
+bound to another provider, connection, session or run, → `INVALID_INPUT`.
+`models.stream` also drops a returned `state` that does not match the request.
+Use a new `runId` per logical run (one user turn including its tool
+continuations). Keep the `state` only in memory for that run, and do not persist it.
+
+Reasoning: for opted-in providers `models.resolveReasoning` uses the model's
+cached discovery metadata (`ModelInfo.reasoning`, read from `models_cache`, so
+inference never triggers discovery). Otherwise it falls back to the
+provider's documented profile. `auto` or omitted resolves to the default. An
+unsupported level goes to the nearest supported level at or below it, else the
+lowest one above it, with a `fallbackReason`. An unknown preference or invalid
+metadata → `INVALID_INPUT`; no metadata and no profile → `CAPABILITY_UNAVAILABLE`.
+
+`FailureInfo` = `{ code, classification, upstreamStatus?, retryAfterMs?, acceptance: none|rejected|accepted|uncertain, retryable, replaySafe }`.
+Codes: `LOGIN_REQUIRED`, `QUOTA_EXHAUSTED`, `RATE_LIMITED`, `PROVIDER_ERROR`,
+`INVALID_INPUT`, `TRANSPORT`, `CANCELLED`, `UNSUPPORTED`, `CAPABILITY_UNAVAILABLE`.
+The SDK never retries. Replay a request only when `replaySafe` is true.
+Messages never contain upstream bodies, tokens, state or checkpoint payloads.
+Token `usage` and `quota` are kept separate. A missing counter stays absent and is never reported as 0.
 
 Model lists are cached per connection in Postgres (`models_cache`, `models_cached_at`).
 The cache never expires: `models.listModels` serves it without network access, asks the
@@ -120,8 +162,67 @@ The owner toggles models with `models.setModelEnabled({ id, model, enabled })`
 ## Built-in Codex provider
 
 `$modelProvider_codex.ts` connects a ChatGPT subscription through the Codex
-backend. It has one optional field, `clientVersion` (default: detected codex CLI
-version), and allows the `direct`, `socks` and `ssh-tunnel` transports.
+backend. It has one optional field, `clientVersion`. Without it,
+`models.codexVersion` sends the documented SDK default **0.157.1** (the floor
+that exposes the GPT-6 catalogue). The SDK never runs the codex CLI, a shell
+or an account-file lookup. The provider allows the `direct`, `socks` and
+`ssh-tunnel` transports.
+
+**Ownership.** The whole Codex path — conversion (`models.codexInput`), SSE
+framing (`models.parseSSE`), version, reasoning profile, failure
+classification (`models.codexFailure`) and quota extraction
+(`models.codexQuota`) — lives in `models`. It calls no `llm`, `llms`, `agent`
+or `session` function. Allowed infrastructure: `procs.db`, `secrets.*Local`
+(key from `secrets.localEncryptionKey`), `socksProxy`, `sshProvider`
+and `codexTunnel.openProduction` as SSH-tunnel transport. Every byte goes
+through `conn.fetch`. `src/models/codexParity.test.ts` replaces legacy
+namespaces with throwing stubs and statically checks the sources.
+
+**Inference.** The request includes `store:false`, `stream:true`,
+`text.verbosity: "medium"`, `prompt_cache_key = promptCacheKey || sessionId`,
+`reasoning: { effort: applied ("off" → "none"), summary: "auto" }`, and tools
+with `parallel_tool_calls:true`. Headers: `originator: codex_cli_rs`,
+`version`, `OpenAI-Beta: responses=experimental`, `session_id` and
+`x-client-request-id` = `sessionId`. Assistant tool calls become
+`function_call` items, and tool results become `function_call_output` items.
+Images become `input_image`, with tool images in a following user message;
+PDFs become `input_text`. Unparseable tool arguments arrive as
+`{ __unparsed }`.
+
+Sticky routing: with `runId`, the first `x-codex-turn-state` response header of
+the run is returned as `state.data.turnState` and replayed on every later
+request of that run. Without `runId`, or on a new run, none is sent.
+
+Reasoning profile `codex-2026-07` (used only when discovery reports no
+`supported_reasoning_levels`/`default_reasoning_level`):
+`gpt-6*` → low…xhigh; `gpt-5*`, `codex-*` → off…high, plus xhigh for gpt-5.2+
+and codex-max. The default is medium. Other models without metadata fail with
+`CAPABILITY_UNAVAILABLE`.
+
+**Checkpoints.** `compact` sends the transcript plus `compaction_trigger` with
+the remote "memento" `x-codex-turn-metadata`. It accepts exactly one non-empty
+`encrypted_content` item and a response id, otherwise it fails. The result's
+`checkpoint` is plain JSON. Replay it as `{ type: "checkpoint", checkpoint }`
+at the position it replaces. It becomes the native `compaction` input item
+there. Legacy `codex_compaction` transcript records are rejected; legacy
+conversion is not provided.
+
+**Failures.** HTTP 401 → `LOGIN_REQUIRED` (and `needsLogin`).
+`usage_limit_reached`/`usage_not_included`/`quota_exceeded`/`credits_depleted`
+→ `QUOTA_EXHAUSTED`. Other 429s → `RATE_LIMITED` (retryable). 5xx →
+`PROVIDER_ERROR`; other 4xx → `INVALID_INPUT`. Retry timing comes from
+`resets_at`, `resets_in_seconds` or `Retry-After`. HTTP errors are `rejected`
+and replay-safe. A `response.failed` event is `accepted`. A stream without a
+terminal event, a malformed event, a dropped connection or an abort
+mid-request is `uncertain`. None of these are replay-safe. Quota windows
+come from the stream `rate_limits` payload, else
+`x-codex-{primary,secondary}-used-percent/window-minutes/reset-at` headers,
+with no extra request.
+
+**Rollout and revert.** Production agents still use `llm.*`. This SDK path is
+used only by explicit `models.*` callers, and migration is a separate change.
+To revert, revert the commit. There is no hidden fallback to the legacy
+runtime in either direction.
 
 Login is the OpenAI device-code flow implemented natively over HTTP
 (`models.codexLogin`). No codex CLI is started and nothing runs on SSH instances,

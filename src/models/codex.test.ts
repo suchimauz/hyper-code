@@ -28,7 +28,8 @@ async function setup(handler: Handler, transport: types.models.TransportSpec = {
         calls.push(call);
         return handler(call);
     };
-    ctx.state.registry.llm.codexCliVersion = async () => "0.99.0";
+    // SDK independence: any legacy llm call from the provider path fails loudly.
+    for (const name of Object.keys(ctx.state.registry.llm ?? {})) ctx.state.registry.llm[name] = () => { throw new Error(`legacy llm.${name} called`); };
     const view = await ctx.fns.models.create({ provider: "codex", accountName: "me", config: {}, secrets: {}, transport });
     const conn = async () => (await ctx.fns.models.resolve({ id: view.id })).conn;
     return { ctx, calls, view, conn };
@@ -170,7 +171,7 @@ describe("codex provider operations", () => {
         const listed = await ctx.fns.models.listModels({ id: view.id });
         expect(listed).toMatchObject({ source: "provider", models: [{ id: "gpt-5", label: "GPT-5", disabled: false }] });
         expect(listed.models.length).toBe(1);
-        expect(calls[0]!.url).toBe("https://chatgpt.com/backend-api/codex/models?client_version=0.99.0");
+        expect(calls[0]!.url).toBe("https://chatgpt.com/backend-api/codex/models?client_version=0.157.1");
         expect(calls[0]!.headers.originator).toBe("codex_cli_rs");
         const usage = await ctx.fns.models.usage({ id: view.id, refresh: true });
         expect(usage.windows).toEqual([
@@ -203,10 +204,10 @@ describe("codex provider operations", () => {
         const events: types.models.StreamEvent[] = [];
         const tools = [{ type: "function", name: "read", parameters: {} }];
         const r = await ctx.fns.models.stream({ connectionId: view.id, model: "gpt-5", instructions: "sys", messages: [{ role: "user", content: "hi" }], tools, reasoningEffort: "off", sessionId: "sess1", onEvent: (e: types.models.StreamEvent) => events.push(e) });
-        expect(r).toEqual({ text: "Hello", thinking: "think", finishReason: "tool_calls", usage: { prompt_tokens: 10, completion_tokens: 5, cache_read_tokens: 3 }, toolCalls: [{ id: "call_1", name: "read", args: { path: "x" } }] });
+        expect(r).toEqual({ text: "Hello", thinking: "think", finishReason: "tool_calls", usage: { prompt_tokens: 10, completion_tokens: 5, cache_read_tokens: 3 }, toolCalls: [{ id: "call_1", name: "read", args: { path: "x" } }], reasoning: { requested: "off", applied: "off", fallbackReason: null, source: "profile", profile: "codex-2026-07" } });
         expect(events.map(e => e.type)).toEqual(["thinking_delta", "text_delta", "text_delta", "tool_args_delta"]);
         const call = calls.at(-1)!;
-        expect(call.headers).toMatchObject({ "chatgpt-account-id": ACCOUNT, originator: "codex_cli_rs", version: "0.99.0", session_id: "sess1", accept: "text/event-stream" });
+        expect(call.headers).toMatchObject({ "chatgpt-account-id": ACCOUNT, originator: "codex_cli_rs", version: "0.157.1", session_id: "sess1", accept: "text/event-stream" });
         expect(JSON.parse(call.body)).toMatchObject({ model: "gpt-5", store: false, stream: true, instructions: "sys", reasoning: { effort: "none", summary: "auto" }, tools, parallel_tool_calls: true, prompt_cache_key: "sess1" });
         await ctx.fns.models.setModelEnabled({ id: view.id, model: "gpt-5", enabled: false });
         const n = calls.length;
@@ -217,13 +218,13 @@ describe("codex provider operations", () => {
     test("stream failure event throws; compaction returns the checkpoint", async () => {
         let fail = true;
         const { ctx, calls, view, conn } = await setup(() => fail
-            ? sse([{ type: "response.failed", response: { error: { message: "quota" } } }])
+            ? sse([{ type: "response.failed", response: { error: { code: "usage_limit_reached", message: "quota" } } }])
             : sse([{ type: "response.output_item.done", item: { type: "compaction", id: "cmp1", encrypted_content: "ENC" } }, { type: "response.completed", response: { id: "resp1", usage: { input_tokens: 7, output_tokens: 2 } } }]));
         await store(ctx, await conn(), now() + 3600);
-        await expect(ctx.fns.models.stream({ connectionId: view.id, model: "gpt-5", instructions: "", messages: [], sessionId: "s" })).rejects.toThrow(/quota/);
+        await expect(ctx.fns.models.stream({ connectionId: view.id, model: "gpt-5", instructions: "", messages: [], sessionId: "s" })).rejects.toMatchObject({ code: "QUOTA_EXHAUSTED", failure: { classification: "quota", acceptance: "accepted", replaySafe: false } });
         fail = false;
         const r = await ctx.fns.models.compact({ connectionId: view.id, model: "gpt-5", instructions: "sys", messages: [{ role: "user", content: "hi" }], sessionId: "s" });
-        expect(r).toEqual({ item: { type: "compaction", id: "cmp1", encrypted_content: "ENC" }, responseId: "resp1", usage: { prompt_tokens: 7, completion_tokens: 2 } });
+        expect(r).toEqual({ item: { type: "compaction", id: "cmp1", encrypted_content: "ENC" }, responseId: "resp1", usage: { prompt_tokens: 7, completion_tokens: 2 }, checkpoint: { kind: "native-checkpoint", version: 1, provider: "codex", connectionId: view.id, model: "gpt-5", payload: { type: "compaction", id: "cmp1", encrypted_content: "ENC" } } });
         const body = JSON.parse(calls.at(-1)!.body);
         expect(body.input.at(-1)).toEqual({ type: "compaction_trigger" });
         expect(body).toMatchObject({ tools: [], parallel_tool_calls: false, reasoning: { effort: "medium" } });

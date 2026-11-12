@@ -43,7 +43,11 @@ export default async function (
             ids.add(m.id);
             const n = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
             const contextWindow = n(m.contextWindow), maxOutputTokens = n(m.maxOutputTokens);
-            models.push({ id: m.id, ...(typeof m.label === "string" ? { label: m.label.slice(0, 200) } : {}), ...(typeof m.description === "string" ? { description: m.description.slice(0, 500) } : {}), ...(contextWindow ? { contextWindow } : {}), ...(maxOutputTokens ? { maxOutputTokens } : {}) });
+            // Reasoning metadata is cached only when well-formed; models.stream re-validates it before use.
+            const levels = ["off", "minimal", "low", "medium", "high", "xhigh"];
+            const r = m.reasoning;
+            const reasoning = r && Array.isArray(r.supported) && r.supported.length && r.supported.every(l => levels.includes(l)) && r.supported.includes(r.default) ? { supported: [...r.supported], default: r.default } : undefined;
+            models.push({ id: m.id, ...(reasoning ? { reasoning } : {}), ...(typeof m.label === "string" ? { label: m.label.slice(0, 200) } : {}), ...(typeof m.description === "string" ? { description: m.description.slice(0, 500) } : {}), ...(contextWindow ? { contextWindow } : {}), ...(maxOutputTokens ? { maxOutputTokens } : {}) });
         }
         const now = Date.now();
         // The cache is metadata, not configuration: updated_at stays put so health caches survive.

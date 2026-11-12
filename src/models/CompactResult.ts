@@ -6,4 +6,6 @@ export type CompactResult = {
     /** Provider stop reason for native compaction, when reported. */
     stopReason?: string;
     usage: { prompt_tokens: number; completion_tokens: number };
+    /** Portable SDK checkpoint wrapping `item`, added by models.compact for providers declaring capabilities.checkpoints. Replay it as a CheckpointEntry. */
+    checkpoint?: types.models.Checkpoint;
 };

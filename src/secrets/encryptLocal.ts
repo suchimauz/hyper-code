@@ -21,7 +21,7 @@ export default async function (
     const namespace = String(opts.namespace ?? "").trim();
         const name = String(opts.name ?? "").trim();
         if (!namespace || !name) throw new Error("local secret namespace and name are required");
-        const raw = await ctx.fns.llm.oauthEncryptionKey({});
+        const raw = await ctx.fns.secrets.localEncryptionKey({});
         const key = await crypto.subtle.importKey("raw", Uint8Array.from(raw), "AES-GCM", false, ["encrypt"]);
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const aad = new TextEncoder().encode(`mauzcode/local-secret/v1/${namespace}/${name}`);
