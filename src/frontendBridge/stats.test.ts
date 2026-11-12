@@ -3,7 +3,7 @@ import stats from './statsData';
 import middleware from '../$middleware_ui-lab-api';
 let serial=0; const session:any={user:{id:'owner-a'}};
 const realNow=Date.now; afterEach(()=>{Date.now=realNow;});
-function fixture(agents:any[]=[],messages:any[]=[],events:any[]=[]){const calls:any[]=[];const owner='owner-'+(++serial);session.user.id=owner;const ctx:any={fns:{auth:{listUsers:async()=>[{id:owner,role:'owner'}]},procs:{db:{select:async(o:any)=>{calls.push(o);return o.sql.includes('FROM agents a')?agents:o.sql.includes('FROM messages m')?messages:events;}}}}};return {ctx,calls};}
+function fixture(agents:any[]=[],messages:any[]=[],events:any[]=[]){const calls:any[]=[];const owner='owner-'+(++serial);session.user.id=owner;const ctx:any={fns:{llm:{modelDisplayNames:async()=>({})},auth:{listUsers:async()=>[{id:owner,role:'owner'}]},procs:{db:{select:async(o:any)=>{calls.push(o);return o.sql.includes('FROM agents a')?agents:o.sql.includes('FROM messages m')?messages:events;}}}}};return {ctx,calls};}
 describe('owner stats',()=>{
  test('requires session before any database read',async()=>{const {ctx,calls}=fixture();await expect(stats(ctx,null,{})).rejects.toThrow('Unauthorized');expect(calls).toHaveLength(0);});
  test('rejects invalid range and timezone',async()=>{const {ctx}=fixture();await expect(stats(ctx,session,{range:'bad' as any})).rejects.toThrow('Invalid');await expect(stats(ctx,session,{timezone:'nonsense'})).rejects.toThrow('Invalid');});

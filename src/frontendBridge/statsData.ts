@@ -60,7 +60,8 @@ export default async function statsData(
     type Model={model:string;messages:number;totalTokens:number|null;inputTokens:number|null;outputTokens:number|null};
     type Day={date:string;messages:number;sessions:number;totalTokens:number|null;models:Array<{model:string;totalTokens:number|null}>};
     const models=new Map<string,Model>(),daily=new Map<string,Day>(),hours=new Array<number>(24).fill(0),active=new Set<string>();
-    const model=(raw:string)=>{const name=raw.slice(raw.lastIndexOf(':')+1)||raw;let m=models.get(name);if(!m){m={model:name,messages:0,totalTokens:null,inputTokens:null,outputTokens:null};models.set(name,m);}return m;};
+    const names=await ctx.fns.llm.modelDisplayNames({models:[...new Set([...messages,...events].map(r=>String(r.model??'')).filter(Boolean))]});
+    const model=(raw:string)=>{const name=names[raw]??(raw.slice(raw.lastIndexOf(':')+1)||raw);let m=models.get(name);if(!m){m={model:name,messages:0,totalTokens:null,inputTokens:null,outputTokens:null};models.set(name,m);}return m;};
     const day=(date:string)=>{let d=daily.get(date);if(!d){d={date,messages:0,sessions:0,totalTokens:null,models:[]};daily.set(date,d);}return d;};
     const within=(date:string)=>date<=today&&(!start||date>=start);
     let sessions=0,count=0,totalTokens:number|null=null,inputTokens:number|null=null,outputTokens:number|null=null,knownUsage=0,missingUsage=0;
