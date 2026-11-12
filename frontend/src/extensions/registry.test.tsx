@@ -7,7 +7,7 @@ const view = () => <p>Plugin content</p>;
 const plugin: UiExtension = { id: 'example', apiVersion: 1, pages: [{ id: 'main', title: 'Main', component: view }], navigation: [{ page: 'main', title: 'Open main' }], panels: [{ id: 'panel', title: 'Panel', component: view }], actions: [{ id: 'act', title: 'Act', run: () => {} }] };
 const context = { agentId: 'test', theme: 'dark' as const, readOnly: false };
 describe('host extension registry', () => {
-  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],sidebarNavigation:[],panels:[],actions:[],canvasKinds:[],canvasLaunchers:[],inputKinds:[]}));
+  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],sidebarNavigation:[],panels:[],actions:[],canvasKinds:[],canvasLaunchers:[],modelProviders:[],inputKinds:[]}));
   it('Canvas kinds require an explicit independent grant and cannot override builtins', () => {
     const extension = { ...plugin, canvasKinds: [{ kind: 'example.map', component: view }] };
     expect(createExtensionRegistry([extension], {}).canvasKinds).toHaveLength(0);
@@ -48,4 +48,16 @@ it('input cards require explicit owner grants and cannot replace core secure inp
  expect(createExtensionRegistry([extension],{}).inputKinds).toHaveLength(0);
  expect(createExtensionRegistry([extension],{demo:{inputKinds:['demo-review']}}).inputKinds[0].key).toBe('demo/demo-review');
  for(const kind of ['secret','confirm','redmine-approval']) expect(()=>createExtensionRegistry([{...extension,inputKinds:[{kind,component:view}]}],{demo:{inputKinds:[kind]}})).toThrow();
+});
+
+it('model provider components require a grant per provider id and reject duplicates', () => {
+ const extension: UiExtension = { id:'acme', apiVersion:1, modelProviders:[{provider:'acme',component:view}] };
+ expect(createExtensionRegistry([extension],{}).modelProviders).toHaveLength(0);
+ expect(createExtensionRegistry([extension],{acme:{modelProviders:['other']}}).modelProviders).toHaveLength(0);
+ const granted = createExtensionRegistry([extension],{acme:{modelProviders:['acme']}});
+ expect(granted.modelProviders[0].key).toBe('acme/acme'); expect(Object.isFrozen(granted.modelProviders)).toBe(true);
+ const second: UiExtension = { id:'beta', apiVersion:1, modelProviders:[{provider:'acme',component:view}] };
+ expect(()=>createExtensionRegistry([extension,second],{acme:{modelProviders:['acme']},beta:{modelProviders:['acme']}})).toThrow(/Duplicate model provider/);
+ expect(()=>createExtensionRegistry([{...extension,modelProviders:[{provider:'acme',component:view},{provider:'acme',component:view}]}],{})).toThrow();
+ expect(()=>createExtensionRegistry([{...extension,modelProviders:[{provider:'Bad_Id',component:view}]}],{})).toThrow();
 });

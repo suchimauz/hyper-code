@@ -16,7 +16,11 @@ export type ExtensionCanvasKind = { kind: string; component: ComponentType<Exten
 export type ExtensionLauncherProps = ExtensionViewProps & { tabId: string; active: boolean };
 /** A button on the Canvas Start page that opens a local tab with `component`.
  * `icon` is a Phosphor class (e.g. "ph-terminal-window"); omitted, the plugin's own procs.icon is used. */
-export type ExtensionCanvasLauncher = { id: string; title: string; description?: string; icon?: string; component: ComponentType<ExtensionLauncherProps> };
+export type ExtensionCanvasLauncher = { id: string; title: string; description?: string; icon?: string } & (
+  | { component: ComponentType<ExtensionLauncherProps>; open?: never }
+  /** One-step launcher: the Start page calls `open` directly and selects the returned server Canvas item, with no local tab. */
+  | { open: (context: ExtensionContext) => Promise<{ id: number }>; component?: never }
+);
 export type ExtensionPage = { id: string; title: string; component: ComponentType<ExtensionViewProps> };
 export type ExtensionPanel = { id: string; title: string; component: ComponentType<ExtensionViewProps> };
 export type ExtensionAction = { id: string; title: string; run: (context: ExtensionContext) => void | Promise<void>; mutates?: boolean };

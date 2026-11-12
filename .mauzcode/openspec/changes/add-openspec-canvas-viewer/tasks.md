@@ -21,14 +21,14 @@
 
 ## 5. React UI
 
-- [ ] 5.1 Create `plugins/openspec/ui/index.tsx` and scoped styles: launcher (POST open, SSH error message), translucent top bar, segmented Changes/Specs/Archive, list + document panes, artifact switcher, progress bars, empty/error states, Validate with result panel; verify the plugin UI builds at runtime and the tab renders the current workspace
-- [ ] 5.2 Wire `useLiveSubscription` (`openspec.changed`, resync, onError) and Canvas item state (`section`, `selected`, `doc`) so selection survives refresh and a removed doc shows "no longer available"; verify by ticking a task on disk and seeing progress update without reload
-- [ ] 5.3 Implement keyboard and ARIA (tablist with arrow keys and roving tabindex, listbox navigation, progressbar values, `role="status"` for validation, focus-visible), light/dark theme tokens, `@container` single-column layout with back control, and reduced-motion; verify with a frontend test for tablist/listbox keyboard behavior and a manual check in both themes and at narrow width
+- [x] 5.1 Create `plugins/openspec/ui/index.tsx` and scoped styles: launcher (POST open, SSH error message), translucent top bar, segmented Changes/Specs/Archive, list + document panes, artifact switcher, progress bars, empty/error states, Validate with result panel; verify the plugin UI builds at runtime and the tab renders the current workspace
+- [x] 5.2 Wire `useLiveSubscription` (`openspec.changed`, resync, onError) and Canvas item state (`section`, `selected`, `doc`) so selection survives refresh and a removed doc shows "no longer available"; verify by ticking a task on disk and seeing progress update without reload
+- [x] 5.3 Implement keyboard and ARIA (tablist with arrow keys and roving tabindex, listbox navigation, progressbar values, `role="status"` for validation, focus-visible), light/dark theme tokens, `@container` single-column layout with back control, and reduced-motion; verify with a frontend test for tablist/listbox keyboard behavior and a manual check in both themes and at narrow width
 
 ## 6. Documentation and integration
 
-- [ ] 6.1 Update `plugins/openspec/SKILL.md` with the Canvas tab (`canvas.show({ kind: "openspec.workspace" })`, read-only, local-only) and verify `plugins.read({ name: "openspec" })` shows it
-- [ ] 6.2 Run plugin tests, `code.quality({})` for the plugin files, and `openspec validate add-openspec-canvas-viewer --strict`; verify all pass
+- [x] 6.1 Update `plugins/openspec/SKILL.md` with the Canvas tab (`canvas.show({ kind: "openspec.workspace" })`, read-only, local-only) and verify `plugins.read({ name: "openspec" })` shows it
+- [x] 6.2 Run plugin tests, `code.quality({})` for the plugin files, and `openspec validate add-openspec-canvas-viewer --strict`; verify all pass
 
 ## Workflow follow-up
 

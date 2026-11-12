@@ -26,3 +26,7 @@ All artifacts live in `<workspace>/.mauzcode/openspec`, never in a project-root 
 - Project-wide constraints (e.g. artifact language) belong in `.mauzcode/openspec/config.yaml` under `context`/`rules`; `instructions` injects them.
 
 `list`, `list --specs`, `show <id> --json` and `view` inspect state. `store` commands and `--store` are rejected. Local workspaces only; `dir` overrides the workspace with another absolute local path.
+
+## Canvas tab
+
+`canvas.show({ kind: "openspec.workspace" })` opens a read-only OpenSpec view of the current local workspace (the "OpenSpec" button on the Canvas Start page does the same). It lists active changes with task progress, specs and the archive, renders `proposal.md`, `design.md`, `tasks.md` and spec deltas, runs strict validation of everything with "Validate", and refreshes itself when files under `.mauzcode/openspec` change. It never edits files, and is refused for SSH workspaces. Open it when the person wants to look at changes, specs or progress together.

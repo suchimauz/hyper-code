@@ -56,6 +56,7 @@ function LauncherPage({ page, launcher, loaded, agentId, theme, active }: { page
   if (!launcher && !loaded) return <div className="canvas-loading" role="status" hidden={!active}>Загружаем плагины…</div>;
   if (!launcher) return <div className="canvas-launcher-missing" role="tabpanel" hidden={!active}>Плагин недоступен: {page.launcher}. Закройте вкладку или включите плагин.</div>;
   const View = launcher.component;
+  if (!View) return <div className="canvas-launcher-missing" role="tabpanel" hidden={!active}>{launcher.title} открывается как вкладка Canvas. Закройте эту вкладку.</div>;
   return <div className="canvas-launcher-page" data-launcher={launcher.key} hidden={!active}>
     <ExtensionBoundary key={launcher.key}><View context={{ agentId, theme, readOnly: false }} tabId={tabId} active={active} /></ExtensionBoundary>
   </div>;
@@ -175,7 +176,22 @@ export function CanvasPanel({ agentId, revision, theme, onClose, expanded, onExp
     } finally { setOpening(false); }
   };
   // The Start page becomes the launcher's page with the next free number.
-  const openLauncher = (startTab: string, launcher: string) => setStore(value => ({ ...value, starts: value.starts.filter(n => startKey(n) !== startTab), pages: [...value.pages, { n: value.next, launcher }], next: value.next + 1, selected: pageKey(value.next) }));
+  const openLauncher = (startTab: string, launcher: string) => {
+    const entry = launchers.find(item => item.key === launcher);
+    if (entry?.open) { void openServerLauncher(startTab, entry.open); return; }
+    setStore(value => ({ ...value, starts: value.starts.filter(n => startKey(n) !== startTab), pages: [...value.pages, { n: value.next, launcher }], next: value.next + 1, selected: pageKey(value.next) }));
+  };
+  // One-step launchers create a server Canvas item; the Start page becomes that item, like Workspace files.
+  const openServerLauncher = async (startTab: string, open: (context: { agentId: string; theme: 'light' | 'dark'; readOnly: boolean }) => Promise<{ id: number }>) => {
+    setOpening(true); setStartError(null);
+    try {
+      const item = await open({ agentId, theme, readOnly: false });
+      await sync();
+      setStore(value => ({ ...value, starts: value.starts.filter(n => startKey(n) !== startTab), selected: typeof item?.id === 'number' ? itemKey(item.id) : value.selected }));
+    } catch (failure) {
+      setStartError(failure instanceof Error ? failure.message : String(failure));
+    } finally { setOpening(false); }
+  };
   const onStrip = (event: React.KeyboardEvent) => {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
     const index = selected ? order.indexOf(selected) : -1;

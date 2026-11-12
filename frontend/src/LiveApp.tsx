@@ -144,8 +144,9 @@ export function LiveApp() {
   const readOnly = archived || !mauzcode.page || (mauzcode.page.archived == null && !selectedChat);
   const current = mauzcode.agents.find(item => item.id === mauzcode.selected) ?? selectedChat;
   const requestedSettings = new URLSearchParams(location.search).get('settings');
-  const [settingsOpen, setSettingsOpen] = useState(requestedSettings === 'ssh-instances' || requestedSettings === 'llm-connections' || requestedSettings === 'push-notifications' || requestedSettings === 'updates');
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>(requestedSettings === 'push-notifications' ? 'push-notifications' : requestedSettings === 'llm-connections' ? 'llm-connections' : requestedSettings === 'updates' ? 'updates' : 'ssh-instances');
+  const linkedSettings = (['ssh-instances', 'llm-connections', 'models', 'push-notifications', 'updates'] as const).find(id => id === requestedSettings);
+  const [settingsOpen, setSettingsOpen] = useState(!!linkedSettings);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>(linkedSettings ?? 'ssh-instances');
   const changeSettingsOpen = (open: boolean) => {
     setSettingsOpen(open);
     if (!open) { const url = new URL(location.href); url.searchParams.delete('settings'); history.replaceState(null, '', url); }
