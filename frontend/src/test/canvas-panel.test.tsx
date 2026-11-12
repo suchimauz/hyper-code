@@ -88,3 +88,26 @@ it('opens Workspace and reads its directory using the state token without a meta
  expect(await screen.findByRole('button',{name:'README.md'})).toBeInTheDocument();
  expect(screen.queryByRole('alert')).toBeNull();
 });
+it('one-step launcher opens a server item directly, without a local launcher tab',async()=>{
+ let items:any[]=[];vi.stubGlobal('fetch',vi.fn(async()=>Response.json({items})));
+ const open=vi.fn(async(context:{agentId:string|null})=>{expect(context.agentId).toBe('a');items=[{id:15,title:'OpenSpec · w',icon:'list-checks',active:true}];return {id:15};});
+ const ext:UiExtension={id:'openspec',apiVersion:1,canvasLaunchers:[{id:'openspec',title:'OpenSpec',open}]};
+ pluginUi.state={registry:createExtensionRegistry([ext],{openspec:{canvasLaunchers:['openspec']}}),applications:{},errors:{},loaded:true};
+ render(<CanvasPanel {...props}/>);await waitFor(()=>expect(fetch).toHaveBeenCalled());
+ fireEvent.click(document.querySelector('.canvas-start-entry[data-launcher="openspec/openspec"]')!);
+ expect(await screen.findByRole('tab',{name:'OpenSpec · w'})).toHaveAttribute('aria-selected','true');
+ expect(open).toHaveBeenCalledTimes(1);expect(screen.queryByRole('tab',{name:'Start'})).toBeNull();expect(screen.queryByRole('tab',{name:'OpenSpec'})).toBeNull();
+});
+it('one-step launcher errors stay on the Start page',async()=>{
+ api([]);const ext:UiExtension={id:'openspec',apiVersion:1,canvasLaunchers:[{id:'openspec',title:'OpenSpec',open:async()=>{throw new Error('SSH workspace');}}]};
+ pluginUi.state={registry:createExtensionRegistry([ext],{openspec:{canvasLaunchers:['openspec']}}),applications:{},errors:{},loaded:true};
+ render(<CanvasPanel {...props}/>);await waitFor(()=>expect(fetch).toHaveBeenCalled());
+ fireEvent.click(document.querySelector('.canvas-start-entry[data-launcher="openspec/openspec"]')!);
+ expect(await screen.findByRole('alert')).toHaveTextContent('SSH workspace');expect(screen.getByRole('tab',{name:'Start'})).toBeInTheDocument();
+});
+it('registry requires exactly one of component or open',()=>{
+ const bad:any={id:'x',apiVersion:1,canvasLaunchers:[{id:'x',title:'X'}]};
+ expect(()=>createExtensionRegistry([bad],{x:{canvasLaunchers:['x']}})).toThrow('Invalid Canvas launcher');
+ const both:any={id:'x',apiVersion:1,canvasLaunchers:[{id:'x',title:'X',component:()=>null,open:async()=>({id:1})}]};
+ expect(()=>createExtensionRegistry([both],{x:{canvasLaunchers:['x']}})).toThrow('Invalid Canvas launcher');
+});

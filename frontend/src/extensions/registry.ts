@@ -48,7 +48,7 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
     }
     const seenLaunchers = new Set<string>();
     for (const entry of extension.canvasLaunchers ?? []) {
-      if (!valid(entry.id) || seenLaunchers.has(entry.id) || !entry.title?.trim() || typeof entry.component !== 'function') throw new Error(`Invalid Canvas launcher: ${extension.id}/${entry.id}`);
+      if (!valid(entry.id) || seenLaunchers.has(entry.id) || !entry.title?.trim() || (typeof entry.component !== 'function') === (typeof entry.open !== 'function')) throw new Error(`Invalid Canvas launcher: ${extension.id}/${entry.id}`);
       seenLaunchers.add(entry.id);
       if (!grant?.canvasLaunchers?.includes(entry.id)) continue;
       const icon = iconClass(entry.icon) ?? iconClass(Object.hasOwn(icons, extension.id) ? icons[extension.id] : null);
