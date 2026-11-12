@@ -26,8 +26,8 @@ export default async function (
     const now = Date.now();
     const runToken = crypto.randomUUID();
     const claimed = await ctx.fns.procs.db.select({
-        sql: "UPDATE agents SET run_state = 'running', run_started_at = ?, run_heartbeat_at = ?, run_token = ?, updated_at = ? WHERE id = ? AND parent_id = ? AND archived_at IS NULL AND stopped_at IS NULL AND run_state = 'idle' RETURNING id",
-        params: [now, now, runToken, now, member, opts.agent.id],
+        sql: "UPDATE agents SET run_state = 'running', run_started_at = ?, run_heartbeat_at = ?, run_token = ?, run_owner = ?, updated_at = ? WHERE id = ? AND parent_id = ? AND archived_at IS NULL AND stopped_at IS NULL AND run_state = 'idle' RETURNING id",
+        params: [now, now, runToken, ctx.fns.agent.instanceId({}), now, member, opts.agent.id],
     }) as any[];
     if (!claimed.length) throw new Error("ask: member is busy or stopped");
     let child: types.agent.Agent | null | undefined;

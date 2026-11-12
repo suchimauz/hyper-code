@@ -27,7 +27,7 @@ function fixture(mode: 'stopped' | 'revoked' | 'replacement' | 'normal') {
             },
         } },
         session: { appendUserMessage: async () => { appended++; }, syncAgentState: async () => {} },
-        agent: { run: async () => { ran++; expect(child.currentJobId).toBe(token); if (mode === 'replacement') child.currentJobId = 'new'; return { text: 'answer' }; }, steer: async () => {} },
+        agent: { instanceId: () => 'test-instance', run: async () => { ran++; expect(child.currentJobId).toBe(token); if (mode === 'replacement') child.currentJobId = 'new'; return { text: 'answer' }; }, steer: async () => {} },
     } };
     return { ctx, child, counts: () => ({ appended, ran }), queries };
 }

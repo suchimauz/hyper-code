@@ -51,6 +51,26 @@ describe('agent.workerLoop', () => {
         expect(ran).toEqual(['r1']);
     }, 8_000);
 
+    test('a claimed run records this process as its owner; finishing clears it', async () => {
+        const ctx: any = await mkTestCtx();
+        ctx.fns.agent.workerLoop = workerLoop;
+        ctx.fns.agent.wakeWorker = wakeWorker;
+        await seedReadyAgent(ctx, 'owned', Date.now() - 100);
+        let ownerDuringRun: string | null = null;
+        ctx.fns.agent.run = async () => {
+            ownerDuringRun = ((await ctx.fns.procs.db.select({ sql: 'SELECT run_owner FROM agents WHERE id = ?', params: ['owned'] })) as any[])[0].run_owner;
+        };
+        const loopPromise = workerLoop(ctx, null, { retryBaseMs: 10 });
+        const deadline = Date.now() + 4_000;
+        while (!ownerDuringRun && Date.now() < deadline) await Bun.sleep(20);
+        (ctx.state as any).workerLoopRunning = false;
+        wakeWorker(ctx, null);
+        await loopPromise;
+        expect(ownerDuringRun).toBe(ctx.fns.agent.instanceId({}));
+        const after = ((await ctx.fns.procs.db.select({ sql: 'SELECT run_state, run_owner FROM agents WHERE id = ?', params: ['owned'] })) as any[])[0];
+        expect(after).toEqual({ run_state: 'idle', run_owner: null });
+    }, 8_000);
+
     test('atomic claim prevents two concurrent claims of the same agent', async () => {
         const ctx: any = await mkTestCtx();
         ctx.fns.agent.workerLoop = workerLoop;

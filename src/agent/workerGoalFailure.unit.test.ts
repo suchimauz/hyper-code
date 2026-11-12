@@ -50,7 +50,7 @@ async function scenario(kind: string, retries = 0) {
             },
             transaction: async ({ fn }: any) => { inTx = true; try { const value = await fn(); order.push('commit'); return value; } catch (error) { order.push('rollback'); throw error; } finally { inTx = false; } },
         } },
-        agent: {
+        agent: { instanceId: () => 'test-instance',
             recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop,
             wakeWorker: () => { ctx.state.workerWakePending = true; }, autoCompactIfNeeded: noop, parkOnUsageLimit: noop,
             run: async ({ onGoalBinding, onGoalFinalCheckpoint, goalAuthority }: any) => {

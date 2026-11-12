@@ -53,7 +53,7 @@ async function scenario(mode: string) {
         },
         session: { syncAgentState: noop, appendErrorEvent: noop },
         webPush: { recallStaleError: noop, notifyError: noop, recordFailure: noop },
-        agent: {
+        agent: { instanceId: () => 'test-instance',
             recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop,
             autoCompactIfNeeded: noop, wakeWorker: () => { ctx.state.workerWakePending = true; },
             run: async () => {

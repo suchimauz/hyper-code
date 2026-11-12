@@ -102,6 +102,7 @@ async function claimOne(ctx: Context, now: number): Promise<{ id: string; token:
                 run_started_at  = ?,
                 run_heartbeat_at = ?,
                 run_token       = ?,
+                run_owner       = ?,
                 next_run_at     = NULL,
                 last_error      = NULL,
                 updated_at      = ?
@@ -119,7 +120,7 @@ async function claimOne(ctx: Context, now: number): Promise<{ id: string; token:
           ) AND run_state = 'idle' AND stopped_at IS NULL AND sleep_context->>'draftRevision' IS NULL
             AND NOT EXISTS (SELECT 1 FROM inputs i WHERE i.agent_id = agents.id AND i.spec->>'_agentWait' = 'true' AND i.state IN ('open','processing'))
           RETURNING id`,
-        params: [now, now, token, now, now],
+        params: [now, now, token, ctx.fns.agent.instanceId({}), now, now],
     }) as any[];
     return claimed.length === 0 ? null : { id: claimed[0]!.id as string, token };
 }
@@ -568,6 +569,10 @@ async function holdWorkerLock(ctx: Context): Promise<boolean> {
             st.workerLockCheckedAt = Date.now();
             st.workerStandbyLogged = false;
             ctx.fns.procs.log.info({ event: 'agent.worker.lock', msg: `agent worker lock acquired (pid ${process.pid})` });
+            // Only the lock holder runs agents, so every run still marked running by another
+            // instance belongs to a holder that is gone: hand it back now, not after the lease.
+            await ctx.fns.agent.recoverOrphanedRuns({ owner: ctx.fns.agent.instanceId({}) })
+                .catch((error: any) => console.error('[workerLoop] orphaned run recovery failed:', error?.message ?? error));
             return true;
         }
     } catch (error: any) {

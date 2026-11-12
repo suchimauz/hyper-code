@@ -164,7 +164,7 @@ The browser shares one topic-filtered `GET /procs/events` stream. React state co
 | Browser refresh | React reads the selected chat's latest bounded JSON page; older history is loaded with `before`. |
 | Lost network | EventSource reconnects; resync refetches canonical snapshots. Disconnected fallback polling remains visible to the user. |
 | Hidden tab | JSON reads stop; HTTP/1.1 releases SSE, HTTP/2 may retain it. Foregrounding reconciles snapshots and reconnects as needed. |
-| Server restart | `loadAll` rehydrates agents; renewable leases reclaim owners whose heartbeat expires. |
+| Server restart | `loadAll` rehydrates agents. On acquiring the single-worker lock, the process immediately requeues runs whose `run_owner` is another instance (`agent.recoverOrphanedRuns`); owner-less legacy runs and hung runs fall back to the 10-minute heartbeat lease. |
 | Invalidation lost | React's connected 60s fallback refetches JSON; compatibility consumers retain their own refresh policies. |
 
 ---
@@ -179,6 +179,7 @@ agents.run_started_at          BIGINT  -- total elapsed display/audit
 agents.run_token               TEXT    -- opaque fencing identity for current owner
 agents.run_heartbeat_at        BIGINT  -- renewable liveness timestamp
 agents.stale_recovery_count    INTEGER -- bounded stale retry counter
+agents.run_owner               TEXT    -- instance id (agent.instanceId) of the process that claimed the run; cleared with run_token
 agents.last_error              TEXT
 ```
 
@@ -186,6 +187,7 @@ Rules:
 
 - `POST` does `UPDATE agents SET next_run_at = MAX(COALESCE(next_run_at, 0), now + N)`. The `MAX` prevents an earlier message from rolling back an already-pushed-out run.
 - The worker's atomic claim is `UPDATE agents SET run_state='running' WHERE id IN (SELECT id FROM agents WHERE run_state='idle' AND next_run_at <= now ORDER BY next_run_at ASC LIMIT 1) RETURNING id`. Postgres row locking makes this one-statement-atomic — two concurrent statements **cannot** both win the same row, so two parallel runners trying to grab the same agent will see exactly one `claimed.length === 1` and one `claimed.length === 0`.
+- **One worker per database.** The worker holds a session advisory lock (`mauzcode.agent.workerLoop`) on one reserved connection; other processes stand by. Only the lock holder starts runs (worker claims, and `agent.ask` inside its runs), and every claim records `run_owner`. So when a process acquires the lock (startup or standby takeover), every `running` row with a foreign owner is orphaned and is requeued at once with the stale-recovery accounting (counter, 5 s→2 min backoff, 3 retries, failure push at the limit). The 10-minute heartbeat lease (`RUN_LEASE_MS`) remains the fallback.
 - **Cursor scope is `role='user'` AND `excluded_from_cursor=0`.** Both the pre-run frontier snapshot and the post-run "still pending" check ignore excluded user rows. Native tool results use `role='tool'` and are not user input in the first place. Without this distinction, internal traffic could look like fresh input and make the worker re-run a completed conversation.
 - `last_processed_msg_idx` only advances on **success**. Aborted or failed runs leave the cursor where it was. They also do **not** auto-reschedule (`next_run_at = NULL` on the failure path) — the user's next POST decides whether to retry. Otherwise a permanently broken LLM call would burn the worker in a tight loop.
 - If new **real user** messages land while a run is in progress, the worker's `finally` block detects `MAX(idx) WHERE role='user' AND excluded_from_cursor=0 > cursor` and sets `next_run_at = now + 5s` again before returning to `idle`. Successful run → auto-rescheduling for the new input. Failed run → no rescheduling.

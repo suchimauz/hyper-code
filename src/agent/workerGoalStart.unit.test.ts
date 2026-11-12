@@ -44,7 +44,7 @@ async function scenario(action: 'run'|'skip'|'defer'|'disabled', opts: { human?:
             },
         },
         session: { syncAgentState: noop, appendErrorEvent: noop }, webPush: { recallStaleError: noop, recordFailure: noop },
-        agent: {
+        agent: { instanceId: () => 'test-instance',
             recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop, autoCompactIfNeeded: noop,
             wakeWorker: () => { wakes++; ctx.state.workerWakePending = true; },
             run: async (args: any) => { models++; runOpts = args; return {}; },

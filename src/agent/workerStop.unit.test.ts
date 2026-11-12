@@ -30,7 +30,7 @@ async function fixture(mode: 'paused' | 'revoked') {
             },
         } },
         settings: { getNumber: async () => 0 }, webPush: { recallStaleError: noop },
-        agent: { recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop, wakeWorker: () => { ctx.state.workerWakePending = true; }, run: async () => { runs++; } },
+        agent: { instanceId: () => 'test-instance', recoverOrphanedCompactions: noop, deliverWakes: noop, pollWatches: noop, pollTriggers: noop, wakeWorker: () => { ctx.state.workerWakePending = true; }, run: async () => { runs++; } },
         session: { syncAgentState: noop },
     };
     await worker(ctx, null, {});

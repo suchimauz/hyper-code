@@ -5,7 +5,8 @@
  * are gone but whose worker loop still claims agents is the orphan that kept
  * running agents on stale code for days. Runs owned by this process are handed
  * back to the queue at once (revoked and rescheduled) so the next process picks
- * them up immediately instead of after the 10-minute stale lease.
+ * them up immediately instead of after the 10-minute stale lease. A process that dies without
+ * reaching this hook is covered by agent.recoverOrphanedRuns when the next process takes the worker lock.
  */
 export default async function (ctx: Context, _session: Session | null, _state?: unknown) {
     const st = ctx.state as any;
