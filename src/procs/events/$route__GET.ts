@@ -56,6 +56,9 @@ export default async function (ctx: Context, session: Session, opts: { req: Requ
             "content-type": "text/event-stream",
             "cache-control": "no-cache, no-transform",
             "connection": "keep-alive",
+            // nginx/openresty in front buffers proxied responses by default; a buffered
+            // stream never delivers `hello`, so EventSource stays in "connecting".
+            "x-accel-buffering": "no",
         },
     });
 }
