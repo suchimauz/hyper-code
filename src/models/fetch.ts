@@ -95,7 +95,8 @@ export default async function (
        try { const next = await bounded(reader!.read()); if (finished) return; if (next.done) { c.close(); cleanup(); } else c.enqueue(next.value!); }
        catch (cause) { if (!finished) { c.error(error('Transport response failed', cause)); cleanup(); } }
       },
-      async cancel(reason) { cleanup(); controller.abort(error('Response cancelled')); await reader!.cancel(reason); }
+      // Consumer cancellation is a normal end of use: cancel the source, then abort the transport without rejecting.
+      async cancel(reason) { cleanup(); await reader!.cancel(reason).catch(() => undefined); controller.abort(error('Response cancelled')); }
      });
      return new Response(body, {status:response.status, statusText:response.statusText, headers:response.headers});
     } catch (cause) { cleanup(); throw error('Model transport failed', cause); }

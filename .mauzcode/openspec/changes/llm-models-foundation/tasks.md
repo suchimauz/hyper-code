@@ -58,10 +58,12 @@ Verification (block 6): client is `frontend/src/lib/modelConnections.ts` (`lib/m
 
 ## 7. Integration checks
 
-- [ ] 7.1 Verify `code.quality({})` is ok and no files under `src/llm`, `src/llms`, `src/sshAccount`, `src/sshProvider` changed (`git diff --stat`)
-- [ ] 7.2 Run existing llm/llms/sshProvider/plugins/frontend test suites and verify they pass unchanged
+- [x] 7.1 Verify `code.quality({})` is ok and no files under `src/llm`, `src/llms`, `src/sshAccount`, `src/sshProvider` changed (`git diff --stat`)
+- [x] 7.2 Run existing llm/llms/sshProvider/plugins/frontend test suites and verify they pass unchanged
 - [ ] 7.3 End-to-end: create a Custom connection against a local mock endpoint (direct) and with a SOCKS proxy, see status and models in the Models tab; load a fixture plugin provider with its own component and see it in the catalogue
-- [ ] 7.4 Run `openspec validate llm-models-foundation --strict` and verify it passes
+- [x] 7.4 Run `openspec validate llm-models-foundation --strict` and verify it passes
+
+Verification (block 7): `code.quality` reports the same 8 pre-existing unresolved calls (myhealthGaps, skill.circleback, tunnel) and nothing from models; `git diff --stat` since fca25527 shows no changes under `src/llm`, `src/llms`, `src/sshAccount`, `src/sshProvider`. `bun test` llm/llms/sshProvider/sshAccount/plugins/models: 666 passed, 3 skipped (LM Studio env). Frontend vitest: 693 passed, 2 pre-existing failures (live-navigation, quota-matrix). E2E on the live server: Custom connection to a local mock (direct) → `generation-ok`, models from discovery + manual; this exposed a bug in `models.fetch` (consumer body cancel rejected, so a successful generation reported `generation-failed`) — fixed with a regression test. Custom connection via a local SOCKS5 saved proxy → `models-ok` and 468 discovered models (proxy accepts only verified HTTPS, so a public endpoint was used); with the proxy stopped it fails without direct fallback. Plugin fixture provider (`~/.mauzcode/user/e2e-model-fixture`) cannot be mounted on the running server: the process predates fca25527 and its statically imported classifier still treats `$modelProvider_*` as a function (`bun test src/models/registryReload.test.ts` proves the real boot path works). Remaining for 7.3: restart the server, mount the fixture, check the catalogue and plugin form in the Models tab. `openspec validate llm-models-foundation --strict` passes.
 
 ## Workflow follow-up
 

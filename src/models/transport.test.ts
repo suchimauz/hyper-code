@@ -31,6 +31,11 @@ describe('model transports', () => {
  test('body cancellation releases lease',async () => {
   const f=fixture(); f.request.mockImplementation(async () => new Response(new ReadableStream({}))); const r=await call(f); await r.body!.cancel(); expect(f.release).toHaveBeenCalledTimes(1);
  });
+ test('direct body cancellation after a successful response resolves',async () => {
+  const server=Bun.serve({port:0,hostname:'127.0.0.1',fetch:() => Response.json({ok:true})});
+  try { const r=await routed({fns:{}} as never,null,{transport:direct,url:`http://127.0.0.1:${server.port}/x`}); expect(r.status).toBe(200); await expect(r.body!.cancel()).resolves.toBeUndefined(); }
+  finally { server.stop(true); }
+ });
  for (const transport of [direct,socks,ssh]) {
   test(`${transport.kind} timeout before headers`,async () => {
    const f=fixture(); const hang=async () => await new Promise<Response>(() => {}); globalThis.fetch=hang as any; f.request.mockImplementation(hang);
