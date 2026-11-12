@@ -8,6 +8,8 @@ export type { ModelConnectionView, ModelProviderView, ModelTransportSpec, ModelF
 export type ModelUsageReport = {
   status: 'available' | 'unavailable' | 'configured' | 'disabled';
   reason?: string;
+  /** Subscription plan reported by the provider, when available. */
+  plan?: string;
   checkedAt: number;
   windows?: { label: string; usedPercent?: number; remaining?: number; resetAt?: number }[];
   balance?: { amount: number; currency: string };

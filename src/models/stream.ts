@@ -6,6 +6,7 @@
  * @param opts.model Provider-native model id on the connection.
  * @param opts.instructions Effective system instructions.
  * @param opts.messages OpenAI-shaped chat transcript.
+ * @param opts.cacheableMessageCount Number of leading cacheable messages, excluding transient guidance. @minimum 0
  * @param opts.tools Wire tool schemas in the provider's API shape.
  * @param opts.reasoningEffort Reasoning effort such as low, medium, high or off.
  * @param opts.onEvent Receives incremental text, reasoning and tool-argument deltas.
@@ -24,6 +25,8 @@ export default async function (
         instructions: string;
         /** OpenAI-shaped chat transcript. */
         messages: Record<string, unknown>[];
+        /** Number of leading cacheable messages, excluding transient guidance. @minimum 0 */
+        cacheableMessageCount?: number;
         /** Wire tool schemas in the provider's API shape. */
         tools?: Record<string, unknown>[];
         /** Reasoning effort such as low, medium, high or off. */

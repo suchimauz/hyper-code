@@ -6,6 +6,8 @@ export type StreamRequest = {
     instructions: string;
     /** OpenAI-shaped chat transcript (role/content/tool_calls/tool_call_id). */
     messages: Record<string, unknown>[];
+    /** Number of leading messages eligible for prompt caching, excluding transient guidance. @minimum 0 */
+    cacheableMessageCount?: number;
     /** Wire tool schemas in the provider's API shape (Responses `function` tools for Codex). */
     tools?: Record<string, unknown>[];
     /** Reasoning effort such as low, medium, high or off. */

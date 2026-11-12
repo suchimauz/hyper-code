@@ -6,6 +6,8 @@
  * @param opts.model Provider-native model id on the connection.
  * @param opts.instructions Effective system instructions.
  * @param opts.messages OpenAI-shaped chat transcript.
+ * @param opts.focus Optional handoff guidance identifying what context to preserve.
+ * @param opts.maxTokens Provider output token budget for compaction. @minimum 1
  * @param opts.sessionId Stable session or agent id for caching and correlation.
  * @param opts.signal Cancels the provider request.
  */
@@ -21,6 +23,10 @@ export default async function (
         instructions: string;
         /** OpenAI-shaped chat transcript. */
         messages: Record<string, unknown>[];
+        /** Optional handoff guidance identifying what context to preserve. */
+        focus?: string;
+        /** Provider output token budget for compaction. @minimum 1 */
+        maxTokens?: number;
         /** Stable session or agent id for caching and correlation. */
         sessionId: string;
         /** Cancels the provider request. */

@@ -67,7 +67,29 @@ describe("models.stream / models.compact enforcement", () => {
         expect(seen).toEqual({ stream: 1, compact: 0, fetch: 1 });
         expect((await ctx.fns.models.stream(req(conn.id, "m2"))).text).toBe("hi m2");
         await ctx.fns.models.setModelEnabled({ id: conn.id, model: "m1", enabled: true });
-        expect((await ctx.fns.models.compact(req(conn.id, "m1"))).item.encrypted_content).toBe("enc-m1");
+        expect((await ctx.fns.models.compact(req(conn.id, "m1"))).item).toMatchObject({ encrypted_content: "enc-m1" });
+    });
+
+    test("passes cache boundaries and compaction guidance unchanged", async () => {
+        let streamed: types.models.StreamRequest | undefined;
+        let compacted: types.models.CompactRequest | undefined;
+        const { ctx, conn } = await setup({
+            stream: async (_ctx, _conn, request) => {
+                streamed = request;
+                return { text: "", thinking: "", finishReason: "stop", usage: { cache_write_tokens: 17 }, toolCalls: [] };
+            },
+            compact: async (_ctx, _conn, request) => {
+                compacted = request;
+                return { item: { type: "compaction", content: "checkpoint", signature: "sig" }, responseId: "", usage: { prompt_tokens: 2, completion_tokens: 1 } };
+            },
+        });
+        const result = await ctx.fns.models.stream({ ...req(conn.id, "m1"), cacheableMessageCount: 0 });
+        expect(streamed?.cacheableMessageCount).toBe(0);
+        expect(result.usage.cache_write_tokens).toBe(17);
+        const compact = await ctx.fns.models.compact({ ...req(conn.id, "m1"), focus: "Preserve decisions", maxTokens: 1234 });
+        expect(compacted?.focus).toBe("Preserve decisions");
+        expect(compacted?.maxTokens).toBe(1234);
+        expect(compact.item).toEqual({ type: "compaction", content: "checkpoint", signature: "sig" });
     });
 
     test("disabled connection and unsupported provider never reach the network", async () => {

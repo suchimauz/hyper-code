@@ -107,10 +107,12 @@ it('tests a connection and toggles enabled', async () => {
 });
 
 it('shows quota windows, or only status and reason without windows', () => {
-  const { rerender } = render(<UsageView usage={{ status: 'available', checkedAt: 1, windows: [{ label: '5h', usedPercent: 42, resetAt: 2 }] }} />);
+  const { rerender } = render(<UsageView usage={{ status: 'available', plan: 'max', checkedAt: 1, windows: [{ label: '5h', usedPercent: 42, resetAt: 2 }] }} />);
+  expect(screen.getByText('Plan: max')).toBeVisible();
   expect(screen.getByRole('meter', { name: '5h used' })).toHaveAttribute('aria-valuenow', '42');
   expect(screen.getByText(/42% used · resets/)).toBeVisible();
   rerender(<UsageView usage={{ status: 'unavailable', reason: 'models-failed', checkedAt: 1 }} />);
+  expect(screen.queryByText(/^Plan:/)).not.toBeInTheDocument();
   expect(screen.queryByRole('list', { name: 'Quota windows' })).toBeNull();
   expect(screen.getByText('Unavailable')).toBeVisible(); expect(screen.getByText('Model list request failed')).toHaveAttribute('title', 'models-failed');
 });
@@ -154,7 +156,8 @@ it('toggles models by clicking the row, saving all changes with one Save button'
   fireEvent.click(await screen.findByRole('button', { name: 'Models' }));
   const m1 = await screen.findByRole('switch', { name: 'Enabled m1' });
   const m2 = screen.getByRole('switch', { name: 'Enabled m2' });
-  expect(m1).toBeChecked(); expect(m2).not.toBeChecked();
+  // The model draft is initialized by an effect after the async catalogue arrives.
+  await waitFor(() => { expect(m1).toBeChecked(); expect(m2).not.toBeChecked(); });
   expect(m2.closest('li')).toHaveAttribute('data-model-disabled', 'true');
   // Clicking the row text toggles the draft only; nothing is sent until Save.
   fireEvent.click(screen.getByText('m1'));
@@ -236,11 +239,13 @@ it('shows a brand logo for known providers and always a generic plug for custom 
   const codexProvider = { id: 'codex', label: 'Codex', fields: [], transports: ['direct'], actions: [] };
   const plain = { ...stored, id: 'c9', accountName: 'Local', config: { baseUrl: 'http://localhost:1', protocol: 'gemini' } };
   const cx = { ...stored, id: 'cx', provider: 'codex', accountName: 'GPT', config: {} };
-  mockApi([stored, plain, cx], [custom, codexProvider]);
+  const claudeProvider = { ...codexProvider, id: 'claude', label: 'Claude' };
+  const cl = { ...cx, id: 'cl', provider: 'claude', accountName: 'Claude' };
+  mockApi([stored, plain, cx, cl], [custom, codexProvider, claudeProvider]);
   const fetchMock = vi.mocked(fetch);
   const base = fetchMock.getMockImplementation()!;
   fetchMock.mockImplementation(async (url: any, init: RequestInit = {}) => {
-    if ((init.method || 'GET') === 'GET') return json({ providers: [custom, codexProvider], connections: [stored, plain, cx], providerLogos: { codex: logo, custom: null }, proxies: [], instances: [], csrfToken: 'csrf' });
+    if ((init.method || 'GET') === 'GET') return json({ providers: [custom, codexProvider, claudeProvider], connections: [stored, plain, cx, cl], providerLogos: { codex: logo, claude: logo, custom: null }, proxies: [], instances: [], csrfToken: 'csrf' });
     if (JSON.parse(String(init.body)).action === 'action') return json({ result: { loggedIn: true, needsLogin: false, flow: null } });
     return base(url, init);
   });
@@ -249,4 +254,55 @@ it('shows a brand logo for known providers and always a generic plug for custom 
   expect((await card('Work')).querySelector('[data-provider-logo]')).toHaveAttribute('data-provider-logo', 'custom');
   expect((await card('Local')).querySelector('[data-provider-logo]')).toHaveAttribute('data-provider-logo', 'custom');
   expect((await card('GPT')).querySelector('[data-provider-logo]')).toHaveAttribute('data-provider-logo', 'brand');
+  expect((await card('Claude')).querySelector('[data-provider-logo]')).toHaveAttribute('data-provider-logo', 'brand');
+});
+
+it.each([true, false])('supports Claude authorization paste, rejection and retry (callback listening: %s)', async (callbackListening) => {
+  const provider = { id: 'claude', label: 'Claude', fields: [], transports: ['direct'], actions: [] };
+  const conn = { ...stored, id: 'cl', provider: 'claude', accountName: 'Claude work', config: {}, secrets: {} };
+  const posts = mockApi([conn], [provider]);
+  const base = vi.mocked(fetch).getMockImplementation()!;
+  const flow = { flowId: 'cf1', kind: 'authorization-code', status: 'pending', authorizationUrl: 'https://claude.ai/oauth/authorize?state=test', callbackListening, expiresAt: Date.now() + 60000 };
+  let current: any = null;
+  let loggedIn = false;
+  vi.mocked(fetch).mockImplementation(async (url: any, init: RequestInit = {}) => {
+    if ((init.method || 'GET') !== 'GET') {
+      const body = JSON.parse(String(init.body));
+      if (body.action === 'action') {
+        posts.push({ body, headers: init.headers });
+        if (body.name === 'loginStatus') return json({ result: { loggedIn, needsLogin: !loggedIn, expiresAt: null, flow: current } });
+        if (body.name === 'login') { current = flow; return json({ result: current }); }
+        if (body.name === 'submitLogin') {
+          loggedIn = body.input.code === 'valid-code';
+          current = loggedIn ? { ...flow, status: 'succeeded' } : { ...flow, message: 'Authorization state does not match. Paste the callback URL again.' };
+          return json({ result: current });
+        }
+        if (body.name === 'cancelLogin') { current = { ...flow, status: 'failed', message: 'Login cancelled' }; return json({ result: current }); }
+      }
+    }
+    return base(url, init);
+  });
+  render(<ModelsPanel context={context} />);
+  const region = await screen.findByRole('region', { name: 'Claude login for Claude work' });
+  await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Not logged in'));
+  fireEvent.click(within(region).getByRole('button', { name: 'Log in' }));
+  const field = await within(region).findByRole('textbox', { name: 'Callback URL or authorization code' });
+  expect(within(region).getByRole('link', { name: 'Open Claude authorization' })).toHaveAttribute('href', flow.authorizationUrl);
+  expect(within(region).getByText(callbackListening ? /Local callback is listening/ : /Local callback is unavailable/)).toBeInTheDocument();
+  expect(within(region).queryByLabelText('One-time code')).not.toBeInTheDocument();
+  expect(within(region).getByRole('button', { name: 'Submit code' })).toBeDisabled();
+  fireEvent.change(field, { target: { value: 'http://localhost:53692/callback?code=bad&state=wrong' } });
+  fireEvent.click(within(region).getByRole('button', { name: 'Submit code' }));
+  expect(await within(region).findByRole('alert')).toHaveTextContent('Authorization state does not match');
+  expect(field).toHaveValue('http://localhost:53692/callback?code=bad&state=wrong');
+  expect(within(region).getByRole('status')).toHaveTextContent('Waiting for authorization');
+  expect(posts.find(p => p.body.name === 'submitLogin')?.body.input).toEqual({ flowId: 'cf1', code: 'http://localhost:53692/callback?code=bad&state=wrong' });
+  fireEvent.change(field, { target: { value: 'valid-code' } });
+  fireEvent.click(within(region).getByRole('button', { name: 'Submit code' }));
+  await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Logged in'));
+  expect(within(region).queryByRole('textbox')).not.toBeInTheDocument();
+  fireEvent.click(within(region).getByRole('button', { name: 'Log in again' }));
+  await within(region).findByRole('textbox');
+  fireEvent.click(within(region).getByRole('button', { name: 'Cancel login' }));
+  await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('Login cancelled'));
 });

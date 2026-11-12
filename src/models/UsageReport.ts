@@ -2,6 +2,8 @@
 export type UsageReport = {
     status: types.models.TestResult["status"];
     reason?: string;
+    /** Subscription plan reported by the provider, when available. */
+    plan?: string;
     /** Unix epoch milliseconds. */
     checkedAt: number;
     windows?: {

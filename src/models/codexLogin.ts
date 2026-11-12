@@ -20,12 +20,12 @@ export default async function (
         /** Override of the 15-minute login expiry, for tests. @default 900000 @minimum 1 @maximum 900000 */
         maxWaitMs?: number;
     },
-): Promise<{ flowId: string; status: types.models.LoginFlow["status"]; verificationUri: string; userCode: string; expiresAt: number; message?: string } | null> {
+): Promise<{ kind: "device-code"; flowId: string; status: types.models.LoginFlow["status"]; verificationUri?: string; userCode?: string; expiresAt: number; message?: string } | null> {
     const conn = opts.conn;
         const issuer = "https://auth.openai.com", clientId = "app_EMoamEEZ73f0CkXaXp7hrann";
         ctx.state.models ??= {};
         const flows = (ctx.state.models.loginFlows ??= {});
-        const view = (f: types.models.LoginFlow | undefined) => f ? { flowId: f.flowId, status: f.status, verificationUri: f.verificationUri, userCode: f.userCode, expiresAt: f.expiresAt, ...(f.message ? { message: f.message } : {}) } : null;
+        const view = (f: types.models.LoginFlow | undefined) => f ? { kind: "device-code" as const, flowId: f.flowId, status: f.status, verificationUri: f.verificationUri, userCode: f.userCode, expiresAt: f.expiresAt, ...(f.message ? { message: f.message } : {}) } : null;
         const json = { "content-type": "application/json", accept: "application/json" };
         if (opts.op === "status") {
             const f = flows[conn.id];
@@ -49,7 +49,7 @@ export default async function (
         if (!deviceAuthId || !userCode) throw Object.assign(new Error("Device code response is incomplete"), { code: "LOGIN_FAILED", status: 502 });
         const seconds = Number(String(uc.interval ?? "").trim());
         const intervalMs = opts.intervalMs ?? (Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 60) * 1000 : 5000);
-        const flow: types.models.LoginFlow = { flowId: crypto.randomUUID(), status: "pending", verificationUri: issuer + "/codex/device", userCode, expiresAt: Date.now() + (opts.maxWaitMs ?? 15 * 60_000), abort: new AbortController() };
+        const flow: types.models.LoginFlow = { kind: "device-code", flowId: crypto.randomUUID(), status: "pending", verificationUri: issuer + "/codex/device", userCode, expiresAt: Date.now() + (opts.maxWaitMs ?? 15 * 60_000), abort: new AbortController() };
         flows[conn.id] = flow;
         const signal = flow.abort.signal;
         const finish = (status: "succeeded" | "failed" | "expired", message: string) => { if (flow.status === "pending") { flow.status = status; flow.message = message; } };

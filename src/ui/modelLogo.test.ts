@@ -13,6 +13,11 @@ describe('ui.modelLogo', () => {
             expect(html).toContain(`aria-label="Model: ${model}"`);
         }
     });
+    test('maps the native Claude connection prefix to its existing inert provider mark', () => {
+        const svg = (model: string) => render(model, false, true).match(/<svg[\s\S]*?<\/svg>/)?.[0];
+        expect(svg('claude:x')).toBe(svg('anthropic:x'));
+        expect(svg('claude/account:x')).toBe(svg('anthropic/account:x'));
+    });
 
     test('uses the Grok mark instead of the generic CPU icon', () => {
         const html = render('xai:grok-4.6');

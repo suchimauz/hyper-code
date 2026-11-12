@@ -33,7 +33,7 @@ export default async function (
                 return { label: w.label.slice(0, 100), ...(usedPercent !== undefined ? { usedPercent: Math.min(100, Math.max(0, usedPercent)) } : {}), ...(remaining !== undefined ? { remaining } : {}), ...(resetAt !== undefined ? { resetAt } : {}) };
             }) : undefined;
             const balance = r.balance && num(r.balance.amount) !== undefined && typeof r.balance.currency === "string" ? { amount: r.balance.amount, currency: r.balance.currency.slice(0, 16) } : undefined;
-            return { status: r.status, ...(typeof r.reason === "string" ? { reason: r.reason.slice(0, 64) } : {}), checkedAt: Date.now(), ...(windows ? { windows } : {}), ...(balance ? { balance } : {}) };
+            return { status: r.status, ...(typeof r.reason === "string" ? { reason: r.reason.slice(0, 64) } : {}), checkedAt: Date.now(), ...(typeof r.plan === "string" ? { plan: r.plan.slice(0, 100) } : {}), ...(windows ? { windows } : {}), ...(balance ? { balance } : {}) };
         } catch (error) {
             const code = (error as { code?: unknown } | null)?.code;
             return { status: "unavailable", reason: code === "TRANSPORT" ? "transport-failed" : code === "UNKNOWN_PROVIDER" ? "unknown-provider" : "usage-failed", checkedAt: Date.now() };

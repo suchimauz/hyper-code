@@ -42,7 +42,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
     const isOpenCode = key.startsWith('opencode:') || key.startsWith('opencode/');
     const path = isOpenCode ? 'M2 3h20v18H2V3zm2 2v14h16V5H4zm2 3 4 4-4 4 1.4 1.4L12.8 12 7.4 6.6 6 8zm7 7h5v2h-5v-2z' : key.startsWith('codex:') || key.startsWith('codex/') || key.startsWith('openai:') || key.startsWith('openai/') || key.includes('gpt-')
             ? openai
-            : key.startsWith('claude-code:') || key.startsWith('claude-code/') || key.startsWith('anthropic:') || key.startsWith('anthropic/') || key.startsWith('anthropic-oauth:') || key.startsWith('anthropic-oauth/') || key.includes('claude')
+            : key.startsWith('claude:') || key.startsWith('claude/') || key.startsWith('claude-code:') || key.startsWith('claude-code/') || key.startsWith('anthropic:') || key.startsWith('anthropic/') || key.startsWith('anthropic-oauth:') || key.startsWith('anthropic-oauth/') || key.includes('claude')
                 ? anthropic
                 : key.startsWith('xai:') || key.startsWith('xai/') || key.includes('grok')
                     ? grok

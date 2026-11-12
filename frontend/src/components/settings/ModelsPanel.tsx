@@ -50,6 +50,7 @@ export function UsageView({ usage }: { usage: ModelUsageReport }) {
         <span className="models-window-meta">{used !== null ? `${Math.round(used)}% used` : typeof w.remaining === 'number' ? `${w.remaining} left` : ''}{w.resetAt ? ` · resets ${formatTime(w.resetAt)}` : ''}</span>
       </li>;
     })}</ul>}
+    {usage.plan && <p className="settings-note">Plan: {usage.plan}</p>}
     {usage.balance && <p className="settings-note">Balance: {usage.balance.amount} {usage.balance.currency}</p>}
   </div>;
 }
@@ -205,7 +206,7 @@ function ConnectionCard({ connection, provider, actions }: { connection: ModelCo
       <button type="button" className="ssh-card-tab" aria-expanded={open === 'models'} disabled={!connection.providerRegistered} onClick={() => { void showModels(); }}>Models</button>
       <button type="button" className="ssh-card-tab is-danger" aria-expanded={open === 'remove'} onClick={() => toggle('remove')}>Remove</button>
     </div>
-    {connection.provider === 'codex' && connection.providerRegistered && <CodexLogin connection={connection} actions={actions} />}
+    {['codex', 'claude'].includes(connection.provider) && connection.providerRegistered && <ProviderLogin connection={connection} actions={actions} />}
     {open === 'edit' && provider && <div className="ssh-card-section"><ProviderForm key={connection.updatedAt} provider={provider} connection={connection} actions={actions} onDone={() => setOpen(null)} /></div>}
     {open === 'models' && <div className="ssh-card-section" aria-live="polite">{!models ? <p className="settings-loading" role="status">Loading models…</p> : <>
       {models.error && <p className="settings-note" role="status">Discovery failed: {models.error}</p>}
@@ -228,22 +229,25 @@ function ConnectionCard({ connection, provider, actions }: { connection: ModelCo
   </article>;
 }
 
-type CodexFlow = { flowId: string; status: 'pending' | 'succeeded' | 'failed' | 'expired'; verificationUri: string; userCode: string; expiresAt: number; message?: string };
-type CodexStatus = { loggedIn: boolean; needsLogin: boolean; expiresAt: number | null; flow: CodexFlow | null };
+type LoginFlow = { flowId: string; kind: 'device-code' | 'authorization-code'; status: 'pending' | 'succeeded' | 'failed' | 'expired'; verificationUri?: string; authorizationUrl?: string; userCode?: string; callbackListening?: boolean; expiresAt: number; message?: string };
+type LoginStatus = { loggedIn: boolean; needsLogin: boolean; expiresAt: number | null; flow: LoginFlow | null };
 
-/** Native Codex device-code login: every request runs on the server through the connection transport. */
-function CodexLogin({ connection, actions }: { connection: ModelConnectionView; actions: Actions }) {
-  const [status, setStatus] = useState<CodexStatus | null>(null);
-  const [flow, setFlow] = useState<CodexFlow | null>(null);
+/** Native provider login; the browser authorization step opens separately from the connection transport. */
+function ProviderLogin({ connection, actions }: { connection: ModelConnectionView; actions: Actions }) {
+  const [status, setStatus] = useState<LoginStatus | null>(null);
+  const [flow, setFlow] = useState<LoginFlow | null>(null);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [code, setCode] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const providerLabel = actions.state.providers.find(p => p.id === connection.provider)?.label ?? connection.provider;
   const { csrf } = actions;
   // actions is rebuilt on every render; keep reload in a ref so polling is not restarted.
   const reloadRef = useRef(actions.reload); reloadRef.current = actions.reload;
   const reload = useCallback(() => reloadRef.current(), []);
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
-      const s = await connectionAction<CodexStatus>(csrf, connection.id, 'loginStatus', null, signal);
+      const s = await connectionAction<LoginStatus>(csrf, connection.id, 'loginStatus', null, signal);
       setStatus(s); setFlow(s.flow);
       return s;
     } catch { return null; }
@@ -256,27 +260,48 @@ function CodexLogin({ connection, actions }: { connection: ModelConnectionView; 
     const timer = setInterval(() => { void refresh(c.signal).then(s => { if (s?.flow?.status === 'succeeded') void reload(); }); }, 2000);
     return () => { clearInterval(timer); c.abort(); };
   }, [pending, refresh, reload]);
-  const start = async () => { setCopied(false); const f = await actions.run('Log in', () => connectionAction<CodexFlow>(csrf, connection.id, 'login')); if (f) setFlow(f); };
-  const cancel = async () => { const f = await actions.run('Cancel login', () => connectionAction<CodexFlow | null>(csrf, connection.id, 'cancelLogin')); if (f !== null) setFlow(f); };
+  const start = async () => { setCopied(false); setCode(''); setSubmitError(null); const f = await actions.run('Log in', () => connectionAction<LoginFlow>(csrf, connection.id, 'login')); if (f) setFlow(f); };
+  const cancel = async () => { const f = await actions.run('Cancel login', () => connectionAction<LoginFlow | null>(csrf, connection.id, 'cancelLogin')); if (f !== null) setFlow(f); };
   const logout = async () => {
     const r = await actions.run('Log out', () => connectionAction(csrf, connection.id, 'logout'), () => `${connection.accountName} logged out`);
     setConfirmLogout(false);
     if (r) { setFlow(null); await refresh(); await reload(); }
   };
-  const copy = async () => { if (!flow) return; try { await navigator.clipboard.writeText(flow.userCode); setCopied(true); } catch { setCopied(false); } };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!flow || !code.trim() || actions.busy) return;
+    setSubmitError(null);
+    const result = await actions.run('Submit login', () => connectionAction<LoginFlow>(csrf, connection.id, 'submitLogin', { flowId: flow.flowId, code: code.trim() }));
+    if (result) {
+      setFlow(result);
+      setSubmitError(result.message ?? null);
+      if (result.status === 'succeeded') { setCode(''); await refresh(); await reload(); }
+    }
+  };
+  const copy = async () => { if (!flow?.userCode) return; try { await navigator.clipboard.writeText(flow.userCode); setCopied(true); } catch { setCopied(false); } };
   const live = !status ? 'Checking login…'
     : pending ? 'Waiting for authorization in the browser…'
     : flow?.status === 'failed' || flow?.status === 'expired' ? (flow.message ?? 'Login failed')
     : status.loggedIn ? 'Logged in' : status.needsLogin && status.expiresAt ? 'Login expired; log in again' : 'Not logged in';
-  return <section className="ssh-card-section models-login" aria-label={`Codex login for ${connection.accountName}`}>
+  return <section className="ssh-card-section models-login" aria-label={`${providerLabel} login for ${connection.accountName}`}>
     <p className="settings-note" role="status" aria-live="polite">{live}</p>
     {pending && flow && <div className="models-login-code">
-      <p>Open <a href={flow.verificationUri} target="_blank" rel="noopener noreferrer">{flow.verificationUri}</a> and enter the code:</p>
-      <p><code aria-label="One-time code">{flow.userCode}</code> <Button variant="ghost" onClick={() => { void copy(); }}>{copied ? 'Copied' : 'Copy code'}</Button></p>
+      {flow.kind === 'authorization-code' ? <>
+        <p><a href={flow.authorizationUrl} target="_blank" rel="noopener noreferrer">Open {providerLabel} authorization</a></p>
+        <p className="settings-note">{flow.callbackListening ? 'Local callback is listening. Login completes automatically when the browser is on this machine; otherwise paste the callback URL below.' : 'Local callback is unavailable. Paste the callback URL from your browser’s address bar, even if that page did not load.'}</p>
+        <form className="ssh-form" onSubmit={event => { void submit(event); }} aria-label="Submit authorization code">
+          <Field label="Callback URL or authorization code" value={code} onChange={event => setCode(event.target.value)} autoComplete="off" spellCheck={false} hint="Paste the complete callback URL or the code returned by the provider." />
+          {submitError && <p role="alert" className="settings-note">{submitError}</p>}
+          <Button type="submit" disabled={actions.busy || !code.trim()}>Submit code</Button>
+        </form>
+      </> : <>
+        <p>Open <a href={flow.verificationUri} target="_blank" rel="noopener noreferrer">{flow.verificationUri}</a> and enter the code:</p>
+        <p><code aria-label="One-time code">{flow.userCode}</code> <Button variant="ghost" onClick={() => { void copy(); }}>{copied ? 'Copied' : 'Copy code'}</Button></p>
+      </>}
       <p className="settings-field-hint">Expires {formatTime(flow.expiresAt)}</p>
     </div>}
     {confirmLogout ? <div className="settings-confirm" role="group" aria-label="Confirm logout">
-      <p className="settings-note">Deletes the stored Codex tokens of <b>{connection.accountName}</b>.</p>
+      <p className="settings-note">Deletes the stored {providerLabel} tokens of <b>{connection.accountName}</b>.</p>
       <div className="ssh-form-actions"><Button variant="ghost" onClick={() => setConfirmLogout(false)}>Cancel</Button><Button className="button--danger" disabled={actions.busy} onClick={() => { void logout(); }}>Log out</Button></div>
     </div> : <div className="ssh-form-actions">
       {pending ? <Button variant="ghost" disabled={actions.busy} onClick={() => { void cancel(); }}>Cancel login</Button>

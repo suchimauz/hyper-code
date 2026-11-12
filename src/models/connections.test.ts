@@ -151,10 +151,10 @@ describe("models test/listModels/usage/action", () => {
 
     test("provider usage is normalized and cached", async () => {
         let n = 0;
-        const { ctx, create } = await setup({ usage: async () => { n++; return { status: "available", checkedAt: 0, windows: [{ label: "5h", usedPercent: 140, resetAt: 5 }], balance: { amount: 3, currency: "USD" } }; } });
+        const { ctx, create } = await setup({ usage: async () => { n++; return { status: "available", plan: "Max", checkedAt: 0, windows: [{ label: "5h", usedPercent: 140, resetAt: 5 }], balance: { amount: 3, currency: "USD" } }; } });
         const c = await create();
         const u = await ctx.fns.models.usage({ id: c.id });
-        expect(u).toMatchObject({ status: "available", windows: [{ label: "5h", usedPercent: 100, resetAt: 5 }], balance: { amount: 3, currency: "USD" } });
+        expect(u).toMatchObject({ status: "available", plan: "Max", windows: [{ label: "5h", usedPercent: 100, resetAt: 5 }], balance: { amount: 3, currency: "USD" } });
         await ctx.fns.models.usage({ id: c.id });
         expect(n).toBe(1);
         await ctx.fns.models.usage({ id: c.id, refresh: true });
