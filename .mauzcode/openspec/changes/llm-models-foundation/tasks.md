@@ -36,8 +36,10 @@ Verification (block 3): migration `20370201120000_llm_connections` applied; `inf
 
 ## 4. Custom provider
 
-- [ ] 4.1 Implement `models.customProtocol` (models endpoint + minimal generation per `openai-chat`, `openai-responses`, `anthropic`, `gemini`, protocol-specific auth headers) and verify unit tests against a local mock server for all four protocols
-- [ ] 4.2 Implement `src/models/$modelProvider_custom.ts` (fields, all transports, url validation, discovery merged with manual models, test reasons `models-ok`/`generation-failed`, no usage) and verify unit tests for each spec scenario
+- [x] 4.1 Implement `models.customProtocol` (models endpoint + minimal generation per `openai-chat`, `openai-responses`, `anthropic`, `gemini`, protocol-specific auth headers) and verify unit tests against a local mock server for all four protocols
+- [x] 4.2 Implement `src/models/$modelProvider_custom.ts` (fields, all transports, url validation, discovery merged with manual models, test reasons `models-ok`/`generation-failed`, no usage) and verify unit tests for each spec scenario
+
+Verification (block 4): 10 custom tests passed in an isolated Bun subprocess executing the test bodies with `bun:test` assertions and a local HTTP mock for all four protocols; 25 existing transport tests passed with the same harness. Stock `bun test` currently exits 0 after its version banner even for a trivial test, so its exit code is not claimed as a successful test run. Harnesses and outputs are in `.mauzcode/tmp/eb/`. `models.customProtocol` created through createFunction, hot-reloaded and strict docs/typecheck validated. Custom declaration registered through the standard modelProvider loader and appears in the live catalogue. Existing live scanner retains a stale static classify import and misclassifies camelCase modelProvider declarations on namespace reload; fresh test contexts classify/load the declaration correctly. No framework changes or restart. Whole-project tsgo still fails on existing files, with no errors in the three new files; quality retains 8 pre-existing unresolved errors and a stale-index dead warning for this declaration. Strict OpenSpec validation passes. No legacy LLM or UI files changed by this block.
 
 ## 5. UI SDK slot
 
