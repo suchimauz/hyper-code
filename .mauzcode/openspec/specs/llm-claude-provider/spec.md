@@ -1,7 +1,7 @@
 # llm-claude-provider Specification
 
 ## Purpose
-TBD - created by archiving change add-claude-provider. Update Purpose after archive.
+Connect a Claude subscription as a models connection: native PKCE login through the selected transport, encrypted rotating tokens, Claude Code-compatible requests, prompt caching, native compaction, usage and safe error classification.
 
 ## Requirements
 

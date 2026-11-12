@@ -115,7 +115,7 @@ Connection cards and the add-connection form SHALL show the brand logo of known 
 - **THEN** its card shows the generic plug icon instead of a brand logo
 
 ### Requirement: Provider login panel
-For a connection whose provider requires login the Models tab SHALL offer a login panel matching the provider's flow kind, with live status and a cancel button. For the device-code flow (codex) it SHALL show the verification link and the one-time code with a copy button. For the authorization-code flow (claude) it SHALL show the authorization link, whether the local callback is listening, and a field to paste the callback URL or code, and SHALL show a submission error without clearing the field. The panel SHALL also offer logout with confirmation and show when login is required.
+For a connection whose provider requires login the Models tab SHALL offer a login panel matching the provider's flow kind, with live status, a cancel button, logout with confirmation and an indication when login is required. The device-code flow (codex) SHALL show the verification link and a copyable one-time code; the authorization-code flow (claude) SHALL show the authorization link, local callback status and a paste field that keeps its value on a submission error.
 
 #### Scenario: Login flow
 - **WHEN** the owner starts login on a codex connection
