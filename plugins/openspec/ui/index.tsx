@@ -71,6 +71,7 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
   const [selected, setSelected] = useState<string | null>(typeof item.state.selected === 'string' ? item.state.selected : null);
   const [docId, setDocId] = useState<string | null>(typeof item.state.doc === 'string' ? item.state.doc : null);
   const [open, setOpen] = useState(docId !== null);
+  const documentGeneration = useRef(0);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [doc, setDoc] = useState<Doc | null>(null);
   const [error, setError] = useState(''), [docError, setDocError] = useState('');
@@ -96,14 +97,21 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
   const entries = entriesOf(snapshot, section);
   const known = new Set(entriesOf(snapshot, 'changes').concat(entriesOf(snapshot, 'specs'), entriesOf(snapshot, 'archive')).flatMap(e => e.artifacts.map(a => a.id)));
   const missing = !!snapshot && docId !== null && !known.has(docId);
+  // Absence alone is not incompatibility: removed artifacts must remain unavailable,
+  // and a removed change may be followed into Archive by the snapshot effect below.
+  const docSection = docId?.startsWith('change:') ? 'changes' : docId?.startsWith('spec:') ? 'specs' : docId?.startsWith('archive:') ? 'archive' : null;
+  const incompatible = !!snapshot && ((docSection !== null && docSection !== section) ||
+    (!!selected && !entries.some(e => e.id === selected) && SECTIONS.some(s => s.id !== section && entriesOf(snapshot, s.id).some(e => e.id === selected))) ||
+    (!!selected && !!docId && entries.some(e => e.id !== selected && e.artifacts.some(a => a.id === docId))));
 
   useEffect(() => {
     let alive = true;
+    const generation = ++documentGeneration.current;
     setDocError('');
-    if (!docId || !snapshot || missing) { setDoc(null); return; }
-    requestJson<Doc>(base + '&op=doc&id=' + encodeURIComponent(docId)).then(data => { if (alive) setDoc(data); }).catch(e => { if (alive) { setDoc(null); setDocError(errorText(e)); } });
+    if (!docId || !snapshot || missing || incompatible) { setDoc(null); return; }
+    requestJson<Doc>(base + '&op=doc&id=' + encodeURIComponent(docId)).then(data => { if (alive && generation === documentGeneration.current) setDoc(data); }).catch(e => { if (alive && generation === documentGeneration.current) { setDoc(null); setDocError(errorText(e)); } });
     return () => { alive = false; };
-  }, [base, docId, tick, snapshot?.key, missing]);
+  }, [base, docId, tick, snapshot?.key, missing, incompatible]);
 
   const keyRef = useRef<string | undefined>(undefined);
   keyRef.current = snapshot?.key;
@@ -155,7 +163,20 @@ export function Workspace({ context, item }: ExtensionCanvasProps) {
 
   useEffect(() => { const i = entries.findIndex(e => e.id === selected); setActive(i >= 0 ? i : 0); }, [section, snapshot]);
 
-  const switchSection = (next: Section) => { setSection(next); save({ section: next }); };
+  const clearSelection = (next: Section) => {
+    ++documentGeneration.current;
+    setSection(next); setSelected(null); setDocId(null); setOpen(false);
+    setDoc(null); setDocError('');
+    save({ section: next, selected: null, doc: null });
+  };
+  useEffect(() => {
+    if (incompatible) clearSelection(section);
+  }, [snapshot, incompatible, section]);
+
+  const switchSection = (next: Section) => {
+    if (next === section) return;
+    clearSelection(next);
+  };
   const pick = (entry: Entry) => {
     const nextDoc = entry.artifacts.find(a => a.id === docId)?.id ?? entry.artifacts[0]?.id ?? null;
     setSelected(entry.id); setDocId(nextDoc); setOpen(true);

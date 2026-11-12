@@ -40,6 +40,88 @@ describe('openspec plugin UI', () => {
     expect(registry.canvasLaunchers[0].open).toBe(openWorkspace);
   });
 
+  const selections = [
+    { section: 'changes', label: 'Changes', selected: 'add-x', doc: 'change:add-x:proposal' },
+    { section: 'specs', label: 'Specs', selected: 'spec:auth', doc: 'spec:auth' },
+    { section: 'archive', label: 'Archive', selected: '2026-11-12-add-x', doc: 'archive:2026-11-12-add-x:proposal' },
+  ];
+  const saves = () => request.mock.calls.filter(([url]) => url === '/canvas/ab/item/7');
+  for (const from of selections) for (const to of selections.filter(s => s !== from)) for (const input of ['mouse', 'keyboard']) {
+    it(`resets ${from.section} to ${to.section} by ${input} and reopens empty`, async () => {
+      const original = request.getMockImplementation()!;
+      request.mockImplementation((url, opts) => url.includes('op=snapshot') ? Promise.resolve({ ...snapshot(), archive: [addX('archive', '2026-11-12-add-x')] }) : original(url, opts));
+      const view = render(<Workspace context={ctx} item={item(from)} />); await settle();
+      expect(screen.getByRole('article')).toBeInTheDocument();
+      const target = screen.getByRole('tab', { name: to.label });
+      if (input === 'mouse') fireEvent.click(target);
+      else {
+        const key = to.section === 'changes' ? 'Home' : to.section === 'archive' ? 'End' : from.section === 'changes' ? 'ArrowRight' : 'ArrowLeft';
+        fireEvent.keyDown(screen.getByRole('tab', { name: from.label }), { key });
+        expect(document.activeElement).toBe(target);
+      }
+      await settle();
+      expect(screen.queryByRole('article')).not.toBeInTheDocument();
+      expect(view.container.querySelector('.osv-body')).toHaveAttribute('data-open', 'false');
+      expect(screen.getByText('Select an item to read it.')).toBeInTheDocument();
+      expect(screen.getAllByRole('option').every(o => o.getAttribute('aria-selected') === 'false')).toBe(true);
+      const state = { section: to.section, selected: null, doc: null };
+      expect(saves()).toEqual([['/canvas/ab/item/7', { method: 'POST', body: { state } }]]);
+      view.unmount(); render(<Workspace context={ctx} item={item(state)} />); await settle();
+      expect(screen.getByRole('tab', { name: to.label })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    });
+  }
+
+  it('keeps active-tab selection but clears it for empty Archive', async () => {
+    const view = render(<Workspace context={ctx} item={item(selections[0])} />); await settle();
+    fireEvent.click(screen.getByRole('tab', { name: 'Changes' }));
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Changes' }), { key: 'Home' }); await settle();
+    expect(screen.getByRole('article')).toBeInTheDocument();
+    expect(saves()).toHaveLength(0);
+    fireEvent.click(screen.getByRole('tab', { name: 'Archive' })); await settle();
+    expect(screen.getByText('Archive is empty.')).toBeInTheDocument();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(view.container.querySelector('.osv-body')).toHaveAttribute('data-open', 'false');
+  });
+
+  it.each([
+    { section: 'specs', selected: 'add-x', doc: 'change:add-x:proposal' },
+    { section: 'specs', selected: 'add-claude-provider', doc: 'change:add-claude-provider:proposal' },
+    { section: 'specs', selected: 'add-x', doc: null },
+    { section: 'changes', selected: 'fix-y', doc: 'change:add-x:proposal' },
+  ])('repairs incompatible persisted state $selected / $doc', async state => {
+    const view = render(<Workspace context={ctx} item={item(state)} />); await settle();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(view.container.querySelector('.osv-body')).toHaveAttribute('data-open', 'false');
+    expect(saves()).toEqual([['/canvas/ab/item/7', { method: 'POST', body: { state: { section: state.section, selected: null, doc: null } } }]]);
+    expect(request.mock.calls.some(([url]) => url.includes('op=doc'))).toBe(false);
+  });
+
+  it.each(['resolve', 'reject'])('ignores stale document %s after navigation', async outcome => {
+    let resolve!: (value: unknown) => void, reject!: (reason: Error) => void;
+    const pending = new Promise((yes, no) => { resolve = yes; reject = no; });
+    const original = request.getMockImplementation()!;
+    request.mockImplementation((url, opts) => url.includes('op=doc') ? pending : original(url, opts));
+    const view = render(<Workspace context={ctx} item={item(selections[0])} />); await settle();
+    fireEvent.click(screen.getByRole('tab', { name: 'Specs' }));
+    await act(async () => {
+      if (outcome === 'resolve') resolve({ id: selections[0].doc, title: 'stale', html: '<p>stale document</p>', mtime: 1 });
+      else reject(new Error('stale document error'));
+    });
+    expect(screen.queryByText(/stale document/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(view.container.querySelector('.osv-body')).toHaveAttribute('data-open', 'false');
+  });
+
+  it('clears an existing document error on navigation', async () => {
+    const original = request.getMockImplementation()!;
+    request.mockImplementation((url, opts) => url.includes('op=doc') ? Promise.reject(new Error('document failed')) : original(url, opts));
+    render(<Workspace context={ctx} item={item(selections[0])} />); await settle();
+    expect(screen.getByText(/document failed/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Specs' })); await settle();
+    expect(screen.queryByText(/document failed/)).not.toBeInTheDocument();
+  });
+
   it('opens the workspace tab in one server request', async () => {
     request.mockResolvedValueOnce({ id: 15 });
     await expect(openWorkspace(ctx)).resolves.toEqual({ id: 15 });
@@ -63,7 +145,7 @@ describe('openspec plugin UI', () => {
     expect(screen.getByRole('tab', { name: 'Specs' })).toHaveAttribute('aria-selected', 'true');
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Specs' }));
     expect(screen.getByRole('option', { name: /auth/ })).toBeInTheDocument();
-    expect(request).toHaveBeenCalledWith('/canvas/ab/item/7', { method: 'POST', body: { state: { section: 'specs' } } });
+    expect(request).toHaveBeenCalledWith('/canvas/ab/item/7', { method: 'POST', body: { state: { section: 'specs', selected: null, doc: null } } });
   });
 
   it('moves through the listbox, opens a document and shows progress', async () => {
