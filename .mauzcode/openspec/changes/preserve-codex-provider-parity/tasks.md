@@ -39,7 +39,7 @@ All items below describe future implementation, not work completed by the specif
 
 ## 6. Separately authorized live acceptance
 
-> Blocked: requires explicit account/connection, model and request/token budget approval. No live traffic was sent; offline evidence is in `src/models/codexParity.test.ts` and `src/models/codex.test.ts`.
+> Partial: a run on the SDK side only (gpt-6-luna, user-approved) is recorded in `live-acceptance.md`. Still open: the legacy-client comparison, conclusive cache evidence and an explicit budget. Offline evidence is in `src/models/codexParity.test.ts` and `src/models/codex.test.ts`.
 
 - [ ] 6.1 Discover safe existing credential references and obtain explicit account/connection, model and request/token budget approval before live traffic; record authorization scope without credential values and keep this task incomplete if unavailable.
 - [ ] 6.2 Run approved isolated normal/tool-continuation/compact/checkpoint-replay sequences through independent legacy and SDK clients on the same model and comparable account conditions; verify correctness and SDK independence without changing user conversations.
