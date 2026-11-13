@@ -185,7 +185,6 @@ export const styles = `:root{--diff-background-color:initial;--diff-text-color:i
 .git-skeleton span:nth-child(3n+2){width:72%}.git-skeleton span:nth-child(3n){width:48%}
 .git-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:40px 20px;color:var(--git-muted);text-align:center}
 .git-empty p{margin:0}
-.git-launcher{align-items:center;justify-content:center}
 
 @keyframes git-spin{to{transform:rotate(360deg)}}
 @keyframes git-pulse{50%{opacity:.45}}

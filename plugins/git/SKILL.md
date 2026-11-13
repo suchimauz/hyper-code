@@ -5,7 +5,7 @@ description: Review live Git diffs and history locally or over SSH, save comment
 
 # Git Canvas
 
-Open `gitUi.repository` with `{ dir: absoluteProjectDirectory, host: "local" }` or an explicit SSH alias. The Git launcher uses the chat workspace and pins its directory and host to the durable Canvas item; reopening the same target reuses it. Changing the chat workspace does not change an existing tab.
+Open `gitUi.repository` with `{ dir: absoluteProjectDirectory, host: "local" }` or an explicit SSH alias. The Canvas Start Git launcher is one-step: its public `open` callback POSTs to the authorized, CSRF-protected `/gitUi?agentId=…` endpoint, which derives the chat workspace host and directory server-side, pins them to the durable `gitUi.repository` item and returns that final item (its `id` selects the tab). No intermediate launcher tab is created; concurrent clicks share one request and reopening the same target reuses its tab. Opening errors stay on the Start page with no placeholder tab and no fallback to another host or directory; other tabs are never closed. Changing the chat workspace does not change an existing tab.
 
 Shows staged, unstaged and untracked files, unified/split highlighted diffs, and fifty-commit pages of HEAD history. Root commits compare with an empty tree; merges compare with their first parent. Binary files, conflicts, submodules, missing shallow parents and oversized diffs are explicit non-text states. All repository operations are read-only; no staging, commits, branch operations, fetch or pushes.
 

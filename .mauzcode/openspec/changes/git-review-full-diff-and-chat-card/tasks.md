@@ -31,8 +31,8 @@ These tasks are for the subsequent implementation stage, not the approved artifa
 
 ## 5. One-step Canvas launch
 
-- [ ] 5.1 Replace Git's intermediate component launcher with the public asynchronous open callback pattern used by OpenSpec; verify the authorized endpoint returns the final repository item ID and update launcher documentation.
-- [ ] 5.2 Add tests for first launch, repeat activation, concurrent clicks, local/SSH target identity and opening errors; verify exactly one matching repository tab, no intermediate/orphan tab, no target fallback and no closure of unrelated tabs.
+- [x] 5.1 Replace Git's intermediate component launcher with the public asynchronous open callback pattern used by OpenSpec; verify the authorized endpoint returns the final repository item ID and update launcher documentation.
+- [x] 5.2 Add tests for first launch, repeat activation, concurrent clicks, local/SSH target identity and opening errors; verify exactly one matching repository tab, no intermediate/orphan tab, no target fallback and no closure of unrelated tabs.
 
 ## 6. Commit reference decorations
 

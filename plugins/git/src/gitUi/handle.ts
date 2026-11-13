@@ -1,6 +1,8 @@
 /**
  * Serve authenticated Git reads, comment mutations and workspace-bound tab opening.
  * Authorize the agent before resolving pinned targets; require CSRF for every POST.
+ * POST without op is the one-step Canvas launcher: it opens or reactivates the repository item pinned to the
+ * agent's current workspace host and directory and returns that final Canvas item (use its id), with no fallback target.
  * Browser host and directory fields are never forwarded. All errors are no-store JSON.
  * @param opts.req Incoming same-origin JSON transport request.
  */

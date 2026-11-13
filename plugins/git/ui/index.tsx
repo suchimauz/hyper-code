@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ApiError, requestJson, useLiveSubscription, type ExtensionCanvasProps, type ExtensionLauncherProps, type UiExtension } from '@mauzcode/ui';
+import { ApiError, requestJson, useLiveSubscription, type ExtensionCanvasProps, type ExtensionContext, type UiExtension } from '@mauzcode/ui';
 import { CommentChips, type CommentActions } from './comments';
 import { DiffView } from './diff';
 import { AggregateDiff, blockKey, type AggregateSection, type CollapseMap } from './aggregate';
@@ -24,23 +24,25 @@ const targetKey = (t: Target | null) => t ? t.group + ':' + (t.hash ?? '') + ':'
 const fileName = (path: string) => path.split('/').pop() || path;
 const fileDir = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
 
-function Launcher({ context }: ExtensionLauncherProps) {
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const sent = useRef(false);
-  const open = () => {
-    if (!context.agentId || busy) return;
-    setError(''); setBusy(true);
-    requestJson('/gitUi?agentId=' + encodeURIComponent(context.agentId), { method: 'POST', body: {} }).catch(e => setError(errorText(e))).finally(() => setBusy(false));
-  };
-  useEffect(() => { if (!sent.current) { sent.current = true; open(); } }, [context.agentId]);
-  return <section className="git-view git-launcher" data-theme={context.theme}><style>{styles}</style>
-    <div className="git-empty"><Icon d={ICONS.branch} size={28} />
-      <p>{error ? '' : 'Git opens in a project-bound Canvas tab.'}</p>
-      {error && <p className="git-inline-alert" role="alert">{error}</p>}
-      <button type="button" className="git-btn git-btn-primary" onClick={open} disabled={busy || !context.agentId}>{busy && <span className="git-spinner" aria-hidden="true" />}Open Git</button>
-    </div>
-  </section>;
+/** In-flight opens keyed by agent: repeated or concurrent activation shares one request and one final tab. */
+const opening = new Map<string, Promise<{ id: number }>>();
+
+/**
+ * One-step Start-page launcher: the authorized, CSRF-protected POST /gitUi opens (or reactivates) the repository tab
+ * pinned to the chat's current workspace host and directory and returns its final Canvas item ID. Errors propagate
+ * to the Start page; no local or placeholder tab is created and no other target is tried.
+ */
+export function openRepository(context: ExtensionContext): Promise<{ id: number }> {
+  const agentId = context.agentId;
+  if (!agentId) return Promise.reject(new Error('Open Git from an agent chat.'));
+  const pending = opening.get(agentId);
+  if (pending) return pending;
+  const request = requestJson<{ id?: unknown }>('/gitUi?agentId=' + encodeURIComponent(agentId), { method: 'POST', body: {} }).then(item => {
+    if (typeof item?.id !== 'number' || !Number.isSafeInteger(item.id) || item.id <= 0) throw new Error('Git did not return a repository tab.');
+    return { id: item.id };
+  }).finally(() => { opening.delete(agentId); });
+  opening.set(agentId, request);
+  return request;
 }
 
 const StatusGlyph = ({ status }: { status: string }) => <span className="git-glyph" data-status={status} title={STATUS_LABEL[status] ?? status}>
@@ -503,7 +505,7 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
 
 const extension: UiExtension = {
   id: 'git', apiVersion: 1,
-  canvasLaunchers: [{ id: 'git', title: 'Git', description: 'Project changes, history and review comments', component: Launcher }],
+  canvasLaunchers: [{ id: 'git', title: 'Git', description: 'Project changes, history and review comments', open: openRepository }],
   canvasKinds: [{ kind: 'gitUi.repository', component: Repository }],
   chatCards: [{ kind: 'git.review', component: ReviewCardDetails }],
 };
