@@ -89,6 +89,7 @@
       "agent": {},
       "cron": {},
       "models": {},
+      "gitUi": {},
       "tsgo": {},
       "procs/http": {
         "port": 3010

@@ -5,13 +5,23 @@
  * Run every hook registered under `name`, in registration order, and return their results.
  * @param opts.name The target name.
  * @param opts.opts Options passed to each registered hook.
+ * @param opts.isolateFailures Run every handler before throwing an AggregateError for failures. Default false preserves fail-fast behavior.
  */
-export default async function (ctx: Context, session: Session | null, opts: { name: string; opts?: any }) {
+export default async function (ctx: Context, session: Session | null, opts: { name: string; opts?: any; isolateFailures?: boolean }) {
     warnIfUndeclared(ctx, opts.name);
     const map = ctx.state.procs?.hooks?.handlers?.[opts.name];
     if (!map) return [];
     const out: any[] = [];
-    for (const fn of map.values()) out.push(await fn(ctx, session, opts.opts ?? {}));
+    const failures: unknown[] = [];
+    for (const fn of [...map.values()]) {
+        try {
+            out.push(await fn(ctx, session, opts.opts ?? {}));
+        } catch (error) {
+            if (!opts.isolateFailures) throw error;
+            failures.push(error);
+        }
+    }
+    if (failures.length) throw new AggregateError(failures, `Hook ${opts.name}: ${failures.length} handler(s) failed`);
     return out;
 }
 

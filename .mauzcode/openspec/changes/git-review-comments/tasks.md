@@ -28,10 +28,10 @@ Block 3 verification: `ui.sendToAgent` is not transaction-compatible (memory mut
 
 ## 4. Archive and delete cleanup
 
-- [ ] 4.1 Core: in `src/session/archive.ts` run `procs.hooks.run({ name: "session.archived", opts: { agentId } })` after a successful UPDATE only; catch and log handler errors; do not run for already archived agents. Update its JSDoc. Run `src/session/archive*.test.ts`.
-- [ ] 4.2 Plugin: `$hook_session.archived.ts` deletes all rows of the agent and emits `gitUi.comments.changed` for each affected (host, dir) key.
-- [ ] 4.3 `gitUi.sweepArchived` deleting rows whose agent is archived; schedule at plugin start and hourly (idempotent registration across reloads).
-- [ ] 4.4 Confirm `session.delete` cascades through the FK; confirm `session.unarchive` restores nothing.
+- [x] 4.1 Core: in `src/session/archive.ts` run `procs.hooks.run({ name: "session.archived", opts: { agentId } })` after a successful UPDATE only; catch and log handler errors; do not run for already archived agents. Update its JSDoc. Run `src/session/archive*.test.ts`.
+- [x] 4.2 Plugin: `$hook_session.archived.ts` deletes all rows of the agent and emits `gitUi.comments.changed` for each affected (host, dir) key.
+- [x] 4.3 `gitUi.sweepArchived` deleting rows whose agent is archived; schedule at plugin start and hourly (idempotent registration across reloads).
+- [x] 4.4 Confirm `session.delete` cascades through the FK; confirm `session.unarchive` restores nothing.
 
 ## 5. Live updates
 

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import archive from './archive';
+import runHooks from '../procs/hooks/run';
 import unarchive from './unarchive';
 import archiveRoute from '../agent/$route_$id_archive_POST';
 import restoreRoute from '../agent/$route_$id_unarchive_POST';
@@ -16,6 +17,7 @@ function fixture() {
     const counts = { messages: 8, events: 3, plans: 1, results: 1 };
     let fail = false, race = false;
     const ctx: any = { state: { agent: { parent: live } }, fns: { procs: { db: {
+        transaction: async ({ fn }: any) => await fn(),
         select: async ({ sql, params }: any) => sql.includes('SELECT id, parent_id') ? [rows.get('child')] : (rows.has(params[0]) ? [{ ...rows.get(params[0]) }] : []),
         run: async ({ sql, params }: any) => {
             calls.push('db');
@@ -32,6 +34,8 @@ function fixture() {
             return { changes: 1 };
         },
     } }, events: { emitAgentsChanged: async () => { calls.push('event'); }, refreshAgentMeta: () => {} }, session: {} } };
+    ctx.fns.procs.hooks = { run: async () => [] };
+    ctx.fns.procs.log = { warn: () => {} };
     ctx.fns.session.archive = (opts: any) => archive(ctx, null, opts);
     ctx.fns.session.unarchive = (opts: any) => unarchive(ctx, null, opts);
     return { ctx, rows, live, calls, counts, fail: () => { fail = true; }, race: () => { race = true; } };
@@ -104,4 +108,41 @@ test('retention skips busy children and does not claim false success', async () 
     f.rows.get('child').next_run_at = null;
     expect(await archiveCompleted(f.ctx, null, { olderThanMs: 0 })).toEqual({ archived: ['child'] });
     expect(f.rows.get('parent').archived_at).toBeNull();
+});
+
+test('archive hook runs after the transition once; failures are logged without failing archive', async () => {
+    for (const failHook of [false, true]) {
+        const f = fixture(); const hooks: any[] = []; const logs: any[] = [];
+        f.ctx.fns.procs.hooks.run = async (opts: any) => {
+            expect(f.rows.get('parent').archived_at).not.toBeNull();
+            hooks.push(opts);
+            if (failHook) throw new Error('cleanup fixture failure');
+        };
+        f.ctx.fns.procs.log.warn = (opts: any) => logs.push(opts);
+        expect(await archive(f.ctx, null, { id: 'parent' })).toEqual({ ok: true });
+        expect(await archive(f.ctx, null, { id: 'parent' })).toEqual({ ok: true });
+        expect(hooks).toEqual([{ name: 'session.archived', opts: { agentId: 'parent' }, isolateFailures: true }]);
+        expect(logs.length).toBe(failHook ? 1 : 0);
+        if (failHook) expect(logs[0].msg).toBe('cleanup fixture failure');
+        expect(f.calls).toEqual(['db', 'event']);
+    }
+});
+
+test('failed archive transition never fires cleanup hook', async () => {
+    const f = fixture(); f.race(); let hooks = 0;
+    f.ctx.fns.procs.hooks.run = async () => { hooks++; };
+    await expect(archive(f.ctx, null, { id: 'parent' })).rejects.toThrow('state changed');
+    expect(hooks).toBe(0);
+});
+test('archive isolates handlers: first failure still runs the second exactly once and succeeds', async () => {
+    const f = fixture(); const calls: string[] = [];
+    f.ctx.state.procs = { hooks: { points: { 'session.archived': {} }, handlers: { 'session.archived': new Map([
+        ['first', async () => { calls.push('first'); throw new Error('first failed'); }],
+        ['second', async () => { calls.push('second'); }],
+    ]) } } };
+    f.ctx.fns.procs.hooks.run = (opts: any) => runHooks(f.ctx, null, opts);
+    expect(await archive(f.ctx, null, { id: 'parent' })).toEqual({ ok: true });
+    expect(await archive(f.ctx, null, { id: 'parent' })).toEqual({ ok: true });
+    expect(calls).toEqual(['first', 'second']);
+    expect(f.rows.get('parent').archived_at).not.toBeNull();
 });

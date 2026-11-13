@@ -1,6 +1,7 @@
 /** Archive one idle conversation without deleting its history, live state, or schedules.
  * Rejects active runs and pending work; callers must explicitly stop work first.
  * Repeated archival succeeds without changing the original archive timestamp. Does not cascade to children.
+ * Fires session.archived only after the first successful transition; cleanup failures are logged, not rolled back.
  */
 export default async function (ctx: Context, _session: Session | null, opts: {
     /** Conversation identifier to hide from active lists. */
@@ -22,6 +23,11 @@ export default async function (ctx: Context, _session: Session | null, opts: {
         params: [Date.now(), id],
     });
     if (!res.changes) throw Object.assign(new Error('Chat state changed while archiving. Refresh and try again.'), { code: 'conflict' });
+    try {
+        await ctx.fns.procs.hooks.run({ name: 'session.archived', opts: { agentId: id }, isolateFailures: true });
+    } catch (error) {
+        ctx.fns.procs.log.warn({ event: 'session.archived.failed', msg: String(error instanceof Error ? error.message : error), agentId: id });
+    }
     // Keep the cache: workspace and other live-only state must survive archive/restore.
     await ctx.fns.events.emitAgentsChanged({ agentId: id, reason: 'archive' });
     return { ok: true };

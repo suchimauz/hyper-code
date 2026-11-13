@@ -1,19 +1,31 @@
 import {test,expect} from 'bun:test';
+import { SQL } from 'bun';
 import {testCtx} from '../../../../src/$test';
 import migration from './$migration_20291016000000_review_comments';
-const names=['commentPath','commentOutdated','ownedItem','commentLines','commentView','commentsChanged','commentMutate','commentCreate','commentUpdate','commentDelete','commentResolve','commentReopen','commentsList','handle','commentsSend','commentToolTarget','gitReviewComments','gitResolveComment'];
+import archiveHook from './$hook_session.archived';
+import sweepArchived from './sweepArchived';
+import unarchive from '../../../../src/session/unarchive';
+import archive from '../../../../src/session/archive';
+import restoringHook from './$hook_session.restoring';
+import runHooks from '../../../../src/procs/hooks/run';
+import deleteSession from '../../../../src/session/delete';
+const names=['cleanupArchivedAgent','commentPath','commentOutdated','ownedItem','commentLines','commentView','commentsChanged','commentMutate','commentCreate','commentUpdate','commentDelete','commentResolve','commentReopen','commentsList','handle','commentsSend','commentToolTarget','gitReviewComments','gitResolveComment'];
 async function fixture(){
  const dbctx=await testCtx();const db=dbctx.fns.procs.db;
  await migration.up(dbctx);
  await db.run({sql:"INSERT INTO agents(id,model,created_at,updated_at) VALUES ('review-a','test',1,1),('review-b','test',1,1)"});
  const events:any[]=[];let calls=0;let closed=false;
  const ctx:any={fns:{procs:{db,events:{emit:({event}:any)=>events.push(event)}},canvas:{list:async({agentId}:any)=>closed?[]:[{id:agentId==='review-a'?1:2,kind:'gitUi.repository',args:{host:'local',dir:'/fixture'}}],authorizeHttp:async()=>null,show:async()=>({id:1})},auth:{verifyCsrf:async()=>true},gitUi:{snapshot:async()=>({files:[{path:'a',group:'unstaged'}]}),commit:async()=>({files:[{path:'a'}]}),checkPath:async({path}:any)=>{if(typeof path!=='string'||path.includes('..'))throw new Error('Invalid path');},diff:async()=>{calls++;return {patch:'@@ -1,2 +1,2 @@\n-old\n+new\n context\n',state:'ok'};}}}};
+ ctx.state={agent:{},procs:{hooks:{points:{'session.archived':{},'session.restoring':{}},handlers:{'session.archived':new Map([['git',archiveHook]]),'session.restoring':new Map([['git',restoringHook]])}}}};
+ ctx.fns.procs.hooks={run:(opts:any)=>runHooks(ctx,null,opts)};
+ ctx.fns.procs.log={warn:()=>{}};
+ ctx.fns.events={emitAgentsChanged:async()=>{}};
  ctx.fns.session={appendUserMessage:(opts:any)=>dbctx.fns.session.appendUserMessage(opts)};
  ctx.fns.agent={current:async()=>({id:'review-a'}),wakeWorker:()=>{}};
  ctx.fns.workspace={get:()=>({agentId:'review-a',host:'',dir:'/fixture'})};
  ctx.fns.procs.events.refresh=()=>{};
  for(const name of names){const fn=(await import('./'+name+'.ts')).default;ctx.fns.gitUi[name]=(opts:any)=>fn(ctx,null,opts);}
- return {ctx,db,events,calls:()=>calls,close:()=>{closed=true;},target:{agentId:'review-a',itemId:1},anchor:{scope:'worktree',commit_hash:null,worktree_group:'unstaged',path:'a',old_path:null,side:'new',line_start:1,line_end:1,line_text:'new'}};
+ return {ctx,db,dbctx,events,calls:()=>calls,close:()=>{closed=true;},target:{agentId:'review-a',itemId:1},anchor:{scope:'worktree',commit_hash:null,worktree_group:'unstaged',path:'a',old_path:null,side:'new',line_start:1,line_end:1,line_text:'new'}};
 }
 test('CRUD, byte limits, timestamps, resolution idempotency, reopen and mutation events',async()=>{
  const f=await fixture(),g=f.ctx.fns.gitUi;
@@ -208,3 +220,117 @@ test('send HTTP uses authorized target and CSRF; append failure leaves unsent ro
  const response=await g.handle({req:request()});expect(response.headers.get('cache-control')).toBe('no-store');expect(await response.json()).toEqual({sent:1});
 });
 
+
+test('archive cleanup removes both statuses, deduplicates repository events and preserves foreign agents; restore cannot revive rows',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ const a=await g.commentCreate({...f.target,anchor:f.anchor,body:'open'});
+ const b=await g.commentCreate({...f.target,anchor:f.anchor,body:'resolved'});await g.commentResolve({...f.target,id:b.comment.id});
+ const c=await g.commentCreate({...f.target,anchor:f.anchor,body:'other repository'});
+ await f.db.run({sql:'UPDATE git_review_comments SET host=?,dir=? WHERE id=?',params:['remote','/elsewhere',c.comment.id]});
+ const foreign=await g.commentCreate({agentId:'review-b',itemId:2,anchor:f.anchor,body:'foreign'});
+ await f.db.run({sql:'UPDATE agents SET archived_at=1 WHERE id=?',params:['review-a']});f.events.length=0;
+ await archiveHook(f.ctx,null,{agentId:'review-a'});
+ expect((await f.db.select({sql:'SELECT id FROM git_review_comments'})).map((r:any)=>r.id)).toEqual([foreign.comment.id]);
+ expect(f.events).toHaveLength(2);expect(new Set(f.events.map(e=>e.key)).size).toBe(2);
+ expect(f.events.every(e=>e.type==='gitUi.comments.changed')).toBe(true);
+ await archiveHook(f.ctx,null,{agentId:'review-a'});expect(f.events).toHaveLength(2);
+ f.ctx.fns.events={emitAgentsChanged:async()=>{}};
+ expect(await unarchive(f.ctx,null,{id:'review-a'})).toEqual({ok:true});
+ expect((await g.commentsList({...f.target,status:'all'})).comments).toEqual([]);
+ expect((await g.commentsList({agentId:'review-b',itemId:2})).comments[0].id).toBe(foreign.comment.id);
+});
+
+test('sweep repairs missed hooks for both statuses and only archived agents; session delete cascades FK',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ await g.commentCreate({...f.target,anchor:f.anchor,body:'open'});
+ const b=await g.commentCreate({...f.target,anchor:f.anchor,body:'resolved'});await g.commentResolve({...f.target,id:b.comment.id});
+ const foreign=await g.commentCreate({agentId:'review-b',itemId:2,anchor:f.anchor,body:'foreign'});
+ await f.db.run({sql:'UPDATE agents SET archived_at=1 WHERE id=?',params:['review-a']});f.events.length=0;
+ expect(await sweepArchived(f.ctx,null,{})).toEqual({deleted:2});expect(f.events).toHaveLength(1);
+ expect(await sweepArchived(f.ctx,null,{})).toEqual({deleted:0});expect(f.events).toHaveLength(1);
+ expect((await f.db.select({sql:'SELECT id FROM git_review_comments'}))[0].id).toBe(foreign.comment.id);
+ f.ctx.fns.events={emitAgentsChanged:async()=>{}};f.ctx.fns.attachments={gc:async()=>{}};
+ expect(await deleteSession(f.ctx,null,{id:'review-b'})).toEqual({ok:true});
+ expect(await f.db.select({sql:'SELECT id FROM git_review_comments'})).toEqual([]);
+});
+
+for (const missed of [false,true]) test(`${missed?'missed':'failed'} archive cleanup cannot expose comments on early restore`,async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ await g.commentCreate({...f.target,anchor:f.anchor,body:'open'});
+ const resolved=await g.commentCreate({...f.target,anchor:f.anchor,body:'resolved'});
+ await g.commentResolve({...f.target,id:resolved.comment.id});
+ const cleanup=g.cleanupArchivedAgent;
+ g.cleanupArchivedAgent=async()=>{throw new Error('cleanup unavailable');};
+ if(missed) await f.db.run({sql:'UPDATE agents SET archived_at=1 WHERE id=?',params:['review-a']});
+ else expect(await archive(f.ctx,null,{id:'review-a'})).toEqual({ok:true});
+ expect((await f.db.select({sql:'SELECT id FROM git_review_comments'}))).toHaveLength(2);
+ await expect(unarchive(f.ctx,null,{id:'review-a'})).rejects.toThrow('handler(s) failed');
+ expect((await f.db.select({sql:'SELECT archived_at FROM agents WHERE id=?',params:['review-a']}))[0].archived_at).not.toBeNull();
+ await expect(g.commentsList(f.target)).rejects.toThrow('unavailable');
+ g.cleanupArchivedAgent=cleanup;
+ expect(await unarchive(f.ctx,null,{id:'review-a'})).toEqual({ok:true});
+ expect(await f.db.select({sql:'SELECT id FROM git_review_comments'})).toEqual([]);
+ expect((await g.commentsList({...f.target,status:'all'})).comments).toEqual([]);
+});
+
+function gate() {
+ let release!: () => void;
+ const wait = new Promise<void>(resolve => { release = resolve; });
+ return { wait, release };
+}
+
+for (const source of ['archive', 'restore', 'sweep'] as const) test(`late ${source} cleanup cannot delete a post-restore comment (Postgres gated interleaving)`, async () => {
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ await g.commentCreate({...f.target,anchor:f.anchor,body:'old open'});
+ const old=await g.commentCreate({...f.target,anchor:f.anchor,body:'old resolved'});
+ await g.commentResolve({...f.target,id:old.comment.id});
+ const pool=new SQL(f.db.url({}),{max:3,prepare:false});
+ const originalPool=f.dbctx.state.procs.db.sql;
+ f.dbctx.state.procs.db.sql=pool;
+ const entered=gate(),resume=gate();
+ let pending:Promise<any>;
+ if(source==='archive') {
+  f.ctx.state.procs.hooks.handlers['session.archived']=new Map([
+   ['gate',async()=>{entered.release();await resume.wait;}],['git',archiveHook],
+  ]);
+  pending=archive(f.ctx,null,{id:'review-a'});
+ } else {
+  await f.db.run({sql:'UPDATE agents SET archived_at=1 WHERE id=?',params:['review-a']});
+  // Distinct async transaction scopes reserve distinct real PostgreSQL connections.
+  const delayedCtx={...f.ctx,fns:{...f.ctx.fns,procs:{...f.ctx.fns.procs,db:{...f.db,select:async(opts:any)=>{
+   if(source==='restore' && opts.sql.includes('FROM agents WHERE id = ? FOR UPDATE')) {
+    entered.release();await resume.wait;
+   }
+   const rows=await f.db.select(opts);
+   if(source==='sweep' && opts.sql.includes('ORDER BY id')) {entered.release();await resume.wait;}
+   return rows;
+  }}}}};
+  pending=source==='restore'?unarchive(delayedCtx,null,{id:'review-a'}):sweepArchived(delayedCtx,null,{});
+ }
+ try {
+  await entered.wait;
+  expect(await unarchive(f.ctx,null,{id:'review-a'})).toEqual({ok:true});
+  expect(await f.db.select({sql:'SELECT id FROM git_review_comments'})).toEqual([]);
+  const fresh=await g.commentCreate({...f.target,anchor:f.anchor,body:'post restore'});
+  resume.release();await pending;
+  expect((await f.db.select({sql:'SELECT id FROM git_review_comments'})).map((r:any)=>r.id)).toEqual([fresh.comment.id]);
+ } finally {resume.release();await pending;f.dbctx.state.procs.db.sql=originalPool;await pool.close();}
+});
+
+test('restore cleanup rolls back both statuses and notifications when a later handler fails',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ await g.commentCreate({...f.target,anchor:f.anchor,body:'open'});
+ const old=await g.commentCreate({...f.target,anchor:f.anchor,body:'resolved'});
+ await g.commentResolve({...f.target,id:old.comment.id});
+ await f.db.run({sql:'UPDATE agents SET archived_at=1 WHERE id=?',params:['review-a']});
+ f.events.length=0;
+ f.ctx.state.procs.hooks.handlers['session.restoring'].set('failure',async()=>{throw new Error('late failure');});
+ await expect(unarchive(f.ctx,null,{id:'review-a'})).rejects.toThrow('handler(s) failed');
+ expect((await f.db.select({sql:'SELECT archived_at FROM agents WHERE id=?',params:['review-a']}))[0].archived_at).not.toBeNull();
+ expect(await f.db.select({sql:'SELECT id FROM git_review_comments'})).toHaveLength(2);
+ expect(f.events).toHaveLength(0);
+ f.ctx.state.procs.hooks.handlers['session.restoring'].delete('failure');
+ await unarchive(f.ctx,null,{id:'review-a'});
+ expect(await f.db.select({sql:'SELECT id FROM git_review_comments'})).toEqual([]);
+ expect(f.events).toHaveLength(1);
+});
