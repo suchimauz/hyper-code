@@ -27,6 +27,33 @@ async function fixture(){
  for(const name of names){const fn=(await import('./'+name+'.ts')).default;ctx.fns.gitUi[name]=(opts:any)=>fn(ctx,null,opts);}
  return {ctx,db,dbctx,events,calls:()=>calls,close:()=>{closed=true;},target:{agentId:'review-a',itemId:1},anchor:{scope:'worktree',commit_hash:null,worktree_group:'unstaged',path:'a',old_path:null,side:'new',line_start:1,line_end:1,line_text:'new'}};
 }
+test('exact IDs intersect ownership and filters, preserve paging and require an open workspace tab',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;const ids:string[]=[];
+ for(let i=0;i<12;i++)ids.push((await g.commentCreate({...f.target,anchor:f.anchor,body:'selected '+i})).comment.id);
+ const unrelated=(await g.commentCreate({...f.target,anchor:f.anchor,body:'unrelated'})).comment.id;
+ const foreign=(await g.commentCreate({agentId:'review-b',itemId:2,anchor:f.anchor,body:'private'})).comment.id;
+ await g.commentResolve({...f.target,id:ids[0]});
+ const requested=[...ids,ids[0].toUpperCase(),foreign,Bun.randomUUIDv7()];
+ const first=await g.gitReviewComments({ids:requested,status:'all'});
+ const second=await g.gitReviewComments({ids:requested,status:'all',page:first.nextPage});
+ expect(first.comments).toHaveLength(10);expect(first.nextPage).toBe(1);expect(second.nextPage).toBeNull();
+ expect([...first.comments,...second.comments].map((c:any)=>c.id).sort()).toEqual([...ids].sort());
+ expect(first.openCount).toBe(12);expect(first.unsentCount).toBe(12);
+ expect((await g.commentsList({...f.target,ids:requested,status:'resolved'})).comments.map((c:any)=>c.id)).toEqual([ids[0]]);
+ expect((await g.commentsList({...f.target,ids:requested})).comments).toHaveLength(11);
+ expect((await g.commentsList({...f.target,ids:requested,status:'all',path:'missing'})).comments).toEqual([]);
+ expect((await g.commentsList({...f.target,ids:[]})).comments).toEqual([]);
+ expect((await g.gitReviewComments({ids:[],status:'all'})).nextPage).toBeNull();
+ expect((await g.commentsList({...f.target,status:'all'})).comments.map((c:any)=>c.id)).toContain(unrelated);
+ for(const invalid of [null,'all',[null],['bad'],[1],Array(501).fill(ids[0])])await expect(g.commentsList({...f.target,ids:invalid})).rejects.toThrow('Invalid comment IDs');
+ await g.commentDelete({...f.target,id:ids[1]});
+ expect((await g.gitReviewComments({ids:[ids[1],foreign],status:'all'})).comments).toEqual([]);
+ f.ctx.fns.workspace.get=()=>({agentId:'review-a',host:'',dir:'/other'});
+ await expect(g.gitReviewComments({ids})).rejects.toThrow('workspace Git tab');
+ f.ctx.fns.workspace.get=()=>({agentId:'review-a',host:'',dir:'/fixture'});f.close();
+ await expect(g.gitReviewComments({ids:[]})).rejects.toThrow('workspace Git tab');
+ await expect(g.commentsList({...f.target,ids:[]})).rejects.toThrow('unavailable');
+});
 test('CRUD, byte limits, timestamps, resolution idempotency, reopen and mutation events',async()=>{
  const f=await fixture(),g=f.ctx.fns.gitUi;
  const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'hello'});
@@ -232,7 +259,13 @@ test('native review schemas reject injected identities and malformed arguments; 
   const rejected=await ctx.fns.tools.call({name,args:{...args,agentId:'foreign'}});expect(rejected.handlerExecuted).toBe(false);expect(rejected.isError).toBe(true);
   const result=await ctx.fns.tools.call({name,args});expect(result.handlerExecuted).toBe(true);expect(result.isError).toBe(true);expect(result.output).toContain('no agent');
  }
- const schema=tools.find((t:any)=>t.wireName==='gitReviewComments')!.parameters;for(const args of [{page:0.5},{status:'bad'}])expect(ctx.fns.tools.validate({schema,args}).ok).toBe(false);
+ const schema=tools.find((t:any)=>t.wireName==='gitReviewComments')!.parameters;
+ // Generic validation handles types, not pattern/maxItems/null. The runtime test above enforces these bounds.
+ expect(schema.properties.ids.maxItems).toBe(500);
+ const uuidPattern=new RegExp(schema.properties.ids.items.pattern);
+ expect(uuidPattern.test(Bun.randomUUIDv7())).toBe(true);expect(uuidPattern.test('bad')).toBe(false);
+ expect(ctx.fns.tools.validate({schema,args:{ids:[]}}).ok).toBe(true);
+ for(const args of [{page:0.5},{status:'bad'},{ids:'bad'},{ids:[1]}])expect(ctx.fns.tools.validate({schema,args}).ok).toBe(false);
 });
 test('send HTTP uses authorized target and CSRF; append failure leaves unsent rows',async()=>{
  const f=await fixture(),g=f.ctx.fns.gitUi;await g.commentCreate({...f.target,anchor:f.anchor,body:'review'});

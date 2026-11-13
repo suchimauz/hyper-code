@@ -4,9 +4,9 @@ These tasks are for the subsequent implementation stage, not the approved artifa
 
 ## 1. Contracts and retrieval
 
-- [ ] 1.1 Read repository guidance, Apple Design and UI SDK architecture; inspect affected runtime slices/callers and chat serialization/grouping; verify a recorded interface map covers ownership, message persistence and work association.
-- [ ] 1.2 Add optional validated IDs filtering to authorized comment retrieval and the agent tool, preserving existing pagination and filters; verify tests cover exact sets, empty/invalid IDs, all statuses, foreign IDs, closed tabs, workspace mismatch and unchanged unfiltered calls.
-- [ ] 1.3 Update tool schema and actionable runtime documentation; verify strict docs validation and typecheck after hot reload.
+- [x] 1.1 Read repository guidance, Apple Design and UI SDK architecture; inspect affected runtime slices/callers and chat serialization/grouping; verify a recorded interface map covers ownership, message persistence and work association.
+- [x] 1.2 Add optional validated IDs filtering to authorized comment retrieval and the agent tool, preserving existing pagination and filters; verify tests cover exact sets, empty/invalid IDs, all statuses, foreign IDs, closed tabs, workspace mismatch and unchanged unfiltered calls.
+- [x] 1.3 Update tool schema and actionable runtime documentation; verify strict docs validation and typecheck after hot reload.
 
 ## 2. Durable references and chat presentation
 
