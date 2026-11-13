@@ -1,1 +1,183 @@
-export const styles=":root{--diff-background-color:initial;--diff-text-color:initial;--diff-font-family:Consolas,Courier,monospace;--diff-selection-background-color:#b3d7ff;--diff-selection-text-color:var(--diff-text-color);--diff-gutter-insert-background-color:#d6fedb;--diff-gutter-insert-text-color:var(--diff-text-color);--diff-gutter-delete-background-color:#fadde0;--diff-gutter-delete-text-color:var(--diff-text-color);--diff-gutter-selected-background-color:#fffce0;--diff-gutter-selected-text-color:var(--diff-text-color);--diff-code-insert-background-color:#eaffee;--diff-code-insert-text-color:var(--diff-text-color);--diff-code-delete-background-color:#fdeff0;--diff-code-delete-text-color:var(--diff-text-color);--diff-code-insert-edit-background-color:#c0dc91;--diff-code-insert-edit-text-color:var(--diff-text-color);--diff-code-delete-edit-background-color:#f39ea2;--diff-code-delete-edit-text-color:var(--diff-text-color);--diff-code-selected-background-color:#fffce0;--diff-code-selected-text-color:var(--diff-text-color);--diff-omit-gutter-line-color:#cb2a1d;}.diff{background-color:var(--diff-background-color);border-collapse:collapse;color:var(--diff-text-color);table-layout:fixed;width:100%;}.diff::-moz-selection{background-color:#b3d7ff;background-color:var(--diff-selection-background-color);color:var(--diff-text-color);color:var(--diff-selection-text-color);}.diff::selection{background-color:#b3d7ff;background-color:var(--diff-selection-background-color);color:var(--diff-text-color);color:var(--diff-selection-text-color);}.diff td{padding-bottom:0;padding-top:0;vertical-align:top;}.diff-line{font-family:Consolas,Courier,monospace;font-family:var(--diff-font-family);line-height:1.5;}.diff-gutter>a{color:inherit;display:block;}.diff-gutter{cursor:pointer;padding:0 1ch;text-align:right;-webkit-user-select:none;-moz-user-select:none;user-select:none;}.diff-gutter-insert{background-color:#d6fedb;background-color:var(--diff-gutter-insert-background-color);color:var(--diff-text-color);color:var(--diff-gutter-insert-text-color);}.diff-gutter-delete{background-color:#fadde0;background-color:var(--diff-gutter-delete-background-color);color:var(--diff-text-color);color:var(--diff-gutter-delete-text-color);}.diff-gutter-omit{cursor:default;}.diff-gutter-selected{background-color:#fffce0;background-color:var(--diff-gutter-selected-background-color);color:var(--diff-text-color);color:var(--diff-gutter-selected-text-color);}.diff-code{word-wrap:break-word;padding:0 0 0 .5em;white-space:pre-wrap;word-break:break-all;}.diff-code-edit{color:inherit;}.diff-code-insert{background-color:#eaffee;background-color:var(--diff-code-insert-background-color);color:var(--diff-text-color);color:var(--diff-code-insert-text-color);}.diff-code-insert .diff-code-edit{background-color:#c0dc91;background-color:var(--diff-code-insert-edit-background-color);color:var(--diff-text-color);color:var(--diff-code-insert-edit-text-color);}.diff-code-delete{background-color:#fdeff0;background-color:var(--diff-code-delete-background-color);color:var(--diff-text-color);color:var(--diff-code-delete-text-color);}.diff-code-delete .diff-code-edit{background-color:#f39ea2;background-color:var(--diff-code-delete-edit-background-color);color:var(--diff-text-color);color:var(--diff-code-delete-edit-text-color);}.diff-code-selected{background-color:#fffce0;background-color:var(--diff-code-selected-background-color);color:var(--diff-text-color);color:var(--diff-code-selected-text-color);}.diff-widget-content{vertical-align:top;}.diff-gutter-col{width:7ch;}.diff-gutter-omit{height:0;}.diff-gutter-omit:before{background-color:#cb2a1d;background-color:var(--diff-omit-gutter-line-color);content:\" \";display:block;height:100%;margin-left:4.6ch;overflow:hidden;white-space:pre;width:2px;}.diff-decoration{line-height:1.5;-webkit-user-select:none;-moz-user-select:none;user-select:none;}.diff-decoration-content{font-family:Consolas,Courier,monospace;font-family:var(--diff-font-family);padding:0;}\n.git-view{container-type:inline-size;height:100%;display:flex;flex-direction:column;gap:10px;padding:16px;color:var(--text-primary,#24292f);background:var(--bg-primary,#fff);font:13px system-ui;min-width:0;--diff-background-color:transparent;--diff-text-color:inherit;--diff-gutter-insert-background-color:#d1f1da;--diff-code-insert-background-color:#e4f7e9;--diff-gutter-delete-background-color:#f6cdd1;--diff-code-delete-background-color:#ffebed}.git-view[data-theme=dark]{color:#e1e4e8;background:#181b20;--diff-gutter-insert-background-color:#244333;--diff-code-insert-background-color:#20372c;--diff-gutter-delete-background-color:#522e35;--diff-code-delete-background-color:#3d252b}.git-view header,.git-view nav,.git-pages{display:flex;align-items:center;gap:8px;justify-content:space-between}.git-view header strong{overflow-wrap:anywhere}.git-view small{display:block;color:inherit;opacity:.7;font-size:11px}.git-view button{font:inherit;color:inherit;background:transparent;border:1px solid #8885;border-radius:7px;padding:8px 10px;cursor:pointer;min-height:34px;text-align:left}.git-view button:hover{background:#8882}.git-view button[aria-pressed=true]{background:#4588d528;border-color:#448bd0}.git-view button:focus-visible,.git-patch:focus-visible{outline:2px solid #2684ff;outline-offset:2px}.git-view button:disabled{opacity:.45;cursor:default}.git-view h3{font-size:12px;margin:12px 0 6px;text-transform:capitalize;overflow-wrap:anywhere}.git-view nav span{flex:1}.git-columns{display:grid;grid-template-columns:minmax(200px,28%) minmax(0,1fr);gap:16px;flex:1;min-height:0}.git-columns aside,.git-columns main{overflow:auto;min-width:0}.git-files,.git-commits{list-style:none;margin:0;padding:0}.git-files button,.git-commits button{width:100%;border-color:transparent;overflow-wrap:anywhere}.git-files button{display:flex;gap:8px}.git-status{font:12px monospace;opacity:.7}.git-note{font-size:12px;opacity:.75}.git-patch{overflow:auto;font:12px ui-monospace,monospace}.git-patch .diff{font-family:inherit}.git-patch .token.comment{color:#83919f}.git-patch .token.keyword,.git-patch .token.operator{color:#b16dc4}.git-patch .token.string{color:#318b67}.git-patch .token.function,.git-patch .token.number{color:#5185bf}.git-view pre{white-space:pre;overflow:auto}.git-pages{margin-top:10px}@container(max-width:650px){.git-columns{grid-template-columns:1fr;grid-template-rows:minmax(130px,35%) minmax(180px,1fr)}}@media(max-width:650px){.git-columns{grid-template-columns:1fr;grid-template-rows:minmax(130px,35%) minmax(180px,1fr)}.git-view{padding:10px}.git-view header{align-items:flex-start}}@media(prefers-reduced-motion:reduce){.git-view *{animation:none!important;transition:none!important}}\n";
+/** Scoped Git Canvas styles: react-diff-view 3.3.2 base CSS (MIT) followed by the git-view design mirrored from style.css. */
+export const styles = `:root{--diff-background-color:initial;--diff-text-color:initial;--diff-font-family:Consolas,Courier,monospace;--diff-selection-background-color:#b3d7ff;--diff-selection-text-color:var(--diff-text-color);--diff-gutter-insert-background-color:#d6fedb;--diff-gutter-insert-text-color:var(--diff-text-color);--diff-gutter-delete-background-color:#fadde0;--diff-gutter-delete-text-color:var(--diff-text-color);--diff-gutter-selected-background-color:#fffce0;--diff-gutter-selected-text-color:var(--diff-text-color);--diff-code-insert-background-color:#eaffee;--diff-code-insert-text-color:var(--diff-text-color);--diff-code-delete-background-color:#fdeff0;--diff-code-delete-text-color:var(--diff-text-color);--diff-code-insert-edit-background-color:#c0dc91;--diff-code-insert-edit-text-color:var(--diff-text-color);--diff-code-delete-edit-background-color:#f39ea2;--diff-code-delete-edit-text-color:var(--diff-text-color);--diff-code-selected-background-color:#fffce0;--diff-code-selected-text-color:var(--diff-text-color);--diff-omit-gutter-line-color:#cb2a1d;}.diff{background-color:var(--diff-background-color);border-collapse:collapse;color:var(--diff-text-color);table-layout:fixed;width:100%;}.diff::-moz-selection{background-color:#b3d7ff;background-color:var(--diff-selection-background-color);color:var(--diff-text-color);color:var(--diff-selection-text-color);}.diff::selection{background-color:#b3d7ff;background-color:var(--diff-selection-background-color);color:var(--diff-text-color);color:var(--diff-selection-text-color);}.diff td{padding-bottom:0;padding-top:0;vertical-align:top;}.diff-line{font-family:Consolas,Courier,monospace;font-family:var(--diff-font-family);line-height:1.5;}.diff-gutter>a{color:inherit;display:block;}.diff-gutter{cursor:pointer;padding:0 1ch;text-align:right;-webkit-user-select:none;-moz-user-select:none;user-select:none;}.diff-gutter-insert{background-color:#d6fedb;background-color:var(--diff-gutter-insert-background-color);color:var(--diff-text-color);color:var(--diff-gutter-insert-text-color);}.diff-gutter-delete{background-color:#fadde0;background-color:var(--diff-gutter-delete-background-color);color:var(--diff-text-color);color:var(--diff-gutter-delete-text-color);}.diff-gutter-omit{cursor:default;}.diff-gutter-selected{background-color:#fffce0;background-color:var(--diff-gutter-selected-background-color);color:var(--diff-text-color);color:var(--diff-gutter-selected-text-color);}.diff-code{word-wrap:break-word;padding:0 0 0 .5em;white-space:pre-wrap;word-break:break-all;}.diff-code-edit{color:inherit;}.diff-code-insert{background-color:#eaffee;background-color:var(--diff-code-insert-background-color);color:var(--diff-text-color);color:var(--diff-code-insert-text-color);}.diff-code-insert .diff-code-edit{background-color:#c0dc91;background-color:var(--diff-code-insert-edit-background-color);color:var(--diff-text-color);color:var(--diff-code-insert-edit-text-color);}.diff-code-delete{background-color:#fdeff0;background-color:var(--diff-code-delete-background-color);color:var(--diff-text-color);color:var(--diff-code-delete-text-color);}.diff-code-delete .diff-code-edit{background-color:#f39ea2;background-color:var(--diff-code-delete-edit-background-color);color:var(--diff-text-color);color:var(--diff-code-delete-edit-text-color);}.diff-code-selected{background-color:#fffce0;background-color:var(--diff-code-selected-background-color);color:var(--diff-text-color);color:var(--diff-code-selected-text-color);}.diff-widget-content{vertical-align:top;}.diff-gutter-col{width:7ch;}.diff-gutter-omit{height:0;}.diff-gutter-omit:before{background-color:#cb2a1d;background-color:var(--diff-omit-gutter-line-color);content:" ";display:block;height:100%;margin-left:4.6ch;overflow:hidden;white-space:pre;width:2px;}.diff-decoration{line-height:1.5;-webkit-user-select:none;-moz-user-select:none;user-select:none;}.diff-decoration-content{font-family:Consolas,Courier,monospace;font-family:var(--diff-font-family);padding:0;}
+.git-view{
+ --git-ease:cubic-bezier(.32,.72,0,1);
+ --git-card:var(--surface,light-dark(#fff,#212121));
+ --git-soft:color-mix(in srgb,var(--text,#161616) 5%,transparent);
+ --git-line:var(--line,light-dark(#e9e9e9,#2c2c2c));
+ --git-accent:var(--accent,#d97757);
+ --git-ok:var(--success,#2f9e44);
+ --git-bad:var(--tool-error,#e5484d);
+ --git-muted:var(--text-tertiary,#8a8a8a);
+ --diff-font-family:var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);
+ --diff-background-color:transparent;--diff-text-color:inherit;
+ --diff-selection-background-color:color-mix(in srgb,var(--git-accent) 18%,transparent);
+ --diff-gutter-selected-background-color:color-mix(in srgb,var(--git-accent) 30%,transparent);
+ --diff-code-insert-background-color:color-mix(in srgb,var(--git-ok) 12%,transparent);
+ --diff-gutter-insert-background-color:color-mix(in srgb,var(--git-ok) 20%,transparent);
+ --diff-code-delete-background-color:color-mix(in srgb,var(--git-bad) 11%,transparent);
+ --diff-gutter-delete-background-color:color-mix(in srgb,var(--git-bad) 19%,transparent);
+ --diff-code-selected-background-color:color-mix(in srgb,var(--git-accent) 16%,transparent);
+ --diff-omit-gutter-line-color:var(--git-bad);
+ container-type:inline-size;container-name:git;display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;
+ color:var(--text,light-dark(#161616,#fdfdfd));background:var(--bg,light-dark(#fff,#191919));
+ font-family:var(--font-sans,system-ui,-apple-system,sans-serif);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.git-view[data-theme=light]{color-scheme:light}.git-view[data-theme=dark]{color-scheme:dark}
+.git-view *{box-sizing:border-box}
+.git-view button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.git-view button:disabled{cursor:default;opacity:.5}
+.git-view button:active:not(:disabled){transform:scale(.97);transition-duration:.08s}
+.git-view :focus-visible{outline:2px solid var(--focus-ring,var(--git-accent));outline-offset:2px}
+.git-icon{flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.git-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.git-hint{color:var(--git-muted);font-size:12px}
+.git-note{margin:6px 14px;color:var(--text-secondary,var(--git-muted));font-size:12px}
+
+/* header */
+.git-bar{position:sticky;top:0;z-index:3;display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:10px 14px;
+ background:color-mix(in srgb,var(--bg,Canvas) 78%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--git-line)}
+.git-title{display:flex;align-items:baseline;gap:8px;min-width:0;margin-right:auto}
+.git-title h2{margin:0;font-size:14px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.git-meta{display:flex;align-items:center;gap:6px;min-width:0;color:var(--git-muted);font-size:12px;white-space:nowrap;overflow:hidden}
+.git-branch{display:inline-flex;align-items:center;gap:3px;overflow:hidden;text-overflow:ellipsis}
+.git-host{padding:0 6px;border-radius:6px;background:var(--git-soft)}
+.git-head{font-family:var(--diff-font-family);font-size:11px}
+.git-seg{position:relative;display:grid;grid-template-columns:repeat(var(--n),1fr);padding:3px;border-radius:10px;background:var(--git-soft);isolation:isolate}
+.git-seg-thumb{position:absolute;z-index:-1;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / var(--n));border-radius:7px;
+ background:var(--surface-raised,light-dark(#fff,#2f2f2f));box-shadow:0 1px 2px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.06);
+ transform:translateX(calc(100% * var(--i)));transition:transform .4s var(--git-ease)}
+.git-seg button{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:0;background:none;padding:4px 12px;border-radius:7px;font-size:12px;font-weight:500;color:var(--text-secondary,inherit)}
+.git-seg button[aria-selected=true]{color:var(--text,inherit)}
+.git-badge{min-width:16px;padding:0 5px;border-radius:8px;background:var(--git-accent);color:#fff;font-size:10px;font-weight:600;line-height:16px;text-align:center}
+.git-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.git-live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--git-muted)}
+.git-live-dot{width:7px;height:7px;border-radius:50%;background:var(--git-muted)}
+.git-live[data-state=live] .git-live-dot{background:var(--git-ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--git-ok) 22%,transparent)}
+.git-live[data-state=connecting] .git-live-dot{background:var(--tool-stopped,#d4a72c);animation:git-pulse 1.4s ease-in-out infinite}
+.git-live[data-state=stopped]{color:var(--git-bad)}.git-live[data-state=stopped] .git-live-dot{background:var(--git-bad)}
+.git-icon-btn{display:inline-grid;place-items:center;width:28px;height:28px;border:0;border-radius:8px;background:none}
+.git-icon-btn:hover:not(:disabled){background:var(--hover,var(--git-soft))}
+.git-refresh-glyph{display:inline-grid}.git-refresh-glyph[data-spinning]{animation:git-spin .9s linear infinite}
+.git-btn{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border:1px solid var(--git-line);border-radius:8px;background:var(--git-card);font-size:12px;font-weight:500;white-space:nowrap;transition:background .15s,border-color .15s}
+.git-btn:hover:not(:disabled){background:var(--hover,var(--git-soft))}
+.git-btn-primary{border-color:transparent;background:var(--git-accent);color:#fff!important}
+.git-btn-primary:hover:not(:disabled){background:var(--accent-hover,var(--git-accent));filter:brightness(1.05)}
+.git-btn-quiet{border-color:transparent;background:none}
+.git-btn-danger{border-color:transparent;background:var(--git-bad);color:#fff!important}
+.git-send-status{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--git-ok)}
+.git-send-status[data-kind=error]{color:var(--git-bad)}
+.git-spinner{width:12px;height:12px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:git-spin .7s linear infinite}
+.git-alert{display:flex;align-items:center;gap:8px;margin:8px 14px;padding:8px 12px;border-radius:10px;color:var(--git-bad);background:color-mix(in srgb,var(--git-bad) 9%,transparent)}
+.git-alert span{flex:1}
+.git-inline-alert{margin:6px 0;color:var(--git-bad);font-size:12px}
+
+/* panes */
+.git-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(240px,32%) 1fr}
+.git-list-pane{min-height:0;overflow:auto;border-right:1px solid var(--git-line);padding:6px 6px 16px}
+.git-diff-pane{min-width:0;min-height:0;display:flex;flex-direction:column}
+.git-diff-head{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--git-line)}
+.git-back{display:none}
+.git-diff-title{flex:1;min-width:0}
+.git-diff-title h3{margin:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--diff-font-family)}
+.git-eyebrow{display:block;font-size:11px;color:var(--git-muted);text-transform:uppercase;letter-spacing:.04em}
+.git-diff-scroll{flex:1;min-height:0;overflow:auto}
+
+/* lists */
+.git-list,.git-list ul{list-style:none;margin:0;padding:0}
+.git-group{margin-top:6px}
+.git-group-label{display:flex;align-items:center;gap:6px;padding:6px 10px 4px;font-size:11px;font-weight:600;color:var(--git-muted);text-transform:uppercase;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.git-comment-list .git-group-label{text-transform:none;letter-spacing:0;font-family:var(--diff-font-family);font-weight:500}
+.git-group-count{font-weight:500}
+.git-option{border-radius:8px;padding:6px 10px;cursor:pointer;outline-offset:-2px;transition:background .15s}
+.git-option:hover{background:var(--hover,var(--git-soft))}
+.git-option[aria-selected=true]{background:var(--accent-soft,color-mix(in srgb,var(--git-accent) 14%,transparent))}
+.git-row{display:flex;align-items:center;gap:8px;min-width:0}
+.git-row-text{display:flex;flex-direction:column;min-width:0;flex:1}
+.git-row-text strong{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.git-row-text small{color:var(--git-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.git-glyph{flex:none;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;font:600 10px/1 var(--diff-font-family);background:var(--git-soft)}
+.git-glyph[data-status=A]{color:var(--git-ok)}.git-glyph[data-status=D]{color:var(--git-bad)}.git-glyph[data-status=M]{color:var(--link,#3b82f6)}.git-glyph[data-status=U]{color:var(--git-bad)}
+.git-count{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--git-accent)}
+.git-more{margin:8px 10px}
+.git-commit-files{margin-top:10px;padding-top:6px;border-top:1px solid var(--git-line)}
+.git-commit-files h3{margin:4px 10px;font-size:12px;font-weight:600}
+.git-filter{display:flex;gap:4px;padding:4px 4px 8px}
+.git-filter button{border:0;background:none;padding:3px 10px;border-radius:7px;font-size:12px;color:var(--text-secondary,inherit)}
+.git-filter button[aria-selected=true]{background:var(--git-soft);color:var(--text,inherit);font-weight:500}
+.git-filter-count{color:var(--git-muted);font-variant-numeric:tabular-nums}
+.git-comment-item{display:flex;flex-direction:column;gap:3px;min-width:0;transition:opacity .3s var(--git-ease),transform .3s var(--git-ease)}
+.git-comment-item[data-leaving]{opacity:0;transform:translateX(12px)}
+.git-ghost{pointer-events:none}
+.git-older{display:grid;gap:6px}
+.git-comment-item-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.git-comment-excerpt{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:pre-wrap;word-break:break-word}
+
+/* comments */
+.git-chips{display:inline-flex;gap:4px;flex-wrap:wrap}
+.git-chip{padding:0 6px;border-radius:6px;font-size:11px;line-height:18px;background:var(--git-soft);white-space:nowrap}
+.git-chip[data-kind=open]{color:var(--git-accent)}.git-chip[data-kind=resolved]{color:var(--git-ok)}
+.git-chip[data-kind=outdated]{color:var(--tool-stopped,#b7791f)}.git-chip[data-kind=sent]{color:var(--link,#3b82f6)}
+.git-widget{display:flex;flex-direction:column;gap:8px;padding:8px 12px;background:var(--git-soft);font-family:var(--font-sans,system-ui,sans-serif);white-space:normal}
+.git-comment{padding:10px 12px;border:1px solid var(--git-line);border-radius:10px;background:var(--git-card);box-shadow:0 1px 2px rgba(0,0,0,.04);max-width:760px}
+.git-comment[data-status=resolved]{opacity:.85}
+.git-comment[data-highlight]{border-color:var(--git-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--git-accent) 20%,transparent)}
+.git-comment-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.git-comment-where{color:var(--git-muted);font-size:11px}
+.git-comment-body{margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
+.git-comment-actions{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.git-resolution{display:flex;flex-direction:column;gap:2px;margin:6px 0 0;padding-left:8px;border-left:2px solid var(--git-ok);font-size:12px}
+.git-resolution-by{color:var(--git-ok)}.git-resolution-note{color:var(--text-secondary,inherit);white-space:pre-wrap}
+.git-composer-wrap{max-width:760px}.git-composer-wrap>.git-hint{margin:0 0 4px}
+.git-composer{display:flex;flex-direction:column;gap:6px;max-width:760px}
+.git-composer textarea{width:100%;min-height:56px;resize:vertical;padding:8px 10px;border:1px solid var(--git-line);border-radius:10px;background:var(--git-card);color:inherit;font:inherit;line-height:1.45}
+.git-composer textarea:focus-visible{outline:none;border-color:var(--git-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--git-accent) 22%,transparent)}
+.git-composer textarea[aria-invalid=true]{border-color:var(--git-bad)}
+.git-composer-bar{display:flex;align-items:center;gap:6px}.git-composer-bar .git-hint{margin-right:auto}
+
+/* diff */
+.git-patch{padding:0 0 24px}
+.git-patch .diff{font-size:12px;line-height:1.55}
+.git-patch .diff-gutter{padding:0;width:1%;min-width:44px;vertical-align:top}
+.git-gutter-btn{position:relative;display:block;width:100%;min-width:44px;padding:0 8px 0 18px;border:0;background:none;text-align:right;font:inherit;color:var(--git-muted);cursor:pointer;user-select:none}
+.git-gutter-plus{position:absolute;left:3px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:4px;background:var(--git-accent);color:#fff;font:600 11px/14px var(--font-sans,system-ui);text-align:center;opacity:0;transform:scale(.8);transition:opacity .12s,transform .12s}
+.git-patch tr:hover .git-gutter-plus,.git-gutter-btn:focus-visible .git-gutter-plus{opacity:1;transform:none}
+.git-gutter-btn[aria-pressed=true]{color:var(--text,inherit);font-weight:600}
+.git-gutter-btn:focus-visible{outline-offset:-2px}
+.git-patch[data-selecting] .git-gutter-btn{cursor:ns-resize}
+.git-patch .diff-widget-content{padding:0;border-top:1px solid var(--git-line);border-bottom:1px solid var(--git-line)}
+.git-patch .diff-hunk-header{background:var(--git-soft);color:var(--git-muted)}
+.git-select-hint{position:sticky;top:0;z-index:2;margin:0;padding:4px 14px;background:color-mix(in srgb,var(--bg,Canvas) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.git-detached{margin:10px 14px;padding:10px;border:1px dashed var(--git-line);border-radius:10px;display:flex;flex-direction:column;gap:8px}
+.git-detached h4{margin:0;font-size:12px;font-weight:600}
+.git-raw{margin:0;padding:12px 14px;font:12px/1.5 var(--diff-font-family);white-space:pre-wrap}
+.git-patch .token.comment,.git-patch .token.prolog{color:var(--git-muted)}
+.git-patch .token.keyword,.git-patch .token.atrule{color:light-dark(#a626a4,#c678dd)}
+.git-patch .token.string,.git-patch .token.char{color:light-dark(#50a14f,#98c379)}
+.git-patch .token.number,.git-patch .token.boolean{color:light-dark(#986801,#d19a66)}
+.git-patch .token.function,.git-patch .token.class-name{color:light-dark(#4078f2,#61afef)}
+.git-patch .token.operator,.git-patch .token.punctuation{color:inherit}
+
+/* states */
+.git-skeleton{display:flex;flex-direction:column;gap:10px;padding:14px}
+.git-skeleton span{height:12px;border-radius:6px;background:var(--git-soft);animation:git-pulse 1.4s ease-in-out infinite}
+.git-skeleton span:nth-child(3n+2){width:72%}.git-skeleton span:nth-child(3n){width:48%}
+.git-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:40px 20px;color:var(--git-muted);text-align:center}
+.git-empty p{margin:0}
+.git-launcher{align-items:center;justify-content:center}
+
+@keyframes git-spin{to{transform:rotate(360deg)}}
+@keyframes git-pulse{50%{opacity:.45}}
+
+@container git (max-width:720px){
+ .git-body{grid-template-columns:1fr}
+ .git-list-pane{border-right:0}
+ .git-body[data-open=true] .git-list-pane,.git-body:not([data-open=true]) .git-diff-pane{display:none}
+ .git-back{display:inline-grid}
+ .git-title{flex-basis:100%}
+}
+@media (prefers-reduced-motion:reduce){
+ .git-view *,.git-view *::before,.git-view *::after{animation:none!important;transition:none!important}
+ .git-view button:active:not(:disabled){transform:none}
+}
+`;
