@@ -25,9 +25,9 @@ These tasks are for the subsequent implementation stage, not the approved artifa
 
 ## 4. Integrated acceptance
 
-- [ ] 4.1 Exercise Changes and History through create/send/read/resolve with local and SSH targets; verify no local fallback or Git mutations and that the agent receives only references until it explicitly retrieves comments.
-- [ ] 4.2 Run relevant backend/frontend tests, typechecks and code quality checks; verify changed runtime docs strictly, regenerate types/reload routes when applicable and record results without claiming unrun checks passed.
-- [ ] 4.3 Verify legacy full-text history plus newly persisted reference cards survive reload and the documented rollback retains readable new history; record acceptance against both capability specs.
+- [x] 4.1 Exercise Changes and History through create/send/read/resolve with local and SSH targets; verify no local fallback or Git mutations and that the agent receives only references until it explicitly retrieves comments.
+- [x] 4.2 Run relevant backend/frontend tests, typechecks and code quality checks; verify changed runtime docs strictly, regenerate types/reload routes when applicable and record results without claiming unrun checks passed. Results and failures: [acceptance-block4.md](acceptance-block4.md).
+- [x] 4.3 Verify legacy full-text history plus newly persisted reference cards survive reload and the documented rollback retains readable new history; record acceptance against both capability specs.
 
 ## 5. One-step Canvas launch
 

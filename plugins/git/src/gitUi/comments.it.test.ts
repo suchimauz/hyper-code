@@ -445,3 +445,25 @@ test('Send boundary: 500 open unsent comments (the enforced cap) go in one refer
  expect((await f.db.select({sql:"SELECT count(*)::int AS n FROM git_review_comments WHERE sent_at IS NULL"}))[0].n).toBe(0);
  for(const e of events)expect((await g.reviewCard({agentId:'review-a',eventIdx:Number(e.idx)})).items.every((i:any)=>i.state==='available')).toBe(true);
 });
+
+test('acceptance: persisted legacy and compact history remain readable with sending disabled',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ await f.dbctx.fns.session.appendUserMessage({id:'review-a',text:'Git review comments for local:/fixture (1)\nlegacy body and quote',messageType:'git_review_comments'});
+ const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'PRIVATE acceptance body'});
+ await g.commentsSend(f.target);
+ // Rollback contract: disable the writer, retain decoder, event reader and detail reader.
+ g.commentsSend=async()=>{throw new Error('compact sending disabled for rollback');};
+ const events=await f.dbctx.fns.session.getEvents({id:'review-a'});
+ expect(events).toHaveLength(2);expect(events[0].text).toContain('legacy body and quote');
+ expect(await f.dbctx.fns.session.decodeReviewReference({value:events[0].gitReview})).toBeNull();
+ const ref=await f.dbctx.fns.session.decodeReviewReference({value:events[1].gitReview});
+ expect(ref?.ids).toEqual([c.id]);expect(events[1].text).not.toContain('PRIVATE acceptance body');
+ const messages=await f.db.select({sql:"SELECT content FROM messages WHERE agent_id='review-a' ORDER BY idx"});
+ expect(JSON.stringify(messages[1])).not.toContain('PRIVATE acceptance body');
+ expect((await g.reviewCard({agentId:'review-a',eventIdx:events[1].idx})).items[0].comment.body).toBe('PRIVATE acceptance body');
+ const explicit=await g.gitReviewComments({ids:ref!.ids,status:'all'});
+ expect(explicit.comments[0].body).toBe('PRIVATE acceptance body');
+ await g.gitResolveComment({id:c.id,note:'isolated acceptance fixture'});
+ expect((await g.gitReviewComments({ids:ref!.ids,status:'all'})).comments[0].status).toBe('resolved');
+ expect((await f.dbctx.fns.session.getEvents({id:'review-a'}))).toHaveLength(2);
+});
