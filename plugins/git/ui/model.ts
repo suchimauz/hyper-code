@@ -5,8 +5,12 @@ export type Section = 'changes' | 'history' | 'comments';
 export type Filter = 'open' | 'resolved' | 'all';
 export type Side = 'old' | 'new';
 export type GitFile = { path: string; oldPath?: string; status: string; group?: string; special?: string };
-export type Commit = { hash: string; author: string; date: string; subject: string; parents: string[] };
-export type Snapshot = { root: string; branch: string; head: string; shallow: boolean; files: GitFile[]; commits: Commit[]; hasMore: boolean; page: number; liveKey?: string; liveState?: 'watching' | 'polling' | 'error'; liveError?: string };
+/** Mirrors types.gitUi.CommitRef: one structured HEAD/branch/remote/tag decoration of a commit. */
+export type CommitRef = { kind: 'head' | 'branch' | 'remote' | 'tag'; name: string; ref: string; branch?: string; detached?: boolean; current?: boolean; alias?: string; annotated?: boolean };
+export type Commit = { hash: string; author: string; date: string; subject: string; parents: string[]; refs?: CommitRef[] };
+export type Snapshot = { root: string; branch: string; head: string; shallow: boolean; files: GitFile[]; commits: Commit[]; hasMore: boolean; page: number; liveKey?: string; liveState?: 'watching' | 'polling' | 'error'; liveError?: string; refsKey?: string; refsError?: string; refsTruncated?: boolean };
+/** Response of the authorized op=refs read (types.gitUi.CommitRef lists keyed by full commit ID). */
+export type RefsLookup = { byCommit: Record<string, CommitRef[]>; key: string; truncated: boolean; error?: string };
 export type CommitFiles = { hash: string; parent?: string; comparison: string; files: GitFile[] };
 export type Patch = { patch: string; state: string; message: string };
 /** Mirrors the backend ReviewComment view (types.gitUi.ReviewComment). */
@@ -128,3 +132,16 @@ export function byFile(list: ReviewComment[]): [string, ReviewComment[]][] {
 export const filterComments = (list: ReviewComment[], f: Filter) => f === 'all' ? list : list.filter(c => c.status === f);
 export const openCountFor = (list: ReviewComment[], pred: (c: ReviewComment) => boolean) => list.filter(c => c.status === 'open' && pred(c)).length;
 export const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+const REF_KIND: Record<CommitRef['kind'], string> = { head: 'HEAD', branch: 'Branch', remote: 'Remote branch', tag: 'Tag' };
+/** Visible badge text for a reference, like git log --decorate: "HEAD -> main", "HEAD", "origin/HEAD -> origin/main". */
+export function refText(r: CommitRef): string {
+  if (r.kind === 'head') return r.branch ? 'HEAD -> ' + r.branch : 'HEAD';
+  return r.alias ? r.name + ' -> ' + r.alias : r.name;
+}
+/** Full accessible label that names the reference type in words, never relying on colour or glyph alone. */
+export function refLabel(r: CommitRef): string {
+  if (r.kind === 'head') return r.branch ? 'HEAD, current branch ' + r.branch : 'HEAD, detached';
+  const kind = r.kind === 'tag' ? (r.annotated ? 'Annotated tag' : 'Tag') : r.kind === 'branch' && r.current ? 'Current branch' : REF_KIND[r.kind];
+  return kind + ' ' + r.name + (r.alias ? ', alias of ' + r.alias : '');
+}

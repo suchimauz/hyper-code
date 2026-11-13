@@ -4,7 +4,7 @@ import path from 'node:path';
  * Touch a shared local or SSH repository live subscription.
  *
  * Use after authorizing a pinned snapshot. Shares watchers across tabs and hot reload, debounces events, expires after ten idle minutes, and never falls back from SSH to local files.
- * Native watcher failures use the same bounded Git-only HEAD/status polling as SSH: successive dirty edits with unchanged status may require manual refresh. Closing suppresses pending results and further commands; an in-flight command retains its transport timeout.
+ * Native watchers cover HEAD, index, refs and packed-refs; SSH and native-watcher failures poll HEAD, status and ref identities (for-each-ref, at most 2001 refs) every three seconds through bounded Git commands, so ref-only moves refresh without fetch: successive dirty edits with unchanged status may require manual refresh. Closing suppresses pending results and further commands; an in-flight command retains its transport timeout.
  * @param opts.host Pinned local host or SSH alias.
  * @param opts.dir Pinned absolute repository directory.
  */
@@ -35,9 +35,13 @@ export default async function (
      if(closed)return;
      const status=await run(['status','--porcelain=v2','-z','--untracked-files=all']);
      if(closed)return;
+     // Ref-only moves (branch/tag/remote-tracking updates without worktree edits) must refresh decorations too.
+     // Same bounded transport and ref cap as gitUi.refs; a lookup failure is hashed, not fatal, so commits stay visible.
+     const refs=await run(['for-each-ref','--count=2001','--format=%(refname)%00%(objectname)%00%(symref)','refs/heads','refs/remotes','refs/tags'],true);
+     if(closed)return;
      // Both transports use bounded Git output, not a filesystem scan. Porcelain
      // does not distinguish successive edits to an already dirty file.
-     const next=new Bun.CryptoHasher('sha256').update(JSON.stringify([head.code,head.stdout,status.stdout])).digest('hex');
+     const next=new Bun.CryptoHasher('sha256').update(JSON.stringify([head.code,head.stdout,status.stdout,refs.code,refs.stdout])).digest('hex');
      if(previous!==undefined&&previous!==next)changed();previous=next;
      if(entry.state==='error'){entry.state='polling';delete entry.error;changed();}
      }catch(error){if(!closed){entry.state='error';entry.error=error instanceof Error?error.message:String(error);changed();}}finally{busy=false;}};

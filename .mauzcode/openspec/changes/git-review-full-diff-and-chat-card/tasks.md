@@ -36,9 +36,9 @@ These tasks are for the subsequent implementation stage, not the approved artifa
 
 ## 6. Commit reference decorations
 
-- [ ] 6.1 Extend history data and UI types with structured HEAD/branch/remote/tag references from bounded read-only commands on the pinned host; verify symbolic/detached HEAD, lightweight/annotated tags, non-commit tags, remote aliases and colliding names in backend tests and document the contract.
-- [ ] 6.2 Render accessible typed reference badges in commit rows; verify multiple references, long/punctuated names, escaping, keyboard navigation, themes and unchanged HEAD-history pagination in UI tests.
-- [ ] 6.3 Include ref movement in local/SSH refresh detection and expose lookup errors without hiding commits; verify ref-only updates, no fetch or mutations, bounded polling and no cross-host fallback.
+- [x] 6.1 Extend history data and UI types with structured HEAD/branch/remote/tag references from bounded read-only commands on the pinned host; verify symbolic/detached HEAD, lightweight/annotated tags, non-commit tags, remote aliases and colliding names in backend tests and document the contract.
+- [x] 6.2 Render accessible typed reference badges in commit rows; verify multiple references, long/punctuated names, escaping, keyboard navigation, themes and unchanged HEAD-history pagination in UI tests.
+- [x] 6.3 Include ref movement in local/SSH refresh detection and expose lookup errors without hiding commits; verify ref-only updates, no fetch or mutations, bounded polling and no cross-host fallback.
 
 ## Workflow follow-up
 

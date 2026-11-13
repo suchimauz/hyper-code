@@ -187,6 +187,23 @@
 @keyframes git-spin{to{transform:rotate(360deg)}}
 @keyframes git-pulse{50%{opacity:.45}}
 
+.git-commit-title{display:flex;align-items:center;gap:6px;min-width:0}
+.git-commit-title strong{flex:0 1 auto;min-width:3em}
+.git-refs{display:inline-flex;align-items:center;gap:4px;flex:0 1 auto;min-width:0;overflow:hidden}
+.git-ref{display:inline-flex;align-items:center;gap:3px;max-width:16em;min-width:0;padding:0 6px;border:1px solid var(--git-line);border-radius:6px;background:var(--git-soft);color:var(--text-secondary,inherit);font-size:10.5px;font-weight:500;line-height:16px;white-space:nowrap}
+.git-ref .git-icon{flex:none}
+.git-ref-text{overflow:hidden;text-overflow:ellipsis}
+.git-ref[data-kind=head]{border-color:var(--git-accent);color:var(--git-accent);font-weight:600}
+.git-ref[data-kind=branch][data-current]{border-color:var(--git-accent)}
+.git-ref[data-kind=remote]{border-style:dashed}
+.git-ref[data-kind=tag]{border-radius:3px 8px 8px 3px}
+.git-ref-more{flex:none;color:var(--git-muted)}
+.git-ref-list{display:flex;flex-wrap:wrap;gap:4px;margin:2px 10px 6px;padding:0;list-style:none}
+.git-ref-list .git-ref{max-width:100%;white-space:normal}
+.git-ref-list .git-ref-text{overflow-wrap:anywhere;text-overflow:clip}
+.git-refs-error{display:flex;align-items:center;gap:6px;color:var(--git-bad)}
+@media (prefers-contrast:more){.git-ref{border-width:2px;color:var(--text,inherit)}}
+@media (forced-colors:active){.git-ref{border-color:CanvasText;forced-color-adjust:auto}}
 @container git (max-width:720px){
  .git-body{grid-template-columns:1fr}
  .git-list-pane{border-right:0}

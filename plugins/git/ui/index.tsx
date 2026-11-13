@@ -6,7 +6,8 @@ import { AggregateDiff, blockKey, type AggregateSection, type CollapseMap } from
 import { Header, Icon, ICONS } from './header';
 import { ListBox } from './list';
 import { byFile, commentMatches, errorText, filterComments, GROUP_LABEL, GROUPS, moveIndex, openCountFor, prefersReducedMotion, rangeLabel, relativeDate, shortHash, STATUS_LABEL, targetOf,
-  type Anchor, type Commit, type CommitFiles, type CommentsPage, type Filter, type GitFile, type Group, type Patch, type ReviewComment, type Section, type Snapshot, type Target } from './model';
+  type Anchor, type Commit, type CommitFiles, type CommentsPage, type Filter, type GitFile, type Group, type Patch, type ReviewComment, type Section, type Snapshot, type Target, type RefsLookup } from './model';
+import { RefList, RowRefs } from './refs';
 import { styles } from './styles';
 import { ReviewCardDetails } from './reviewCard';
 import { indicatorOf, useTransportStatus } from './useLive';
@@ -126,7 +127,21 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
       if (prev && first.head && prev.head === first.head && pagesRef.current > 1) {
         // History anchored at an unchanged HEAD is immutable: refresh files and keep the loaded commits.
         liveKey.current = first.liveKey;
-        const merged = { ...first, commits: first.commits.concat(prev.commits.slice(first.commits.length)), hasMore: prev.hasMore };
+        let older = prev.commits.slice(first.commits.length);
+        // Ref-only move: re-decorate the already loaded older pages from one ref lookup on the pinned host.
+        if (first.refsKey !== prev.refsKey && older.length) {
+          try {
+            const r = await requestJson<RefsLookup>(base + '&op=refs');
+            if (gen !== snapGen.current) return;
+            older = older.map(c => ({ ...c, refs: r.byCommit[c.hash] ?? [] }));
+            if (r.error && !first.refsError) first.refsError = r.error;
+          } catch (e) {
+            if (gen !== snapGen.current) return;
+            older = older.map(c => ({ ...c, refs: [] }));
+            first.refsError = errorText(e);
+          }
+        }
+        const merged = { ...first, commits: first.commits.concat(older), hasMore: prev.hasMore };
         snapRef.current = merged; setSnapshot(merged); setError('');
         setWatcher({ state: first.liveState, error: first.liveError });
         return;
@@ -407,9 +422,11 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
       if (!snapshot) return error ? null : <Skeleton label="Loading history" />;
       return <>
         {snapshot.shallow && <p className="git-note">Shallow repository — older history and parents may be unavailable.</p>}
+        {snapshot.refsError && <p className="git-note git-refs-error" role="status"><Icon d={ICONS.alert} size={12} /> References unavailable: {snapshot.refsError}. Commits are still shown.</p>}
+        {!snapshot.refsError && snapshot.refsTruncated && <p className="git-note" role="note">Only the first 2,000 references are shown as decorations.</p>}
         <ListBox label="Commit history" sections={[{ id: 'commits', items: snapshot.commits }]} itemKey={c => c.hash} selectedKey={hash} onPick={pickCommit}
           render={c => <span className="git-row git-commit-row">
-            <span className="git-row-text"><strong>{c.subject || '(no subject)'}</strong>
+            <span className="git-row-text"><span className="git-commit-title"><strong>{c.subject || '(no subject)'}</strong><RowRefs refs={c.refs} /></span>
               <small><code>{shortHash(c.hash)}</code> · {c.author} · <time dateTime={c.date} title={c.date}>{relativeDate(c.date)}</time></small></span>
             <CountBadge n={openCountFor(comments, x => x.scope === 'commit' && x.commit_hash === c.hash)} />
           </span>}
@@ -419,6 +436,7 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
           {loadingMore && <span className="git-spinner" aria-hidden="true" />}{loadingMore ? 'Loading…' : 'Load more'}</button>}
         {hash && <section className="git-commit-files" aria-label={'Files in commit ' + shortHash(hash)}>
           <h3><code>{shortHash(hash)}</code> {commit?.hash === hash && <span className="git-hint">{commit.comparison}</span>}</h3>
+          <RefList refs={snapshot.commits.find(c => c.hash === hash)?.refs} />
           {snapshot && !snapshot.hasMore && !snapshot.commits.some(c => c.hash === hash) && <p className="git-note" role="status">This commit is no longer in the current branch history.</p>}
           {commitError ? <Alert text={commitError} /> : commit?.hash !== hash ? <Skeleton label="Loading commit" rows={3} />
             : <ListBox label={'Files changed in ' + shortHash(hash)} sections={[{ id: 'commit', items: commit.files }]} itemKey={f => f.path}

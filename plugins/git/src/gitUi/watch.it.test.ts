@@ -12,6 +12,9 @@ test('real recursive local edit and linked worktree Git metadata subscriptions',
  const live=await watch(ctx,null,{dir:linked,host:'local'});expect(live.state).toBe('watching');
  await writeFile(linked+'/a','two');const wait=async()=>{const end=Date.now()+5000;while(!events&&Date.now()<end)await Bun.sleep(30);expect(events).toBeGreaterThan(0);};await wait();
  await Bun.sleep(400);events=0;await git(linked,'add','a');await wait();
+ // Ref-only moves (tag create, branch move) in shared metadata notify without worktree edits or fetch.
+ await Bun.sleep(400);events=0;await git(linked,'tag','refs-only');await wait();
+ await Bun.sleep(400);events=0;await git(dir,'branch','-f','linked-copy','HEAD');await wait();
  expect(ctx.state.gitUi.watchers.size).toBe(1);
  }finally{for(const e of ctx.state.gitUi.watchers?.values()??[])e.close();await rm(dir,{recursive:true,force:true});}
 },15000);
