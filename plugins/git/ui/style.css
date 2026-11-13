@@ -156,6 +156,27 @@
 .git-patch .token.function,.git-patch .token.class-name{color:light-dark(#4078f2,#61afef)}
 .git-patch .token.operator,.git-patch .token.punctuation{color:inherit}
 
+/* aggregate review */
+.git-full-btn{display:flex;align-items:center;gap:6px;width:calc(100% - 8px);margin:4px 4px 6px;justify-content:flex-start}
+.git-full-btn[aria-pressed=true]{background:var(--accent-soft,color-mix(in srgb,var(--git-accent) 14%,transparent))}
+.git-full-btn .git-hint{margin-left:auto}
+.git-aggregate{padding:0 0 24px}
+.git-aggregate-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 14px;background:color-mix(in srgb,var(--bg,Canvas) 86%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--git-line)}
+.git-aggregate-actions{display:flex;gap:4px;margin-left:auto}
+.git-aggregate-title{margin:14px 14px 6px;font-size:11px;font-weight:600;color:var(--git-muted);text-transform:uppercase;letter-spacing:.04em}
+.git-block{margin:8px 12px;border:1px solid var(--git-line);border-radius:10px;background:var(--git-card);overflow:clip;scroll-margin-top:44px}
+.git-block-head{margin:0;font:inherit}
+.git-block-toggle{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:6px 10px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;outline-offset:-2px}
+.git-block-toggle:hover{background:var(--hover,var(--git-soft))}
+.git-block-chevron{display:inline-grid;color:var(--git-muted);transition:transform .25s var(--git-ease)}
+.git-block-toggle[aria-expanded=false] .git-block-chevron{transform:rotate(-90deg)}
+.git-block-toggle[aria-expanded=true]{border-bottom:1px solid var(--git-line)}
+.git-block-path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 12px/1.4 var(--diff-font-family)}
+.git-block-state{margin:0;padding:14px;color:var(--text-secondary,var(--git-muted));font-size:12px}
+.git-block-pending{display:flex;flex-direction:column;gap:8px;min-height:72px;padding:14px}
+.git-block-pending span{height:10px;border-radius:5px;background:var(--git-soft);animation:git-pulse 1.4s ease-in-out infinite}
+.git-block-pending span:nth-child(2){width:70%}.git-block-pending span:nth-child(3){width:45%}
+
 /* states */
 .git-skeleton{display:flex;flex-direction:column;gap:10px;padding:14px}
 .git-skeleton span{height:12px;border-radius:6px;background:var(--git-soft);animation:git-pulse 1.4s ease-in-out infinite}

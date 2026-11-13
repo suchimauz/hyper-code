@@ -9,6 +9,12 @@ Open `gitUi.repository` with `{ dir: absoluteProjectDirectory, host: "local" }` 
 
 Shows staged, unstaged and untracked files, unified/split highlighted diffs, and fifty-commit pages of HEAD history. Root commits compare with an empty tree; merges compare with their first parent. Binary files, conflicts, submodules, missing shallow parents and oversized diffs are explicit non-text states. All repository operations are read-only; no staging, commits, branch operations, fetch or pushes.
 
+## Whole-review diffs
+
+**Changes** keeps single-file viewing (pick a file in the list) and adds a **Full diff** entry above the list that shows the entire worktree as three separate sections — Staged, Unstaged and Untracked. A path changed in both Staged and Unstaged appears once in each section with its own comments and review target. **History** opens the whole selected commit as an aggregate (comparison shown in the bar: empty tree for root commits, first parent for merges); picking a file in the commit's file list jumps to, expands and focuses its block. A missing shallow parent is reported as *Comparison unavailable* rather than an empty diff.
+
+Every file is an independently collapsible block, expanded by default, with **Collapse all** / **Expand all** for the current aggregate. Block identity is the pinned host and directory, scope, worktree group or full commit hash, and path, so collapse state never leaks between sections, commits or repositories and survives live refresh. Diffs load lazily only for expanded blocks near the viewport, at most three requests at a time, through the same per-file endpoint and size limits; switching commit or aggregate aborts and discards older responses. Each block shows its own loading, error (with Retry), binary, conflict, submodule, oversized or empty state without hiding the others. Blocks reuse the same diff renderer as single-file view: unified/split, line and range comments on the old or new side, existing comments, outdated badges and rename anchors (`old_path`).
+
 ## Live review workflow
 
 Local filesystem changes refresh the view through debounced live events; SSH targets use bounded Git polling. The live indicator reports watching, polling or errors, and Refresh remains available. Closing or leaving tabs idle releases watchers. SSH failures never switch to a local repository.

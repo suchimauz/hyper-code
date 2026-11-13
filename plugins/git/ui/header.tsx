@@ -5,7 +5,7 @@ import type { LiveIndicator } from './useLive';
 export const SECTIONS: { id: Section; label: string }[] = [{ id: 'changes', label: 'Changes' }, { id: 'history', label: 'History' }, { id: 'comments', label: 'Comments' }];
 const LIVE_TEXT: Record<LiveIndicator, string> = { live: 'Live', connecting: 'Connecting…', stopped: 'Not live' };
 export const Icon = ({ d, size = 14 }: { d: string; size?: number }) => <svg className="git-icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
-export const ICONS = { refresh: 'M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5', back: 'M15 18l-6-6 6-6', send: 'M22 2L11 13M22 2l-7 20-4-9-9-4z', branch: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9', alert: 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', check: 'M20 6L9 17l-5-5', file: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5', comment: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' };
+export const ICONS = { refresh: 'M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5', back: 'M15 18l-6-6 6-6', send: 'M22 2L11 13M22 2l-7 20-4-9-9-4z', branch: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9', alert: 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', check: 'M20 6L9 17l-5-5', file: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5', comment: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', chevron: 'M6 9l6 6 6-6', stack: 'M12 2l9 5-9 5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5' };
 
 type Props = {
   name: string; dir: string; host: string; branch?: string; head?: string;

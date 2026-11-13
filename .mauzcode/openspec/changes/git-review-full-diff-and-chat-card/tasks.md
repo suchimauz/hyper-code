@@ -17,11 +17,11 @@ These tasks are for the subsequent implementation stage, not the approved artifa
 
 ## 3. Aggregate diff review
 
-- [ ] 3.1 Add reusable keyed aggregate file blocks with independent/default-expanded collapse and collapse/expand-all controls; verify target identity includes repository/scope/group/hash/path and controls expose keyboard/focus/expanded semantics.
-- [ ] 3.2 Add Changes Full diff with three separate sections while retaining single-file viewing; verify a path shared by Staged and Unstaged keeps separate comments and targets, and document the new entry point.
-- [ ] 3.3 Make History commit selection open the aggregate and file selection navigate to its block; verify root/merge comparison semantics, shallow-parent errors and collapse isolation across commits.
-- [ ] 3.4 Add bounded near-viewport loading and stale-response protection; verify request concurrency, offscreen behavior, preserved size limits, per-file failures and live refresh retaining collapse state.
-- [ ] 3.5 Reuse DiffView/comment actions in aggregate blocks; verify unified/split rendering, old/new-side range comments, outdated indicators, rename anchors and explicit binary/conflict/submodule/oversized states. Update review workflow docs alongside the tests.
+- [x] 3.1 Add reusable keyed aggregate file blocks with independent/default-expanded collapse and collapse/expand-all controls; verify target identity includes repository/scope/group/hash/path and controls expose keyboard/focus/expanded semantics.
+- [x] 3.2 Add Changes Full diff with three separate sections while retaining single-file viewing; verify a path shared by Staged and Unstaged keeps separate comments and targets, and document the new entry point.
+- [x] 3.3 Make History commit selection open the aggregate and file selection navigate to its block; verify root/merge comparison semantics, shallow-parent errors and collapse isolation across commits.
+- [x] 3.4 Add bounded near-viewport loading and stale-response protection; verify request concurrency, offscreen behavior, preserved size limits, per-file failures and live refresh retaining collapse state.
+- [x] 3.5 Reuse DiffView/comment actions in aggregate blocks; verify unified/split rendering, old/new-side range comments, outdated indicators, rename anchors and explicit binary/conflict/submodule/oversized states. Update review workflow docs alongside the tests.
 
 ## 4. Integrated acceptance
 

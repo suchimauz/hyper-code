@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { ApiError, requestJson, useLiveSubscription, type ExtensionCanvasProps, type ExtensionLauncherProps, type UiExtension } from '@mauzcode/ui';
 import { CommentChips, type CommentActions } from './comments';
 import { DiffView } from './diff';
+import { AggregateDiff, blockKey, type AggregateSection, type CollapseMap } from './aggregate';
 import { Header, Icon, ICONS } from './header';
 import { ListBox } from './list';
 import { byFile, commentMatches, errorText, filterComments, GROUP_LABEL, GROUPS, moveIndex, openCountFor, prefersReducedMotion, rangeLabel, relativeDate, shortHash, STATUS_LABEL, targetOf,
@@ -68,6 +69,11 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
   const [filter, setFilter] = useState<Filter>(initial.filter === 'resolved' || initial.filter === 'all' ? initial.filter : 'open');
   const [focusId, setFocusId] = useState<string | null>(str(initial.comment));
   const [open, setOpen] = useState(false);
+  /** Changes shows the whole-worktree aggregate instead of one selected file. */
+  const [fullDiff, setFullDiff] = useState(initial.full === true);
+  /** Collapsed aggregate blocks, keyed by blockKey (repository, scope, group, commit, path); kept across refreshes. */
+  const [collapsed, setCollapsed] = useState<CollapseMap>({});
+  const [jump, setJump] = useState<{ key: string; n: number } | null>(() => selection?.group === 'commit' ? { key: blockKey(host, dir, selection), n: 0 } : null);
 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [pages, setPages] = useState(1);
@@ -77,6 +83,7 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
   const [watcher, setWatcher] = useState<{ state?: string; error?: string }>({});
   const [commit, setCommit] = useState<CommitFiles | null>(null);
   const [commitError, setCommitError] = useState('');
+  const [commitRetry, setCommitRetry] = useState(0);
   const [patch, setPatch] = useState<{ key: string; data: Patch } | null>(null);
   const [diffError, setDiffError] = useState('');
   const [tick, setTick] = useState(0);
@@ -259,11 +266,13 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
     setCommit(c => c?.hash === hash ? c : null);
     requestJson<CommitFiles>(base + '&op=commit&hash=' + encodeURIComponent(hash)).then(d => { if (alive) setCommit(d); }).catch(e => { if (alive) setCommitError(errorText(e)); });
     return () => { alive = false; };
-  }, [base, hash]);
+  }, [base, hash, commitRetry]);
 
   // The diff target: the activated comment in Comments, otherwise the selected file.
   const focused = focusId ? comments.find(c => c.id === focusId) ?? null : null;
-  const target: Target | null = section === 'comments' ? (focused ? targetOf(focused) : null) : selection && (section === 'history' ? selection.group === 'commit' && selection.hash === hash : selection.group !== 'commit') ? selection : null;
+  // History and Full diff show aggregates; the single-file target exists only for Changes file selection and Comments.
+  const aggregate: 'changes' | 'commit' | null = section === 'history' ? (hash ? 'commit' : null) : section === 'changes' && fullDiff ? 'changes' : null;
+  const target: Target | null = section === 'comments' ? (focused ? targetOf(focused) : null) : section === 'changes' && !fullDiff && selection && selection.group !== 'commit' ? selection : null;
   const tKey = targetKey(target);
   const vanished = !!target && target.group !== 'commit' && !!snapshot && !snapshot.files.some(f => f.path === target.path && f.group === target.group);
   const targetFile: GitFile | undefined = target ? (target.group === 'commit' ? commit && commit.hash === target.hash ? commit.files.find(f => f.path === target.path) : undefined : snapshot?.files.find(f => f.path === target.path && f.group === target.group)) : undefined;
@@ -325,14 +334,21 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
     setSection(next); setOpen(false);
     save({ section: next });
   };
+  /** Changes: a file opens its single-file diff. History: a file navigates to its block in the commit's aggregate. */
   const pickFile = (file: GitFile, group: Group | 'commit') => {
     const t: Target = group === 'commit' ? { path: file.path, group, hash: hash ?? '' } : { path: file.path, group };
     setSelection(t); setOpen(true);
-    save({ path: t.path, group: t.group, hash: t.hash ?? hash });
+    if (group === 'commit') setJump(j => ({ key: blockKey(host, dir, t), n: (j?.n ?? 0) + 1 }));
+    else setFullDiff(false);
+    save({ path: t.path, group: t.group, hash: t.hash ?? hash, full: group === 'commit' ? undefined : false });
   };
   const pickCommit = (c: Commit) => {
-    if (c.hash !== hash) { setHash(c.hash); setSelection(null); save({ hash: c.hash, path: null, group: null }); }
+    setOpen(true);
+    if (c.hash !== hash) { setHash(c.hash); setSelection(null); setJump(null); save({ hash: c.hash, path: null, group: null }); }
   };
+  const openFullDiff = () => { setFullDiff(true); setOpen(true); save({ full: true }); };
+  const onCollapse = useCallback((changes: CollapseMap) => setCollapsed(c => ({ ...c, ...changes })), []);
+  const loadPatch = useCallback((t: Target, signal: AbortSignal) => requestJson<Patch>(base + '&op=diff&path=' + encodeURIComponent(t.path) + '&group=' + t.group + (t.group === 'commit' ? '&hash=' + encodeURIComponent(t.hash ?? '') : ''), { signal }), [base]);
   const pickComment = (c: ReviewComment) => { setFocusId(c.id); setOpen(true); save({ comment: c.id }); };
   const pickFilter = (f: Filter) => { setFilter(f); save({ filter: f }); };
 
@@ -380,9 +396,10 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
   const list = () => {
     if (section === 'changes') {
       if (!snapshot) return error ? null : <Skeleton label="Loading changes" />;
-      return <ListBox label="Changed files" sections={fileSections} itemKey={f => (f.group ?? '') + ':' + f.path} selectedKey={selection && selection.group !== 'commit' ? selection.group + ':' + selection.path : null}
+      return <>{files.length > 0 && <button type="button" className="git-btn git-full-btn" aria-pressed={fullDiff} onClick={openFullDiff}><Icon d={ICONS.stack} size={14} />Full diff <span className="git-hint">{files.length}</span></button>}
+      <ListBox label="Changed files" sections={fileSections} itemKey={f => (f.group ?? '') + ':' + f.path} selectedKey={!fullDiff && selection && selection.group !== 'commit' ? selection.group + ':' + selection.path : null}
         onPick={f => pickFile(f, f.group as Group)} render={f => fileRow(f, f.group as Group)}
-        empty={<Empty text="Working tree is clean" detail="Edits appear here automatically." icon={ICONS.check} />} />;
+        empty={<Empty text="Working tree is clean" detail="Edits appear here automatically." icon={ICONS.check} />} /></>;
     }
     if (section === 'history') {
       if (!snapshot) return error ? null : <Skeleton label="Loading history" />;
@@ -435,7 +452,24 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
   };
 
   const targetComments = target ? comments.filter(c => commentMatches(c, target)) : [];
+  const changeSections: AggregateSection[] = GROUPS.map(g => ({ id: g, label: GROUP_LABEL[g], entries: files.filter(f => f.group === g).map(f => ({ file: f, target: { path: f.path, group: g } as Target })) })).filter(s => s.entries.length);
+  const aggregatePane = () => {
+    if (aggregate === 'changes') {
+      if (!snapshot) return error ? null : <Skeleton label="Loading changes" rows={8} />;
+      return <AggregateDiff host={host} dir={dir} aggregateKey={'changes'} sections={changeSections} version={tick} load={loadPatch} collapsed={collapsed} onCollapse={onCollapse}
+        split={split} comments={comments} actions={actions} readOnly={readOnly} onCreate={create} jump={null}
+        empty={<Empty text="Working tree is clean" detail="Edits appear here automatically." icon={ICONS.check} />} />;
+    }
+    if (commitError) return <Alert text={'Comparison unavailable: ' + commitError} onRetry={() => setCommitRetry(n => n + 1)} />;
+    if (!commit || commit.hash !== hash) return <Skeleton label="Loading commit" rows={8} />;
+    return <AggregateDiff host={host} dir={dir} aggregateKey={'commit:' + commit.hash} version={0} load={loadPatch} collapsed={collapsed} onCollapse={onCollapse}
+      sections={[{ id: 'commit', label: '', entries: commit.files.map(f => ({ file: f, target: { path: f.path, group: 'commit', hash: commit.hash } as Target })) }]}
+      intro={<span className="git-hint">Compared with: {commit.comparison}</span>}
+      split={split} comments={comments} actions={actions} readOnly={readOnly} onCreate={create} jump={jump}
+      empty={<Empty text="This commit changes no files" />} />;
+  };
   const diffPane = () => {
+    if (aggregate) return aggregatePane();
     if (!target) return <Empty icon={section === 'comments' ? ICONS.comment : ICONS.file} text={section === 'comments' ? (focusId && commentsLoaded ? (resolvedView.older > 0 ? 'This comment is not loaded. It may be an older resolved comment — load older resolved comments to find it.' : 'This comment no longer exists.') : 'Select a comment to open its lines.') : section === 'history' && !hash ? 'Select a commit to see its files.' : 'Select a file to see its diff.'} />;
     if (vanished) return <Empty icon={ICONS.check} text={`${target.path} no longer has ${GROUP_LABEL[target.group as Group].toLowerCase()} changes.`} detail={targetComments.length ? 'Its comments remain under Comments.' : undefined} />;
     if (diffError) return <Alert text={diffError} onRetry={() => setTick(t => t + 1)} />;
@@ -456,8 +490,10 @@ export function Repository({ context, item }: ExtensionCanvasProps) {
       <main className="git-diff-pane" aria-label="Diff">
         <div className="git-diff-head">
           <button type="button" className="git-icon-btn git-back" onClick={() => setOpen(false)} aria-label="Back to list"><Icon d={ICONS.back} size={16} /></button>
-          <div className="git-diff-title">{target ? <><span className="git-eyebrow">{target.group === 'commit' ? 'Commit ' + shortHash(target.hash) : GROUP_LABEL[target.group]}</span><h3>{target.path}</h3></> : <h3>Diff</h3>}</div>
-          {target && <button type="button" className="git-btn git-btn-quiet" aria-pressed={split} onClick={() => { setSplit(!split); save({ split: !split }); }}>{split ? 'Split' : 'Unified'}</button>}
+          <div className="git-diff-title">{aggregate === 'changes' ? <><span className="git-eyebrow">Working tree</span><h3>Full diff</h3></>
+            : aggregate === 'commit' ? <><span className="git-eyebrow">Commit {shortHash(hash)}</span><h3>{snapshot?.commits.find(c => c.hash === hash)?.subject || 'All changed files'}</h3></>
+            : target ? <><span className="git-eyebrow">{target.group === 'commit' ? 'Commit ' + shortHash(target.hash) : GROUP_LABEL[target.group]}</span><h3>{target.path}</h3></> : <h3>Diff</h3>}</div>
+          {(target || aggregate) && <button type="button" className="git-btn git-btn-quiet" aria-pressed={split} onClick={() => { setSplit(!split); save({ split: !split }); }}>{split ? 'Split' : 'Unified'}</button>}
         </div>
         <div className="git-diff-scroll">{diffPane()}</div>
       </main>
