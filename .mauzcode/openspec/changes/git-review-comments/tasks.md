@@ -9,11 +9,13 @@ All items describe future implementation. Sections 1–5 and 7 are backend work;
 
 ## 2. Comments API and authorization
 
-- [ ] 2.1 Extract the existing ownership resolution in `gitUi.handle` into a reusable step that returns `{ agentId, item, host, dir }` for an owned open `gitUi.repository` item of a non-archived agent; verify existing read tests still pass.
-- [ ] 2.2 Implement `gitUi.commentCreate`, `commentUpdate`, `commentDelete`, `commentResolve`, `commentReopen`, `commentsList` (via `procs.dev.createFunction`), all joining `agents` with `archived_at IS NULL`, validating paths with `gitUi.checkPath`, anchors, sizes and the 500-open limit (409).
-- [ ] 2.3 Implement worktree outdated detection by comparing `line_text` with the current group diff (`gitUi.diff`), computed per request and cached per (path, group) within one list call.
-- [ ] 2.4 Extend `gitUi.handle` with GET `op=comments` and POST ops listed in design.md; POST requires CSRF; JSON errors 400/403/409 with `Cache-Control: no-store`.
-- [ ] 2.5 Emit `gitUi.comments.changed { key }` after every successful mutation.
+- [x] 2.1 Extract the existing ownership resolution in `gitUi.handle` into a reusable step that returns `{ agentId, item, host, dir }` for an owned open `gitUi.repository` item of a non-archived agent; verify existing read tests still pass.
+- [x] 2.2 Implement `gitUi.commentCreate`, `commentUpdate`, `commentDelete`, `commentResolve`, `commentReopen`, `commentsList` (via `procs.dev.createFunction`), all joining `agents` with `archived_at IS NULL`, validating saved paths lexically with `gitUi.commentPath` and filesystem reads with `gitUi.checkPath`, anchors, sizes and the 500-open limit (409).
+- [x] 2.3 Implement worktree outdated detection by comparing `line_text` with the current group diff (`gitUi.diff`), computed per request and cached per (path, group) within one list call.
+- [x] 2.4 Extend `gitUi.handle` with GET `op=comments` and POST ops listed in design.md; POST requires CSRF; JSON errors 400/403/409 with `Cache-Control: no-store`.
+- [x] 2.5 Emit `gitUi.comments.changed { key }` after every successful mutation.
+
+Block 2 review corrections: bounded pagination reaches all history, saved-path CRUD survives filesystem changes, unavailable paths become outdated without hiding SSH transport errors, mutation responses use shared outdated detection, and creation checks actual rename metadata. Regression run: `bun test --timeout 60000 plugins/git/src/gitUi/comments.test.ts plugins/git/src/gitUi/gitUi.test.ts` — 15 pass, 0 fail, 133 assertions. Namespace hot-reloaded; strict docs/typecheck passed for changed functions; quality baseline unchanged (8 unrelated errors, 540 warnings). No manual acceptance performed.
 
 ## 3. Delivery and agent tools
 

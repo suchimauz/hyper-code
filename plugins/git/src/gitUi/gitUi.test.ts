@@ -8,7 +8,7 @@ async function setup(){
  const base=resolve(root,'.mauzcode/tmp/emh/tests');await mkdir(base,{recursive:true});const dir=await mkdtemp(base+'/repo-');
  const ctx:any={fns:{git:{},gitUi:{},remote:{quote:({value}:any)=>"'"+value.replaceAll("'","'\\''")+"'"}},state:{}};
  const run=await load(root+'/src/git/run.ts');ctx.fns.git.run=(o:any)=>run(ctx,null,o);
- for(const name of ['command','snapshot','commit','diff','checkPath','blobSize','handle']){const fn=await load(import.meta.dir+'/'+name+'.ts');ctx.fns.gitUi[name]=(o:any)=>fn(ctx,null,o);}
+ for(const name of ['commentPath','command','snapshot','commit','diff','checkPath','blobSize','handle','ownedItem']){const fn=await load(import.meta.dir+'/'+name+'.ts');ctx.fns.gitUi[name]=(o:any)=>fn(ctx,null,o);}
  const git=async(...args:string[])=>{const p=Bun.spawn(['git',...args],{cwd:dir,stdout:'pipe',stderr:'pipe'});const text=await new Response(p.stdout).text();const err=await new Response(p.stderr).text();if(await p.exited)throw new Error(err);return text.trim();};
  await git('init','-b','main');await git('config','user.email','test@example.invalid');await git('config','user.name','Fixture');
  return {ctx,dir,git,opts:{dir,host:'local'}};
@@ -49,8 +49,8 @@ test('bounded core command and mocked SSH routing',async()=>{
 test('HTTP ownership, CSRF, closed item and fixed operation boundary',async()=>{
  const {ctx}=await setup();ctx.fns.canvas={authorizeHttp:async()=>new Response('denied',{status:403})};
  expect((await ctx.fns.gitUi.handle({req:new Request('http://localhost/gitUi?agentId=test')})).status).toBe(403);
- ctx.fns.canvas.authorizeHttp=async()=>null;ctx.fns.canvas.list=async()=>[];
- expect((await ctx.fns.gitUi.handle({req:new Request('http://localhost/gitUi?agentId=test&itemId=1')})).status).toBe(404);
+ ctx.fns.canvas.authorizeHttp=async()=>null;ctx.fns.canvas.list=async()=>[];ctx.fns.procs={db:{select:async()=>[{id:'test'}]}};
+ expect((await ctx.fns.gitUi.handle({req:new Request('http://localhost/gitUi?agentId=test&itemId=1')})).status).toBe(403);
  ctx.fns.auth={verifyCsrf:async()=>false};expect((await ctx.fns.gitUi.handle({req:new Request('http://localhost/gitUi?agentId=test',{method:'POST'})})).status).toBe(403);
  ctx.fns.canvas.list=async()=>[{id:1,kind:'gitUi.repository',args:{dir:'/pinned',host:'local'}}];
  expect((await ctx.fns.gitUi.handle({req:new Request('http://localhost/gitUi?agentId=test&itemId=1&op=run')})).status).toBe(400);

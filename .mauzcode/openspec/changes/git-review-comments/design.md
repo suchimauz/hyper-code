@@ -88,7 +88,8 @@ Tool results are untrusted-content-free (only the person's comment text) and bou
 
 ### HTTP surface
 Existing `$route__GET` / `$route__POST` delegate to `gitUi.handle`. New ops:
-- GET `op=comments&status=&path=` → `{ comments, openCount, unsentCount }`.
+- GET `op=comments&status=&path=&page=&limit=` → `{ comments, openCount, unsentCount, nextPage }`. Block 2 clarification: zero-based `page` defaults to 0, `limit` defaults to 100 (integer 1–500); invalid values return 400. Results sort by `(created_at, id)` ascending with bounded LIMIT/OFFSET and one lookahead row; `nextPage` is the next page number or null. All/Resolved history is not capped at 500. Consumers must follow `nextPage` to load the complete selection, preserve the same filters/limit, and restart at page 0 on live refresh because mutations may shift offsets. Counts remain repository-wide open/open-unsent counts independent of path, status and pagination.
+- Saved comment paths and optional list filters are validated lexically without requiring the current filesystem entry to remain a regular file. Only diff reading performs filesystem safety checks. Missing, directory, symlink-ancestor and explicitly unsafe remote paths produce `outdated: true`; SSH transport failures remain errors. List and mutation responses use the same outdated computation; immutable commit anchors remain not outdated. Create verifies `old_path` against actual snapshot/commit rename metadata, including null for non-renames.
 - POST `op=commentCreate|commentUpdate|commentResolve|commentReopen|commentDelete|commentsSend` with JSON body.
 Errors are JSON `{ error }` with 400 (validation), 403 (ownership/CSRF), 409 (limit); all responses `Cache-Control: no-store`.
 
