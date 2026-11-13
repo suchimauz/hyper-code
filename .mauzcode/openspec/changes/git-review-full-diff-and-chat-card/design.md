@@ -46,3 +46,13 @@ Card expansion fetches authorized current details for the exact sent IDs; it doe
 5. Rollback disables new aggregate entry points and compact sending while retaining the reference-message reader so newly persisted review messages stay readable. Never delete comments or rewrite history as rollback.
 
 No application code is changed by the current artifact-only stage. Implementation requires the user's subsequent request.
+
+## One-step Git Launcher
+
+The current Git canvasLaunchers registration uses a component whose mount POSTs to /gitUi, creating a launcher surface before opening the repository. OpenSpec instead uses an asynchronous open callback that returns the repository item ID. Adopt that public SDK open callback contract for Git, keeping the existing authenticated and CSRF-protected workspace-opening endpoint. The callback returns the final Canvas item identity; no temporary launcher item is created. Preserve pinned host/directory targeting, including SSH, and reuse the existing matching repository tab. Repeated activation during opening must not create duplicates. Surface failures through the launcher error handling without leaving a placeholder tab or falling back to another repository. Do not automatically close or delete existing tabs belonging to other targets.
+
+## History Reference Decorations
+
+The current Commit UI model contains hash, author, date, subject and parents but no reference decorations. Extend the history response and UI model with typed reference records for HEAD, local branches, remote-tracking branches and tags. Resolve references on the pinned repository host using bounded read-only Git commands and associate them by full commit ID. Peel annotated tags to their target commit, omit tags targeting non-commit objects, and preserve namespaced identity even when short names collide. Use structured ref fields rather than splitting human-readable decoration text on commas. Render escaped text badges with distinct accessible labels, not color alone; indicate symbolic HEAD as HEAD -> branch and detached HEAD as HEAD. Handle remote symbolic aliases without inventing extra branches. Long labels must remain discoverable and must not break row selection or keyboard navigation.
+
+Retain the current paginated HEAD ancestry: decorate only commits actually shown, without implicitly enabling --all, a topology graph, fetch, checkout or branch mutation. Refresh decorations when refs move even if worktree files do not change; inspect current watcher/poll fingerprints and include relevant ref identity, preserving local/SSH limits. A ref lookup failure must be visibly distinguishable from a successful empty decoration list without hiding otherwise available commits. Update the API model, docs and tests together.

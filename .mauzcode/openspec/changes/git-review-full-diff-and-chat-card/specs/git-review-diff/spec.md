@@ -53,3 +53,41 @@ Controls SHALL preserve themes, keyboard access, visible focus, expanded-state s
 #### Scenario: Keyboard collapse
 - **WHEN** a reviewer toggles a file using the keyboard
 - **THEN** focus remains usable and the control exposes its updated expanded state
+
+### Requirement: Single-step repository launch
+Activating Git from Canvas Start SHALL open or activate exactly one repository tab directly, without an intermediate launcher tab. The target SHALL use the current workspace host and directory and remain pinned. Repeated activation for the same target SHALL reuse the existing repository tab.
+
+#### Scenario: First activation
+- **WHEN** the user activates Git with no tab for the current target
+- **THEN** one repository tab opens without a separate launcher tab or second user action
+
+#### Scenario: Repeated activation
+- **WHEN** Git is activated again for an already open target or repeatedly while opening
+- **THEN** the same repository tab is activated without duplicate tabs
+
+#### Scenario: Opening fails
+- **WHEN** the authorized target cannot be opened
+- **THEN** a visible error is reported without an orphan launcher tab or fallback to a different host or directory
+
+### Requirement: Commit reference decorations
+History SHALL display HEAD, local branches, remote-tracking branches and tags attached to each visible commit, with distinguishable accessible labels. Symbolic HEAD SHALL identify its current branch; detached HEAD SHALL remain visible without implying a branch. Annotated and lightweight tags SHALL attach to their target commits.
+
+#### Scenario: Multiple references point to one commit
+- **WHEN** a visible commit is pointed to by HEAD, branches and tags
+- **THEN** all applicable reference decorations are available with their types distinguishable, including colliding short names
+
+#### Scenario: Detached HEAD and annotated tags
+- **WHEN** HEAD is detached at a commit with an annotated tag
+- **THEN** the commit shows HEAD and the tag resolved to the commit rather than to the tag object
+
+#### Scenario: References move
+- **WHEN** a branch or tag changes without worktree changes and History refreshes through its live or manual mechanism
+- **THEN** decorations reflect the current references on the pinned host without fetching or modifying Git state
+
+#### Scenario: History scope and lookup errors
+- **WHEN** decorations are loaded for a page of HEAD history
+- **THEN** unrelated branch history is not added and any reference-lookup failure is reported distinctly from an empty reference list
+
+#### Scenario: Long or unusual ref names
+- **WHEN** reference names are long or contain punctuation
+- **THEN** they render safely as text with full names discoverable and do not break commit selection or keyboard access

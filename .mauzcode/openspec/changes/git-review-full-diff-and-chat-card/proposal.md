@@ -25,3 +25,11 @@ None. There are no existing Git review capability specs in the canonical spec di
 Affects plugins/git/ui, gitUi.commentsSend, gitReviewComments, commentsList, tool documentation, chat event serialization and frontend grouping/rendering tests. Existing single-file workflows and unfiltered tool calls remain compatible. No new dependency or database table is planned. Git operations remain read-only and SSH failures never fall back to local execution.
 
 This approved stage creates and validates OpenSpec artifacts only. Application-code implementation requires a subsequent user request.
+
+## Additional Scope: One-step Git Launch
+
+- Open Git directly into a single repository Canvas tab, following the OpenSpec launcher pattern, without an intermediate launcher tab. Repeated activation reuses the existing tab for the same pinned host and directory.
+
+## Additional Scope: History Reference Decorations
+
+- Show HEAD, local branches, remote-tracking branches and tags beside their commits, similar to git log --decorate. Keep the current HEAD-history scope; an all-branches graph is not part of this change.

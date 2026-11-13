@@ -29,6 +29,17 @@ These tasks are for the subsequent implementation stage, not the approved artifa
 - [ ] 4.2 Run relevant backend/frontend tests, typechecks and code quality checks; verify changed runtime docs strictly, regenerate types/reload routes when applicable and record results without claiming unrun checks passed.
 - [ ] 4.3 Verify legacy full-text history plus newly persisted reference cards survive reload and the documented rollback retains readable new history; record acceptance against both capability specs.
 
+## 5. One-step Canvas launch
+
+- [ ] 5.1 Replace Git's intermediate component launcher with the public asynchronous open callback pattern used by OpenSpec; verify the authorized endpoint returns the final repository item ID and update launcher documentation.
+- [ ] 5.2 Add tests for first launch, repeat activation, concurrent clicks, local/SSH target identity and opening errors; verify exactly one matching repository tab, no intermediate/orphan tab, no target fallback and no closure of unrelated tabs.
+
+## 6. Commit reference decorations
+
+- [ ] 6.1 Extend history data and UI types with structured HEAD/branch/remote/tag references from bounded read-only commands on the pinned host; verify symbolic/detached HEAD, lightweight/annotated tags, non-commit tags, remote aliases and colliding names in backend tests and document the contract.
+- [ ] 6.2 Render accessible typed reference badges in commit rows; verify multiple references, long/punctuated names, escaping, keyboard navigation, themes and unchanged HEAD-history pagination in UI tests.
+- [ ] 6.3 Include ref movement in local/SSH refresh detection and expose lookup errors without hiding commits; verify ref-only updates, no fetch or mutations, bounded polling and no cross-host fallback.
+
 ## Workflow follow-up
 
 - Request a separate user instruction before beginning application-code implementation.
