@@ -6,7 +6,7 @@
     "src": "src",
     "label": "Git",
     "icon": "ph-git-branch",
-    "description": "Inspect project Git changes and HEAD history in a read-only Canvas tab, locally or over SSH.",
+    "description": "Review live Git diffs and history locally or over SSH, save comments, explicitly Send to an agent and resolve via tools. Repository stays read-only; archiving an agent permanently deletes its Git comments.",
     "ui": {
       "entry": "ui/index.tsx",
       "canvasKinds": [

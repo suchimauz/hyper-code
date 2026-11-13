@@ -43,6 +43,26 @@ test('CRUD, byte limits, timestamps, resolution idempotency, reopen and mutation
  await g.commentDelete({...f.target,id:c.id});expect((await g.commentsList(f.target)).comments).toHaveLength(0);
  expect(f.events).toHaveLength(6);expect(f.events.every(e=>e.type==='gitUi.comments.changed'&&e.key===f.events[0].key)).toBe(true);
 });
+test('HTTP permission and CSRF matrix rejects every comment operation without mutations or events',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'keep'});
+ const operations=['comments','commentCreate','commentUpdate','commentDelete','commentResolve','commentReopen','commentsSend'];
+ const request=(op:string)=>new Request(`http://localhost/gitUi?agentId=review-a&itemId=1&op=${op}`,op==='comments'?{}:{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:c.id,anchor:f.anchor,body:'changed',note:'done'})});
+ for(const guard of ['csrf','foreign','archived','closed']){
+  f.ctx.fns.auth.verifyCsrf=async()=>guard!=='csrf';
+  f.ctx.fns.canvas.authorizeHttp=async()=>guard==='foreign'?new Response(null,{status:403}):null;
+  await f.db.run({sql:'UPDATE agents SET archived_at=? WHERE id=?',params:[guard==='archived'?1:null,'review-a']});
+  if(guard==='closed')f.close();
+  f.events.length=0;
+  for(const op of operations){
+   if(guard==='csrf'&&op==='comments')continue;
+   const response=await g.handle({req:request(op)});
+   expect(response.status).toBe(403);expect(response.headers.get('cache-control')).toBe('no-store');expect(await response.json()).toHaveProperty('error');
+  }
+  const rows=await f.db.select({sql:'SELECT body,status,sent_at FROM git_review_comments WHERE id=?',params:[c.id]});
+  expect(rows).toEqual([{body:'keep',status:'open',sent_at:null}]);expect(f.events).toHaveLength(0);
+ }
+});
 test('foreign, closed and archived guards cover every entry point',async()=>{
  const f=await fixture(),g=f.ctx.fns.gitUi;const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'x'});
  await expect(g.commentUpdate({agentId:'review-b',itemId:2,id:c.id,body:'steal'})).rejects.toThrow('not found');
@@ -67,6 +87,8 @@ test('500-open limit serializes concurrent create and reopen using the agent row
  for(const name of names){const fn=(await import('./'+name+'.ts')).default;other.fns.gitUi[name]=(opts:any)=>fn(other,null,opts);}
  const results=await Promise.allSettled([g.commentCreate({...f.target,anchor:f.anchor,body:'race'}),other.fns.gitUi.commentReopen({...f.target,id:c.id})]);expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect(results.filter(r=>r.status==='rejected')).toHaveLength(1);expect((await g.commentsList(f.target)).openCount).toBe(500);
  await expect(g.commentCreate({...f.target,anchor:f.anchor,body:'overflow'})).rejects.toThrow('500');
+ const response=await g.handle({req:new Request('http://localhost/gitUi?agentId=review-a&itemId=1&op=commentCreate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({anchor:f.anchor,body:'overflow'})})});
+ expect(response.status).toBe(409);expect(response.headers.get('cache-control')).toBe('no-store');expect(await response.json()).toHaveProperty('error');
 });
 test('HTTP JSON errors, CSRF, trusted targets and no-op POST opening contract',async()=>{
  const f=await fixture(),g=f.ctx.fns.gitUi;
