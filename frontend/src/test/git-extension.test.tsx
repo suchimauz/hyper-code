@@ -16,6 +16,7 @@ vi.mock('../../../plugins/git/node_modules/react/jsx-dev-runtime.js', async () =
 import { requestJson } from '@mauzcode/ui';
 import git, { Repository, parsePatch, extendRange, rangeText } from '../../../plugins/git/ui';
 import { createExtensionRegistry } from '../extensions/registry';
+import { ReviewCardDetails } from '../../../plugins/git/ui/reviewCard';
 
 const request = vi.mocked(requestJson);
 const PATCH = ['diff --git a/src/a.ts b/src/a.ts', '--- a/src/a.ts', '+++ b/src/a.ts', '@@ -1,6 +1,8 @@',
@@ -336,5 +337,36 @@ describe('git plugin UI', () => {
       expect(screen.getByRole('note')).toHaveTextContent('Showing the latest 201 commits, the most this view can load.');
       expect(snapshotCalls().some(c => c.startsWith('201'))).toBe(false);
     }, 30000);
+  });
+});
+
+describe('Git review chat card details', () => {
+  const reference = { version: 1 as const, host: 'local', dir: '/w/proj', count: 3, ids: ['a1', 'a2', 'a3'] };
+  beforeEach(() => { request.mockReset(); });
+  it('is granted only through chatCards and reads live details on demand in send order', async () => {
+    expect(createExtensionRegistry([git], {}).chatCards).toHaveLength(0);
+    expect(createExtensionRegistry([git], { git: { chatCards: ['git.review'] } }).chatCards.map(card => card.kind)).toEqual(['git.review']);
+    request.mockImplementation(async () => ({ eventIdx: 7, host: 'local', dir: '/w/proj', count: 3, sentAt: 5, items: [
+      { id: 'a1', state: 'available', changedAfterSend: false, comment: comment('a1', { body: 'First body' }) },
+      { id: 'a2', state: 'available', changedAfterSend: true, comment: comment('a2', { body: 'Edited body', status: 'resolved', resolution_note: 'done' }) },
+      { id: 'a3', state: 'unavailable' },
+    ] }) as never);
+    render(<ReviewCardDetails context={{ ...ctx, readOnly: true }} eventIdx={7} reference={reference} />);
+    await settle();
+    expect(request.mock.calls[0][0]).toBe('/gitUi?agentId=ab&op=reviewCard&eventIdx=7');
+    expect(request.mock.calls.every(([, o]) => !o?.method)).toBe(true);
+    const items = within(screen.getByRole('list', { name: 'Комментарии Git review' })).getAllByRole('listitem');
+    expect(items.map(item => item.dataset.reviewState)).toEqual(['available', 'available', 'unavailable']);
+    expect(items[0]).toHaveTextContent('First body'); expect(items[0]).not.toHaveTextContent('Текущая версия');
+    expect(items[1]).toHaveTextContent('Текущая версия (изменён после отправки)'); expect(items[1]).toHaveTextContent('Решён'); expect(items[1]).toHaveTextContent('done');
+    expect(items[2]).toHaveTextContent('Комментарий удалён или недоступен');
+    expect(screen.getByText(/не снимок/)).toBeInTheDocument();
+  });
+  it('shows explicit access denial without loosening the target', async () => {
+    request.mockImplementation(async () => { throw Object.assign(new Error('Access denied: open the Git tab for local:/w/proj to view these comments'), { status: 403 }); });
+    render(<ReviewCardDetails context={{ ...ctx, readOnly: true }} eventIdx={7} reference={reference} />);
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent('Нет доступа: Access denied: open the Git tab');
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

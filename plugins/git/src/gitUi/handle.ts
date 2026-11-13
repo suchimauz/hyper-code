@@ -22,6 +22,8 @@ export default async function(ctx:Context,session:Session|null,opts:{
    return reply(await ctx.fns.canvas.show({agentId,kind:'gitUi.repository',args:{}}));
   }
  }
+ // Chat card details resolve their own repository from the persisted reference and still require an open owned tab.
+ if(opts.req.method==='GET'&&op==='reviewCard')return reply(await ctx.fns.gitUi.reviewCard({agentId,eventIdx:Number(url.searchParams.get('eventIdx'))}));
  const itemId=Number(url.searchParams.get('itemId'));
  const {dir,host}=await ctx.fns.gitUi.ownedItem({agentId,itemId});
  const target={agentId,itemId};let data:object;
@@ -44,5 +46,5 @@ export default async function(ctx:Context,session:Session|null,opts:{
  else if(op==='comments')data=await ctx.fns.gitUi.commentsList({...target,page:Number(url.searchParams.get('page')??0),limit:Number(url.searchParams.get('limit')??100),status:(url.searchParams.get('status')||'open') as 'open'|'resolved'|'all',path:url.searchParams.get('path')??undefined});
  else return reply({error:'Unsupported read operation'},400);
  return reply(data);
- }catch(error){const status=error instanceof Error&&'status' in error?Number(error.status):400;return reply({error:error instanceof Error?error.message:String(error)},[400,403,409].includes(status)?status:400);}
+ }catch(error){const status=error instanceof Error&&'status' in error?Number(error.status):400;return reply({error:error instanceof Error?error.message:String(error)},[400,403,404,409].includes(status)?status:400);}
 }

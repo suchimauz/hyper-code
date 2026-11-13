@@ -7,6 +7,7 @@ import { ListBox } from './list';
 import { byFile, commentMatches, errorText, filterComments, GROUP_LABEL, GROUPS, moveIndex, openCountFor, prefersReducedMotion, rangeLabel, relativeDate, shortHash, STATUS_LABEL, targetOf,
   type Anchor, type Commit, type CommitFiles, type CommentsPage, type Filter, type GitFile, type Group, type Patch, type ReviewComment, type Section, type Snapshot, type Target } from './model';
 import { styles } from './styles';
+import { ReviewCardDetails } from './reviewCard';
 import { indicatorOf, useTransportStatus } from './useLive';
 
 export { parsePatch, extendRange, rangeText, buildAnchor, moveIndex } from './model';
@@ -468,5 +469,6 @@ const extension: UiExtension = {
   id: 'git', apiVersion: 1,
   canvasLaunchers: [{ id: 'git', title: 'Git', description: 'Project changes, history and review comments', component: Launcher }],
   canvasKinds: [{ kind: 'gitUi.repository', component: Repository }],
+  chatCards: [{ kind: 'git.review', component: ReviewCardDetails }],
 };
 export default extension;

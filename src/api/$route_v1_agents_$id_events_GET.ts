@@ -90,6 +90,20 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
         sql: "SELECT idx FROM messages WHERE agent_id = ? AND idx = ANY(?::integer[]) AND role = 'user' AND coalesce(message_type, 'message') = 'message' AND coalesce(author, '') NOT LIKE 'agent:%'",
         params: [id, `{${linkedUsers.join(',')}}`],
     })).map((row: any) => Number(row.idx)) : []);
+    // Only a typed review delivery may carry a compact reference; a forged field
+    // on any other user event is ignored. Legacy full-text deliveries have none
+    // and stay readable through their original text.
+    const reviewEvents = events.filter((event: any) => event.type === 'user' && typeof event.messageIdx === 'number' && event.gitReview != null);
+    const reviewMessages = new Set<number>(reviewEvents.length ? (await ctx.fns.procs.db.select({
+        sql: "SELECT idx FROM messages WHERE agent_id = ? AND idx = ANY(?::integer[]) AND role = 'user' AND message_type = 'git_review_comments'",
+        params: [id, `{${reviewEvents.map((event: any) => event.messageIdx).join(',')}}`],
+    })).map((row: any) => Number(row.idx)) : []);
+    const reviewRefs = new Map<number, types.session.ReviewReference>();
+    for (const event of reviewEvents) {
+        if (!reviewMessages.has(event.messageIdx)) continue;
+        const ref = await ctx.fns.session.decodeReviewReference({ value: event.gitReview });
+        if (ref) reviewRefs.set(Number(event.idx), ref);
+    }
 
     // Persisted assistant tool_calls distinguish a final reply from commentary,
     // including legacy history whose run start is outside the loaded page.
@@ -189,6 +203,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
             // Only the explicit terminal answer path opts in; historical rendered markdown is not proof.
             htmlSource: event.type === 'assistant' && event.htmlSource === 'assistant-answer' && typeof event.html === 'string' ? 'assistant-answer' : null,
             actor: typeof event.actor === 'string' ? event.actor : null,
+            gitReview: reviewRefs.get(Number(event.idx)) ?? null,
             navigationEligible: event.type === 'user' && humanMessages.has(event.messageIdx)
                 && !String(event.actor || '').startsWith('agent:') && !event.agentMessage && !event.outgoingAgentMessage
                 && !/^<(?:agent-message|team-update|input-result|canvas-ping)(?:\s|>)/.test(String(event.text || '').trimStart()),
@@ -268,7 +283,7 @@ export default async function (ctx: Context, _session: Session | null, opts: { r
             mobileEvents.push({
                 idx: base + n / 1000, messageIdx: null, ts: at, type: 'goal_transition', text: typeof row.objective === 'string' ? row.objective : null,
                 goalStatus: row.after_status ?? null, goalBeforeStatus: row.before_status ?? null, goalOrigin: String(row.origin ?? ''),
-                mentions: [], html: null, actor: null, navigationEligible: false, author: null, peerAuthor: null, agentMessage: null, outgoingAgentMessage: null, name: null, attachments: [],
+                mentions: [], html: null, actor: null, navigationEligible: false, gitReview: null, author: null, peerAuthor: null, agentMessage: null, outgoingAgentMessage: null, name: null, attachments: [],
             } as any);
         }
         mobileEvents.sort((a: any, b: any) => a.idx - b.idx);

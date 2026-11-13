@@ -9,7 +9,8 @@ import archive from '../../../../src/session/archive';
 import restoringHook from './$hook_session.restoring';
 import runHooks from '../../../../src/procs/hooks/run';
 import deleteSession from '../../../../src/session/delete';
-const names=['cleanupArchivedAgent','commentPath','commentOutdated','ownedItem','commentLines','commentView','commentsChanged','commentMutate','commentCreate','commentUpdate','commentDelete','commentResolve','commentReopen','commentsList','handle','commentsSend','commentToolTarget','gitReviewComments','gitResolveComment'];
+import decodeReviewReference from '../../../../src/session/decodeReviewReference';
+const names=['cleanupArchivedAgent','commentPath','commentOutdated','ownedItem','commentLines','commentView','commentsChanged','commentMutate','commentCreate','commentUpdate','commentDelete','commentResolve','commentReopen','commentsList','handle','commentsSend','commentToolTarget','gitReviewComments','gitResolveComment','reviewCard'];
 async function fixture(){
  const dbctx=await testCtx();const db=dbctx.fns.procs.db;
  await migration.up(dbctx);
@@ -20,7 +21,7 @@ async function fixture(){
  ctx.fns.procs.hooks={run:(opts:any)=>runHooks(ctx,null,opts)};
  ctx.fns.procs.log={warn:()=>{}};
  ctx.fns.events={emitAgentsChanged:async()=>{}};
- ctx.fns.session={appendUserMessage:(opts:any)=>dbctx.fns.session.appendUserMessage(opts)};
+ ctx.fns.session={appendUserMessage:(opts:any)=>dbctx.fns.session.appendUserMessage(opts),decodeReviewReference:(opts:any)=>decodeReviewReference(dbctx as any,null,opts)};
  ctx.fns.agent={current:async()=>({id:'review-a'}),wakeWorker:()=>{}};
  ctx.fns.workspace={get:()=>({agentId:'review-a',host:'',dir:'/fixture'})};
  ctx.fns.procs.events.refresh=()=>{};
@@ -223,7 +224,10 @@ test('real commit and index anchors ignore worktree obstacles, including rename 
 test('delivery commits transcript, scheduling and receipts once under concurrent sends; reopen resends',async()=>{
  const f=await fixture(),g=f.ctx.fns.gitUi;const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'fix this'});
  const results=await Promise.all([g.commentsSend(f.target),g.commentsSend(f.target)]);expect(results.map(r=>r.sent).sort()).toEqual([0,1]);
- const messages=await f.db.select({sql:"SELECT * FROM messages WHERE agent_id='review-a' AND message_type='git_review_comments'"});expect(messages).toHaveLength(1);expect(messages[0].role).toBe('user');expect(messages[0].content).toContain('Git review comments for local:/fixture (1)');expect(messages[0].content).toContain(c.id);expect(messages[0].content).toContain('   > new');
+ const messages=await f.db.select({sql:"SELECT * FROM messages WHERE agent_id='review-a' AND message_type='git_review_comments'"});expect(messages).toHaveLength(1);expect(messages[0].role).toBe('user');expect(messages[0].content).toContain('Git review comments for local:/fixture (1)');expect(messages[0].content).toContain(c.id);
+ // Reference-only: no body, no quoted line, but exact IDs and retrieval/resolution instructions.
+ expect(messages[0].content).not.toContain('fix this');expect(messages[0].content).not.toContain('> new');expect(messages[0].content).toContain("gitReviewComments({ ids, status: 'all' })");expect(messages[0].content).toContain('nextPage');expect(messages[0].content).toContain('gitResolveComment');expect(messages[0].content).toContain(JSON.stringify([c.id]));
+ const sentEvents=await f.db.select({sql:"SELECT payload FROM events WHERE agent_id='review-a'"});expect(sentEvents).toHaveLength(1);expect(JSON.parse(sentEvents[0].payload).gitReview).toEqual({version:1,host:'local',dir:'/fixture',count:1,ids:[c.id]});
  expect((await f.db.select({sql:"SELECT next_run_at FROM agents WHERE id='review-a'"}))[0].next_run_at).not.toBeNull();
  expect((await g.commentsList(f.target)).comments[0].sent_at).not.toBeNull();expect(await g.commentsSend(f.target)).toEqual({sent:0});
  await g.gitResolveComment({id:c.id,note:'fixed'});const reopened=(await g.commentReopen({...f.target,id:c.id})).comment;for(const key of ['sent_at','resolved_at','resolved_by','resolution_note'])expect(reopened[key]).toBeNull();expect(await g.commentsSend(f.target)).toEqual({sent:1});
@@ -388,4 +392,56 @@ test('restore cleanup rolls back both statuses and notifications when a later ha
  await unarchive(f.ctx,null,{id:'review-a'});
  expect(await f.db.select({sql:'SELECT id FROM git_review_comments'})).toEqual([]);
  expect(f.events).toHaveLength(1);
+});
+test('review card reads the exact sent set live in send order with placeholders, current versions and explicit denial',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;
+ const ids:string[]=[];for(const body of ['first','second','third'])ids.push((await g.commentCreate({...f.target,anchor:f.anchor,body})).comment.id);
+ await g.commentsSend(f.target);
+ const later=(await g.commentCreate({...f.target,anchor:f.anchor,body:'unsent later'})).comment.id;
+ const eventIdx=Number((await f.db.select({sql:"SELECT idx FROM events WHERE agent_id='review-a' ORDER BY idx DESC LIMIT 1"}))[0].idx);
+ await Bun.sleep(2);await g.commentUpdate({...f.target,id:ids[1],body:'second edited'});await g.commentDelete({...f.target,id:ids[2]});
+ const before={m:(await f.db.select({sql:'SELECT count(*)::int AS n FROM messages'}))[0].n,e:(await f.db.select({sql:'SELECT count(*)::int AS n FROM events'}))[0].n};
+ const card=await g.reviewCard({agentId:'review-a',eventIdx});
+ expect(card).toMatchObject({eventIdx,host:'local',dir:'/fixture',count:3});
+ expect(card.items.map((i:any)=>i.id)).toEqual(ids);expect(card.items.map((i:any)=>i.id)).not.toContain(later);
+ expect(card.items[0]).toMatchObject({state:'available',changedAfterSend:false});expect(card.items[0].comment.body).toBe('first');
+ expect(card.items[1]).toMatchObject({state:'available',changedAfterSend:true});expect(card.items[1].comment.body).toBe('second edited');
+ expect(card.items[2]).toEqual({id:ids[2],state:'unavailable'});
+ const response=await g.handle({req:new Request(`http://localhost/gitUi?agentId=review-a&op=reviewCard&eventIdx=${eventIdx}`)});expect(response.status).toBe(200);expect((await response.json()).items).toHaveLength(3);
+ expect((await f.db.select({sql:'SELECT count(*)::int AS n FROM messages'}))[0].n).toBe(before.m);expect((await f.db.select({sql:'SELECT count(*)::int AS n FROM events'}))[0].n).toBe(before.e);
+ expect((await g.handle({req:new Request('http://localhost/gitUi?agentId=review-a&op=reviewCard&eventIdx=999')})).status).toBe(404);
+ expect((await g.handle({req:new Request('http://localhost/gitUi?agentId=review-a&op=reviewCard&eventIdx=-1')})).status).toBe(400);
+ // A forged reference on an ordinary user event is not a review card.
+ await f.dbctx.fns.session.appendUserMessage({id:'review-a',text:'plain',eventExtra:{gitReview:{version:1,host:'local',dir:'/fixture',count:1,ids:[ids[0]]}}});
+ const forged=Number((await f.db.select({sql:"SELECT idx FROM events WHERE agent_id='review-a' ORDER BY idx DESC LIMIT 1"}))[0].idx);
+ await expect(g.reviewCard({agentId:'review-a',eventIdx:forged})).rejects.toThrow('unavailable');
+ await expect(g.reviewCard({agentId:'review-b',eventIdx})).rejects.toThrow('unavailable');
+ f.ctx.fns.canvas.authorizeHttp=async()=>new Response(null,{status:403});expect((await g.handle({req:new Request(`http://localhost/gitUi?agentId=review-a&op=reviewCard&eventIdx=${eventIdx}`)})).status).toBe(403);f.ctx.fns.canvas.authorizeHttp=async()=>null;
+ f.close();await expect(g.reviewCard({agentId:'review-a',eventIdx})).rejects.toThrow('Access denied');
+ expect((await g.handle({req:new Request(`http://localhost/gitUi?agentId=review-a&op=reviewCard&eventIdx=${eventIdx}`)})).status).toBe(403);
+});
+test('repeated sends produce distinct cards; reopen resends the same ID in a new reference',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'again'});
+ await g.commentsSend(f.target);await g.gitResolveComment({id:c.id,note:'n'});await g.commentReopen({...f.target,id:c.id});await g.commentsSend(f.target);
+ const rows=await f.db.select({sql:"SELECT idx,payload FROM events WHERE agent_id='review-a' ORDER BY idx"});expect(rows).toHaveLength(2);
+ for(const row of rows){expect(JSON.parse(row.payload).gitReview.ids).toEqual([c.id]);const card=await g.reviewCard({agentId:'review-a',eventIdx:Number(row.idx)});expect(card.items[0].state).toBe('available');}
+});
+test('Send boundary: 500 open unsent comments (the enforced cap) go in one reference; a forced 501 splits atomically',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'seed'});
+ const clone=(n:number,from:number)=>f.db.run({sql:"INSERT INTO git_review_comments SELECT md5(?||n::text)::uuid,agent_id,host,dir,scope,commit_hash,worktree_group,path,old_path,side,line_start,line_end,line_text,body,'open',NULL,NULL,NULL,NULL,created_at+n,updated_at FROM git_review_comments CROSS JOIN generate_series(?,?) AS n WHERE id=?",params:['x',from,from+n-1,c.id]});
+ await clone(499,1);
+ await expect(g.commentCreate({...f.target,anchor:f.anchor,body:'501st'})).rejects.toThrow('Maximum of 500 open comments');
+ expect(await g.commentsSend(f.target)).toEqual({sent:500});
+ let events=await f.db.select({sql:"SELECT payload FROM events WHERE agent_id='review-a' ORDER BY idx"});expect(events).toHaveLength(1);
+ const first=JSON.parse(events[0].payload).gitReview;expect(first.count).toBe(500);expect(new Set(first.ids).size).toBe(500);
+ // Bypass the cap directly (legacy/corrupt data) to prove Send never fails as a whole above 500.
+ await f.db.run({sql:'DELETE FROM git_review_comments'});await f.db.run({sql:'DELETE FROM events'});await f.db.run({sql:'DELETE FROM messages'});
+ const {comment:d}=await g.commentCreate({...f.target,anchor:f.anchor,body:'seed2'});
+ await f.db.run({sql:"INSERT INTO git_review_comments SELECT md5('y'||n::text)::uuid,agent_id,host,dir,scope,commit_hash,worktree_group,path,old_path,side,line_start,line_end,line_text,body,'open',NULL,NULL,NULL,NULL,created_at+n,updated_at FROM git_review_comments CROSS JOIN generate_series(1,500) AS n WHERE id=?",params:[d.id]});
+ expect(await g.commentsSend(f.target)).toEqual({sent:501});
+ events=await f.db.select({sql:"SELECT idx,payload FROM events WHERE agent_id='review-a' ORDER BY idx"});expect(events).toHaveLength(2);
+ const refs=events.map((e:any)=>JSON.parse(e.payload).gitReview);expect(refs.map((r:any)=>r.count)).toEqual([500,1]);
+ expect(new Set([...refs[0].ids,...refs[1].ids]).size).toBe(501);expect(refs[0].ids[0]).toBe(d.id);
+ expect((await f.db.select({sql:"SELECT count(*)::int AS n FROM git_review_comments WHERE sent_at IS NULL"}))[0].n).toBe(0);
+ for(const e of events)expect((await g.reviewCard({agentId:'review-a',eventIdx:Number(e.idx)})).items.every((i:any)=>i.state==='available')).toBe(true);
 });

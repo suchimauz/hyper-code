@@ -130,3 +130,18 @@ test('modelProviders grants compile, are validated and changes invalidate approv
   }
  } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test('chatCards grants compile only for kinds owned by the plugin and changes invalidate approval', async () => {
+ const dir = await plugin({ chatCards: ['demo.review'] }, { 'ui/index.tsx': view, 'ui/helper.ts': "export const helper = 'Demo';" });
+ try {
+  const built = await compile(context(dir), null, {name:'demo'});
+  expect(built.build?.error).toBeNull();
+  expect(built.build?.grants.chatCards).toEqual(['demo.review']);
+  const old = {pages:[],panels:[],actions:[],canvasKinds:[]};
+  expect((await manifest(context(dir,'user',[{name:'demo',hash:built.build!.hash,grants:old}]),null,{})).pending[0]?.reason).toBe('changed');
+  for (const kind of ['git.review', 'demo', 'Demo.review', 'demo._x']) {
+   await writeFile(join(dir,'package.json'), JSON.stringify({procs:{ui:{chatCards:[kind]}}}));
+   expect((await compile(context(dir),null,{name:'demo'})).build?.error).toContain('must belong to plugin demo');
+  }
+ } finally { await rm(dir,{recursive:true,force:true}); }
+});

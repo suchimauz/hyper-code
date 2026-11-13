@@ -1,0 +1,5 @@
+/* Git review receipt reuses tool-row/question-history geometry; only plugin-independent notes live here. */
+.git-review-card .question-history-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
+.git-review-card-note { margin: 0; color: var(--text-tertiary); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .git-review-card, .git-review-card * { transition: none !important; animation: none !important; } }
+@media (prefers-contrast: more) { .git-review-card { border: 1px solid var(--line); } }

@@ -10,10 +10,10 @@ These tasks are for the subsequent implementation stage, not the approved artifa
 
 ## 2. Durable references and chat presentation
 
-- [ ] 2.1 Add versioned compact review-reference encoding/decoding through session APIs and event serialization; verify round-trip persistence and readable legacy full-text fallback without direct transcript mutation.
-- [ ] 2.2 Add authorized on-demand card detail retrieval with missing-ID placeholders and current-version labels; verify edited/deleted comments, access denial and exclusion of unrelated newly created comments, and document live rather than snapshot semantics.
-- [ ] 2.3 Render the accessible Git review count card outside tool-call groups and inside its associated work/Completed group; verify mixed form/tool/review grouping, completion, reload, themes, keyboard focus and reduced motion in frontend tests.
-- [ ] 2.4 Switch commentsSend to reference-only delivery while retaining atomic scheduling and receipts; verify no bodies/quotes/diffs in model-facing delivery, concurrent/repeated Send, reopen eligibility and full rollback on failure. Update plugin workflow documentation and hot-reload/validate changed functions.
+- [x] 2.1 Add versioned compact review-reference encoding/decoding through session APIs and event serialization; verify round-trip persistence and readable legacy full-text fallback without direct transcript mutation.
+- [x] 2.2 Add authorized on-demand card detail retrieval with missing-ID placeholders and current-version labels; verify edited/deleted comments, access denial and exclusion of unrelated newly created comments, and document live rather than snapshot semantics.
+- [x] 2.3 Render the accessible Git review count card outside tool-call groups and inside its associated work/Completed group; verify mixed form/tool/review grouping, completion, reload, themes, keyboard focus and reduced motion in frontend tests.
+- [x] 2.4 Switch commentsSend to reference-only delivery while retaining atomic scheduling and receipts; verify no bodies/quotes/diffs in model-facing delivery, concurrent/repeated Send, reopen eligibility and full rollback on failure. Update plugin workflow documentation and hot-reload/validate changed functions.
 
 ## 3. Aggregate diff review
 

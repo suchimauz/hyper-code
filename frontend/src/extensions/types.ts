@@ -38,6 +38,13 @@ export type ModelConnectionView = Readonly<{ id: string; provider: string; provi
 export type ExtensionModelProviderProps = ExtensionViewProps & { provider: ModelProviderView; connection?: ModelConnectionView; onSaved: (connection: ModelConnectionView) => void; onCancel: () => void };
 /** Connection form for one provider id; requires a modelProviders grant for that id. */
 export type ExtensionModelProvider = { provider: string; component: ComponentType<ExtensionModelProviderProps> };
+/** Compact durable reference of a sent Git review; identities only, never comment content. */
+export type ExtensionReviewReference = Readonly<{ version: 1; host: string; dir: string; count: number; ids: readonly string[] }>;
+/** Expanded details of a structured chat card. The host owns the card header, grouping and disclosure; the component
+ * fetches live details through the plugin's own authorized endpoint and must never append them to the transcript. */
+export type ExtensionChatCardProps = ExtensionViewProps & { eventIdx: number; reference: ExtensionReviewReference };
+/** Detail renderer for a host-classified chat card kind (`git.review`); requires a chatCards grant. */
+export type ExtensionChatCard = { kind: string; component: ComponentType<ExtensionChatCardProps> };
 export type ExtensionPage = { id: string; title: string; component: ComponentType<ExtensionViewProps> };
 export type ExtensionPanel = { id: string; title: string; component: ComponentType<ExtensionViewProps> };
 export type ExtensionAction = { id: string; title: string; run: (context: ExtensionContext) => void | Promise<void>; mutates?: boolean };
@@ -58,9 +65,11 @@ export type UiExtension = {
   canvasLaunchers?: readonly ExtensionCanvasLauncher[];
   /** Provider connection forms for the Models settings tab; each also requires a modelProviders grant. */
   modelProviders?: readonly ExtensionModelProvider[];
+  /** Detail renderers for host chat cards; each also requires a chatCards grant. */
+  chatCards?: readonly ExtensionChatCard[];
   actions?: readonly ExtensionAction[];
 };
-export type ExtensionGrant = Readonly<{ inputKinds?: readonly string[]; pages?: readonly string[]; sidebarNavigation?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[]; canvasLaunchers?: readonly string[]; modelProviders?: readonly string[] }>;
+export type ExtensionGrant = Readonly<{ inputKinds?: readonly string[]; pages?: readonly string[]; sidebarNavigation?: readonly string[]; panels?: readonly string[]; actions?: readonly string[]; canvasKinds?: readonly string[]; canvasLaunchers?: readonly string[]; modelProviders?: readonly string[]; chatCards?: readonly string[] }>;
 export type RegisteredView = Readonly<{ key: string; title: string; component: ComponentType<ExtensionViewProps> }>;
 /** A granted launcher; `icon` is resolved (launcher icon, else plugin icon, else null → default). */
 export type RegisteredLauncher = Readonly<Omit<ExtensionCanvasLauncher, 'icon'> & { key: string; icon: string | null }>;
@@ -74,5 +83,6 @@ export type ExtensionRegistry = Readonly<{
   canvasKinds: readonly Readonly<ExtensionCanvasKind & { key: string }>[];
   canvasLaunchers: readonly RegisteredLauncher[];
   modelProviders: readonly Readonly<ExtensionModelProvider & { key: string }>[];
+  chatCards: readonly Readonly<ExtensionChatCard & { key: string }>[];
   actions: readonly RegisteredAction[];
 }>;

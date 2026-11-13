@@ -35,6 +35,29 @@ describe("GET /api/v1/agents/:id/events", () => {
         expect(await response.json()).toMatchObject({ version: 1, agentId: "ab", mascot: "deepy", nextAfter: 3, isRunning: true, partial: { text: "live", revision: 3, startedAt: 9 }, events: [{ idx: 1, type: "wake_up", lifecycle: { reason: "x" } }, { idx: 2, type: "assistant", text: "hello @anna", mentions: ["anna"] }] });
     });
 
+    test('projects a compact Git review reference only for typed review deliveries; legacy and forged events stay text', async () => {
+        const id = '0190aaaa-0000-7000-8000-000000000001';
+        const ref = { version: 1, host: 'local', dir: '/repo', count: 1, ids: [id.toUpperCase()] };
+        const events = [
+            { idx: 1, ts: 10, type: 'user', text: 'Git review comments for local:/repo (1)', messageIdx: 5, gitReview: ref },
+            { idx: 2, ts: 11, type: 'user', text: 'plain human text', messageIdx: 6, gitReview: ref },
+            { idx: 3, ts: 12, type: 'user', text: 'Git review comments for local:/repo (1)\n1. a:1-1 legacy body', messageIdx: 7 },
+            { idx: 4, ts: 13, type: 'user', text: 'Git review comments', messageIdx: 8, gitReview: { ...ref, count: 2 } },
+        ];
+        const queries: string[] = [];
+        const ctx: any = { state: {}, fns: { auth: { author: async () => null }, mentions: { parse: async () => [] }, procs: { db: { select: async ({ sql }: any) => {
+            queries.push(sql);
+            if (sql.includes("message_type = 'git_review_comments'")) return [{ idx: 5 }, { idx: 7 }, { idx: 8 }];
+            return sql.includes('SELECT 1') ? [{ exists: 1 }] : sql.includes("coalesce(message_type, 'message') = 'message'") ? [{ idx: 6 }] : [{ run_state: 'idle', next_run_at: null }];
+        } } }, session: { getEvents: async () => events, getMaxEventIdx: async () => 4, decodeReviewReference: async ({ value }: any) => (await import('../session/decodeReviewReference')).default(ctx, null, { value }) } } };
+        const response = await route(ctx, null, { req: new Request('http://local/api/v1/agents/ab/events'), params: { id: 'ab' } });
+        const body: any = await response.json();
+        expect(body.events.map((event: any) => event.gitReview)).toEqual([{ version: 1, host: 'local', dir: '/repo', count: 1, ids: [id] }, null, null, null]);
+        expect(body.events[2].text).toContain('legacy body');
+        expect(body.events[1].navigationEligible).toBe(true);
+        expect(body.events[0].navigationEligible).toBe(false);
+    });
+
     test("includes resolved authors for multiuser messages", async () => {
         const ctx: any = { state: {}, fns: {
             auth: { author: async ({ userId }: any) => ({ id: userId, name: "Alice", initials: "A", hue: 42, picture: "https://example.com/alice.jpg" }) },

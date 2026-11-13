@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ChatEvent } from '../lib/mauzcode';
-import { processEntries, workTurns } from '../components/mauzcode/transcriptGroups';
+import { isGitReview, processEntries, workTurns } from '../components/mauzcode/transcriptGroups';
 import { Transcript } from '../components/mauzcode/Transcript';
 const ev = (idx: number, type: string, text = '', extra: Partial<ChatEvent> = {}): ChatEvent => ({ idx, ts: idx * 1000, type, text, ...extra });
 const history = [ev(0, 'user', 'Question', { messageIdx: 0 }), ev(1, 'assistant', 'Checking'), ev(2, 'tool_call', '', { name: 'read' }), ev(3, 'tool_call', '', { name: 'unfamiliar_tool' }), ev(4, 'assistant', 'Final answer')];
@@ -186,4 +186,36 @@ it('expands and collapses goal row details like other tool rows', () => {
   expect(screen.getByText(/Статус: В работе → Пауза/)).toBeVisible();
   fireEvent.click(toggle);
   expect(toggle).toHaveAttribute('aria-expanded', 'false');
+});
+
+const reviewRef = { version: 1 as const, host: 'local', dir: '/repo', count: 2, ids: ['0190aaaa-0000-7000-8000-000000000001', '0190aaaa-0000-7000-8000-000000000002'] };
+const review = (idx: number) => ev(idx, 'user', 'Git review comments for local:/repo (2)', { messageIdx: idx, gitReview: reviewRef, navigationEligible: false });
+it('places a Git review card inside its durable run, outside tool groups, with mixed form and tool rows', () => {
+  const runs = [{ id: 'review-run', startIdx: 11, endIdx: 14, startedAt: 11000, endedAt: 14000, status: 'completed' as const, answerIdx: 14, hasInterleavedInput: false }];
+  const events = [ev(9, 'user', 'Earlier', { messageIdx: 9 }), review(10), ev(11, 'tool_call', '', { name: 'gitReviewComments' }), ev(12, 'input', '', { inputId: 'q1', kind: 'confirm' }), ev(13, 'tool_call', '', { name: 'gitResolveComment' }), ev(14, 'assistant', 'Fixed', { isFinalReply: true })];
+  const turns = workTurns(events, false, runs);
+  const run = turns.find(turn => turn.run?.id === 'review-run')!;
+  expect(run.events[0].idx).toBe(10); expect(isGitReview(run.events[0])).toBe(true); expect(run.input).toBeUndefined();
+  expect(processEntries(run.events)[0]).toMatchObject({ kind: 'message' });
+  const view = render(<Transcript {...props} events={events} page={{ isRunning: false, runs } as never} />);
+  const card = view.container.querySelector('[data-chat-flow-kind="git-review"]')!;
+  expect(card).not.toBeNull(); expect(card.closest('.work-group')).not.toBeNull(); expect(card.closest('.process-group')).toBeNull();
+  expect(view.container.querySelector('.message--user[data-event-idx="10"]')).toBeNull();
+  expect(screen.getByRole('button', { name: /Git review · 2/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^Завершено/ })).toHaveAttribute('aria-expanded', 'true');
+});
+it('starts legacy (run-less) work at a review card and folds it once completed on reload', () => {
+  const events = [review(0), ev(1, 'tool_call', '', { name: 'gitReviewComments' }), ev(2, 'assistant', 'Done', { isFinalReply: true }), ev(3, 'user', 'Next', { messageIdx: 3 }), ev(4, 'assistant', 'Ok', { isFinalReply: true })];
+  const turns = workTurns(events, false);
+  expect(turns[0]).toMatchObject({ completeStart: true, status: 'completed', latest: false });
+  expect(turns[0].input).toBeUndefined(); expect(turns[0].events.map(event => event.idx)).toEqual([0, 1]);
+  const view = render(<Transcript {...props} events={events} />);
+  const card = view.container.querySelector('[data-chat-flow-kind="git-review"]')!;
+  expect(card.closest('.work-group')).not.toBeNull(); expect(card).not.toBeVisible();
+  fireEvent.click(screen.getAllByRole('button', { name: /^Завершено/ })[0]);
+  expect(card).toBeVisible();
+});
+it('keeps legacy full-text review messages and forged references as ordinary text', () => {
+  expect(isGitReview(ev(1, 'user', 'Git review comments for local:/repo (1)', { messageIdx: 1 }))).toBe(false);
+  expect(isGitReview(ev(1, 'user', 'x', { gitReview: reviewRef }))).toBe(false);
 });

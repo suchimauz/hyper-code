@@ -9,7 +9,8 @@ import { ChatMarkdown } from './ChatMarkdown';
 import type { ChatEvent } from '../../lib/mauzcode';
 import { ThinkingRow } from './ThinkingRow';
 import { ToolRow } from './ToolRow';
-import { isPeer } from './transcriptGroups';
+import { isGitReview, isPeer } from './transcriptGroups';
+import { GitReviewCard } from './GitReviewCard';
 import { AgentMessage } from './AgentMessage';
 import { CompactionRow } from './CompactionRow';
 import { isCompaction } from './compactionEvents';
@@ -41,6 +42,7 @@ export function TranscriptMessage({ event, agentId }: { event: ChatEvent; agentI
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   if (choiceResultId(event)) return <QuestionHistory event={event} agentId={agentId} />;
+  if (isGitReview(event)) return <GitReviewCard event={event} reference={event.gitReview!} agentId={agentId} />;
   if (isCommandEvent(event)) return <CommandRow event={event} />;
   if (isPeer(event)) return <AgentMessage event={event} />;
   if (isLifecycleEvent(event)) return <LifecycleRow event={event} />;

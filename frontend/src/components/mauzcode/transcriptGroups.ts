@@ -3,8 +3,10 @@ import type { ChatEvent } from '../../lib/mauzcode';
 export type ProcessEntry = { kind: 'message'; event: ChatEvent } | { kind: 'process'; key: number; events: ChatEvent[] };
 export type RunMetadata = { id: string; startIdx: number; endIdx: number | null; startedAt: number; endedAt: number | null; status: 'open' | 'completed' | 'stopped' | 'error'; answerIdx: number | null; hasInterleavedInput: boolean };
 export type WorkTurn = { run?: RunMetadata; key: number; input?: ChatEvent; events: ChatEvent[]; answer?: ChatEvent; status: 'completed' | 'stopped' | 'error' | 'open'; latest: boolean; completeStart: boolean };
-const isHumanInput = (event: ChatEvent) => event.type === 'user' && event.messageIdx != null && !event.agentMessage && !event.outgoingAgentMessage && event.author?.kind !== 'agent' && event.navigationEligible !== false;
+const isHumanInput = (event: ChatEvent) => event.type === 'user' && event.messageIdx != null && !event.gitReview && !event.agentMessage && !event.outgoingAgentMessage && event.author?.kind !== 'agent' && event.navigationEligible !== false;
 export const isPeer = (event: ChatEvent) => !!(event.agentMessage || event.outgoingAgentMessage || event.author?.kind === 'agent' || event.type === 'agent_message_outgoing');
+/** A structured Git review delivery: its own card, never a human bubble or a tool-call group member. */
+export const isGitReview = (event: ChatEvent) => event.type === 'user' && event.messageIdx != null && !!event.gitReview && Array.isArray(event.gitReview.ids);
 const isProcess = (event: ChatEvent) => isPeer(event) || ['thinking', 'tool_call', 'tool_result'].includes(event.type);
 
 /** dsh process-groups: contiguous work only; every assistant reply and input flushes it. */
@@ -35,8 +37,9 @@ export function workTurns(events: ChatEvent[], running: boolean, runs: RunMetada
       // Peer delivery can precede the durable start of the run it wakes.
       // Carry only the adjacent peer suffix into that run; keep human input,
       // assistant replies and earlier work on their original side of the boundary.
+      // A Git review delivery likewise precedes the run it wakes (durable event identity, not position on screen).
       let peerStart = legacy.length;
-      while (peerStart > 0 && isPeer(legacy[peerStart - 1])) peerStart--;
+      while (peerStart > 0 && (isPeer(legacy[peerStart - 1]) || isGitReview(legacy[peerStart - 1]))) peerStart--;
       const pendingPeers = legacy.splice(peerStart);
       flush();
       let turn = result.at(-1);
@@ -46,20 +49,21 @@ export function workTurns(events: ChatEvent[], running: boolean, runs: RunMetada
       else turn.events.push(event);
     }
     flush(true);
-    for (const turn of result) turn.latest = !events.some(event => event.idx > (turn.run?.endIdx ?? turn.events.at(-1)?.idx ?? turn.key) && isHumanInput(event));
+    for (const turn of result) turn.latest = !events.some(event => event.idx > (turn.run?.endIdx ?? turn.events.at(-1)?.idx ?? turn.key) && (isHumanInput(event) || isGitReview(event)));
     return result;
   }
   const turns: WorkTurn[] = [];
   for (const event of events) {
-    if (!turns.length || isHumanInput(event)) {
+    // A review delivery starts the work it requests, but renders inside that work group.
+    if (!turns.length || isHumanInput(event) || isGitReview(event)) {
       const input = isHumanInput(event) ? event : undefined;
-      turns.push({ key: event.idx, input, events: input ? [] : [event], status: 'open', latest: false, completeStart: !!input });
+      turns.push({ key: event.idx, input, events: input ? [] : [event], status: 'open', latest: false, completeStart: !!input || isGitReview(event) });
     } else turns.at(-1)!.events.push(event);
   }
   turns.forEach((turn, index) => {
     turn.latest = index === turns.length - 1;
     // Peer receipts belong inside the same work block, not after its answer.
-    const last = turn.events.filter(event => !isPeer(event)).at(-1);
+    const last = turn.events.filter(event => !isPeer(event) && !isGitReview(event)).at(-1);
     // Tool failures are recoverable; only terminal event status marks the work.
     const interrupted = last?.type === 'stop';
     const failed = last?.type === 'error';

@@ -18,7 +18,7 @@ export default async function (
     const approvals = new Map(rows.map(r => [r.name, { hash: r.hash, grants: typeof r.grants === 'string' ? JSON.parse(r.grants) as types.plugins.UiGrants : r.grants }]));
     const plugins: Array<{ name: string; url: string; hash: string; grants: types.plugins.UiGrants; applications: Record<string, string>; icon: string | null }> = [];
     const pending: Array<{ name: string; source: string; hash: string | null; grants: types.plugins.UiGrants; error: string | null; reason: 'unapproved' | 'changed' | 'failed' }> = [];
-    const same = (a: types.plugins.UiGrants, b: types.plugins.UiGrants) => (['pages', 'panels', 'actions', 'canvasKinds', 'canvasLaunchers', 'sidebarNavigation', 'inputKinds', 'modelProviders'] as const).every(k => JSON.stringify([...(a[k] ?? [])].sort()) === JSON.stringify([...(b[k] ?? [])].sort()));
+    const same = (a: types.plugins.UiGrants, b: types.plugins.UiGrants) => (['pages', 'panels', 'actions', 'canvasKinds', 'canvasLaunchers', 'sidebarNavigation', 'inputKinds', 'modelProviders', 'chatCards'] as const).every(k => JSON.stringify([...(a[k] ?? [])].sort()) === JSON.stringify([...(b[k] ?? [])].sort()));
     for (const b of builds) {
         if (b.error || !b.hash || !b.code) { pending.push({ name: b.name, source: b.source, hash: b.hash, grants: b.grants, error: b.error, reason: 'failed' }); continue; }
         const approval = approvals.get(b.name);

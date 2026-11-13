@@ -12,6 +12,7 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
   const canvasKinds: ExtensionRegistry['canvasKinds'][number][] = [];
   const canvasLaunchers: ExtensionRegistry['canvasLaunchers'][number][] = [];
   const modelProviders: ExtensionRegistry['modelProviders'][number][] = [];
+  const chatCards: ExtensionRegistry['chatCards'][number][] = [];
   const iconClass = (icon: unknown) => typeof icon === 'string' && /^ph-[a-z0-9-]{1,64}$/.test(icon) ? icon : null;
   const ids = new Set<string>();
   const valid = (id: string) => /^[a-z][a-z0-9-]{0,63}$/.test(id);
@@ -63,6 +64,14 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
       if (modelProviders.some(p => p.provider === entry.provider)) throw new Error(`Duplicate model provider component: ${entry.provider}`);
       modelProviders.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.provider}` }));
     }
+    const seenCards = new Set<string>();
+    for (const entry of extension.chatCards ?? []) {
+      if (typeof entry.kind !== 'string' || !entry.kind.startsWith(extension.id + '.') || !/^[a-z][a-z0-9-]*\.[a-z][a-zA-Z0-9.-]{0,63}$/.test(entry.kind) || seenCards.has(entry.kind) || typeof entry.component !== 'function') throw new Error(`Invalid chat card: ${extension.id}/${String(entry.kind)}`);
+      seenCards.add(entry.kind);
+      if (!grant?.chatCards?.includes(entry.kind)) continue;
+      if (chatCards.some(card => card.kind === entry.kind)) throw new Error(`Duplicate chat card: ${entry.kind}`);
+      chatCards.push(Object.freeze({ ...entry, key: `${extension.id}/${entry.kind}` }));
+    }
     for (const placement of ['navigation', 'sidebarNavigation'] as const) {
     const seenNav = new Set<string>();
     for (const item of extension[placement] ?? []) {
@@ -75,5 +84,5 @@ export function createExtensionRegistry(extensions: readonly UiExtension[], gran
     }
     }
   }
-  return Object.freeze({ inputKinds: Object.freeze(inputKinds), sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), canvasLaunchers: Object.freeze(canvasLaunchers), modelProviders: Object.freeze(modelProviders), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
+  return Object.freeze({ inputKinds: Object.freeze(inputKinds), sidebarNavigation: Object.freeze(sidebarNavigation), canvasKinds: Object.freeze(canvasKinds), canvasLaunchers: Object.freeze(canvasLaunchers), modelProviders: Object.freeze(modelProviders), chatCards: Object.freeze(chatCards), pages: Object.freeze(pages), navigation: Object.freeze(navigation), panels: Object.freeze(panels), actions: Object.freeze(actions) });
 }

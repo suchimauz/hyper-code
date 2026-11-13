@@ -7,7 +7,7 @@ const view = () => <p>Plugin content</p>;
 const plugin: UiExtension = { id: 'example', apiVersion: 1, pages: [{ id: 'main', title: 'Main', component: view }], navigation: [{ page: 'main', title: 'Open main' }], panels: [{ id: 'panel', title: 'Panel', component: view }], actions: [{ id: 'act', title: 'Act', run: () => {} }] };
 const context = { agentId: 'test', theme: 'dark' as const, readOnly: false };
 describe('host extension registry', () => {
-  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],sidebarNavigation:[],panels:[],actions:[],canvasKinds:[],canvasLaunchers:[],modelProviders:[],inputKinds:[]}));
+  it('defaults to no granted surfaces', () => expect(createExtensionRegistry([plugin], {})).toEqual({pages:[],navigation:[],sidebarNavigation:[],panels:[],actions:[],canvasKinds:[],canvasLaunchers:[],modelProviders:[],chatCards:[],inputKinds:[]}));
   it('Canvas kinds require an explicit independent grant and cannot override builtins', () => {
     const extension = { ...plugin, canvasKinds: [{ kind: 'example.map', component: view }] };
     expect(createExtensionRegistry([extension], {}).canvasKinds).toHaveLength(0);
@@ -60,4 +60,13 @@ it('model provider components require a grant per provider id and reject duplica
  expect(()=>createExtensionRegistry([extension,second],{acme:{modelProviders:['acme']},beta:{modelProviders:['acme']}})).toThrow(/Duplicate model provider/);
  expect(()=>createExtensionRegistry([{...extension,modelProviders:[{provider:'acme',component:view},{provider:'acme',component:view}]}],{})).toThrow();
  expect(()=>createExtensionRegistry([{...extension,modelProviders:[{provider:'Bad_Id',component:view}]}],{})).toThrow();
+});
+
+it('chat card renderers require a grant, plugin-owned kinds and reject duplicates', () => {
+ const extension: UiExtension = { id:'git', apiVersion:1, chatCards:[{kind:'git.review',component:view as never}] };
+ expect(createExtensionRegistry([extension],{}).chatCards).toHaveLength(0);
+ const granted = createExtensionRegistry([extension],{git:{chatCards:['git.review']}});
+ expect(granted.chatCards[0].key).toBe('git/git.review'); expect(Object.isFrozen(granted.chatCards)).toBe(true);
+ expect(()=>createExtensionRegistry([{...extension,chatCards:[{kind:'other.review',component:view as never}]}],{})).toThrow(/Invalid chat card/);
+ expect(()=>createExtensionRegistry([{...extension,chatCards:[{kind:'git.review',component:view as never},{kind:'git.review',component:view as never}]}],{})).toThrow();
 });
