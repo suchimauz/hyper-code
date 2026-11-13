@@ -35,9 +35,9 @@ Block 3 verification: `ui.sendToAgent` is not transaction-compatible (memory mut
 
 ## 5. Live updates
 
-- [ ] 5.1 Implement `gitUi.watch({ host, dir })` modelled on `openspec.watch`: shared entry by key, touch on authorized snapshot, 10-minute idle close, local recursive watcher ignoring `.git/objects` and `.git/logs` plus HEAD/index/refs/packed-refs, 300 ms debounce, polling fallback.
-- [ ] 5.2 SSH: 3-second fingerprint polling of `rev-parse HEAD` + `status --porcelain=v2 -z --untracked-files=all` through `gitUi.command`; error state on failure; never local fallback.
-- [ ] 5.3 Return `liveKey` (and watcher state) in the snapshot response; emit `gitUi.changed { key }`.
+- [x] 5.1 Implement `gitUi.watch({ host, dir })` modelled on `openspec.watch`: shared entry by key, touch on authorized snapshot, 10-minute idle close, local recursive watcher ignoring `.git/objects` and `.git/logs` plus HEAD/index/refs/packed-refs, 300 ms debounce, polling fallback.
+- [x] 5.2 SSH: 3-second fingerprint polling of `rev-parse HEAD` + `status --porcelain=v2 -z --untracked-files=all` through `gitUi.command`; error state on failure; never local fallback.
+- [x] 5.3 Return `liveKey` (and watcher state) in the snapshot response; emit `gitUi.changed { key }`.
 
 ## 6. UI block (hand to the UI agent)
 

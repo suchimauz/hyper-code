@@ -34,7 +34,11 @@ export default async function(ctx:Context,session:Session|null,opts:{
   else if(op==='commentReopen')data=await ctx.fns.gitUi.commentReopen({...target,id:body.id});
   else if(op==='commentsSend')data=await ctx.fns.gitUi.commentsSend(target);
   else return reply({error:'Unsupported write operation'},400);
- }else if(!op||op==='snapshot')data=await ctx.fns.gitUi.snapshot({dir,host,page:Number(url.searchParams.get('page')||0),anchor:url.searchParams.get('anchor')||undefined});
+ }else if(!op||op==='snapshot'){
+  const live=await ctx.fns.gitUi.watch({dir,host});
+  try{data={...await ctx.fns.gitUi.snapshot({dir,host,page:Number(url.searchParams.get('page')||0),anchor:url.searchParams.get('anchor')||undefined}),liveKey:live.key,liveState:live.state,...(live.error?{liveError:live.error}:{})};}
+  catch(error){return reply({error:error instanceof Error?error.message:String(error),liveKey:live.key,liveState:'error'},400);}
+ }
  else if(op==='commit')data=await ctx.fns.gitUi.commit({dir,host,hash:url.searchParams.get('hash')||''});
  else if(op==='diff')data=await ctx.fns.gitUi.diff({dir,host,path:url.searchParams.get('path')||'',group:url.searchParams.get('group')||'',hash:url.searchParams.get('hash')||undefined});
  else if(op==='comments')data=await ctx.fns.gitUi.commentsList({...target,page:Number(url.searchParams.get('page')??0),limit:Number(url.searchParams.get('limit')??100),status:(url.searchParams.get('status')||'open') as 'open'|'resolved'|'all',path:url.searchParams.get('path')??undefined});
