@@ -19,10 +19,12 @@ Block 2 review corrections: bounded pagination reaches all history, saved-path C
 
 ## 3. Delivery and agent tools
 
-- [ ] 3.1 Verify `ui.sendToAgent` appends a user turn to the owning agent and schedules a run; if not suitable, use the documented session append plus worker wake API. Record the choice in the function JSDoc.
-- [ ] 3.2 Implement `gitUi.commentsSend`: claim open unsent rows `FOR UPDATE`, render the message format from design.md, deliver, set `sent_at` in the same transaction, roll back on delivery failure; second send with nothing new returns `{ sent: 0 }` without a message.
-- [ ] 3.3 Add `$tool_gitReviewComments.md` and `$tool_gitResolveComment.md` with strict JSON Schemas (`additionalProperties: false`) and their implementations, scoped to the calling agent and its workspace repository; bound output size.
-- [ ] 3.4 Make `commentReopen` clear `sent_at`, `resolved_*` and `resolution_note`.
+- [x] 3.1 Verify `ui.sendToAgent` appends a user turn to the owning agent and schedules a run; if not suitable, use the documented session append plus worker wake API. Record the choice in the function JSDoc.
+- [x] 3.2 Implement `gitUi.commentsSend`: claim open unsent rows `FOR UPDATE`, render the message format from design.md, deliver, set `sent_at` in the same transaction, roll back on delivery failure; second send with nothing new returns `{ sent: 0 }` without a message.
+- [x] 3.3 Add `$tool_gitReviewComments.md` and `$tool_gitResolveComment.md` with strict JSON Schemas (`additionalProperties: false`) and their implementations, scoped to the calling agent and its workspace repository; bound output size.
+- [x] 3.4 Make `commentReopen` clear `sent_at`, `resolved_*` and `resolution_note`.
+
+Block 3 verification: `ui.sendToAgent` is not transaction-compatible (memory mutation + queued microtask). `commentsSend` uses transaction-bound `session.appendUserMessage`, durable `next_run_at`, then `sent_at`, with agent lock followed by `FOR UPDATE OF c`; post-commit worker wake and comment/agent refresh. The session append emits an early content-free refresh, repeated after commit; rollback tests verify zero persisted message/event/schedule/receipt after a late receipt-write failure. Concurrent sends deliver once; reopen clears delivery and resolution fields and enables a new send. Tools expose ten-comment pages, require calling-agent/workspace/open-owned-tab identity, and disallow extra schema fields. Renamed `comments.test.ts` to `comments.it.test.ts` because its existing real Git subprocess regressions are integration tests. Verified: `bun test --timeout 60000 plugins/git/src/gitUi/comments.it.test.ts plugins/git/src/gitUi/gitUi.test.ts` — 21 pass, 0 fail, 215 assertions. All five added/changed runtime functions passed strict docs/typecheck; namespace reloaded and declarations regenerated. Full reindex quality: 8 unchanged unrelated errors, 529 warnings (baseline 540). No manual acceptance, commit or push.
 
 ## 4. Archive and delete cleanup
 

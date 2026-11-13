@@ -32,6 +32,7 @@ export default async function(ctx:Context,session:Session|null,opts:{
   else if(op==='commentDelete')data=await ctx.fns.gitUi.commentDelete({...target,id:body.id});
   else if(op==='commentResolve')data=await ctx.fns.gitUi.commentResolve({...target,id:body.id,note:body.note,resolvedBy:'user'});
   else if(op==='commentReopen')data=await ctx.fns.gitUi.commentReopen({...target,id:body.id});
+  else if(op==='commentsSend')data=await ctx.fns.gitUi.commentsSend(target);
   else return reply({error:'Unsupported write operation'},400);
  }else if(!op||op==='snapshot')data=await ctx.fns.gitUi.snapshot({dir,host,page:Number(url.searchParams.get('page')||0),anchor:url.searchParams.get('anchor')||undefined});
  else if(op==='commit')data=await ctx.fns.gitUi.commit({dir,host,hash:url.searchParams.get('hash')||''});

@@ -1,13 +1,17 @@
 import {test,expect} from 'bun:test';
 import {testCtx} from '../../../../src/$test';
 import migration from './$migration_20291016000000_review_comments';
-const names=['commentPath','commentOutdated','ownedItem','commentLines','commentView','commentsChanged','commentMutate','commentCreate','commentUpdate','commentDelete','commentResolve','commentReopen','commentsList','handle'];
+const names=['commentPath','commentOutdated','ownedItem','commentLines','commentView','commentsChanged','commentMutate','commentCreate','commentUpdate','commentDelete','commentResolve','commentReopen','commentsList','handle','commentsSend','commentToolTarget','gitReviewComments','gitResolveComment'];
 async function fixture(){
  const dbctx=await testCtx();const db=dbctx.fns.procs.db;
  await migration.up(dbctx);
  await db.run({sql:"INSERT INTO agents(id,model,created_at,updated_at) VALUES ('review-a','test',1,1),('review-b','test',1,1)"});
  const events:any[]=[];let calls=0;let closed=false;
  const ctx:any={fns:{procs:{db,events:{emit:({event}:any)=>events.push(event)}},canvas:{list:async({agentId}:any)=>closed?[]:[{id:agentId==='review-a'?1:2,kind:'gitUi.repository',args:{host:'local',dir:'/fixture'}}],authorizeHttp:async()=>null,show:async()=>({id:1})},auth:{verifyCsrf:async()=>true},gitUi:{snapshot:async()=>({files:[{path:'a',group:'unstaged'}]}),commit:async()=>({files:[{path:'a'}]}),checkPath:async({path}:any)=>{if(typeof path!=='string'||path.includes('..'))throw new Error('Invalid path');},diff:async()=>{calls++;return {patch:'@@ -1,2 +1,2 @@\n-old\n+new\n context\n',state:'ok'};}}}};
+ ctx.fns.session={appendUserMessage:(opts:any)=>dbctx.fns.session.appendUserMessage(opts)};
+ ctx.fns.agent={current:async()=>({id:'review-a'}),wakeWorker:()=>{}};
+ ctx.fns.workspace={get:()=>({agentId:'review-a',host:'',dir:'/fixture'})};
+ ctx.fns.procs.events.refresh=()=>{};
  for(const name of names){const fn=(await import('./'+name+'.ts')).default;ctx.fns.gitUi[name]=(opts:any)=>fn(ctx,null,opts);}
  return {ctx,db,events,calls:()=>calls,close:()=>{closed=true;},target:{agentId:'review-a',itemId:1},anchor:{scope:'worktree',commit_hash:null,worktree_group:'unstaged',path:'a',old_path:null,side:'new',line_start:1,line_end:1,line_text:'new'}};
 }
@@ -154,3 +158,53 @@ test('real commit and index anchors ignore worktree obstacles, including rename 
  await git('reset','HEAD','--','next/a','new/a');
  expect((await g.commentUpdate({...f.target,id:c.id,body:'index changed'})).comment.outdated).toBe(true);
 });
+
+test('delivery commits transcript, scheduling and receipts once under concurrent sends; reopen resends',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;const {comment:c}=await g.commentCreate({...f.target,anchor:f.anchor,body:'fix this'});
+ const results=await Promise.all([g.commentsSend(f.target),g.commentsSend(f.target)]);expect(results.map(r=>r.sent).sort()).toEqual([0,1]);
+ const messages=await f.db.select({sql:"SELECT * FROM messages WHERE agent_id='review-a' AND message_type='git_review_comments'"});expect(messages).toHaveLength(1);expect(messages[0].role).toBe('user');expect(messages[0].content).toContain('Git review comments for local:/fixture (1)');expect(messages[0].content).toContain(c.id);expect(messages[0].content).toContain('   > new');
+ expect((await f.db.select({sql:"SELECT next_run_at FROM agents WHERE id='review-a'"}))[0].next_run_at).not.toBeNull();
+ expect((await g.commentsList(f.target)).comments[0].sent_at).not.toBeNull();expect(await g.commentsSend(f.target)).toEqual({sent:0});
+ await g.gitResolveComment({id:c.id,note:'fixed'});const reopened=(await g.commentReopen({...f.target,id:c.id})).comment;for(const key of ['sent_at','resolved_at','resolved_by','resolution_note'])expect(reopened[key]).toBeNull();expect(await g.commentsSend(f.target)).toEqual({sent:1});
+});
+test('delivery rolls back appended message, event, schedule and receipts after late failure',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;await g.commentCreate({...f.target,anchor:f.anchor,body:'retry'});
+ await f.db.exec({sql:"CREATE FUNCTION reject_receipt() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.sent_at IS NOT NULL THEN RAISE EXCEPTION 'receipt failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_receipt BEFORE UPDATE ON git_review_comments FOR EACH ROW EXECUTE FUNCTION reject_receipt()"});
+ await expect(g.commentsSend(f.target)).rejects.toThrow('receipt failure');expect(await f.db.select({sql:'SELECT * FROM messages'})).toHaveLength(0);expect(await f.db.select({sql:'SELECT * FROM events'})).toHaveLength(0);expect((await f.db.select({sql:"SELECT next_run_at FROM agents WHERE id='review-a'"}))[0].next_run_at).toBeNull();expect((await g.commentsList(f.target)).comments[0].sent_at).toBeNull();
+ await f.db.exec({sql:'DROP TRIGGER reject_receipt ON git_review_comments'});expect(await g.commentsSend(f.target)).toEqual({sent:1});
+});
+test('review tools enforce caller, workspace, open tab and foreign comment isolation with bounded pages',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;for(let i=0;i<11;i++)await g.commentCreate({...f.target,anchor:f.anchor,body:'review'});
+ await expect(g.gitReviewComments({page:-1})).rejects.toThrow('pagination');
+ const first=await g.gitReviewComments({});expect(first.comments).toHaveLength(10);expect(first.nextPage).toBe(1);expect((await g.gitReviewComments({page:1})).comments).toHaveLength(1);
+ const other=(await g.commentCreate({agentId:'review-b',itemId:2,anchor:f.anchor,body:'private'})).comment;await expect(g.gitResolveComment({id:other.id})).rejects.toThrow('not found');
+ const own=first.comments[0];expect((await g.gitResolveComment({id:own.id,note:'done'})).comment.resolved_by).toBe('agent');expect((await g.gitResolveComment({id:own.id,note:'changed'})).comment.resolution_note).toBe('done');
+ f.ctx.fns.workspace.get=()=>({agentId:'review-a',host:'ssh-other',dir:'/fixture'});await expect(g.gitReviewComments({})).rejects.toThrow('workspace Git tab');f.ctx.fns.workspace.get=()=>({agentId:'review-b',host:'',dir:'/fixture'});await expect(g.gitReviewComments({})).rejects.toThrow('Calling workspace');f.ctx.fns.workspace.get=()=>({agentId:'review-a',host:'',dir:'/fixture'});f.close();await expect(g.gitReviewComments({})).rejects.toThrow('workspace Git tab');await expect(g.commentsSend(f.target)).rejects.toThrow('unavailable');
+});
+
+
+test('native review schemas reject injected identities and malformed arguments; dispatch resolves registered functions',async()=>{
+ const ctx=await testCtx();
+ const loader=(await import('../../../../src/tools/$loader_tool')).default;
+ await loader(ctx,null,{entries:['gitReviewComments','gitResolveComment'].map(name=>({name,moduleDir:'gitUi',fileName:'$tool_'+name+'.md',rel:'gitUi/$tool_'+name+'.md',abs:import.meta.dir+'/$tool_'+name+'.md'}))});
+ // testCtx loads core only: install the plugin handlers explicitly for native dispatch.
+ (ctx.fns as any).gitUi={};for(const name of ['commentToolTarget','gitReviewComments','gitResolveComment']){const fn=(await import('./'+name+'.ts')).default;(ctx.fns as any).gitUi[name]=(opts:any)=>fn(ctx,null,opts);}
+ const tools=ctx.fns.tools.list({});
+ for(const name of ['gitReviewComments','gitResolveComment']){
+  const tool=tools.find((t:any)=>t.wireName===name)!;expect(tool).toBeDefined();expect(tool.parameters.additionalProperties).toBe(false);expect(tool.fn).toBe('gitUi.'+name);
+  const args=name==='gitResolveComment'?{id:Bun.randomUUIDv7()}:{};
+  expect(ctx.fns.tools.validate({schema:tool.parameters,args}).ok).toBe(true);
+  for(const extra of ['agentId','itemId','host','dir','resolvedBy'])expect(ctx.fns.tools.validate({schema:tool.parameters,args:{...args,[extra]:'foreign'}}).ok).toBe(false);
+  const rejected=await ctx.fns.tools.call({name,args:{...args,agentId:'foreign'}});expect(rejected.handlerExecuted).toBe(false);expect(rejected.isError).toBe(true);
+  const result=await ctx.fns.tools.call({name,args});expect(result.handlerExecuted).toBe(true);expect(result.isError).toBe(true);expect(result.output).toContain('no agent');
+ }
+ const schema=tools.find((t:any)=>t.wireName==='gitReviewComments')!.parameters;for(const args of [{page:0.5},{status:'bad'}])expect(ctx.fns.tools.validate({schema,args}).ok).toBe(false);
+});
+test('send HTTP uses authorized target and CSRF; append failure leaves unsent rows',async()=>{
+ const f=await fixture(),g=f.ctx.fns.gitUi;await g.commentCreate({...f.target,anchor:f.anchor,body:'review'});
+ const request=()=>new Request('http://localhost/gitUi?agentId=review-a&itemId=1&op=commentsSend',{method:'POST',body:'{}'});
+ f.ctx.fns.auth.verifyCsrf=async()=>false;expect((await g.handle({req:request()})).status).toBe(403);f.ctx.fns.auth.verifyCsrf=async()=>true;
+ const append=f.ctx.fns.session.appendUserMessage;f.ctx.fns.session.appendUserMessage=async()=>{throw new Error('append failed');};await expect(g.commentsSend(f.target)).rejects.toThrow('append failed');expect((await g.commentsList(f.target)).unsentCount).toBe(1);f.ctx.fns.session.appendUserMessage=append;
+ const response=await g.handle({req:request()});expect(response.headers.get('cache-control')).toBe('no-store');expect(await response.json()).toEqual({sent:1});
+});
+
